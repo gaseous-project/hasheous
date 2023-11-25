@@ -300,6 +300,16 @@ namespace Classes
                         return dbConnString;
                     }
                 }
+
+                [JsonIgnore]
+                public string ConnectionStringNoDatabase
+                {
+                    get
+                    {
+                        string dbConnString = "server=" + HostName + ";port=" + Port + ";userid=" + UserName + ";password=" + Password + ";";
+                        return dbConnString;
+                    }
+                }
             }
 
             public class Library
@@ -332,6 +342,14 @@ namespace Classes
                     }
                 }
 
+                public string LibraryMetadataDirectory_IGDB
+                {
+                    get
+                    {
+                        return Path.Combine(LibraryMetadataDirectory, "IGDB");
+                    }
+                }
+
                 public string LibrarySignaturesDirectory
                 {
                     get
@@ -348,11 +366,33 @@ namespace Classes
                     }
                 }
 
+                public string LibraryMetadataDirectory_IGDB_Platform(Platform platform)
+                {
+                    string MetadataPath = Path.Combine(LibraryMetadataDirectory_IGDB, "Platforms", platform.Slug);
+                    if (!Directory.Exists(MetadataPath)) { Directory.CreateDirectory(MetadataPath); }
+                    return MetadataPath;
+                }
+
+                public string LibraryMetadataDirectory_IGDB_Game(Game game)
+                {
+                    string MetadataPath = Path.Combine(LibraryMetadataDirectory_IGDB, "Games", game.Slug);
+                    if (!Directory.Exists(MetadataPath)) { Directory.CreateDirectory(MetadataPath); }
+                    return MetadataPath;
+                }
+
+                public string LibraryMetadataDirectory_IGDB_Company(Company company)
+                {
+                    string MetadataPath = Path.Combine(LibraryMetadataDirectory_IGDB, "Companies", company.Slug);
+                    if (!Directory.Exists(MetadataPath)) { Directory.CreateDirectory(MetadataPath); }
+                    return MetadataPath;
+                }
+
                 public void InitLibrary()
                 {
                     if (!Directory.Exists(LibraryRootDirectory)) { Directory.CreateDirectory(LibraryRootDirectory); }
                     if (!Directory.Exists(LibraryUploadDirectory)) { Directory.CreateDirectory(LibraryUploadDirectory); }
                     if (!Directory.Exists(LibraryMetadataDirectory)) { Directory.CreateDirectory(LibraryMetadataDirectory); }
+                    if (!Directory.Exists(LibraryMetadataDirectory_IGDB)) { Directory.CreateDirectory(LibraryMetadataDirectory_IGDB); }
                     if (!Directory.Exists(LibraryTempDirectory)) { Directory.CreateDirectory(LibraryTempDirectory); }
                 }
             }

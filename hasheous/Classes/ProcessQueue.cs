@@ -115,8 +115,11 @@ namespace Classes
                                         }
                                     }
                                     
-                                    _SaveLastRunTime = true;
+                                    break;
 
+                                case QueueItemType.SignatureMetadataMatcher:
+                                    BackgroundMetadataMatcher.BackgroundMetadataMatcher backgroundMetadataMatcher = new BackgroundMetadataMatcher.BackgroundMetadataMatcher();
+                                    backgroundMetadataMatcher.StartMatcher();
                                     break;
 
                             }
@@ -163,34 +166,9 @@ namespace Classes
             SignatureIngestor,
 
             /// <summary>
-            /// Imports game files into the database and moves them to the required location on disk
+            /// Matches metadata provided by signatures to supported metadata providers
             /// </summary>
-            TitleIngestor,
-
-            /// <summary>
-            /// Forces stored metadata to be refreshed
-            /// </summary>
-            MetadataRefresh,
-
-            /// <summary>
-            /// Ensures all managed files are where they are supposed to be
-            /// </summary>
-            OrganiseLibrary,
-
-            /// <summary>
-            /// Looks for orphaned files in the library and re-adds them to the database
-            /// </summary>
-            LibraryScan,
-
-            /// <summary>
-            /// Builds collections - set the options attribute to the id of the collection to build
-            /// </summary>
-            CollectionCompiler,
-
-            /// <summary>
-            /// Performs and post database upgrade scripts that can be processed as a background task
-            /// </summary>
-            BackgroundDatabaseUpgrade
+            SignatureMetadataMatcher
         }
 
         public enum QueueItemState

@@ -56,6 +56,8 @@ namespace XML
                         bool processGames = false;
                         if (Object.SourceMd5 != null)
                         {
+                            int sourceId = 0;
+                            
                             sql = "SELECT * FROM Signatures_Sources WHERE `SourceMD5`=@sourcemd5";
                             dbDict = new Dictionary<string, object>();
                             dbDict.Add("name", Common.ReturnValueIfNull(Object.Name, ""));
@@ -81,9 +83,11 @@ namespace XML
                             if (sigDB.Rows.Count == 0)
                             {
                                 // entry not present, insert it
-                                sql = "INSERT INTO Signatures_Sources (`Name`, `Description`, `Category`, `Version`, `Author`, `Email`, `Homepage`, `Url`, `SourceType`, `SourceMD5`, `SourceSHA1`) VALUES (@name, @description, @category, @version, @author, @email, @homepage, @uri, @sourcetype, @sourcemd5, @sourcesha1)";
+                                sql = "INSERT INTO Signatures_Sources (`Name`, `Description`, `Category`, `Version`, `Author`, `Email`, `Homepage`, `Url`, `SourceType`, `SourceMD5`, `SourceSHA1`) VALUES (@name, @description, @category, @version, @author, @email, @homepage, @uri, @sourcetype, @sourcemd5, @sourcesha1); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
 
-                                db.ExecuteCMD(sql, dbDict);
+                                sigDB = db.ExecuteCMD(sql, dbDict);
+
+                                sourceId = Convert.ToInt32(sigDB.Rows[0][0]);
 
                                 processGames = true;
                             }
@@ -224,12 +228,23 @@ namespace XML
                                                 sql = "INSERT INTO Signatures_Roms (`GameId`, `Name`, `Size`, `CRC`, `MD5`, `SHA1`, `DevelopmentStatus`, `Attributes`, `RomType`, `RomTypeMedia`, `MediaLabel`, `MetadataSource`, `IngestorVersion`) VALUES (@gameid, @name, @size, @crc, @md5, @sha1, @developmentstatus, @attributes, @romtype, @romtypemedia, @medialabel, @metadatasource, @ingestorversion); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
                                                 sigDB = db.ExecuteCMD(sql, dbDict);
 
-
                                                 romId = Convert.ToInt32(sigDB.Rows[0][0]);
                                             }
                                             else
                                             {
                                                 romId = (int)sigDB.Rows[0][0];
+                                            }
+
+                                            // map the rom to the source
+                                            sql = "SELECT * FROM Signatures_RomToSource WHERE SourceId=@sourceid AND RomId=@romid;";
+                                            dbDict.Add("romid", romId);
+                                            dbDict.Add("sourceId", sourceId);
+
+                                            sigDB = db.ExecuteCMD(sql, dbDict);
+                                            if (sigDB.Rows.Count == 0)
+                                            {
+                                                sql = "INSERT INTO Signatures_RomToSource (`SourceId`, `RomId`) VALUES (@sourceid, @romid);";
+                                                db.ExecuteCMD(sql, dbDict);
                                             }
                                         }
                                     }

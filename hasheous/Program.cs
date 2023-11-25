@@ -3,11 +3,37 @@ using System.Text.Json.Serialization;
 using Classes;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Versioning;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.OpenApi.Models;
+using Authentication;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.UI.Services;
+
+Logging.WriteToDiskOnly = true;
+Logging.Log(Logging.LogType.Information, "Startup", "Starting Hasheous Server " + Assembly.GetExecutingAssembly().GetName().Version);
 
 // set up db
-Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionStringNoDatabase);
+
+// check db availability
+bool dbOnline = false;
+do
+{
+    Logging.Log(Logging.LogType.Information, "Startup", "Waiting for database...");
+    if (db.TestConnection() == true)
+    {
+        dbOnline = true;
+    }
+    else
+    {
+        Thread.Sleep(30000);
+    }
+} while (dbOnline == false);
+
+db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+
 db.InitDB();
 
 // load app settings
@@ -52,6 +78,22 @@ builder.Services.AddControllers(options =>
         });
 });
 
+// api versioning
+builder.Services.AddApiVersioning(config =>
+{
+    config.DefaultApiVersion = new ApiVersion(1, 0);
+    config.AssumeDefaultVersionWhenUnspecified = true;
+    config.ReportApiVersions = true;
+    config.ApiVersionReader = ApiVersionReader.Combine(new UrlSegmentApiVersionReader(),
+                                                    new HeaderApiVersionReader("x-api-version"),
+                                                    new MediaTypeApiVersionReader("x-api-version"));
+});
+builder.Services.AddVersionedApiExplorer(setup =>
+{
+    setup.GroupNameFormat = "'v'VVV";
+    setup.SubstituteApiVersionInUrl = true;
+});
+
 // set max upload size
 builder.Services.Configure<IISServerOptions>(options =>
 {
@@ -74,7 +116,7 @@ builder.Services.AddSwaggerGen(options =>
     {
         options.SwaggerDoc("v1", new OpenApiInfo
         {
-            Version = "v1",
+            Version = "v1.0",
             Title = "Hasheous API",
             Description = "An API for querying game metadata",
             TermsOfService = new Uri("https://github.com/gaseous-project/hasheous"),
@@ -103,7 +145,11 @@ var app = builder.Build();
 //if (app.Environment.IsDevelopment())
 //{
 app.UseSwagger();
-app.UseSwaggerUI();
+app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint($"/swagger/v1/swagger.json", "v1.0");
+    }
+);
 //}
 
 //app.UseHttpsRedirection();
@@ -122,7 +168,27 @@ app.UseStaticFiles(new StaticFileOptions
 app.MapControllers();
 
 // add background tasks
-ProcessQueue.QueueItems.Add(new ProcessQueue.QueueItem(ProcessQueue.QueueItemType.SignatureIngestor, 60));
+ProcessQueue.QueueItems.Add(
+    new ProcessQueue.QueueItem(
+        ProcessQueue.QueueItemType.SignatureIngestor, 
+        60,
+        new List<ProcessQueue.QueueItemType>
+        {
+            ProcessQueue.QueueItemType.SignatureMetadataMatcher
+        }
+        )
+    );
+ProcessQueue.QueueItems.Add(
+    new ProcessQueue.QueueItem(
+        ProcessQueue.QueueItemType.SignatureMetadataMatcher, 
+        60,
+        new List<ProcessQueue.QueueItemType>
+        {
+            ProcessQueue.QueueItemType.SignatureIngestor
+        }
+        )
+    );
+
 
 // start the app
 app.Run();

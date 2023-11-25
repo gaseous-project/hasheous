@@ -64,14 +64,16 @@ namespace Classes
 					// check if the database exists first - first run must have permissions to create a database
 					string sql = "CREATE DATABASE IF NOT EXISTS `" + Config.DatabaseConfiguration.DatabaseName + "`;";
 					Dictionary<string, object> dbDict = new Dictionary<string, object>();
+					Logging.Log(Logging.LogType.Information, "Database", "Creating database if it doesn't exist");
 					ExecuteCMD(sql, dbDict, 30, "server=" + Config.DatabaseConfiguration.HostName + ";port=" + Config.DatabaseConfiguration.Port + ";userid=" + Config.DatabaseConfiguration.UserName + ";password=" + Config.DatabaseConfiguration.Password);
 
 					// check if schema version table is in place - if not, create the schema version table
-					sql = "SELECT TABLE_SCHEMA, TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = 'hasheous' AND TABLE_NAME = 'schema_version';";
+					sql = "SELECT TABLE_SCHEMA, TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = '" + Config.DatabaseConfiguration.DatabaseName + "' AND TABLE_NAME = 'schema_version';";
 					DataTable SchemaVersionPresent = ExecuteCMD(sql, dbDict);
 					if (SchemaVersionPresent.Rows.Count == 0)
 					{
                         // no schema table present - create it
+                        Logging.Log(Logging.LogType.Information, "Database", "Schema version table doesn't exist. Creating it.");
                         sql = "CREATE TABLE `schema_version` (`schema_version` INT NOT NULL, PRIMARY KEY (`schema_version`)); INSERT INTO `schema_version` (`schema_version`) VALUES (0);";
 						ExecuteCMD(sql, dbDict);
 					}
@@ -96,25 +98,35 @@ namespace Classes
 								if (SchemaVersion.Rows.Count == 0)
 								{
                                     // something is broken here... where's the table?
+                                    Logging.Log(Logging.LogType.Critical, "Database", "Schema table missing! This shouldn't happen!");
                                     throw new Exception("schema_version table is missing!");
 								}
 								else
 								{
 									int SchemaVer = (int)SchemaVersion.Rows[0][0];
+                                    Logging.Log(Logging.LogType.Information, "Database", "Schema version is " + SchemaVer);
                                     if (SchemaVer < i)
 									{
-										// apply schema!
+										// run pre-upgrade code
+										DatabaseMigration.PreUpgradeScript(i, _ConnectorType);
+										
+                                        // apply schema!
+                                        Logging.Log(Logging.LogType.Information, "Database", "Updating schema to version " + i);
                                         ExecuteCMD(dbScript, dbDict);
 
 										sql = "UPDATE schema_version SET schema_version=@schemaver";
 										dbDict = new Dictionary<string, object>();
 										dbDict.Add("schemaver", i);
 										ExecuteCMD(sql, dbDict);
+
+										// run post-upgrade code
+										DatabaseMigration.PostUpgradeScript(i, _ConnectorType);
 									}
 								}
 							}
 						}
                     }
+                    Logging.Log(Logging.LogType.Information, "Database", "Database setup complete");
                     break;
 			}
 		}
@@ -135,6 +147,50 @@ namespace Classes
 			return _ExecuteCMD(Command, Parameters, Timeout, ConnectionString);
         }
 
+		public List<Dictionary<string, object>> ExecuteCMDDict(string Command)
+		{
+			Dictionary<string, object> dbDict = new Dictionary<string, object>();
+			return _ExecuteCMDDict(Command, dbDict, 30, "");
+		}
+
+        public List<Dictionary<string, object>> ExecuteCMDDict(string Command, Dictionary<string, object> Parameters)
+        {
+            return _ExecuteCMDDict(Command, Parameters, 30, "");
+        }
+
+        public List<Dictionary<string, object>> ExecuteCMDDict(string Command, Dictionary<string, object> Parameters, int Timeout = 30, string ConnectionString = "")
+        {
+			return _ExecuteCMDDict(Command, Parameters, Timeout, ConnectionString);
+        }
+
+		private List<Dictionary<string, object>> _ExecuteCMDDict(string Command, Dictionary<string, object> Parameters, int Timeout = 30, string ConnectionString = "")
+		{
+			DataTable dataTable = _ExecuteCMD(Command, Parameters, Timeout, ConnectionString);
+
+			// convert datatable to dictionary
+			List<Dictionary<string, object?>> rows = new List<Dictionary<string, object?>>();
+
+			foreach (DataRow dataRow in dataTable.Rows)
+			{
+				Dictionary<string, object?> row = new Dictionary<string, object?>();
+				for (int i = 0; i < dataRow.Table.Columns.Count; i++)
+				{
+					string columnName = dataRow.Table.Columns[i].ColumnName;
+					if (dataRow[i] == System.DBNull.Value)
+					{
+						row.Add(columnName, null);
+					}
+					else
+					{
+						row.Add(columnName, dataRow[i].ToString());
+					}
+				}
+				rows.Add(row);
+			}
+
+			return rows;
+		}
+
         private DataTable _ExecuteCMD(string Command, Dictionary<string, object> Parameters, int Timeout = 30, string ConnectionString = "")
         {
             if (ConnectionString == "") { ConnectionString = _ConnectionString; }
@@ -145,6 +201,35 @@ namespace Classes
                     return (DataTable)conn.ExecCMD(Command, Parameters, Timeout);
                 default:
                     return new DataTable();
+            }
+        }
+
+		public int ExecuteNonQuery(string Command)
+		{
+			Dictionary<string, object> dbDict = new Dictionary<string, object>();
+			return _ExecuteNonQuery(Command, dbDict, 30, "");
+		}
+
+        public int ExecuteNonQuery(string Command, Dictionary<string, object> Parameters)
+        {
+            return _ExecuteNonQuery(Command, Parameters, 30, "");
+        }
+
+        public int ExecuteNonQuery(string Command, Dictionary<string, object> Parameters, int Timeout = 30, string ConnectionString = "")
+        {
+			return _ExecuteNonQuery(Command, Parameters, Timeout, ConnectionString);
+        }
+
+        private int _ExecuteNonQuery(string Command, Dictionary<string, object> Parameters, int Timeout = 30, string ConnectionString = "")
+        {
+            if (ConnectionString == "") { ConnectionString = _ConnectionString; }
+            switch (_ConnectorType)
+            {
+                case databaseType.MySql:
+                    MySQLServerConnector conn = new MySQLServerConnector(ConnectionString);
+                    return (int)conn.ExecNonQuery(Command, Parameters, Timeout);
+                default:
+                    return 0;
             }
         }
 
@@ -193,6 +278,18 @@ namespace Classes
 			}
 		}
 
+		public bool TestConnection()
+		{
+			switch (_ConnectorType)
+            {
+                case databaseType.MySql:
+                    MySQLServerConnector conn = new MySQLServerConnector(_ConnectionString);
+                    return conn.TestConnection();
+                default:
+                    return false;
+            }
+		}
+
         public class SQLTransactionItem
         {
 			public SQLTransactionItem()
@@ -223,6 +320,7 @@ namespace Classes
 			{
 				DataTable RetTable = new DataTable();
 
+                Logging.Log(Logging.LogType.Debug, "Database", "Connecting to database", null, true);
                 MySqlConnection conn = new MySqlConnection(DBConn);
 				conn.Open();
 
@@ -240,19 +338,64 @@ namespace Classes
 
 				try
 				{
-                    if (Parameters.Count > 0)
+                    Logging.Log(Logging.LogType.Debug, "Database", "Executing sql: '" + SQL + "'", null, true);
+					if (Parameters.Count > 0)
 					{
 						string dictValues = string.Join(";", Parameters.Select(x => string.Join("=", x.Key, x.Value)));
+						Logging.Log(Logging.LogType.Debug, "Database", "Parameters: " + dictValues, null, true);
 					}
                     RetTable.Load(cmd.ExecuteReader());
 				} catch (Exception ex) {
+					Logging.Log(Logging.LogType.Critical, "Database", "Error while executing '" + SQL + "'", ex);
 					Trace.WriteLine("Error executing " + SQL);
 					Trace.WriteLine("Full exception: " + ex.ToString());
 				}
 
+				Logging.Log(Logging.LogType.Debug, "Database", "Closing database connection", null, true);
 				conn.Close();
 
 				return RetTable;
+			}
+
+			public int ExecNonQuery(string SQL, Dictionary< string, object> Parameters, int Timeout)
+			{
+				int result = 0;
+
+                Logging.Log(Logging.LogType.Debug, "Database", "Connecting to database", null, true);
+                MySqlConnection conn = new MySqlConnection(DBConn);
+				conn.Open();
+
+				MySqlCommand cmd = new MySqlCommand
+				{
+					Connection = conn,
+					CommandText = SQL,
+					CommandTimeout = Timeout
+				};
+
+				foreach (string Parameter in Parameters.Keys)
+				{
+					cmd.Parameters.AddWithValue(Parameter, Parameters[Parameter]);
+				}
+
+				try
+				{
+                    Logging.Log(Logging.LogType.Debug, "Database", "Executing sql: '" + SQL + "'", null, true);
+					if (Parameters.Count > 0)
+					{
+						string dictValues = string.Join(";", Parameters.Select(x => string.Join("=", x.Key, x.Value)));
+						Logging.Log(Logging.LogType.Debug, "Database", "Parameters: " + dictValues, null, true);
+					}
+                    result = cmd.ExecuteNonQuery();
+				} catch (Exception ex) {
+					Logging.Log(Logging.LogType.Critical, "Database", "Error while executing '" + SQL + "'", ex);
+					Trace.WriteLine("Error executing " + SQL);
+					Trace.WriteLine("Full exception: " + ex.ToString());
+				}
+
+				Logging.Log(Logging.LogType.Debug, "Database", "Closing database connection", null, true);
+				conn.Close();
+
+				return result;
 			}
 
             public void TransactionExecCMD(List<Dictionary<string, object>> Parameters, int Timeout)
@@ -296,6 +439,20 @@ namespace Classes
                 return cmd;
             }
 
+			public bool TestConnection()
+			{
+				MySqlConnection conn = new MySqlConnection(DBConn);
+				try
+				{
+					conn.Open();
+					conn.Close();
+					return true;
+				}
+				catch
+				{
+					return false;
+				}
+			}
         }
     }
 }

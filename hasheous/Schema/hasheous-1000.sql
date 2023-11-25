@@ -5,6 +5,15 @@ CREATE TABLE `Settings` (
   UNIQUE KEY `Setting_UNIQUE` (`Setting`)
 );
 
+CREATE TABLE `ServerLogs` (
+  `Id` BIGINT NOT NULL AUTO_INCREMENT,
+  `EventTime` DATETIME NOT NULL,
+  `EventType` INT NOT NULL,
+  `Process` VARCHAR(100) NOT NULL,
+  `Message` LONGTEXT NOT NULL,
+  `Exception` LONGTEXT NULL,
+  PRIMARY KEY (`Id`));
+
 CREATE TABLE `Signatures_Games` (
   `Id` int NOT NULL AUTO_INCREMENT,
   `Name` varchar(255) DEFAULT NULL,
@@ -63,9 +72,7 @@ CREATE TABLE `Signatures_Roms` (
   KEY `sha1_Idx` (`SHA1`) USING BTREE
 );
 
-SET global log_output = 'FILE';
-SET global general_log_file='/Users/michaelgreen/mysql_general.log';
-SET global general_log = 0;CREATE TABLE `Signatures_Sources` (
+CREATE TABLE `Signatures_Sources` (
   `Id` int NOT NULL AUTO_INCREMENT,
   `Name` varchar(255) DEFAULT NULL,
   `Description` varchar(255) DEFAULT NULL,
@@ -82,4 +89,21 @@ SET global general_log = 0;CREATE TABLE `Signatures_Sources` (
   UNIQUE KEY `Id_UNIQUE` (`Id`),
   KEY `sourcemd5_Idx` (`SourceMD5`,`Id`) USING BTREE,
   KEY `sourcesha1_Idx` (`SourceSHA1`,`Id`) USING BTREE
+);
+
+CREATE TABLE `Signatures_RomToSource` (
+  `SourceId` int NOT NULL,
+  `RomId` int NOT NULL,
+  PRIMARY KEY (`SourceId`, `RomId`)
+);
+
+CREATE TABLE `Match_SignaturePlatforms` (
+  `SignaturePlatformId` int NOT NULL,
+  `IGDBPlatformId` bigint NOT NULL,
+  `MatchMethod` int DEFAULT NULL,
+  `LastSearched` datetime DEFAULT NULL,
+  `NextSearch` datetime DEFAULT NULL,
+  PRIMARY KEY (`SignaturePlatformId`,`IGDBPlatformId`),
+  KEY `idx_SignaturePlatformId` (`SignaturePlatformId`),
+  KEY `idx_IGDBPlatformId` (`IGDBPlatformId`)
 );
