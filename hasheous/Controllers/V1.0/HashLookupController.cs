@@ -7,18 +7,22 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace hasheous_server.Controllers.v1_0
 {
+    /// <summary>
+    /// Endpoints used for looking up hash signatures and their metadata id mappings
+    /// </summary>
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]/[action]")]
     [ApiVersion("1.0")]
     public class HashLookupController : ControllerBase
     {
         /// <summary>
-        /// Get the current signature counts from the database
+        /// Look up the signature coresponding to the provided MD5 and SHA1 hash - and if available any mapped metadata ids
         /// </summary>
-        /// <returns>Number of sources, publishers, games, and rom signatures in the database</returns>
+        /// <returns>Game and ROM signature from available DATs, and if available mapped metadata ids. 404 if no signature is found.</returns>
         [MapToApiVersion("1.0")]
         [HttpPost]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Lookup(HashLookupModel model)
         {
             HashLookup hashLookup = new HashLookup(model);
