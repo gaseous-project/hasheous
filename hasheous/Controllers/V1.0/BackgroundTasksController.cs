@@ -5,13 +5,16 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Classes;
 
-namespace gaseous_server.Controllers
+namespace hasheous_server.Controllers.v1_0
 {
     [ApiController]
-    [Route("api/v1/[controller]")]
+    [Route("api/v{version:apiVersion}/[controller]")]
+    [ApiVersion("1.0")]
+    [ApiExplorerSettings(IgnoreApi = true)]
     public class BackgroundTasksController : Controller
     {
         [HttpGet]
+        [MapToApiVersion("1.0")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         public List<ProcessQueue.QueueItem> GetQueue()
         {
@@ -19,6 +22,7 @@ namespace gaseous_server.Controllers
         }
 
         [HttpGet]
+        [MapToApiVersion("1.0")]
         [Route("{TaskType}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]

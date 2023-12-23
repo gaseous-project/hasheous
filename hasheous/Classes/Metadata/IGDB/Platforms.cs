@@ -4,7 +4,7 @@ using Classes.Metadata;
 using IGDB;
 using IGDB.Models;
 
-namespace gaseous_server.Classes.Metadata.IGDB
+namespace hasheous_server.Classes.Metadata.IGDB
 {
     public class Platforms
 	{
@@ -15,11 +15,6 @@ namespace gaseous_server.Classes.Metadata.IGDB
 
 		}
 
-        private static IGDBClient igdb = new IGDBClient(
-                    // Found in Twitch Developer portal for your app
-                    Config.IGDB.ClientId,
-                    Config.IGDB.Secret
-                );
 
         public static Platform? GetPlatform(long Id, bool forceRefresh = false)
 		{
@@ -141,7 +136,8 @@ namespace gaseous_server.Classes.Metadata.IGDB
         private static async Task<Platform> GetObjectFromServer(string WhereClause)
         {
             // get platform metadata
-            var results = await igdb.QueryAsync<Platform>(IGDBClient.Endpoints.Platforms, query: fieldList + " " + WhereClause + ";");
+            Communications comms = new Communications();
+            var results = await comms.APIComm<Platform>(IGDBClient.Endpoints.Platforms, fieldList, WhereClause);
             var result = results.First();
 
             return result;

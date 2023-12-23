@@ -15,7 +15,7 @@ CREATE TABLE `ServerLogs` (
   PRIMARY KEY (`Id`));
 
 CREATE TABLE `Signatures_Games` (
-  `Id` int NOT NULL AUTO_INCREMENT,
+  `Id` BIGINT NOT NULL AUTO_INCREMENT,
   `Name` varchar(255) DEFAULT NULL,
   `Description` varchar(255) DEFAULT NULL,
   `Year` varchar(15) DEFAULT NULL,
@@ -51,8 +51,8 @@ CREATE TABLE `Signatures_Publishers` (
 );
 
 CREATE TABLE `Signatures_Roms` (
-  `Id` int NOT NULL AUTO_INCREMENT,
-  `GameId` int DEFAULT NULL,
+  `Id` BIGINT NOT NULL AUTO_INCREMENT,
+  `GameId` BIGINT DEFAULT NULL,
   `Name` varchar(255) DEFAULT NULL,
   `Size` bigint DEFAULT NULL,
   `CRC` varchar(20) DEFAULT NULL,
@@ -69,7 +69,8 @@ CREATE TABLE `Signatures_Roms` (
   UNIQUE KEY `Id_UNIQUE` (`Id`,`GameId`) USING BTREE,
   KEY `GameId_Idx` (`GameId`),
   KEY `md5_Idx` (`MD5`) USING BTREE,
-  KEY `sha1_Idx` (`SHA1`) USING BTREE
+  KEY `sha1_Idx` (`SHA1`) USING BTREE,
+  KEY `name_Idx` (`Name`) USING BTREE
 );
 
 CREATE TABLE `Signatures_Sources` (
@@ -93,7 +94,7 @@ CREATE TABLE `Signatures_Sources` (
 
 CREATE TABLE `Signatures_RomToSource` (
   `SourceId` int NOT NULL,
-  `RomId` int NOT NULL,
+  `RomId` BIGINT NOT NULL,
   PRIMARY KEY (`SourceId`, `RomId`)
 );
 
@@ -107,3 +108,35 @@ CREATE TABLE `Match_SignaturePlatforms` (
   KEY `idx_SignaturePlatformId` (`SignaturePlatformId`),
   KEY `idx_IGDBPlatformId` (`IGDBPlatformId`)
 );
+
+CREATE TABLE `Match_SignatureGames` (
+  `SignatureGameId` BIGINT NOT NULL,
+  `IGDBGameId` BIGINT NOT NULL,
+  `MatchMethod` INT NULL,
+  `LastSearched` DATETIME NULL,
+  `NextSearch` DATETIME NULL,
+  PRIMARY KEY (`SignatureGameId`, `IGDBGameId`),
+  KEY `idx_SignatureGameId` (`SignatureGameId`),
+  KEY `idx_IGDBGameId` (`IGDBGameId`));
+
+DROP VIEW IF EXISTS `view_Signatures_Games`;
+CREATE VIEW `view_Signatures_Games` AS
+    SELECT 
+        `Signatures_Games`.`Id` AS `Id`,
+        `Signatures_Games`.`Name` AS `Name`,
+        `Signatures_Games`.`Description` AS `Description`,
+        `Signatures_Games`.`Year` AS `Year`,
+        `Signatures_Games`.`PublisherId` AS `PublisherId`,
+        `Signatures_Publishers`.`Publisher` AS `Publisher`,
+        `Signatures_Games`.`Demo` AS `Demo`,
+        `Signatures_Games`.`SystemId` AS `PlatformId`,
+        `Signatures_Platforms`.`Platform` AS `Platform`,
+        `Signatures_Games`.`SystemVariant` AS `SystemVariant`,
+        `Signatures_Games`.`VIdeo` AS `Video`,
+        `Signatures_Games`.`Country` AS `Country`,
+        `Signatures_Games`.`Language` AS `Language`,
+        `Signatures_Games`.`Copyright` AS `Copyright`
+    FROM
+        ((`Signatures_Games`
+        JOIN `Signatures_Publishers` ON ((`Signatures_Games`.`PublisherId` = `Signatures_Publishers`.`Id`)))
+        JOIN `Signatures_Platforms` ON ((`Signatures_Games`.`SystemId` = `Signatures_Platforms`.`Id`)));

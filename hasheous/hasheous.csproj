@@ -32,13 +32,20 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Remove="Support\" />
+    <None Remove="Support\PlatformMap.json" />
     <None Remove="Schema\" />
     <None Remove="Schema\hasheous-1000.sql" />
     <None Remove="Schema\hasheous-1001.sql" />
+    <None Remove="Schema\hasheous-1002.sql" />
+    <None Remove="Schema\hasheous-1003.sql" />
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Support\PlatformMap.json" />
     <EmbeddedResource Include="Schema\hasheous-1000.sql" />
     <EmbeddedResource Include="Schema\hasheous-1001.sql" />
+    <EmbeddedResource Include="Schema\hasheous-1002.sql" />
+    <EmbeddedResource Include="Schema\hasheous-1003.sql" />
   </ItemGroup>
 </Project>

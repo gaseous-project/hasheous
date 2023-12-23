@@ -2,6 +2,7 @@
 using System.Data;
 using Newtonsoft.Json;
 using IGDB.Models;
+using hasheous_server.Classes.Metadata.IGDB;
 
 namespace Classes
 {
@@ -46,6 +47,14 @@ namespace Classes
             get
             {
                 return _config.LibraryConfiguration;
+            }
+        }
+
+        public static ConfigFile.MetadataAPI MetadataConfiguration
+        {
+            get
+            {
+                return _config.MetadataConfiguration;
             }
         }
 
@@ -235,6 +244,8 @@ namespace Classes
             [JsonIgnore]
             public Library LibraryConfiguration = new Library();
 
+            public MetadataAPI MetadataConfiguration = new MetadataAPI();
+
             public IGDB IGDBConfiguration = new IGDB();
 
             public Logging LoggingConfiguration = new Logging();
@@ -397,6 +408,26 @@ namespace Classes
                 }
             }
 
+            public class MetadataAPI
+            {
+                private static Communications.MetadataSources _Source
+                {
+                    get
+                    {
+                        if (!String.IsNullOrEmpty(Environment.GetEnvironmentVariable("metadatasource")))
+                        {
+                            return (Communications.MetadataSources)Enum.Parse(typeof(Communications.MetadataSources), Environment.GetEnvironmentVariable("metadatasource"));
+                        }
+                        else
+                        {
+                            return Communications.MetadataSources.IGDB;
+                        }
+                    }
+                }
+
+                public Communications.MetadataSources Source = _Source;
+            }
+            
             public class IGDB
             {
                 private static string _DefaultIGDBClientId

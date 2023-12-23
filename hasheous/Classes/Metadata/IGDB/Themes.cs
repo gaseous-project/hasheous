@@ -4,7 +4,7 @@ using Classes.Metadata;
 using IGDB;
 using IGDB.Models;
 
-namespace gaseous_server.Classes.Metadata.IGDB
+namespace hasheous_server.Classes.Metadata.IGDB
 {
     public class Themes
     {
@@ -14,11 +14,6 @@ namespace gaseous_server.Classes.Metadata.IGDB
         {
         }
 
-        private static IGDBClient igdb = new IGDBClient(
-                    // Found in Twitch Developer portal for your app
-                    Config.IGDB.ClientId,
-                    Config.IGDB.Secret
-                );
 
         public static Theme? GetGame_Themes(long? Id)
         {
@@ -104,7 +99,8 @@ namespace gaseous_server.Classes.Metadata.IGDB
         private static async Task<Theme> GetObjectFromServer(string WhereClause)
         {
             // get Game_Themes metadata
-            var results = await igdb.QueryAsync<Theme>(IGDBClient.Endpoints.Themes, query: fieldList + " " + WhereClause + ";");
+            Communications comms = new Communications();
+            var results = await comms.APIComm<Theme>(IGDBClient.Endpoints.Themes, fieldList, WhereClause);
             var result = results.First();
 
             return result;

@@ -4,7 +4,7 @@ using Classes.Metadata;
 using IGDB;
 using IGDB.Models;
 
-namespace gaseous_server.Classes.Metadata.IGDB
+namespace hasheous_server.Classes.Metadata.IGDB
 {
 	public class GamesVideos
     {
@@ -14,11 +14,6 @@ namespace gaseous_server.Classes.Metadata.IGDB
         {
         }
 
-        private static IGDBClient igdb = new IGDBClient(
-                    // Found in Twitch Developer portal for your app
-                    Config.IGDB.ClientId,
-                    Config.IGDB.Secret
-                );
 
         public static GameVideo? GetGame_Videos(long? Id)
         {
@@ -104,7 +99,8 @@ namespace gaseous_server.Classes.Metadata.IGDB
         private static async Task<GameVideo> GetObjectFromServer(string WhereClause)
         {
             // get Game_Videos metadata
-            var results = await igdb.QueryAsync<GameVideo>(IGDBClient.Endpoints.GameVideos, query: fieldList + " " + WhereClause + ";");
+            Communications comms = new Communications();
+            var results = await comms.APIComm<GameVideo>(IGDBClient.Endpoints.GameVideos, fieldList, WhereClause);
             var result = results.First();
 
             return result;

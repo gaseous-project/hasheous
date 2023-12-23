@@ -4,7 +4,7 @@ using Classes.Metadata;
 using IGDB;
 using IGDB.Models;
 
-namespace gaseous_server.Classes.Metadata.IGDB
+namespace hasheous_server.Classes.Metadata.IGDB
 {
 	public class InvolvedCompanies
 	{
@@ -14,11 +14,6 @@ namespace gaseous_server.Classes.Metadata.IGDB
         {
         }
 
-        private static IGDBClient igdb = new IGDBClient(
-                    // Found in Twitch Developer portal for your app
-                    Config.IGDB.ClientId,
-                    Config.IGDB.Secret
-                );
 
         public static InvolvedCompany? GetInvolvedCompanies(long? Id)
         {
@@ -115,13 +110,18 @@ namespace gaseous_server.Classes.Metadata.IGDB
             // get InvolvedCompanies metadata
             try
             {
-                var results = await igdb.QueryAsync<InvolvedCompany>(IGDBClient.Endpoints.InvolvedCompanies, query: fieldList + " " + WhereClause + ";");
+                Communications comms = new Communications();
+            var results = await comms.APIComm<InvolvedCompany>(IGDBClient.Endpoints.InvolvedCompanies, fieldList, WhereClause);
                 var result = results.First();
 
                 return result;
             }
             catch (Exception ex)
             {
+                Logging.Log(Logging.LogType.Critical, "Involved Companies", "Failure when requesting involved companies.");
+                Logging.Log(Logging.LogType.Critical, "Involved Companies", "Field list: " + fieldList);
+                Logging.Log(Logging.LogType.Critical, "Involved Companies", "Where clause: " + WhereClause);
+                Logging.Log(Logging.LogType.Critical, "Involved Companies", "Error", ex);
                 throw;
             }
         }

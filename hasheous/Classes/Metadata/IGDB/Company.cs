@@ -4,7 +4,7 @@ using Classes.Metadata;
 using IGDB;
 using IGDB.Models;
 
-namespace gaseous_server.Classes.Metadata.IGDB
+namespace hasheous_server.Classes.Metadata.IGDB
 {
 	public class Companies
 	{
@@ -13,12 +13,6 @@ namespace gaseous_server.Classes.Metadata.IGDB
         public Companies()
         {
         }
-
-        private static IGDBClient igdb = new IGDBClient(
-                    // Found in Twitch Developer portal for your app
-                    Config.IGDB.ClientId,
-                    Config.IGDB.Secret
-                );
 
         public static Company? GetCompanies(long? Id)
         {
@@ -113,7 +107,8 @@ namespace gaseous_server.Classes.Metadata.IGDB
         private static async Task<Company> GetObjectFromServer(string WhereClause)
         {
             // get Companies metadata
-            var results = await igdb.QueryAsync<Company>(IGDBClient.Endpoints.Companies, query: fieldList + " " + WhereClause + ";");
+            Communications comms = new Communications();
+            var results = await comms.APIComm<Company>(IGDBClient.Endpoints.Companies, fieldList, WhereClause);
             if (results.Length > 0)
             {
                 var result = results.First();

@@ -10,6 +10,8 @@ using Microsoft.OpenApi.Models;
 using Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
+using System.Threading.RateLimiting;
+using hasheous_server.Classes.Metadata.IGDB;
 
 Logging.WriteToDiskOnly = true;
 Logging.Log(Logging.LogType.Information, "Startup", "Starting Hasheous Server " + Assembly.GetExecutingAssembly().GetName().Version);
@@ -40,6 +42,12 @@ db.InitDB();
 Config.InitSettings();
 // write updated settings back to the config file
 Config.UpdateConfig();
+
+// set api metadata source from config
+Communications.MetadataSource = Config.MetadataConfiguration.Source;
+
+// update platform map
+JsonPlatformMap.ImportPlatformMap();
 
 // set up server
 var builder = WebApplication.CreateBuilder(args);
@@ -76,6 +84,26 @@ builder.Services.AddControllers(options =>
             Duration = 604800,
             Location = ResponseCacheLocation.Any
         });
+});
+
+// rate limiting
+builder.Services.AddRateLimiter(options =>
+{
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+    {
+        return RateLimitPartition.GetFixedWindowLimiter(partitionKey: httpContext.Request.Headers.Host.ToString(), partition =>
+            new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                AutoReplenishment = true,
+                Window = TimeSpan.FromSeconds(10)
+            });
+    });
+    options.OnRejected = async (context, token) =>
+    {
+        context.HttpContext.Response.StatusCode = 429;
+        await context.HttpContext.Response.WriteAsync("Too many requests. Please try later again... ", cancellationToken: token);
+    };
 });
 
 // api versioning
@@ -139,6 +167,46 @@ builder.Services.AddSwaggerGen(options =>
 );
 builder.Services.AddHostedService<TimedHostedService>();
 
+// identity
+builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
+        {
+            options.Password.RequireDigit = true;
+            options.Password.RequireLowercase = true;
+            options.Password.RequireNonAlphanumeric = false;
+            options.Password.RequireUppercase = true;
+            options.Password.RequiredLength = 10;
+            options.User.AllowedUserNameCharacters = null;
+            options.User.RequireUniqueEmail = true;
+            options.SignIn.RequireConfirmedPhoneNumber = false;
+            options.SignIn.RequireConfirmedEmail = false;
+            options.SignIn.RequireConfirmedAccount = false;
+        })
+    .AddUserStore<UserStore>()
+    .AddRoleStore<RoleStore>()
+    .AddDefaultTokenProviders()
+    .AddDefaultUI()
+    ;
+builder.Services.ConfigureApplicationCookie(options =>
+        {
+            options.Cookie.Name = "Hasheous.Identity";
+            options.ExpireTimeSpan = TimeSpan.FromDays(90);
+            options.SlidingExpiration = true;
+            options.Cookie.HttpOnly = true;
+            options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+            options.Cookie.SameSite = SameSiteMode.Strict;
+        });
+builder.Services.AddScoped<UserStore>();
+builder.Services.AddScoped<RoleStore>();
+
+builder.Services.AddTransient<IUserStore<ApplicationUser>, UserStore>();
+builder.Services.AddTransient<IRoleStore<ApplicationRole>, RoleStore>();
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("Admin", policy => policy.RequireRole("Admin"));
+    options.AddPolicy("Member", policy => policy.RequireRole("Member"));
+});
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -155,6 +223,45 @@ app.UseSwaggerUI(options =>
 //app.UseHttpsRedirection();
 
 app.UseResponseCaching();
+
+// set up system roles
+using (var scope = app.Services.CreateScope())
+{
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleStore>();
+    var roles = new[] { "Admin", "Member" };
+ 
+    foreach (var role in roles)
+    {
+        if (await roleManager.FindByNameAsync(role, CancellationToken.None) == null)
+        {
+            ApplicationRole applicationRole = new ApplicationRole();
+            applicationRole.Name = role;
+            applicationRole.NormalizedName = role.ToUpper();
+            await roleManager.CreateAsync(applicationRole, CancellationToken.None);
+        }
+    }
+
+    // set up administrator account
+    var userManager = scope.ServiceProvider.GetRequiredService<UserStore>();
+    if (await userManager.FindByNameAsync("admin@localhost", CancellationToken.None) == null)
+    {
+        ApplicationUser adminUser = new ApplicationUser{
+            Id = Guid.NewGuid().ToString(),
+            Email = "admin@localhost",
+            NormalizedEmail = "ADMIN@LOCALHOST",
+            EmailConfirmed = true,
+            UserName = "administrator",
+            NormalizedUserName = "ADMINISTRATOR"
+        };
+
+        //set user password
+        PasswordHasher<ApplicationUser> ph = new PasswordHasher<ApplicationUser>();
+        adminUser.PasswordHash = ph.HashPassword(adminUser, "letmein");
+
+        await userManager.CreateAsync(adminUser, CancellationToken.None);
+        await userManager.AddToRoleAsync(adminUser, "Admin", CancellationToken.None);
+    }
+}
 
 app.UseAuthorization();
 

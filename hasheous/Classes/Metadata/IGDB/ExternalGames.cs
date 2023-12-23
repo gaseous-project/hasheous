@@ -4,7 +4,7 @@ using Classes.Metadata;
 using IGDB;
 using IGDB.Models;
 
-namespace gaseous_server.Classes.Metadata.IGDB
+namespace hasheous_server.Classes.Metadata.IGDB
 {
 	public class ExternalGames
     {
@@ -14,11 +14,6 @@ namespace gaseous_server.Classes.Metadata.IGDB
         {
         }
 
-        private static IGDBClient igdb = new IGDBClient(
-                    // Found in Twitch Developer portal for your app
-                    Config.IGDB.ClientId,
-                    Config.IGDB.Secret
-                );
 
         public static ExternalGame? GetExternalGames(long? Id)
         {
@@ -107,7 +102,8 @@ namespace gaseous_server.Classes.Metadata.IGDB
         private static async Task<ExternalGame?> GetObjectFromServer(string WhereClause)
         {
             // get ExternalGames metadata
-            var results = await igdb.QueryAsync<ExternalGame>(IGDBClient.Endpoints.ExternalGames, query: fieldList + " " + WhereClause + ";");
+            Communications comms = new Communications();
+            var results = await comms.APIComm<ExternalGame>(IGDBClient.Endpoints.ExternalGames, fieldList, WhereClause);
             if (results.Length > 0)
             {
                 var result = results.First();

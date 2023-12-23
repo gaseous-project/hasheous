@@ -6,16 +6,15 @@ using IGDB.Models;
 
 namespace hasheous_server.Classes.Metadata.IGDB
 {
-    public class PlayerPerspectives
+	public class ReleaseDates
     {
-        const string fieldList = "fields checksum,created_at,name,slug,updated_at,url;";
+        const string fieldList = "fields category,checksum,created_at,date,game,human,m,platform,region,status,updated_at,y;";
 
-        public PlayerPerspectives()
+        public ReleaseDates()
         {
         }
 
-
-        public static PlayerPerspective? GetGame_PlayerPerspectives(long? Id)
+        public static ReleaseDate? GetReleaseDates(long? Id)
         {
             if ((Id == 0) || (Id == null))
             {
@@ -23,28 +22,28 @@ namespace hasheous_server.Classes.Metadata.IGDB
             }
             else
             {
-                Task<PlayerPerspective> RetVal = _GetGame_PlayerPerspectives(SearchUsing.id, Id);
+                Task<ReleaseDate> RetVal = _GetReleaseDates(SearchUsing.id, Id);
                 return RetVal.Result;
             }
         }
 
-        public static PlayerPerspective GetGame_PlayerPerspectives(string Slug)
+        public static ReleaseDate GetReleaseDates(string Slug)
         {
-            Task<PlayerPerspective> RetVal = _GetGame_PlayerPerspectives(SearchUsing.slug, Slug);
+            Task<ReleaseDate> RetVal = _GetReleaseDates(SearchUsing.slug, Slug);
             return RetVal.Result;
         }
 
-        private static async Task<PlayerPerspective> _GetGame_PlayerPerspectives(SearchUsing searchUsing, object searchValue)
+        private static async Task<ReleaseDate> _GetReleaseDates(SearchUsing searchUsing, object searchValue)
         {
             // check database first
             Storage.CacheStatus? cacheStatus = new Storage.CacheStatus();
             if (searchUsing == SearchUsing.id)
             {
-                cacheStatus = Storage.GetCacheStatus(Storage.TablePrefix.IGDB, "PlayerPerspective", (long)searchValue);
+                cacheStatus = Storage.GetCacheStatus(Storage.TablePrefix.IGDB, "ReleaseDate", (long)searchValue);
             }
             else
             {
-                cacheStatus = Storage.GetCacheStatus(Storage.TablePrefix.IGDB, "PlayerPerspective", (string)searchValue);
+                cacheStatus = Storage.GetCacheStatus(Storage.TablePrefix.IGDB, "ReleaseDate", (string)searchValue);
             }
 
             // set up where clause
@@ -61,15 +60,13 @@ namespace hasheous_server.Classes.Metadata.IGDB
                     throw new Exception("Invalid search type");
             }
 
-            PlayerPerspective returnValue = new PlayerPerspective();
-            bool forceImageDownload = false;
+            ReleaseDate returnValue = new ReleaseDate();
             switch (cacheStatus)
             {
                 case Storage.CacheStatus.NotPresent:
                     returnValue = await GetObjectFromServer(WhereClause);
                     Storage.NewCacheValue(Storage.TablePrefix.IGDB, returnValue);
-                    forceImageDownload = true;
-                    break;
+                    break;  
                 case Storage.CacheStatus.Expired:
                     try
                     {
@@ -78,12 +75,12 @@ namespace hasheous_server.Classes.Metadata.IGDB
                     }
                     catch (Exception ex)
                     {
-                        Console.Error.WriteLine("Metadata: " + returnValue.GetType().Name + ": An error occurred while connecting to IGDB. WhereClause: " + WhereClause + ex.ToString());
-                        returnValue = Storage.GetCacheValue<PlayerPerspective>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
+                        Logging.Log(Logging.LogType.Warning, "Metadata: " + returnValue.GetType().Name, "An error occurred while connecting to IGDB. WhereClause: " + WhereClause, ex);
+                        returnValue = Storage.GetCacheValue<ReleaseDate>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
                     }
                     break;
                 case Storage.CacheStatus.Current:
-                    returnValue = Storage.GetCacheValue<PlayerPerspective>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
+                    returnValue = Storage.GetCacheValue<ReleaseDate>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
                     break;
                 default:
                     throw new Exception("How did you get here?");
@@ -98,15 +95,15 @@ namespace hasheous_server.Classes.Metadata.IGDB
             slug
         }
 
-        private static async Task<PlayerPerspective> GetObjectFromServer(string WhereClause)
+        private static async Task<ReleaseDate> GetObjectFromServer(string WhereClause)
         {
-            // get Game_PlayerPerspectives metadata
+            // get ReleaseDates metadata
             Communications comms = new Communications();
-            var results = await comms.APIComm<PlayerPerspective>(IGDBClient.Endpoints.PlayerPerspectives, fieldList, WhereClause);
+            var results = await comms.APIComm<ReleaseDate>(IGDBClient.Endpoints.ReleaseDates, fieldList, WhereClause);
             var result = results.First();
 
             return result;
         }
-    }
+	}
 }
 

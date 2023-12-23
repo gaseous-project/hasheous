@@ -5,7 +5,7 @@ using IGDB;
 using IGDB.Models;
 
 
-namespace gaseous_server.Classes.Metadata.IGDB
+namespace hasheous_server.Classes.Metadata.IGDB
 {
 	public class Covers
     {
@@ -15,11 +15,6 @@ namespace gaseous_server.Classes.Metadata.IGDB
         {
         }
 
-        private static IGDBClient igdb = new IGDBClient(
-                    // Found in Twitch Developer portal for your app
-                    Config.IGDB.ClientId,
-                    Config.IGDB.Secret
-                );
 
         public static Cover? GetCover(long? Id, string LogoPath)
         {
@@ -115,7 +110,8 @@ namespace gaseous_server.Classes.Metadata.IGDB
         private static async Task<Cover> GetObjectFromServer(string WhereClause, string LogoPath)
         {
             // get Cover metadata
-            var results = await igdb.QueryAsync<Cover>(IGDBClient.Endpoints.Covers, query: fieldList + " " + WhereClause + ";");
+            Communications comms = new Communications();
+            var results = await comms.APIComm<Cover>(IGDBClient.Endpoints.Covers, fieldList, WhereClause);
             var result = results.First();
 
             //GetImageFromServer(result.Url, LogoPath, LogoSize.t_thumb, result.ImageId);

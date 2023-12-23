@@ -5,7 +5,7 @@ using Classes.Metadata;
 using IGDB;
 using IGDB.Models;
 
-namespace gaseous_server.Classes.Metadata.IGDB
+namespace hasheous_server.Classes.Metadata.IGDB
 {
 	public class Games
 	{
@@ -16,11 +16,6 @@ namespace gaseous_server.Classes.Metadata.IGDB
 
         }
 
-        private static IGDBClient igdb = new IGDBClient(
-                    // Found in Twitch Developer portal for your app
-                    Config.IGDB.ClientId,
-                    Config.IGDB.Secret
-                );
 
         public static Game? GetGame(long Id, bool getAllMetadata, bool followSubGames, bool forceRefresh)
         {
@@ -280,7 +275,8 @@ namespace gaseous_server.Classes.Metadata.IGDB
         private static async Task<Game> GetObjectFromServer(string WhereClause)
         {
             // get Game metadata
-            var results = await igdb.QueryAsync<Game>(IGDBClient.Endpoints.Games, query: fieldList + " " + WhereClause + ";");
+            Communications comms = new Communications();
+            var results = await comms.APIComm<Game>(IGDBClient.Endpoints.Games, fieldList, WhereClause);
             var result = results.First();
 
             return result;
@@ -295,27 +291,25 @@ namespace gaseous_server.Classes.Metadata.IGDB
         private static async Task<Game[]> _SearchForGame(string SearchString, long PlatformId, SearchType searchType)
         {
             string searchBody = "";
-            searchBody += "fields id,name,slug,platforms,summary; ";
+            string searchFields = "fields id,name,slug,platforms,summary; ";
             switch (searchType)
             {
-                case SearchType.searchNoPlatform:
-                    searchBody += "search \"" + SearchString + "\"; ";
-                    break;
                 case SearchType.search:
-                    searchBody += "search \"" + SearchString + "\"; ";
+                    searchBody = "search \"" + SearchString + "\"; ";
                     searchBody += "where platforms = (" + PlatformId + ");";
                     break;
                 case SearchType.wherefuzzy:
-                    searchBody += "where platforms = (" + PlatformId + ") & name ~ *\"" + SearchString + "\"*;";
+                    searchBody = "where platforms = (" + PlatformId + ") & name ~ *\"" + SearchString + "\"*;";
                     break;
                 case SearchType.where:
-                    searchBody += "where platforms = (" + PlatformId + ") & name ~ \"" + SearchString + "\";";
+                    searchBody = "where platforms = (" + PlatformId + ") & name ~ \"" + SearchString + "\";";
                     break;
             }
             
 
             // get Game metadata
-            var results = await igdb.QueryAsync<Game>(IGDBClient.Endpoints.Games, query: searchBody);
+            Communications comms = new Communications();
+            var results = await comms.APIComm<Game>(IGDBClient.Endpoints.Games, searchFields, searchBody);
 
             return results;
         }
@@ -324,8 +318,7 @@ namespace gaseous_server.Classes.Metadata.IGDB
         {
             where = 0,
             wherefuzzy = 1,
-            search = 2,
-            searchNoPlatform = 3
+            search = 2
         }
     }
 }

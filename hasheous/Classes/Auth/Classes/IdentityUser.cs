@@ -1,4 +1,4 @@
-﻿using gaseous_server.Classes;
+﻿using hasheous_server.Classes;
 using Microsoft.AspNetCore.Identity;
 using System;
 

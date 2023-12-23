@@ -5,7 +5,7 @@ using IGDB;
 using IGDB.Models;
 
 
-namespace gaseous_server.Classes.Metadata.IGDB
+namespace hasheous_server.Classes.Metadata.IGDB
 {
     public class CompanyLogos
     {
@@ -14,12 +14,6 @@ namespace gaseous_server.Classes.Metadata.IGDB
         public CompanyLogos()
         {
         }
-
-        private static IGDBClient igdb = new IGDBClient(
-                    // Found in Twitch Developer portal for your app
-                    Config.IGDB.ClientId,
-                    Config.IGDB.Secret
-                );
 
         public static CompanyLogo? GetCompanyLogo(long? Id, string LogoPath)
         {
@@ -120,7 +114,8 @@ namespace gaseous_server.Classes.Metadata.IGDB
         private static async Task<CompanyLogo?> GetObjectFromServer(string WhereClause, string LogoPath)
         {
             // get CompanyLogo metadata
-            var results = await igdb.QueryAsync<CompanyLogo>(IGDBClient.Endpoints.CompanyLogos, query: fieldList + " " + WhereClause + ";");
+            Communications comms = new Communications();
+            var results = await comms.APIComm<CompanyLogo>(IGDBClient.Endpoints.CompanyLogos, fieldList, WhereClause);
             if (results.Length > 0)
             {
                 var result = results.First();

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
-using gaseous_server.Classes;
+using hasheous_server.Classes;
 using Microsoft.AspNetCore.Identity;
 
 namespace Authentication

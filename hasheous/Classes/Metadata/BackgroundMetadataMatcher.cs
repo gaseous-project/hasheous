@@ -6,7 +6,8 @@ using System.Data;
 using Classes;
 using IGDB;
 using IGDB.Models;
-using gaseous_server.Classes.Metadata.IGDB;
+using hasheous_server.Classes.Metadata.IGDB;
+using hasheous_server.Models;
 
 namespace BackgroundMetadataMatcher
 {
@@ -42,12 +43,6 @@ namespace BackgroundMetadataMatcher
             /// </summary>
             AutomaticTooManyMatches = 3
         }
-
-        private static IGDBClient igdb = new IGDBClient(
-                    // Found in Twitch Developer portal for your app
-                    Config.IGDB.ClientId,
-                    Config.IGDB.Secret
-                );
 
         public async void StartMatcher()
         {
@@ -114,80 +109,126 @@ namespace BackgroundMetadataMatcher
             }
         }
 
-        private async Task<Platform[]> SearchForPlatform(string PlatformName)
+        private async void PerformPlatformSearch(Random rand, Database db, DataRow row, string sql, Dictionary<string, object> dbDict)
         {
-            string searchBody = "fields *; search \"" + PlatformName + "\";";
-            var results = await igdb.QueryAsync<Platform>(IGDBClient.Endpoints.Platforms, query: searchBody);
+            long platformMapId = -1;
+            int hoursToAdd = rand.Next(168, 336);
 
-            if (results.Length == 0)
+            foreach (PlatformMapItem platformMapItem in JsonPlatformMap.PlatformMap)
             {
-                searchBody = "fields *; where name ~ *\"" + PlatformName + "\"*;";
-                results = await igdb.QueryAsync<Platform>(IGDBClient.Endpoints.Platforms, query: searchBody);
-
-                if (results.Length == 0)
+                if (
+                    platformMapItem.IGDBName == ((string)row["Platform"]).ToLower() ||
+                    platformMapItem.AlternateNames.Contains(((string)row["Platform"]).ToLower(), StringComparer.OrdinalIgnoreCase)
+                )
                 {
-                    searchBody = "fields *; where name ~ \"" + PlatformName + "\";";
-                    results = await igdb.QueryAsync<Platform>(IGDBClient.Endpoints.Platforms, query: searchBody);
+                    platformMapId = platformMapItem.IGDBId;
+                    break;
                 }
             }
 
-            return results;
-        }
+            if (platformMapId == -1)
+            {
+                // no platform map match, perform search
+                string searchPlatform = ((string)row["Platform"]).ToLower();
+                Task<Platform[]> platforms = SearchForPlatform(searchPlatform);
 
-        private void PerformPlatformSearch(Random rand, Database db, DataRow row, string sql, Dictionary<string, object> dbDict)
-        {
-            Task<IGDB.Models.Platform[]> platforms = SearchForPlatform(((string)row["Platform"]).ToLower());
-            int hoursToAdd = rand.Next(168, 336);
-            if (platforms.Result.Length == 0)
-            {
-                // no match
-                dbDict.Add("igdbplatformid", 0);
-                dbDict.Add("matchmethod", MatchMethod.NoMatch);
-                dbDict.Add("lastsearched", DateTime.UtcNow);
-                dbDict.Add("nextsearch", DateTime.UtcNow.AddHours(hoursToAdd));
-            }
-            else if (platforms.Result.Length == 1)
-            {
-                // exact match
-                dbDict.Add("igdbplatformid", platforms.Result[0].Id);
-                dbDict.Add("matchmethod", MatchMethod.Automatic);
-                dbDict.Add("lastsearched", DateTime.UtcNow);
-                dbDict.Add("nextsearch", DateTime.UtcNow.AddHours(hoursToAdd));
-
-                // get platform metadata
-                Platforms.GetPlatform((long)platforms.Result[0].Id);
-            }
-            else
-            {
-                // multiple matches
-                
-                bool matchFound = false;
-                foreach (Platform platform in platforms.Result)
+                if (platforms != null)
                 {
-                    if (matchFound == false)
+                    if (platforms.Result != null)
                     {
-                        if (platform.Name.ToLower() == ((string)row["Platform"]).ToLower())
+                        if (platforms.Result.Length == 0)
+                        {
+                            // no match
+                            dbDict.Add("igdbplatformid", 0);
+                            dbDict.Add("matchmethod", MatchMethod.NoMatch);
+                            dbDict.Add("lastsearched", DateTime.UtcNow);
+                            dbDict.Add("nextsearch", DateTime.UtcNow.AddHours(hoursToAdd));
+                        }
+                        else if (platforms.Result.Length == 1)
                         {
                             // exact match
                             dbDict.Add("igdbplatformid", platforms.Result[0].Id);
                             dbDict.Add("matchmethod", MatchMethod.Automatic);
                             dbDict.Add("lastsearched", DateTime.UtcNow);
                             dbDict.Add("nextsearch", DateTime.UtcNow.AddHours(hoursToAdd));
-                            matchFound = true;
+
+                            // get platform metadata
+                            Platforms.GetPlatform((long)platforms.Result[0].Id);
+                        }
+                        else
+                        {
+                            // multiple matches
+                            
+                            bool matchFound = false;
+                            foreach (Platform platform in platforms.Result)
+                            {
+                                if (matchFound == false)
+                                {
+                                    if (platform.Name.ToLower() == ((string)row["Platform"]).ToLower())
+                                    {
+                                        // exact match
+                                        dbDict.Add("igdbplatformid", platforms.Result[0].Id);
+                                        dbDict.Add("matchmethod", MatchMethod.Automatic);
+                                        dbDict.Add("lastsearched", DateTime.UtcNow);
+                                        dbDict.Add("nextsearch", DateTime.UtcNow.AddHours(hoursToAdd));
+                                        matchFound = true;
+                                    }
+                                }
+                                Platforms.GetPlatform((long)platform.Id);
+                            }
+
+                            if (matchFound == false)
+                            {
+                                dbDict.Add("igdbplatformid", 0);
+                                dbDict.Add("matchmethod", MatchMethod.AutomaticTooManyMatches);
+                                dbDict.Add("lastsearched", DateTime.UtcNow);
+                                dbDict.Add("nextsearch", DateTime.UtcNow.AddHours(hoursToAdd));
+                            }
                         }
                     }
-                    Platforms.GetPlatform((long)platform.Id);
-                }
-
-                if (matchFound == false)
-                {
-                    dbDict.Add("igdbplatformid", 0);
-                    dbDict.Add("matchmethod", MatchMethod.AutomaticTooManyMatches);
-                    dbDict.Add("lastsearched", DateTime.UtcNow);
-                    dbDict.Add("nextsearch", DateTime.UtcNow.AddHours(hoursToAdd));
+                    else
+                    {
+                        // no match
+                        dbDict.Add("igdbplatformid", 0);
+                        dbDict.Add("matchmethod", MatchMethod.NoMatch);
+                        dbDict.Add("lastsearched", DateTime.UtcNow);
+                        dbDict.Add("nextsearch", DateTime.UtcNow.AddHours(hoursToAdd));
+                    }
                 }
             }
+            else
+            {
+                // platform map defined
+                dbDict.Add("igdbplatformid", platformMapId);
+                dbDict.Add("matchmethod", MatchMethod.Automatic);
+                dbDict.Add("lastsearched", DateTime.UtcNow);
+                dbDict.Add("nextsearch", DateTime.UtcNow.AddHours(hoursToAdd));
+
+                // get platform metadata
+                Platforms.GetPlatform(platformMapId);
+            }
             db.ExecuteCMD(sql, dbDict);
+        }
+
+        private async Task<Platform[]> SearchForPlatform(string PlatformName)
+        {
+            Communications comms = new Communications();
+            string searchBody = "search \"" + PlatformName + "\";";
+            var results = await comms.APIComm<Platform>(IGDBClient.Endpoints.Platforms, "fields *;", searchBody);
+
+            if (results == null || results.Length == 0)
+            {
+                searchBody = "where name ~ *\"" + PlatformName + "\"*;";
+                results = await comms.APIComm<Platform>(IGDBClient.Endpoints.Platforms, "fields *;", searchBody);
+
+                if (results == null || results.Length == 0)
+                {
+                    searchBody = "where name ~ \"" + PlatformName + "\";";
+                    results = await comms.APIComm<Platform>(IGDBClient.Endpoints.Platforms, "fields *;", searchBody);
+                }
+            }
+
+            return results;
         }
     }
 }

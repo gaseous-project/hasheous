@@ -7,11 +7,12 @@ using Microsoft.AspNetCore.Mvc;
 
 // For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
-namespace gaseous_server.Controllers
+namespace hasheous_server.Controllers.v1_0
 {
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]/[action]")]
     [ApiVersion("1.0")]
+    [ApiExplorerSettings(IgnoreApi = true)]
     public class SignaturesController : ControllerBase
     {
         /// <summary>
@@ -67,38 +68,41 @@ namespace gaseous_server.Controllers
 
             foreach (DataRow sigDbRow in sigDb.Rows)
             {
+                Signatures_Games.GameItem game = new Signatures_Games.GameItem
+                {
+                    Id = (long)sigDbRow["Id"],
+                    Name = (string)sigDbRow["Name"],
+                    Description = (string)sigDbRow["Description"],
+                    Year = (string)sigDbRow["Year"],
+                    Publisher = (string)sigDbRow["Publisher"],
+                    Demo = (Signatures_Games.GameItem.DemoTypes)(int)sigDbRow["Demo"],
+                    SystemId = (int)sigDbRow["PlatformId"],
+                    System = (string)sigDbRow["Platform"],
+                    SystemVariant = (string)sigDbRow["SystemVariant"],
+                    Video = (string)sigDbRow["Video"],
+                    Country = (string)sigDbRow["Country"],
+                    Language = (string)sigDbRow["Language"],
+                    Copyright = (string)sigDbRow["Copyright"]
+                };
+                Signatures_Games.RomItem rom = new Signatures_Games.RomItem{
+                    Id = (long)sigDbRow["romid"],
+                    Name = (string)sigDbRow["romname"],
+                    Size = (long)sigDbRow["Size"],
+                    Crc = (string)sigDbRow["CRC"],
+                    Md5 = ((string)sigDbRow["MD5"]).ToLower(),
+                    Sha1 = ((string)sigDbRow["SHA1"]).ToLower(),
+                    DevelopmentStatus = (string)sigDbRow["DevelopmentStatus"],
+                    Attributes = Newtonsoft.Json.JsonConvert.DeserializeObject<List<KeyValuePair<string, object>>>((string)Common.ReturnValueIfNull(sigDbRow["Attributes"], "[]")),
+                    RomType = (RomSignatureObject.Game.Rom.RomTypes)(int)sigDbRow["RomType"],
+                    RomTypeMedia = (string)sigDbRow["RomTypeMedia"],
+                    MediaLabel = (string)sigDbRow["MediaLabel"],
+                    SignatureSource = (RomSignatureObject.Game.Rom.SignatureSourceType)(Int32)sigDbRow["MetadataSource"]
+                };
+
                 Signatures_Games gameItem = new Signatures_Games
                 {
-                    Game = new Signatures_Games.GameItem
-                    {
-                        Id = (Int32)sigDbRow["Id"],
-                        Name = (string)sigDbRow["Name"],
-                        Description = (string)sigDbRow["Description"],
-                        Year = (string)sigDbRow["Year"],
-                        Publisher = (string)sigDbRow["Publisher"],
-                        Demo = (Signatures_Games.GameItem.DemoTypes)(int)sigDbRow["Demo"],
-                        System = (string)sigDbRow["Platform"],
-                        SystemVariant = (string)sigDbRow["SystemVariant"],
-                        Video = (string)sigDbRow["Video"],
-                        Country = (string)sigDbRow["Country"],
-                        Language = (string)sigDbRow["Language"],
-                        Copyright = (string)sigDbRow["Copyright"]
-                    },
-                    Rom = new Signatures_Games.RomItem
-                    {
-                        Id = (Int32)sigDbRow["romid"],
-                        Name = (string)sigDbRow["romname"],
-                        Size = (Int64)sigDbRow["Size"],
-                        Crc = (string)sigDbRow["CRC"],
-                        Md5 = ((string)sigDbRow["MD5"]).ToLower(),
-                        Sha1 = ((string)sigDbRow["SHA1"]).ToLower(),
-                        DevelopmentStatus = (string)sigDbRow["DevelopmentStatus"],
-                        Attributes = Newtonsoft.Json.JsonConvert.DeserializeObject<List<KeyValuePair<string, object>>>((string)Common.ReturnValueIfNull(sigDbRow["Attributes"], "[]")),
-                        RomType = (RomSignatureObject.Game.Rom.RomTypes)(int)sigDbRow["RomType"],
-                        RomTypeMedia = (string)sigDbRow["RomTypeMedia"],
-                        MediaLabel = (string)sigDbRow["MediaLabel"],
-                        SignatureSource = (RomSignatureObject.Game.Rom.SignatureSourceType)(Int32)sigDbRow["MetadataSource"]
-                    }
+                    Game = game,
+                    Rom = rom
                 };
                 GamesList.Add(gameItem);
             }

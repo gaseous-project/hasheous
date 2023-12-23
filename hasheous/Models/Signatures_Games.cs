@@ -13,7 +13,7 @@ namespace hasheous_server.Models
         public GameItem? Game { get; set; }
         public RomItem? Rom { get; set; }
 
-        //[JsonIgnore]
+        [JsonIgnore]
         public int Score
         {
             get
@@ -34,16 +34,15 @@ namespace hasheous_server.Models
             }
         }
 
-        public SignatureFlags Flags = new SignatureFlags();
-
 		public class GameItem
 		{
-            public Int32? Id { get; set; }
+            public long? Id { get; set; }
             public string? Name { get; set; }
             public string? Description { get; set; }
             public string? Year { get; set; }
             public string? Publisher { get; set; }
             public DemoTypes Demo { get; set; }
+            public long? SystemId { get; set; }
             public string? System { get; set; }
             public string? SystemVariant { get; set; }
             public string? Video { get; set; }
@@ -118,9 +117,9 @@ namespace hasheous_server.Models
 
         public class RomItem
         {
-            public Int32? Id { get; set; }
+            public long? Id { get; set; }
             public string? Name { get; set; }
-            public Int64? Size { get; set; }
+            public long? Size { get; set; }
             public string? Crc { get; set; }
             public string? Md5 { get; set; }
             public string? Sha1 { get; set; }
@@ -131,6 +130,19 @@ namespace hasheous_server.Models
 
             public RomSignatureObject.Game.Rom.RomTypes RomType { get; set; }
             public string? RomTypeMedia { get; set; }
+            public MediaType? MediaDetail {
+				get
+				{
+					if (RomTypeMedia != null)
+					{
+						return new MediaType(SignatureSource, RomTypeMedia);
+					}
+					else
+					{
+						return null;
+					}
+				}
+			}
             public string? MediaLabel { get; set; }
 
             public RomSignatureObject.Game.Rom.SignatureSourceType SignatureSource { get; set; }
@@ -189,12 +201,93 @@ namespace hasheous_server.Models
                     return _score;
                 }
             }
-        }
 
-        public class SignatureFlags
-        {
-            public long IGDBPlatformId { get; set; }
-            public string IGDBPlatformName { get; set; }
+            public class MediaType
+            {
+                public MediaType(RomSignatureObject.Game.Rom.SignatureSourceType Source, string MediaTypeString)
+                {
+                    switch (Source)
+                    {
+                        case RomSignatureObject.Game.Rom.SignatureSourceType.TOSEC:
+                            string[] typeString = MediaTypeString.Split(" ");
+
+                            string inType = "";
+                            foreach (string typeStringVal in typeString)
+                            {
+                                if (inType == "")
+                                {
+                                    switch (typeStringVal.ToLower())
+                                    {
+                                        case "disk":
+                                            Media = RomSignatureObject.Game.Rom.RomTypes.Disk;
+
+                                            inType = typeStringVal;
+                                            break;
+                                        case "disc":
+                                            Media = RomSignatureObject.Game.Rom.RomTypes.Disc;
+
+                                            inType = typeStringVal;
+                                            break;
+                                        case "file":
+                                            Media = RomSignatureObject.Game.Rom.RomTypes.File;
+
+                                            inType = typeStringVal;
+                                            break;
+                                        case "part":
+                                            Media = RomSignatureObject.Game.Rom.RomTypes.Part;
+
+                                            inType = typeStringVal;
+                                            break;
+                                        case "tape":
+                                            Media = RomSignatureObject.Game.Rom.RomTypes.Tape;
+
+                                            inType = typeStringVal;
+                                            break;
+                                        case "of":
+                                            inType = typeStringVal;
+                                            break;
+                                        case "side":
+                                            inType = typeStringVal;
+                                            break;
+                                    }
+                                }
+                                else {
+                                    switch (inType.ToLower())
+                                    {
+                                        case "disk":
+                                        case "disc":
+                                        case "file":
+                                        case "part":
+                                        case "tape":
+                                            Number = int.Parse(typeStringVal);
+                                            break;
+                                        case "of":
+                                            Count = int.Parse(typeStringVal);
+                                            break;
+                                        case "side":
+                                            Side = typeStringVal;
+                                            break;
+                                    }
+                                    inType = "";
+                                }
+                            }
+
+                            break;
+
+                        default:
+                            break;
+
+                    }
+                }
+
+                public RomSignatureObject.Game.Rom.RomTypes? Media { get; set; }
+
+                public int? Number { get; set; }
+
+                public int? Count { get; set; }
+
+                public string? Side { get; set; }
+            }
         }
     }
 }
