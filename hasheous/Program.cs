@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using System.Threading.RateLimiting;
 using hasheous_server.Classes.Metadata.IGDB;
+using static Classes.Common;
 
 Logging.WriteToDiskOnly = true;
 Logging.Log(Logging.LogType.Information, "Startup", "Starting Hasheous Server " + Assembly.GetExecutingAssembly().GetName().Version);
@@ -274,6 +275,28 @@ app.UseStaticFiles(new StaticFileOptions
 
 app.MapControllers();
 
+app.Use(async (context, next) =>
+{
+    // set the correlation id
+    string correlationId = Guid.NewGuid().ToString();
+    CallContext.SetData("CorrelationId", correlationId);
+    CallContext.SetData("CallingProcess", context.Request.Method + ": " + context.Request.Path);
+    
+    string userIdentity;
+    try
+    {
+        userIdentity = context.User.Claims.Where(x=>x.Type==System.Security.Claims.ClaimTypes.NameIdentifier).FirstOrDefault().Value;
+    }
+    catch
+    {
+        userIdentity = "";
+    }
+    CallContext.SetData("CallingUser", userIdentity);
+
+    context.Response.Headers.Add("x-correlation-id", correlationId.ToString());
+    await next();
+});
+
 // add background tasks
 ProcessQueue.QueueItems.Add(
     new ProcessQueue.QueueItem(
@@ -296,6 +319,7 @@ ProcessQueue.QueueItems.Add(
         )
     );
 
+Logging.WriteToDiskOnly = false;
 
 // start the app
 app.Run();

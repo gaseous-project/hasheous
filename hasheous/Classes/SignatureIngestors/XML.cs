@@ -31,6 +31,8 @@ namespace XML
             {
                 string XMLFile = PathContents[i];
 
+                Logging.Log(Logging.LogType.Information, "Signature Ingest", "(" + (i + 1) + " / " + PathContents.Length + ") Processing " + XMLType.ToString() + " DAT file: " + XMLFile);
+
                 // check xml file md5
                 Common.hashObject hashObject = new Common.hashObject(XMLFile);
                 sql = "SELECT * FROM Signatures_Sources WHERE SourceMD5=@sourcemd5";
@@ -165,7 +167,7 @@ namespace XML
                                     dbDict.Add("publisherid", gamePublisher);
 
                                     // store game
-                                    int gameId = 0;
+                                    long gameId = 0;
                                     sql = "SELECT * FROM Signatures_Games WHERE `Name`=@name AND `Year`=@year AND `PublisherId`=@publisherid AND `SystemId`=@systemid";
 
                                     sigDB = db.ExecuteCMD(sql, dbDict);
@@ -181,7 +183,7 @@ namespace XML
                                     }
                                     else
                                     {
-                                        gameId = (int)sigDB.Rows[0][0];
+                                        gameId = (long)sigDB.Rows[0][0];
                                     }
 
                                     // store rom
@@ -189,7 +191,7 @@ namespace XML
                                     {
                                         if (romObject.Md5 != null || romObject.Sha1 != null)
                                         {
-                                            int romId = 0;
+                                            long romId = 0;
                                             sql = "SELECT * FROM Signatures_Roms WHERE `GameId`=@gameid AND (`MD5`=@md5 OR `SHA1`=@sha1)";
                                             dbDict = new Dictionary<string, object>();
                                             dbDict.Add("gameid", gameId);
@@ -232,7 +234,7 @@ namespace XML
                                             }
                                             else
                                             {
-                                                romId = (int)sigDB.Rows[0][0];
+                                                romId = (long)sigDB.Rows[0][0];
                                             }
 
                                             // map the rom to the source
@@ -254,12 +256,12 @@ namespace XML
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine("Signature Ingestor - XML - Invalid import file: " + XMLFile + ex.ToString());
+                        Logging.Log(Logging.LogType.Warning, "Signature Ingest", "Error ingesting " + XMLType.ToString() + " file: " + XMLFile, ex);
                     }
                 }
                 else
                 {
-                    Console.WriteLine("Signature Ingestor - XML - Rejecting already imported file: " + XMLFile);
+                    Logging.Log(Logging.LogType.Information, "Signature Ingest", "Rejecting already imported " + XMLType.ToString() + " file: " + XMLFile);
                 }
             }
         }

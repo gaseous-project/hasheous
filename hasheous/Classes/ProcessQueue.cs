@@ -1,5 +1,6 @@
 ﻿using System;
 using Classes;
+using static Classes.Common;
 
 namespace Classes
 {
@@ -55,12 +56,15 @@ namespace Classes
             private bool _AllowManualStart = true;
             private bool _RemoveWhenStopped = false;
             private bool _IsBlocked = false;
+            private string _CorrelationId = "";
             private List<QueueItemType> _Blocks = new List<QueueItemType>();
 
             public QueueItemType ItemType => _ItemType;
             public QueueItemState ItemState => _ItemState;
             public DateTime LastRunTime => _LastRunTime;
+            private double _LastRunDuration = 0;
             public DateTime LastFinishTime => _LastFinishTime;
+            public double LastRunDuration => _LastRunDuration;
             public DateTime NextRunTime {
                 get
                 {
@@ -73,6 +77,7 @@ namespace Classes
             public bool Force => _ForceExecute;
             public bool AllowManualStart => _AllowManualStart;
             public bool RemoveWhenStopped => _RemoveWhenStopped;
+            public string CorrelationId => _CorrelationId;
             public bool IsBlocked => _IsBlocked;
             public object? Options { get; set; } = null;
             public List<QueueItemType> Blocks => _Blocks;
@@ -88,6 +93,16 @@ namespace Classes
                         _ItemState = QueueItemState.Running;
                         _LastResult = "";
                         _LastError = null;
+
+                        // set the correlation id
+                        Guid correlationId = Guid.NewGuid();
+                        _CorrelationId = correlationId.ToString();
+                        CallContext.SetData("CorrelationId", correlationId);
+                        CallContext.SetData("CallingProcess", _ItemType.ToString());
+                        CallContext.SetData("CallingUser", "System");
+
+                        // log the start
+                        Logging.Log(Logging.LogType.Debug, "Timered Event", "Executing " + _ItemType + " with correlation id " + _CorrelationId);
 
                         try
                         {
@@ -126,6 +141,7 @@ namespace Classes
                         }
                         catch (Exception ex)
                         {
+                            Logging.Log(Logging.LogType.Warning, "Timered Event", "An error occurred", ex);
                             _LastResult = "";
                             _LastError = ex.ToString();
                         }
@@ -133,6 +149,9 @@ namespace Classes
                         _ForceExecute = false;
                         _ItemState = QueueItemState.Stopped;
                         _LastFinishTime = DateTime.UtcNow;
+                        _LastRunDuration = Math.Round((DateTime.UtcNow - _LastRunTime).TotalSeconds, 2);
+
+                        Logging.Log(Logging.LogType.Information, "Timered Event", "Total " + _ItemType + " run time = " + _LastRunDuration);
                     }
                 }
             }

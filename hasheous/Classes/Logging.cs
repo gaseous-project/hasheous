@@ -1,12 +1,17 @@
 ﻿using System;
+using System.ComponentModel.DataAnnotations;
 using System.Data;
 using System.Diagnostics;
 using System.Reflection;
 using System.Reflection.Metadata.Ecma335;
+using Classes;
+using static Classes.Common;
+
 namespace Classes
 {
 	public class Logging
 	{
+        private static DateTime lastDiskRetentionSweep = DateTime.UtcNow;
         public static bool WriteToDiskOnly { get; set; } = false;
 
         static public void Log(LogType EventType, string ServerProcess, string Message, Exception? ExceptionValue = null, bool LogToDiskOnly = false)
@@ -69,8 +74,64 @@ namespace Classes
 
                 if (LogToDiskOnly == false)
                 {
+                    if (Config.LoggingConfiguration.AlwaysLogToDisk == true)
+                    {
+                        LogToDisk(logItem, TraceOutput, null);
+                    }
+
+                    string correlationId;
+                    try
+                    {
+                        if (CallContext.GetData("CorrelationId").ToString() == null)
+                        {
+                            correlationId = "";
+                        }
+                        else
+                        {
+                            correlationId = CallContext.GetData("CorrelationId").ToString();
+                        }
+                    }
+                    catch
+                    {
+                        correlationId = "";
+                    }
+
+                    string callingProcess;
+                    try
+                    {
+                        if (CallContext.GetData("CallingProcess").ToString() == null)
+                        {
+                            callingProcess = "";
+                        }
+                        else
+                        {
+                            callingProcess = CallContext.GetData("CallingProcess").ToString();
+                        }
+                    }
+                    catch
+                    {
+                        callingProcess = "";
+                    }
+
+                    string callingUser;
+                    try
+                    {
+                        if (CallContext.GetData("CallingUser").ToString() == null)
+                        {
+                            callingUser = "";
+                        }
+                        else
+                        {
+                            callingUser = CallContext.GetData("CallingUser").ToString();
+                        }
+                    }
+                    catch
+                    {
+                        callingUser = "";
+                    }
+
                     Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-                    string sql = "DELETE FROM ServerLogs WHERE EventTime < @EventRententionDate; INSERT INTO ServerLogs (EventTime, EventType, Process, Message, Exception) VALUES (@EventTime, @EventType, @Process, @Message, @Exception);";
+                    string sql = "DELETE FROM ServerLogs WHERE EventTime < @EventRententionDate; INSERT INTO ServerLogs (EventTime, EventType, Process, Message, Exception, CorrelationId, CallingProcess, CallingUser) VALUES (@EventTime, @EventType, @Process, @Message, @Exception, @correlationid, @callingprocess, @callinguser);";
                     Dictionary<string, object> dbDict = new Dictionary<string, object>();
                     dbDict.Add("EventRententionDate", DateTime.UtcNow.AddDays(Config.LoggingConfiguration.LogRetention * -1));
                     dbDict.Add("EventTime", logItem.EventTime);
@@ -78,6 +139,9 @@ namespace Classes
                     dbDict.Add("Process", logItem.Process);
                     dbDict.Add("Message", logItem.Message);
                     dbDict.Add("Exception", Common.ReturnValueIfNull(logItem.ExceptionValue, "").ToString());
+                    dbDict.Add("correlationid", correlationId);
+                    dbDict.Add("callingprocess", callingProcess);
+                    dbDict.Add("callinguser", callingUser);
 
                     try
                     {
@@ -91,6 +155,22 @@ namespace Classes
                 else
                 {
                     LogToDisk(logItem, TraceOutput, null);
+                }
+            }
+
+            if (lastDiskRetentionSweep.AddMinutes(60) < DateTime.UtcNow)
+            {
+                // time to delete any old logs
+                lastDiskRetentionSweep = DateTime.UtcNow;
+                string[] files = Directory.GetFiles(Config.LogPath);
+
+                foreach (string file in files)
+                {
+                    FileInfo fi = new FileInfo(file);
+                    if (fi.LastAccessTime < DateTime.Now.AddDays(Config.LoggingConfiguration.LogRetention * -1)) 
+                    { 
+                        fi.Delete(); 
+                    }
                 }
             }
         }
@@ -110,22 +190,111 @@ namespace Classes
             File.AppendAllText(Config.LogFilePath, TraceOutput);
         }
 
-        static public List<LogItem> GetLogs(long? StartIndex, int PageNumber = 1, int PageSize = 100) 
+        static public List<LogItem> GetLogs(LogsViewModel model) 
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            Dictionary<string, object> dbDict = new Dictionary<string, object>();
+            dbDict.Add("StartIndex", model.StartIndex);
+            dbDict.Add("PageNumber", (model.PageNumber - 1) * model.PageSize);
+            dbDict.Add("PageSize", model.PageSize);
             string sql = "";
-            if (StartIndex == null)
+
+            List<string> whereClauses = new List<string>();
+
+            // handle status criteria
+            if (model.Status != null)
             {
-                sql = "SELECT * FROM ServerLogs ORDER BY Id DESC LIMIT @PageSize OFFSET @PageNumber;";
+                if (model.Status.Count > 0)
+                {
+                    List<string> statusWhere = new List<string>();
+                    for (int i = 0; i < model.Status.Count; i++)
+                    {
+                        string valueName = "@eventtype" + i;
+                        statusWhere.Add(valueName);
+                        dbDict.Add(valueName, (int)model.Status[i]);
+                    }
+
+                    whereClauses.Add("EventType IN (" + string.Join(",", statusWhere) + ")");
+                }
+            }
+
+            // handle start date criteria
+            if (model.StartDateTime != null)
+            {
+                dbDict.Add("startdate", model.StartDateTime);
+                whereClauses.Add("EventTime >= @startdate");
+            }
+
+            // handle end date criteria
+            if (model.EndDateTime != null)
+            {
+                dbDict.Add("enddate", model.EndDateTime);
+                whereClauses.Add("EventTime <= @enddate");
+            }
+
+            // handle search text criteria
+            if (model.SearchText != null)
+            {
+                if (model.SearchText.Length > 0)
+                {
+                    dbDict.Add("messageSearch", model.SearchText);
+                    whereClauses.Add("MATCH(Message) AGAINST (@messageSearch)");
+                }
+            }
+
+            if (model.CorrelationId != null)
+            {
+                if (model.CorrelationId.Length > 0)
+                {
+                    dbDict.Add("correlationId", model.CorrelationId);
+                    whereClauses.Add("CorrelationId = @correlationId");
+                }
+            }
+
+            if (model.CallingProcess != null)
+            {
+                if (model.CallingProcess.Length > 0)
+                {
+                    dbDict.Add("callingProcess", model.CallingProcess);
+                    whereClauses.Add("CallingProcess = @callingProcess");
+                }
+            }
+
+            if (model.CallingUser != null)
+            {
+                if (model.CallingUser.Length > 0)
+                {
+                    dbDict.Add("callingUser", model.CallingUser);
+                    whereClauses.Add("CallingUser = @callingUser");
+                }
+            }
+
+            // compile WHERE clause
+            string whereClause = "";
+            if (whereClauses.Count > 0)
+            {
+                whereClause = "(" + String.Join(" AND ", whereClauses) + ")";
+            }
+
+            // execute query
+            if (model.StartIndex == null)
+            {
+                if (whereClause.Length > 0)
+                {
+                    whereClause = "WHERE " + whereClause;
+                }
+                
+                sql = "SELECT ServerLogs.Id, ServerLogs.EventTime, ServerLogs.EventType, ServerLogs.`Process`, ServerLogs.Message, ServerLogs.Exception, ServerLogs.CorrelationId, ServerLogs.CallingProcess, Users.Email FROM ServerLogs LEFT JOIN Users ON ServerLogs.CallingUser = Users.Id " + whereClause + " ORDER BY ServerLogs.Id DESC LIMIT @PageSize OFFSET @PageNumber;";
             }
             else
             {
-                sql = "SELECT * FROM ServerLogs WHERE Id < @StartIndex ORDER BY Id DESC LIMIT @PageSize OFFSET @PageNumber;";
+                if (whereClause.Length > 0)
+                {
+                    whereClause = "AND " + whereClause;
+                }
+                
+                sql = "SELECT ServerLogs.Id, ServerLogs.EventTime, ServerLogs.EventType, ServerLogs.`Process`, ServerLogs.Message, ServerLogs.Exception, ServerLogs.CorrelationId, ServerLogs.CallingProcess, Users.Email FROM ServerLogs LEFT JOIN Users ON ServerLogs.CallingUser = Users.Id  WHERE ServerLogs.Id < @StartIndex " + whereClause + " ORDER BY ServerLogs.Id DESC LIMIT @PageSize OFFSET @PageNumber;";
             }
-            Dictionary<string, object> dbDict = new Dictionary<string, object>();
-            dbDict.Add("StartIndex", StartIndex);
-            dbDict.Add("PageNumber", (PageNumber - 1) * PageSize);
-            dbDict.Add("PageSize", PageSize);
             DataTable dataTable = db.ExecuteCMD(sql, dbDict);
 
             List<LogItem> logs = new List<LogItem>();
@@ -138,7 +307,10 @@ namespace Classes
                     EventType = (LogType)row["EventType"],
                     Process = (string)row["Process"],
                     Message = (string)row["Message"],
-                    ExceptionValue = (string)row["Exception"]
+                    ExceptionValue = (string)row["Exception"],
+                    CorrelationId = (string)Common.ReturnValueIfNull(row["CorrelationId"], ""),
+                    CallingProcess = (string)Common.ReturnValueIfNull(row["CallingProcess"], ""),
+                    CallingUser = (string)Common.ReturnValueIfNull(row["Email"], "")
                 };
 
                 logs.Add(log);
@@ -161,6 +333,9 @@ namespace Classes
             public DateTime EventTime { get; set; }
             public LogType? EventType { get; set; }
             public string Process { get; set; } = "";
+            public string CorrelationId { get; set; } = "";
+            public string? CallingProcess { get; set; } = "";
+            public string? CallingUser { get; set; } = "";
             private string _Message = "";
             public string Message
             {
@@ -174,6 +349,66 @@ namespace Classes
                 }
             }
             public string? ExceptionValue { get; set; }
+        }
+
+        /// <summary>
+        /// Describes the log search criteria
+        /// </summary>
+        public class LogsViewModel
+        {
+            /// <summary>
+            /// The log Id to start on when using paging - required when using paging
+            /// </summary>
+            public long? StartIndex { get; set; }
+
+            /// <summary>
+            /// The page of the logs to load
+            /// </summary>
+            /// 
+            [Required()]
+            public int PageNumber { get; set; } = 1;
+
+            /// <summary>
+            /// The size of the page to load
+            /// </summary>
+            /// 
+            [Required()]
+            public int PageSize { get; set; } = 100;
+
+            /// <summary>
+            /// An array of log status to filter on
+            /// </summary>
+            public List<LogType> Status { get; set; } = new List<LogType>();
+
+            /// <summary>
+            /// The start date and time of the returned logs - all dates are in UTC
+            /// </summary>
+            public DateTime? StartDateTime { get; set; }
+            
+            /// <summary>
+            /// The end date and time of the returned logs - all dates are in UTC
+            /// </summary>
+            public DateTime? EndDateTime { get; set; }
+
+            /// <summary>
+            /// Text to search the logs for
+            /// </summary>
+            public string? SearchText { get; set; }
+
+            /// <summary>
+            /// Correlation id of the events to search for - use to find related events
+            /// </summary>
+            public string? CorrelationId { get; set; }
+
+            /// <summary>
+            /// The background process or API endpoint that generated the log entry
+            /// </summary>
+            public string? CallingProcess { get; set; }
+
+            /// <summary>
+            /// The user that generated the log entry
+            /// </summary>
+            public string? CallingUser { get; set; }
         }
     }
 }

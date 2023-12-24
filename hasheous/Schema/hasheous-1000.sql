@@ -6,13 +6,20 @@ CREATE TABLE `Settings` (
 );
 
 CREATE TABLE `ServerLogs` (
-  `Id` BIGINT NOT NULL AUTO_INCREMENT,
-  `EventTime` DATETIME NOT NULL,
-  `EventType` INT NOT NULL,
-  `Process` VARCHAR(100) NOT NULL,
-  `Message` LONGTEXT NOT NULL,
-  `Exception` LONGTEXT NULL,
-  PRIMARY KEY (`Id`));
+  `Id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `EventTime` datetime NOT NULL,
+  `EventType` int(11) NOT NULL,
+  `Process` varchar(100) NOT NULL,
+  `Message` longtext NOT NULL,
+  `Exception` longtext DEFAULT NULL,
+  `CorrelationId` varchar(45) DEFAULT NULL,
+  `CallingProcess` varchar(255) DEFAULT NULL,
+  `CallingUser` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`Id`),
+  KEY `idx_CorrelationId` (`CorrelationId`),
+  KEY `idx_CallingProcess` (`CallingProcess`),
+  FULLTEXT KEY `ft_message` (`Message`)
+);
 
 CREATE TABLE `Signatures_Games` (
   `Id` BIGINT NOT NULL AUTO_INCREMENT,

@@ -471,11 +471,7 @@ namespace Classes
                 // log retention in days
                 public int LogRetention = 7;
 
-                public enum LoggingFormat
-                {
-                    Json,
-                    Text
-                }
+                public bool AlwaysLogToDisk = false;
             }
         }
     }
