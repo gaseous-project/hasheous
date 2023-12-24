@@ -1,0 +1,38 @@
+version: '2'
+services:
+  hasheous-server:
+    container_name: hasheous-server
+    image: gaseousgames/hasheousserver:latest
+    restart: unless-stopped
+    networks:
+      - hasheous
+    depends_on:
+      - hsdb
+    ports:
+      - 7157:80
+    volumes:
+      - hs:/root/.hasheous-server
+    environment:
+      - dbhost=hsdb
+      - dbuser=root
+      - dbpass=hasheous
+      - igdbclientid=<clientid>
+      - igdbclientsecret=<clientsecret>
+  hsdb:
+    container_name: hsdb
+    image: mariadb
+    restart: unless-stopped
+    networks:
+      - hasheous
+    volumes:
+      - hsdb:/var/lib/mysql
+    environment:
+      - MARIADB_ROOT_PASSWORD=hasheous
+      - MARIADB_USER=hasheous
+      - MARIADB_PASSWORD=hasheous
+networks:
+  gaseous:
+    driver: bridge
+volumes:
+  hs:
+  hsdb:
