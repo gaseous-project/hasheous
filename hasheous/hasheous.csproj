@@ -20,6 +20,7 @@
   <ItemGroup>
     <PackageReference Include="gaseous-signature-parser" Version="2.0.0" />
     <PackageReference Include="gaseous.IGDB" Version="1.0.1" />
+    <PackageReference Include="hasheous-client" Version="0.1.0" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="7.0.13" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Versioning" Version="5.1.0" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Versioning.ApiExplorer" Version="5.1.0" />
@@ -47,5 +48,9 @@
     <EmbeddedResource Include="Schema\hasheous-1001.sql" />
     <EmbeddedResource Include="Schema\hasheous-1002.sql" />
     <EmbeddedResource Include="Schema\hasheous-1003.sql" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\gaseous-server\hasheous-client\hasheous-client.csproj" />
   </ItemGroup>
 </Project>

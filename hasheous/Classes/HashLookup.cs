@@ -110,10 +110,10 @@ namespace Classes
                         Sha1 = ((string)sigDbRow["SHA1"]).ToLower(),
                         DevelopmentStatus = (string)sigDbRow["DevelopmentStatus"],
                         Attributes = Newtonsoft.Json.JsonConvert.DeserializeObject<List<KeyValuePair<string, object>>>((string)Common.ReturnValueIfNull(sigDbRow["Attributes"], "[]")),
-                        RomType = (RomSignatureObject.Game.Rom.RomTypes)(int)sigDbRow["RomType"],
+                        RomType = (Signatures_Games.RomItem.RomTypes)(int)sigDbRow["RomType"],
                         RomTypeMedia = (string)sigDbRow["RomTypeMedia"],
                         MediaLabel = (string)sigDbRow["MediaLabel"],
-                        SignatureSource = (RomSignatureObject.Game.Rom.SignatureSourceType)(Int32)sigDbRow["MetadataSource"]
+                        SignatureSource = (Signatures_Games.RomItem.SignatureSourceType)(Int32)sigDbRow["MetadataSource"]
                     };
 
                     Signatures_Games gameItem = new Signatures_Games
