@@ -4,6 +4,7 @@ using gaseous_signature_parser.models.RomSignatureObject;
 using hasheous_server.Classes.Metadata.IGDB;
 using hasheous_server.Models;
 using IGDB.Models;
+using NuGet.Common;
 
 namespace Classes
 {
@@ -196,7 +197,7 @@ namespace Classes
             
             if (mapItem != null)
             {
-                // signature map found - produce metadata results for each metadata provider
+                // signature map found, it's been searched for before - produce metadata results for each metadata provider
 
                 // process IGDB
                 if (mapItem.IGDBGameId != 0)
@@ -214,8 +215,21 @@ namespace Classes
                 }
                 else
                 {
-                    // no IGDB metadata linked - search for game and link
-                    results.AddRange(SearchAndLinkGame(db, PlatformId, PlatformMatchMethod, gameItem));
+                    // no IGDB metadata linked - search for game and link if nextsearch has expired
+                    if (mapItem.NextSearch < DateTime.UtcNow)
+                    {
+                        results.AddRange(SearchAndLinkGame(db, PlatformId, PlatformMatchMethod, gameItem));
+                    }
+                    else
+                    {
+                        results.Add(new SignatureLookupItem.MetadataResult{
+                            PlatformId = PlatformId,
+                            PlatformMatchMethod = PlatformMatchMethod,
+                            GameId = mapItem.IGDBGameId,
+                            GameMatchMethod = mapItem.MatchMethod,
+                            Source = Communications.MetadataSources.IGDB
+                        });
+                    }
                 }
 
                 // FOR FUTURE - add structure similar to above from "process IGDB" down for other metadata sources
