@@ -38,12 +38,12 @@ namespace Classes
             if (GetSignatureGameMap(SignatureGameId) == null)
             {
                 // record doesn't exist - insert it
-                sql = "INSERT INTO Match_SignatureGames (SignatureGameId, IGDBGameId, MatchMethod, LastSearched, NextSearch) VALUES (@signaturegameid, @igdbgameid, @matchmethod, @lastsearch, @nextsearch);";
+                sql = "INSERT INTO Match_SignatureGames (SignatureGameId, IGDBGameId, MatchMethod, LastSearched, NextSearch) VALUES (@signaturegameid, @igdbgameid, @matchmethod, @lastsearch, NextSearch = @nextsearch);";
             }
             else
             {
                 // record exists - update it
-                sql = "UPDATE Match_SignatureGames SET SignatureGameId = @signaturegameid, IGDBGameId = @igdbgameid, MatchMethod = @matchmethod, LastSearched = @lastsearch, @nextsearch;";
+                sql = "UPDATE Match_SignatureGames SET IGDBGameId = @igdbgameid, MatchMethod = @matchmethod, LastSearched = @lastsearch, NextSearch = @nextsearch WHERE SignatureGameId = @signaturegameid;";
             }
             Dictionary<string, object> dbDict = new Dictionary<string, object>
             {
