@@ -38,7 +38,7 @@ namespace Classes
             if (GetSignatureGameMap(SignatureGameId) == null)
             {
                 // record doesn't exist - insert it
-                sql = "INSERT INTO Match_SignatureGames (SignatureGameId, IGDBGameId, MatchMethod, LastSearched, NextSearch) VALUES (@signaturegameid, @igdbgameid, @matchmethod, @lastsearch, NextSearch = @nextsearch);";
+                sql = "INSERT INTO Match_SignatureGames (SignatureGameId, IGDBGameId, MatchMethod, LastSearched, NextSearch) VALUES (@signaturegameid, @igdbgameid, @matchmethod, @lastsearch, @nextsearch);";
             }
             else
             {
