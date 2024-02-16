@@ -5,6 +5,7 @@ using hasheous_server.Classes.Metadata.IGDB;
 using hasheous_server.Models;
 using IGDB.Models;
 using NuGet.Common;
+using static Classes.Common;
 
 namespace Classes
 {
@@ -18,10 +19,10 @@ namespace Classes
         public HashLookup(HashLookupModel model)
         {
             // get the raw signature
-            List<Signatures_Games> rawSignatures = GetRawSignatures(model);
+            List<Signatures_Games_2> rawSignatures = GetRawSignatures(model);
 
             // narrow down the options
-            Signatures_Games discoveredSignature = new Signatures_Games();
+            Signatures_Games_2 discoveredSignature = new Signatures_Games_2();
             if (rawSignatures.Count == 0)
             {
                 Signature = null;
@@ -37,7 +38,7 @@ namespace Classes
                 else if (rawSignatures.Count > 1)
                 {
                     // more than one signature found - find one with highest score
-                    foreach (Signatures_Games Sig in rawSignatures)
+                    foreach (Signatures_Games_2 Sig in rawSignatures)
                     {
                         if (Sig.Score > discoveredSignature.Score)
                         {
@@ -59,7 +60,7 @@ namespace Classes
         public SignatureLookupItem.SignatureResult? Signature { get; set; }
         public List<SignatureLookupItem.MetadataResult>? MetadataResults { get; set; }
 
-        private static List<Signatures_Games> GetRawSignatures(HashLookupModel model)
+        private static List<Signatures_Games_2> GetRawSignatures(HashLookupModel model)
 		{
             Dictionary<string, object> dbDict = new Dictionary<string, object>();
             List<string> whereClauses = new List<string>();
@@ -82,42 +83,43 @@ namespace Classes
 
                 DataTable sigDb = db.ExecuteCMD(sql, dbDict);
 
-                List<Signatures_Games> GamesList = new List<Signatures_Games>();
+                List<Signatures_Games_2> GamesList = new List<Signatures_Games_2>();
 
                 foreach (DataRow sigDbRow in sigDb.Rows)
                 {
-                    Signatures_Games.GameItem game = new Signatures_Games.GameItem
+                    Signatures_Games_2.GameItem game = new Signatures_Games_2.GameItem
                     {
-                        Id = (long)sigDbRow["Id"],
+                        Id = ((long)sigDbRow["Id"]).ToString(),
                         Name = (string)sigDbRow["Name"],
                         Description = (string)sigDbRow["Description"],
                         Year = (string)sigDbRow["Year"],
-                        Publisher = (string)sigDbRow["Publisher"],
-                        Demo = (Signatures_Games.GameItem.DemoTypes)(int)sigDbRow["Demo"],
+                        Publisher = (string)Common.ReturnValueIfNull(sigDbRow["Publisher"], ""),
+                        Demo = (Signatures_Games_2.GameItem.DemoTypes)(int)sigDbRow["Demo"],
                         SystemId = (int)sigDbRow["PlatformId"],
                         System = (string)sigDbRow["Platform"],
                         SystemVariant = (string)sigDbRow["SystemVariant"],
                         Video = (string)sigDbRow["Video"],
-                        Country = (string)sigDbRow["Country"],
-                        Language = (string)sigDbRow["Language"],
+                        Countries = new Dictionary<string, string>(GetLookup(LookupTypes.Country, (long)sigDbRow["Id"])),
+                        Languages = new Dictionary<string, string>(GetLookup(LookupTypes.Language, (long)sigDbRow["Id"])),
                         Copyright = (string)sigDbRow["Copyright"]
                     };
-                    Signatures_Games.RomItem rom = new Signatures_Games.RomItem{
-                        Id = (long)sigDbRow["romid"],
+                    
+                    Signatures_Games_2.RomItem rom = new Signatures_Games_2.RomItem{
+                        Id = ((long)sigDbRow["romid"]).ToString(),
                         Name = (string)sigDbRow["romname"],
-                        Size = (long)sigDbRow["Size"],
+                        Size = (ulong)(long)sigDbRow["Size"],
                         Crc = (string)sigDbRow["CRC"],
                         Md5 = ((string)sigDbRow["MD5"]).ToLower(),
                         Sha1 = ((string)sigDbRow["SHA1"]).ToLower(),
                         DevelopmentStatus = (string)sigDbRow["DevelopmentStatus"],
-                        Attributes = Newtonsoft.Json.JsonConvert.DeserializeObject<List<KeyValuePair<string, object>>>((string)Common.ReturnValueIfNull(sigDbRow["Attributes"], "[]")),
-                        RomType = (Signatures_Games.RomItem.RomTypes)(int)sigDbRow["RomType"],
+                        Attributes = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>((string)Common.ReturnValueIfNull(sigDbRow["Attributes"], "")),
+                        RomType = (Signatures_Games_2.RomItem.RomTypes)(int)sigDbRow["RomType"],
                         RomTypeMedia = (string)sigDbRow["RomTypeMedia"],
                         MediaLabel = (string)sigDbRow["MediaLabel"],
-                        SignatureSource = (Signatures_Games.RomItem.SignatureSourceType)(Int32)sigDbRow["MetadataSource"]
+                        SignatureSource = (Signatures_Games_2.RomItem.SignatureSourceType)(Int32)sigDbRow["MetadataSource"]
                     };
 
-                    Signatures_Games gameItem = new Signatures_Games
+                    Signatures_Games_2 gameItem = new Signatures_Games_2
                     {
                         Game = game,
                         Rom = rom
@@ -132,7 +134,38 @@ namespace Classes
             }
         }
 
-        private List<SignatureLookupItem.MetadataResult> BuildMetaData(Signatures_Games GameSignature)
+        private static Dictionary<string, string> GetLookup(LookupTypes LookupType, long GameId)
+        {
+            string tableName = "";
+            switch (LookupType)
+            {
+                case LookupTypes.Country:
+                    tableName = "Countries";
+                    break;
+                
+                case LookupTypes.Language:
+                    tableName = "Languages";
+                    break;
+
+            }
+
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql = "SELECT " + LookupType.ToString() + ".Code, " + LookupType.ToString() + ".Value FROM Signatures_Games_" + tableName + " JOIN " + LookupType.ToString() + " ON Signatures_Games_" + tableName + "." + LookupType.ToString() + "Id = " + LookupType.ToString() + ".Id WHERE Signatures_Games_" + tableName + ".GameId = @id;";
+            Dictionary<string, object> dbDict = new Dictionary<string, object>{
+                { "id", GameId }
+            };
+            DataTable data = db.ExecuteCMD(sql, dbDict);
+
+            Dictionary<string, string> returnDict = new Dictionary<string, string>();
+            foreach (DataRow row in data.Rows)
+            {
+                returnDict.Add((string)row["Code"], (string)row["Value"]);
+            }
+
+            return returnDict;
+        }
+
+        private List<SignatureLookupItem.MetadataResult> BuildMetaData(Signatures_Games_2 GameSignature)
         {
             List<SignatureLookupItem.MetadataResult> results = new List<SignatureLookupItem.MetadataResult>();
 
@@ -150,7 +183,7 @@ namespace Classes
             return results;
         }
 
-        private Platform? SearchForPlatform(Database db, Signatures_Games.GameItem gameItem)
+        private Platform? SearchForPlatform(Database db, Signatures_Games_2.GameItem gameItem)
         {
             // platform lookup
             if (gameItem.SystemId != null)
@@ -188,12 +221,12 @@ namespace Classes
             return null;
         }
 
-        private List<SignatureLookupItem.MetadataResult>? SearchForGame(Database db, long PlatformId, BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod PlatformMatchMethod, Signatures_Games.GameItem gameItem)
+        private List<SignatureLookupItem.MetadataResult>? SearchForGame(Database db, long PlatformId, BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod PlatformMatchMethod, Signatures_Games_2.GameItem gameItem)
         {
             List<SignatureLookupItem.MetadataResult> results = new List<SignatureLookupItem.MetadataResult>();
 
             // check the signature to game map first
-            SignatureGameMapItem mapItem = SignatureGameMap.GetSignatureGameMap((long)gameItem.Id);
+            SignatureGameMapItem mapItem = SignatureGameMap.GetSignatureGameMap(long.Parse(gameItem.Id));
             
             if (mapItem != null)
             {
@@ -336,7 +369,7 @@ namespace Classes
             return SearchCandidates;
         }
 
-        private List<SignatureLookupItem.MetadataResult>? SearchAndLinkGame(Database db, long PlatformId, BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod PlatformMatchMethod, Signatures_Games.GameItem gameItem)
+        private List<SignatureLookupItem.MetadataResult>? SearchAndLinkGame(Database db, long PlatformId, BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod PlatformMatchMethod, Signatures_Games_2.GameItem gameItem)
         {
             List<SignatureLookupItem.MetadataResult> results = new List<SignatureLookupItem.MetadataResult>();
 
@@ -347,12 +380,12 @@ namespace Classes
                 {
                     // no match found :(
                     // set IGDB match to 0
-                    SignatureGameMap.SetSignatureGameMap((long)gameItem.Id, 0, BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch);
+                    SignatureGameMap.SetSignatureGameMap(long.Parse(gameItem.Id), 0, BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch);
                 }
                 else
                 {
                     // match found! :)
-                    SignatureGameMap.SetSignatureGameMap((long)gameItem.Id, (long)IGDBgame.Id, BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic);
+                    SignatureGameMap.SetSignatureGameMap(long.Parse(gameItem.Id), (long)IGDBgame.Id, BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic);
 
                     // return metadataresult
                     SignatureLookupItem.MetadataResult IGDBresult = new SignatureLookupItem.MetadataResult{

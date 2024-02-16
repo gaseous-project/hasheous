@@ -119,14 +119,21 @@ namespace Classes
                                             parserType != gaseous_signature_parser.parser.SignatureParser.Unknown
                                         )
                                         {
+                                            
                                             string SignaturePath = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesDirectory, parserType.ToString());
+                                            string SignatureProcessedPath = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesProcessedDirectory, parserType.ToString());
 
                                             if (!Directory.Exists(SignaturePath))
                                             {
                                                 Directory.CreateDirectory(SignaturePath);
                                             }
 
-                                            tIngest.Import(SignaturePath, parserType);
+                                            if (!Directory.Exists(SignatureProcessedPath))
+                                            {
+                                                Directory.CreateDirectory(SignatureProcessedPath);
+                                            }
+
+                                            tIngest.Import(SignaturePath, SignatureProcessedPath, parserType);
                                         }
                                     }
                                     

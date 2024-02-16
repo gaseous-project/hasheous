@@ -369,6 +369,14 @@ namespace Classes
                     }
                 }
 
+                public string LibrarySignaturesProcessedDirectory
+                {
+                    get
+                    {
+                        return Path.Combine(LibraryRootDirectory, "Signatures - Processed");
+                    }
+                }
+
                 public string LibraryTempDirectory
                 {
                     get

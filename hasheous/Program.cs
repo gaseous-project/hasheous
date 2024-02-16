@@ -12,7 +12,9 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using System.Threading.RateLimiting;
 using hasheous_server.Classes.Metadata.IGDB;
+using Microsoft.AspNetCore.Mvc.NewtonsoftJson;
 using static Classes.Common;
+using Newtonsoft.Json.Converters;
 
 Logging.WriteToDiskOnly = true;
 Logging.Log(Logging.LogType.Information, "Startup", "Starting Hasheous Server " + Assembly.GetExecutingAssembly().GetName().Version);
@@ -64,6 +66,20 @@ builder.Services.AddControllers().AddJsonOptions(x =>
 
     // set max depth
     x.JsonSerializerOptions.MaxDepth = 64;
+});
+builder.Services.AddMvc().AddNewtonsoftJson(x =>
+{
+    // serialize enums as string in api responses
+    x.SerializerSettings.Converters.Add(new Newtonsoft.Json.Converters.StringEnumConverter());
+
+    // suppress nulls
+    x.SerializerSettings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
+
+    // set max depth
+    x.SerializerSettings.MaxDepth = 64;
+
+    // indent all responses
+    x.SerializerSettings.Formatting = Newtonsoft.Json.Formatting.Indented;
 });
 builder.Services.AddResponseCaching();
 builder.Services.AddControllers(options =>

@@ -31,14 +31,28 @@ CREATE TABLE `Signatures_Games` (
   `SystemId` int DEFAULT NULL,
   `SystemVariant` varchar(100) DEFAULT NULL,
   `Video` varchar(10) DEFAULT NULL,
-  `Country` varchar(5) DEFAULT NULL,
-  `Language` varchar(5) DEFAULT NULL,
+  `Country` int DEFAULT NULL,
+  `Language` int DEFAULT NULL,
   `Copyright` varchar(15) DEFAULT NULL,
   PRIMARY KEY (`Id`),
   UNIQUE KEY `Id_UNIQUE` (`Id`),
   KEY `publisher_Idx` (`PublisherId`),
   KEY `system_Idx` (`SystemId`),
   KEY `ingest_Idx` (`Name`,`Year`,`PublisherId`,`SystemId`) USING BTREE
+);
+
+CREATE TABLE `Signatures_Games_Countries` (
+  `GameId` BIGINT NOT NULL,
+  `CountryId` INT NOT NULL,
+  PRIMARY KEY (`GameId`, `CountryId`),
+  CONSTRAINT `GameCountry` FOREIGN KEY (`GameId`) REFERENCES `Signatures_Games` (`Id`) ON DELETE CASCADE ON UPDATE NO ACTION
+);
+
+CREATE TABLE `Signatures_Games_Languages` (
+  `GameId` BIGINT NOT NULL,
+  `LanguageId` INT NOT NULL,
+  PRIMARY KEY (`GameId`, `LanguageId`),
+  CONSTRAINT `GameLanguage` FOREIGN KEY (`GameId`) REFERENCES `Signatures_Games` (`Id`) ON DELETE CASCADE ON UPDATE NO ACTION
 );
 
 CREATE TABLE `Signatures_Platforms` (
@@ -145,5 +159,5 @@ CREATE VIEW `view_Signatures_Games` AS
         `Signatures_Games`.`Copyright` AS `Copyright`
     FROM
         ((`Signatures_Games`
-        JOIN `Signatures_Publishers` ON ((`Signatures_Games`.`PublisherId` = `Signatures_Publishers`.`Id`)))
+        LEFT JOIN `Signatures_Publishers` ON ((`Signatures_Games`.`PublisherId` = `Signatures_Publishers`.`Id`)))
         JOIN `Signatures_Platforms` ON ((`Signatures_Games`.`SystemId` = `Signatures_Platforms`.`Id`)));
