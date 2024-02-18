@@ -16,6 +16,8 @@ services:
   mariadb:
     hostname: mariadb
     image: mariadb:latest
+    ports: 
+      - 3307:3306
     environment:
       - MARIADB_ROOT_PASSWORD=hasheous
       - MARIADB_DATABASE=hasheous
