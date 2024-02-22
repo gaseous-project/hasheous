@@ -1,0 +1,41 @@
+<div class="loginwindow">
+    <div id="loginform" class="loginwindow-content">
+        <img src="/images/logo.svg" style="display: block; margin: 20px auto; width: 100px;" />
+
+        <div class="header_label" style="display: block; text-align: center;">Hasheous</div>
+
+        <table style="width: 100%; margin-top: 20px;" cellpadding="5px">
+            <tr>
+                <th>Email</th>
+                <td><input type="email" id="login_email" /></td>
+            </tr>
+            <tr>
+                <th>Password</th>
+                <td><input type="password" id="login_password" /></td>
+            </tr>
+            <tr>
+                <td colspan="2" id="login_errorlabel" style="color: red;"></td>
+            </tr>
+            <tr>
+                <td colspan="2">
+                    <input type="checkbox" id="login_rememberme"> <label for="login_rememberme">Remember Me</label>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2">
+                    <a href="#">Forgotten Password</a>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2">
+                    <a href="#">Create an account</a>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2" style="padding-top: 20px;">
+                    <button type="button" value="Sign In" onclick="UserLogin();" class="bigbutton">Sign In</button>
+                </td>
+            </tr>
+        </table>
+    </div>
+</div>

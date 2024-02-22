@@ -1,0 +1,295 @@
+:root {
+    --link-color: rgb(0, 0, 120);
+    --link-color-highlight: rgb(0, 0, 230);
+    --element-background-color: rgba(240, 240, 240);
+    --element-background-color-translucent: rgba(240, 240, 240, 0.5);
+    --element-border-color: rgb(190, 190, 190);
+    --element-highlight: #ddd;
+    --field-background-color: #ffffff;
+    --field-text-color: #000000;
+    --field-border-color: #000000;
+    --button-color: #555;
+    --button-text-color: #ffffff;
+    --button-color-hover: #888;
+    --button-color-disabled: #555;
+    --button-text-color-disabled: #888;
+    --redbutton-color: darkred;
+    --redbutton-text-color: #ffffff;
+    --redbutton-color-hover: red;
+    --max-page-width: 1122px;
+    --banner-height: 40px;
+}
+
+@font-face {
+    font-family: Commodore64;
+    src: url('/fonts/Commodore Pixelized v1.2.ttf');
+}
+
+body {
+    font-family: "PT Sans", Arial, Helvetica, sans-serif;
+    font-kerning: normal;
+    font-style: normal;
+    font-weight: 100;
+    font-size: 13px;
+}
+
+h1 {
+    margin-top: unset;
+    position: relative;
+    display: block;
+    width: 100%;
+}
+
+a {
+    color: var(--link-color);
+    text-decoration: none;
+}
+
+a:hover {
+    color: var(--link-color-highlight);
+    text-decoration: underline;
+}
+
+input[type='text'], input[type='number'], input[type="email"], input[type="password"], input[type="datetime-local"] {
+    background-color: var(--field-background-color);
+    color: var(--field-text-color);
+    padding: 4px;
+    font-family: "PT Sans", Arial, Helvetica, sans-serif;
+    font-kerning: normal;
+    font-style: normal;
+    font-weight: 100;
+    font-size: 13px;
+    border-radius: 5px;
+    border-width: 1px;
+    border-style: solid;
+    border-color: var(--field-border-color);
+    height: 21px;
+}
+
+input[type='text']:hover, input[type='number']:hover, input[type="email"]:hover, input[type="password"]:hover, input[type="datetime-local"]:hover {
+    
+}
+
+button:not(.select2-selection__choice__remove):not(.ejs_menu_button):not(.bigbutton) {
+    background-color: var(--button-color);
+    color: var(--button-text-color);
+    border-width: 1px;
+    border-color: var(--button-color);
+    border-style: solid;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    padding-left: 15px;
+    padding-right: 15px;
+    margin-right: 3px;
+    margin-bottom: 3px;
+    font-size: 13px;
+    height: 30px;
+}
+
+button:not(.select2-selection__choice__remove):not(.ejs_menu_button):hover {
+    background-color: var(--button-color-hover);
+    cursor: pointer;
+}
+
+button:not(.select2-selection__choice__remove):not(.ejs_menu_button):disabled {
+    background-color: var(--button-color-disabled);
+    color: var(--button-text-color-disabled);
+    cursor: not-allowed;
+}
+
+.bigbutton {
+    background-color: var(--button-color);
+    color: var(--button-text-color);
+    border-width: 1px;
+    border-color: var(--button-color);
+    border-style: solid;
+    margin-top: 10px;
+    width: 100%;
+    height: 42px;
+    font-size: 16px;
+    border-radius: 10px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+}
+
+.redbutton {
+    background-color: var(--redbutton-color);
+    border-color: var(--redbutton-color);
+    color: var(--redbutton-text-color);
+}
+
+.redbutton:hover {
+    background-color: var(--redbutton-color-hover);
+}
+
+.redbutton:disabled {
+    background-color: var(--button-color-disabled);
+}
+
+#banner_header {
+    background-color: var(--element-background-color-translucent);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    position: fixed;
+    top: 0px;
+    left: 0px;
+    height: var(--banner-height);
+    right: 0px;
+    align-items: center;
+    z-index: 49;
+    border-bottom-color: var(--element-border-color);
+    border-bottom-width: 1px;
+    border-bottom-style: solid;
+}
+
+#banner_icon {
+    position: fixed;
+    top: 0px;
+    left: 0px;
+    width: 40px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    padding: 0px;
+    margin: 0px;
+    display: flex;
+    z-index: 50;
+}
+
+#banner_header_label, .header_label {
+    font-family: Commodore64;
+    display: inline-block;
+    font-size: 16pt;
+    color: rgba(0, 22, 56, 1);
+}
+
+#banner_header_label {
+    padding: 8px;
+    margin-left: 35px;
+    vertical-align: top;
+    cursor: pointer;
+}
+
+#banner_icon_image {
+    width: 40px;
+    height: 40px;
+}
+
+.banner_button_image {
+    height: 20px;
+    width: 20px;
+    margin-right: 5px;
+    /* filter: invert(100%); */
+}
+
+.banner_button {
+    background-color: transparent;
+    float: right;
+    top: 0px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-top: 0px;
+    padding-bottom: 0px;
+    margin: 0px 0px 0px 0px;
+    display: flex;
+    /* color: white; */
+    color: rgba(0, 22, 56, 1);
+    /* border-left-color: rgb(190, 190, 190);
+    border-left-width: 1px;
+    border-left-style: solid; */
+}
+
+.banner_button:hover {
+    cursor: pointer;
+    background-color: var(--element-highlight);
+    /* color: white; */
+}
+
+.banner_button_nohover:hover {
+    background-color: transparent;
+}
+
+#banner_search_field {
+    width: 250px;
+}
+
+/* The container <div> - needed to position the dropdown content */
+.dropdown {
+    position: relative;
+    display: inline-block;
+    float: right;
+}
+
+/* Dropdown Content (Hidden by Default) */
+.dropdown-content {
+    display: none;
+    position: absolute;
+    background-color: var(--element-background-color);
+    border-color: var(--element-border-color);
+    border-width: 1px;
+    border-style: solid;
+    min-width: 160px;
+    /* box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); */
+    z-index: -1;
+    right: 0;
+    top: 40px;
+    filter: drop-shadow(5px 5px 5px rgba(0, 0, 0, 0.3));
+    -webkit-filter: drop-shadow(5px 5px 5px rgba(0, 0, 0, 0.3));
+}
+
+/* Links inside the dropdown */
+.dropdown-content a, .dropdown-content span {
+    color: black;
+    padding: 12px 16px;
+    text-decoration: none;
+    display: block;
+}
+
+.dropdown-content span {
+    cursor: auto;
+}
+  
+/* Change color of dropdown links on hover */
+.dropdown-content a:hover {background-color: var(--element-highlight);}
+  
+/* Show the dropdown menu (use JS to add this class to the .dropdown-content container when the user clicks on the dropdown button) */
+.show {display:block;}
+
+#pagecontainer {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    padding-top: var(--banner-height);
+}
+
+#content {
+    padding-top: 5px;
+    padding-left: 5px;
+    padding-right: 5px;
+    width: var(--max-page-width);
+    max-width: var(--max-page-width);
+}
+
+.loginwindow {
+    margin: 0 auto;
+    max-width: 350px;
+}
+
+.loginwindow-content {
+    text-align: left;
+}
+
+#login_email, #login_password {
+    width: 250px;
+}
+
+.table_container {
+    position: relative;
+    display: block;
+    width: 100%;
+    background-color: yellow;
+    overflow: auto;
+}

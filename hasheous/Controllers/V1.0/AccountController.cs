@@ -15,7 +15,7 @@ namespace hasheous_server.Controllers.v1_0
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]")]
     [ApiVersion("1.0")]
-    [ApiExplorerSettings(IgnoreApi = true)]
+    // [ApiExplorerSettings(IgnoreApi = true)]
     [Authorize]
     public class AccountController : Controller
     {
@@ -104,7 +104,7 @@ namespace hasheous_server.Controllers.v1_0
 
         [HttpGet]
         [Route("Profile/Basic/profile.js")]
-        [ApiExplorerSettings(IgnoreApi = true)]
+        // [ApiExplorerSettings(IgnoreApi = true)]
         [AllowAnonymous]
         public async Task<IActionResult> ProfileBasicFile()
         {

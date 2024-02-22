@@ -1,0 +1,17 @@
+@media screen and (max-width: 799px) {
+    /* applies when the viewport is < 800px */
+    #banner_header_label {
+        display: none;
+    }
+}
+
+@media screen and (max-width: 649px) {
+    /* applies when the viewport is < 650px */
+    #banner_search, #banner_github {
+        display: none;
+    }
+
+    #login_email, #login_password {
+        width: 200px;
+    }
+}
