@@ -41,6 +41,23 @@ namespace Classes
             return sourceItems;
         }
 
+        public Dictionary<RomSignatureObject.Game.Rom.SignatureSourceType, int> GetSourceStatistics()
+        {
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql = "SELECT MetadataSource, COUNT(Id) AS RomCount FROM Signatures_Roms GROUP BY MetadataSource;";
+            Dictionary<string, object> dbDict = new Dictionary<string, object>();
+            DataTable table = db.ExecuteCMD(sql, dbDict);
+
+            Dictionary<RomSignatureObject.Game.Rom.SignatureSourceType, int> romCount = new Dictionary<RomSignatureObject.Game.Rom.SignatureSourceType, int>();
+
+            foreach (DataRow row in table.Rows)
+            {
+                romCount.Add((RomSignatureObject.Game.Rom.SignatureSourceType)row["MetadataSource"], (int)(long)row["RomCount"]);
+            }
+
+            return romCount;
+        }
+
         public Models.SourceItem BuildSourceItem(DataRow row)
         {
             Models.SourceItem sourceItem = new Models.SourceItem{

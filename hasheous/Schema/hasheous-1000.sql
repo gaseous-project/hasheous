@@ -91,7 +91,8 @@ CREATE TABLE `Signatures_Roms` (
   KEY `GameId_Idx` (`GameId`),
   KEY `md5_Idx` (`MD5`) USING BTREE,
   KEY `sha1_Idx` (`SHA1`) USING BTREE,
-  KEY `name_Idx` (`Name`) USING BTREE
+  KEY `name_Idx` (`Name`) USING BTREE,
+  INDEX `source_Idx` (`MetadataSource` ASC) VISIBLE
 );
 
 CREATE TABLE `Signatures_Sources` (

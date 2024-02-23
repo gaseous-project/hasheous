@@ -11,7 +11,7 @@ namespace hasheous_server.Controllers.v1_0
     /// Endpoints used for looking up hash signatures and their metadata id mappings
     /// </summary>
     [ApiController]
-    [Route("api/v{version:apiVersion}/[controller]/[action]")]
+    [Route("api/v{version:apiVersion}/[controller]/")]
     [ApiVersion("1.0")]
     public class HashLookupController : ControllerBase
     {
@@ -23,6 +23,7 @@ namespace hasheous_server.Controllers.v1_0
         [HttpPost]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [Route("Lookup")]
         public async Task<IActionResult> Lookup(HashLookupModel model)
         {
             HashLookup hashLookup = new HashLookup(model);
