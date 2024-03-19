@@ -73,7 +73,7 @@ namespace Classes
             string sql = "";
 
             // get platform data
-            IGDB.Models.Platform platform = Platforms.GetPlatform(IGDBId);
+            IGDB.Models.Platform platform = hasheous_server.Classes.Metadata.IGDB.Platforms.GetPlatform(IGDBId);
 
             // get platform alternate names
             sql = "SELECT * FROM PlatformMap_AlternateNames WHERE Id = @Id ORDER BY Name";

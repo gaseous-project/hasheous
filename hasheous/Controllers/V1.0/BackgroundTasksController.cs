@@ -4,12 +4,14 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Classes;
+using Microsoft.AspNetCore.Authorization;
 
 namespace hasheous_server.Controllers.v1_0
 {
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]")]
     [ApiVersion("1.0")]
+    [Authorize(Roles = "Admin")]
     public class BackgroundTasksController : Controller
     {
         [HttpGet]

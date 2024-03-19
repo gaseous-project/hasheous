@@ -1,6 +1,6 @@
 // set up banner UI elements
 $('#banner_search_field').select2({
-    placeholder: "Search",
+    placeholder: getLang("search"),
     allowClear: true
 });
 
@@ -12,10 +12,9 @@ function showMenu() {
 // Close the dropdown menu if the user clicks outside of it
 window.onclick = function(event) {
     if (!event.target.matches('.dropbtn')) {
-        var dropdowns = document.getElementsByClassName("dropdown-content");
-        var i;
-        for (i = 0; i < dropdowns.length; i++) {
-            var openDropdown = dropdowns[i];
+        let dropdowns = document.getElementsByClassName("dropdown-content");
+        for (let i = 0; i < dropdowns.length; i++) {
+            let openDropdown = dropdowns[i];
             if (openDropdown.classList.contains('show')) {
                 openDropdown.classList.remove('show');
             }
@@ -24,8 +23,8 @@ window.onclick = function(event) {
 }
 
 // handle logins
-var buttonProfile = document.getElementById('banner_user');;
-var buttonLogin = document.getElementById('banner_login');
+let buttonProfile = document.getElementById('banner_user');;
+let buttonLogin = document.getElementById('banner_login');
 if (userProfile == null) {
     // not logged in
     buttonProfile.style.display = 'none';
@@ -48,25 +47,59 @@ function userLogoff() {
     );
 }
 
+function setPageElementInnerHTMLLanguage(elementList) {
+    for (let i = 0; i < elementList.length; i++) {
+        if (elementList[i].getAttribute('data-lang')) {
+            elementList[i].innerHTML = getLang(elementList[i].getAttribute('data-lang'));
+        }
+    }
+}
+
 // load the page into the main container and set the page title
-var targetPage = getQueryString('page', 'string');
+let targetPage = getQueryString('page', 'string');
 if (!targetPage) { targetPage = "home"; }
 switch (targetPage) {
     default:
-        $('#content').load('/pages/' + targetPage + '.html');
-        if (pageNames[targetPage]) {
-            if (pageNames[targetPage].length > 0) {
-                document.title = "Hasheous - " + pageNames[targetPage];
-            } else {
-                document.title = "Hasheous";    
+        $('#content').load('/pages/' + targetPage + '.html', function(responseTxt, statusTxt, xhr){
+            if (statusTxt == "success") {
+                let pageScriptDiv = document.getElementById('postLoadPageScripts');
+                pageScriptDiv.innerHTML = '';
+                let pageScriptElement = document.createElement('script');
+                pageScriptElement.setAttribute('src', '/pages/' + targetPage + '.js');
+                pageScriptDiv.appendChild(pageScriptElement);
+
+                // set page headers
+                setPageElementInnerHTMLLanguage(document.getElementsByTagName('h1'));
+                setPageElementInnerHTMLLanguage(document.getElementsByTagName('h2'));
+                setPageElementInnerHTMLLanguage(document.getElementsByTagName('span'));
+                setPageElementInnerHTMLLanguage(document.getElementsByTagName('p'));
+                setPageElementInnerHTMLLanguage(document.getElementsByTagName('div'));
+                setPageElementInnerHTMLLanguage(document.getElementsByTagName('th'));
+                setPageElementInnerHTMLLanguage(document.getElementsByTagName('td'));
+                setPageElementInnerHTMLLanguage(document.getElementsByTagName('label'));
+                setPageElementInnerHTMLLanguage(document.getElementsByTagName('a'));
+                setPageElementInnerHTMLLanguage(document.getElementsByTagName('button'));
             }
-        } else {
-            document.title = "Hasheous";
-        }
+            if (statusTxt == "error") {
+                console.error("Error loading page: " + xhr.status + ": " + xhr.statusText);
+            }
+            setPageTitle(targetPage);
+        });
         break;
 }
-var pageScriptDiv = document.getElementById('postLoadPageScripts');
-pageScriptDiv.innerHTML = '';
-var pageScriptElement = document.createElement('script');
-pageScriptElement.setAttribute('src', '/pages/' + targetPage + '.js');
-pageScriptDiv.appendChild(pageScriptElement);
+
+function setPageTitle(targetPage, overrideLanguageLookup) {
+    if (overrideLanguageLookup === true) {
+        document.title = getLang("Hasheous") + " - " + targetPage;
+    } else {
+        if (getLang(targetPage)) {
+            if (getLang(targetPage).length > 0) {
+                document.title = getLang("Hasheous") + " - " + getLang(targetPage);
+            } else {
+                document.title = getLang("Hasheous");
+            }
+        } else {
+            document.title = getLang("Hasheous");
+        }
+    }
+}

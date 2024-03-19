@@ -153,7 +153,7 @@ namespace BackgroundMetadataMatcher
                             dbDict.Add("nextsearch", DateTime.UtcNow.AddHours(hoursToAdd));
 
                             // get platform metadata
-                            Platforms.GetPlatform((long)platforms.Result[0].Id);
+                            hasheous_server.Classes.Metadata.IGDB.Platforms.GetPlatform((long)platforms.Result[0].Id);
                         }
                         else
                         {
@@ -174,7 +174,7 @@ namespace BackgroundMetadataMatcher
                                         matchFound = true;
                                     }
                                 }
-                                Platforms.GetPlatform((long)platform.Id);
+                                hasheous_server.Classes.Metadata.IGDB.Platforms.GetPlatform((long)platform.Id);
                             }
 
                             if (matchFound == false)
@@ -205,7 +205,7 @@ namespace BackgroundMetadataMatcher
                 dbDict.Add("nextsearch", DateTime.UtcNow.AddHours(hoursToAdd));
 
                 // get platform metadata
-                Platforms.GetPlatform(platformMapId);
+                hasheous_server.Classes.Metadata.IGDB.Platforms.GetPlatform(platformMapId);
             }
             db.ExecuteCMD(sql, dbDict);
         }

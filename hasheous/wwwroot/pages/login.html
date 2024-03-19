@@ -2,15 +2,15 @@
     <div id="loginform" class="loginwindow-content">
         <img src="/images/logo.svg" style="display: block; margin: 20px auto; width: 100px;" />
 
-        <div class="header_label" style="display: block; text-align: center;">Hasheous</div>
+        <div class="header_label" style="display: block; text-align: center;" data-lang="hasheous">Hasheous</div>
 
         <table style="width: 100%; margin-top: 20px;" cellpadding="5px">
             <tr>
-                <th>Email</th>
+                <th data-lang="email">Email</th>
                 <td><input type="email" id="login_email" /></td>
             </tr>
             <tr>
-                <th>Password</th>
+                <th data-lang="password">Password</th>
                 <td><input type="password" id="login_password" /></td>
             </tr>
             <tr>
@@ -18,22 +18,22 @@
             </tr>
             <tr>
                 <td colspan="2">
-                    <input type="checkbox" id="login_rememberme"> <label for="login_rememberme">Remember Me</label>
+                    <input type="checkbox" id="login_rememberme"> <label for="login_rememberme" data-lang="rememberme">Remember Me</label>
                 </td>
             </tr>
             <tr>
                 <td colspan="2">
-                    <a href="#">Forgotten Password</a>
+                    <a href="#" data-lang="forgottenpassword">Forgotten Password</a>
                 </td>
             </tr>
             <tr>
                 <td colspan="2">
-                    <a href="#">Create an account</a>
+                    <a href="#" data-lang="createanaccount">Create an account</a>
                 </td>
             </tr>
             <tr>
                 <td colspan="2" style="padding-top: 20px;">
-                    <button type="button" value="Sign In" onclick="UserLogin();" class="bigbutton">Sign In</button>
+                    <button type="button" value="Sign In" onclick="UserLogin();" class="bigbutton" data-lang="signin">Sign In</button>
                 </td>
             </tr>
         </table>

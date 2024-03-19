@@ -7,8 +7,8 @@
         <link type="text/css" href="/styles/style-skinny.css" rel="stylesheet" />
         <link type="text/css" href="/styles/select2.min.css" rel="stylesheet" />
         <script src="/scripts/common.js"></script>
-        <script src="/scripts/pages.js"></script>
         <script src="/scripts/jquery-3.6.0.min.js"></script>
+        <script src="/scripts/moment-with-locales.min.js"></script>
         <script src="/scripts/select2.min.js"></script>
         <script src="/api/v1/Account/Profile/Basic/profile.js"></script>
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
@@ -28,13 +28,13 @@
                     <img src="/images/user.svg" alt="Account" title="Account" id="banner_user_image" class="banner_button_image" style="position: relative; top: 10px; right: 0px; pointer-events: none;" onclick="showMenu();" />
                     <div id="myDropdown" class="dropdown-content">
                         <div id="banner_user_roles"></div>
-                        <a href="/index.html?page=profile">Profile</a>
-                        <a href="#" onclick="userLogoff();">Sign Out</a>
+                        <a href="/index.html?page=profile" data-lang="profile">Profile</a>
+                        <a href="#" onclick="userLogoff();" data-lang="signout">Sign Out</a>
                     </div>
                 </div>
 
                 <div id="banner_login" onclick="window.location.href = '/index.html?page=login';" class="banner_button" style="display: none;">
-                    <span id="banner_login_label">Login</span>
+                    <span id="banner_login_label" data-lang="login">Login</span>
                 </div>
                 
                 <div id="banner_github" onclick="window.location.href = 'https:\/\/github.com\/gaseous-project\/hasheous';" class="banner_button">
@@ -47,11 +47,15 @@
                 </div>
 
                 <div id="banner_platform" onclick="window.location.href = '/index.html?page=platforms';" class="banner_button">
-                    <span id="banner_platform_label">Platforms</span>
+                    <span id="banner_platform_label" data-lang="platforms">Platforms</span>
+                </div>
+
+                <div id="banner_company" onclick="window.location.href = '/index.html?page=companies';" class="banner_button">
+                    <span id="banner_company_label" data-lang="companies">Companies</span>
                 </div>
 
                 <div id="banner_source" onclick="window.location.href = '/index.html?page=sources';" class="banner_button">
-                    <span id="banner_source_label">Sources</span>
+                    <span id="banner_source_label" data-lang="sources">Sources</span>
                 </div>
 
                 <div id="banner_search" class="banner_button banner_button_nohover">
@@ -59,7 +63,7 @@
                 </div>
             </div>
 
-            <div id="banner_header_label" onclick="window.location.href = '/index.html';">Hasheous</div>
+            <div id="banner_header_label" onclick="window.location.href = '/index.html';" data-lang="hasheous">Hasheous</div>
         </div>
 
         <!-- page content -->

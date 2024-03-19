@@ -4,7 +4,7 @@ if (userProfile != null) {
 }
 
 function UserLogin() {
-    var loginObj = {
+    let loginObj = {
         "email": document.getElementById('login_email').value,
         "password": document.getElementById('login_password').value,
         "rememberMe": document.getElementById('login_rememberme').checked

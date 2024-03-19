@@ -320,17 +320,7 @@ ProcessQueue.QueueItems.Add(
         60,
         new List<ProcessQueue.QueueItemType>
         {
-            ProcessQueue.QueueItemType.SignatureMetadataMatcher
-        }
-        )
-    );
-ProcessQueue.QueueItems.Add(
-    new ProcessQueue.QueueItem(
-        ProcessQueue.QueueItemType.SignatureMetadataMatcher, 
-        60,
-        new List<ProcessQueue.QueueItemType>
-        {
-            ProcessQueue.QueueItemType.SignatureIngestor
+            
         }
         )
     );

@@ -1,7 +1,7 @@
 using System.Security.Cryptography.X509Certificates;
 using gaseous_signature_parser.models.RomSignatureObject;
 
-namespace Models
+namespace hasheous_server.Models
 {
     public class SourceItem
     {

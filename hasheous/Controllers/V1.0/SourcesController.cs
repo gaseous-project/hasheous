@@ -10,11 +10,13 @@ namespace hasheous_server.Controllers.v1_0
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]/")]
     [ApiVersion("1.0")]
+    [Authorize]
     public class SourcesController : ControllerBase
     {
         [MapToApiVersion("1.0")]
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [AllowAnonymous]
         [Route("")]
         public async Task<IActionResult> SourceList()
         {
@@ -24,16 +26,18 @@ namespace hasheous_server.Controllers.v1_0
         [MapToApiVersion("1.0")]
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [AllowAnonymous]
         [Route("Statistics")]
         public async Task<IActionResult> GetSourceStatistics()
         {
-            Sources sources = new Sources();
+            hasheous_server.Classes.Sources sources = new hasheous_server.Classes.Sources();
             return Ok(sources.GetSourceStatistics());
         }
 
         [MapToApiVersion("1.0")]
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [AllowAnonymous]
         [Route("{sourceType}/Details")]
         public async Task<IActionResult> GetSources(RomSignatureObject.Game.Rom.SignatureSourceType sourceType)
         {
@@ -45,7 +49,7 @@ namespace hasheous_server.Controllers.v1_0
                 case RomSignatureObject.Game.Rom.SignatureSourceType.MAMEArcade:
                 case RomSignatureObject.Game.Rom.SignatureSourceType.MAMEMess:
                 case RomSignatureObject.Game.Rom.SignatureSourceType.NoIntros:
-                    Sources sources = new Sources();
+                    hasheous_server.Classes.Sources sources = new hasheous_server.Classes.Sources();
                     return Ok(sources.GetSources(sourceType));
 
                 default:

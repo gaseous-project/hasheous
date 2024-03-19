@@ -205,7 +205,7 @@ namespace Classes
                         if (mappedPlatformId != 0)
                         {
                             // we have a mapped platform
-                            ReturnPlatform = Platforms.GetPlatform(mappedPlatformId, false);
+                            ReturnPlatform = hasheous_server.Classes.Metadata.IGDB.Platforms.GetPlatform(mappedPlatformId, false);
                             
                             // return the platform if we get a value back
                             if (ReturnPlatform != null)

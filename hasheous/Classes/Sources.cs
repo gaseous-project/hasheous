@@ -1,11 +1,12 @@
 using System.Data;
+using Classes;
 using gaseous_signature_parser.models.RomSignatureObject;
 
-namespace Classes
+namespace hasheous_server.Classes
 {
     public class Sources
     {
-        public List<Models.SourceItem> GetSources(RomSignatureObject.Game.Rom.SignatureSourceType sourceType)
+        public List<hasheous_server.Models.SourceItem> GetSources(RomSignatureObject.Game.Rom.SignatureSourceType sourceType)
         {
             string SourceTypeLabel = "";
             switch (sourceType)
@@ -31,7 +32,7 @@ namespace Classes
             };
             DataTable table = db.ExecuteCMD(sql, dbDict);
 
-            List<Models.SourceItem> sourceItems = new List<Models.SourceItem>();
+            List<hasheous_server.Models.SourceItem> sourceItems = new List<hasheous_server.Models.SourceItem>();
 
             foreach (DataRow row in table.Rows)
             {
@@ -58,9 +59,9 @@ namespace Classes
             return romCount;
         }
 
-        public Models.SourceItem BuildSourceItem(DataRow row)
+        public hasheous_server.Models.SourceItem BuildSourceItem(DataRow row)
         {
-            Models.SourceItem sourceItem = new Models.SourceItem{
+            hasheous_server.Models.SourceItem sourceItem = new hasheous_server.Models.SourceItem{
                 Id = (int)row["Id"],
                 Name = (string)row["Name"],
                 Description = (string)row["Description"],
