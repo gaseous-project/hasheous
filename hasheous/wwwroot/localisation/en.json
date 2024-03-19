@@ -10,6 +10,7 @@
     "sources": "Data Sources",
     "source": "Source",
     "platforms": "Platforms",
+    "newplatform": "New Platform",
     "companies": "Companies",
     "newcompany": "New Company",
     "search": "Search",

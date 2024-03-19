@@ -14,34 +14,32 @@ CREATE TABLE `Language` (
   INDEX `id_Code` (`Code` ASC) VISIBLE,
   INDEX `id_Value` (`Value` ASC) VISIBLE);
 
-CREATE TABLE `Company` (
+CREATE TABLE `DataObject` (
   `Id` bigint(20) NOT NULL AUTO_INCREMENT,
   `Name` varchar(255) DEFAULT NULL,
+  `ObjectType` int NOT NULL,
   `CreatedDate` datetime DEFAULT NULL,
   `UpdatedDate` datetime DEFAULT NULL,
-  PRIMARY KEY (`Id`)
+  PRIMARY KEY (`Id`, `ObjectType`)
 );
 
-CREATE TABLE `Company_SignatureMap` (
-  `CompanyId` bigint(20) NOT NULL,
+CREATE TABLE `DataObject_SignatureMap` (
+  `DataObjectId` bigint(20) NOT NULL,
   `SignatureId` int NOT NULL,
-  PRIMARY KEY (`CompanyId`, `SignatureId`),
+  PRIMARY KEY (`DataObjectId`, `SignatureId`),
   KEY `SignatureId` (`SignatureId`), 
-  CONSTRAINT `Company_SignatureMap_ibfk_1` FOREIGN KEY (`CompanyId`) REFERENCES `Company` (`Id`) ON DELETE CASCADE, 
-  CONSTRAINT `Company_SignatureMap_ibfk_2` FOREIGN KEY (`SignatureId`) REFERENCES `Signatures_Publishers` (`Id`) ON DELETE CASCADE
+  CONSTRAINT `DataObject_SignatureMap_ibfk_1` FOREIGN KEY (`DataObjectId`) REFERENCES `DataObject` (`Id`) ON DELETE CASCADE, 
+  CONSTRAINT `DataObject_SignatureMap_ibfk_2` FOREIGN KEY (`SignatureId`) REFERENCES `Signatures_Publishers` (`Id`) ON DELETE CASCADE
 );
 
-CREATE TABLE `Platform` (
-  `Id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `Company` bigint(20) NOT NULL DEFAULT 0,
-  `Name` varchar(255) DEFAULT NULL,
-  `CreatedDate` datetime DEFAULT NULL,
-  `UpdatedDate` datetime DEFAULT NULL,
-  PRIMARY KEY (`Id`)
-)
-
-CREATE TABLE `Platform_SignatureNames` (
-  `PlatformId` bigint(20) NOT NULL,
-  `SignaturePlatformId` bigint(20) NOT NULL,
-  PRIMARY KEY (`PlatformId`, `SignaturePlatformId`)
-)
+CREATE TABLE `DataObject_MetadataMap` (
+  `DataObjectId` bigint(20) NOT NULL,
+  `MetadataId` varchar(50) NOT NULL,
+  `SourceId` int(11) NOT NULL,
+  `MatchMethod` int(11) NOT NULL,
+  `LastSearched` datetime NOT NULL,
+  `NextSearch` datetime NOT NULL,
+  PRIMARY KEY (`DataObjectId`,`SourceId`),
+  KEY `DataObjectId` (`DataObjectId`),
+  CONSTRAINT `DataObject_MetadataMap_ibfk_1` FOREIGN KEY (`DataObjectId`) REFERENCES `DataObject` (`Id`) ON DELETE CASCADE
+);

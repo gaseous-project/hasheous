@@ -13,6 +13,16 @@ namespace hasheous_server.Classes.Metadata.IGDB
     /// </summary>
     public class Communications
     {
+        public Communications()
+        {
+
+        }
+
+        public Communications(MetadataSources Source)
+        {
+            MetadataSource = Source;
+        }
+
         private static IGDBClient igdb = new IGDBClient(
                     // Found in Twitch Developer portal for your app
                     Config.IGDB.ClientId,
@@ -22,7 +32,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
         /// <summary>
         /// Configure metadata API communications
         /// </summary>
-        public static MetadataSources MetadataSource
+        public MetadataSources MetadataSource
         {
             get
             {
@@ -50,7 +60,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
                 }
             }
         }
-        private static MetadataSources _MetadataSource = MetadataSources.None;
+        private MetadataSources _MetadataSource = MetadataSources.None;
 
         // rate limit avoidance - what can we do to ensure that rate limiting is avoided?
         // these values affect all communications
@@ -202,7 +212,8 @@ namespace hasheous_server.Classes.Metadata.IGDB
                 }
 
                 // perform the actual API call
-                var results = await igdb.QueryAsync<T>(Endpoint, query: Fields + " " + Query + ";");
+                string queryString = Fields + " " + Query + ";";
+                var results = await igdb.QueryAsync<T>(Endpoint, query: queryString);
 
                 // increment rate limiter avoidance call count
                 RateLimitAvoidanceCallCount += 1;

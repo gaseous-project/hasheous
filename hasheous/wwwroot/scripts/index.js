@@ -1,6 +1,6 @@
 // set up banner UI elements
 $('#banner_search_field').select2({
-    placeholder: getLang("search"),
+    placeholder: lang.getLang("search"),
     allowClear: true
 });
 
@@ -50,7 +50,7 @@ function userLogoff() {
 function setPageElementInnerHTMLLanguage(elementList) {
     for (let i = 0; i < elementList.length; i++) {
         if (elementList[i].getAttribute('data-lang')) {
-            elementList[i].innerHTML = getLang(elementList[i].getAttribute('data-lang'));
+            elementList[i].innerHTML = lang.getLang(elementList[i].getAttribute('data-lang'));
         }
     }
 }
@@ -90,16 +90,16 @@ switch (targetPage) {
 
 function setPageTitle(targetPage, overrideLanguageLookup) {
     if (overrideLanguageLookup === true) {
-        document.title = getLang("Hasheous") + " - " + targetPage;
+        document.title = lang.getLang("Hasheous") + " - " + targetPage;
     } else {
-        if (getLang(targetPage)) {
-            if (getLang(targetPage).length > 0) {
-                document.title = getLang("Hasheous") + " - " + getLang(targetPage);
+        if (lang.getLang(targetPage)) {
+            if (lang.getLang(targetPage).length > 0) {
+                document.title = lang.getLang("Hasheous") + " - " + lang.getLang(targetPage);
             } else {
-                document.title = getLang("Hasheous");
+                document.title = lang.getLang("Hasheous");
             }
         } else {
-            document.title = getLang("Hasheous");
+            document.title = lang.getLang("Hasheous");
         }
     }
 }

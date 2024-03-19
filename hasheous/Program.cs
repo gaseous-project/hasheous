@@ -46,9 +46,6 @@ Config.InitSettings();
 // write updated settings back to the config file
 Config.UpdateConfig();
 
-// set api metadata source from config
-Communications.MetadataSource = Config.MetadataConfiguration.Source;
-
 // update platform map
 JsonPlatformMap.ImportPlatformMap();
 

@@ -1,9 +1,5 @@
-let locale = window.navigator.userLanguage || window.navigator.language;
-console.log("Browser locale: " + locale);
-
-let languageDefault = undefined;
-let languageOverlay = undefined;
-loadLanguage();
+const lang = new language();
+console.log("Browser locale: " + lang.locale);
 
 function ajaxCall(endpoint, method, successFunction, errorFunction, body) {
     $.ajax({
@@ -116,7 +112,7 @@ function generateTable(resultSet, columns, indexColumn, hideIndex, rowClickCallb
             indexColumn = "";
         }
         for (let i = 0; i < columns.length; i++) {
-            let headerName = getLang(columns[i].split(":")[0]);
+            let headerName = lang.getLang(columns[i].split(":")[0]);
             if (
                 (hideIndex === true && (headerName.toLowerCase() !== indexColumn.toLowerCase())) ||
                 (hideIndex === false)
@@ -147,7 +143,7 @@ function generateTable(resultSet, columns, indexColumn, hideIndex, rowClickCallb
                         break;
                     
                     case "lang":
-                        cellContent = getLang(resultSet[i][cellName]);
+                        cellContent = lang.getLang(resultSet[i][cellName]);
                         break;
 
                     case "link":
@@ -193,34 +189,5 @@ function generateTable(resultSet, columns, indexColumn, hideIndex, rowClickCallb
         }
 
         return table;
-    }
-}
-
-async function loadLanguage() {
-    // load base language
-    languageDefault = JSON.parse(await (await fetch('/localisation/en.json')).text());
-
-    try {
-        if (locale !== "en" && locale !== "en-US") {
-            // load overlay language
-            languageOverlay = JSON.parse(await (await fetch('/localisation/' + locale + '.json')).text());
-            console.log('Loaded language file: ' + locale + '.json');
-        }
-    } catch(e) {
-        languageOverlay = undefined;
-    }
-}
-
-function getLang(token) {
-    if (languageOverlay) {
-        if (token.toLowerCase() in languageOverlay) {
-            return languageOverlay[token.toLowerCase()];
-        }
-    }
-
-    if (token.toLowerCase() in languageDefault) {
-        return languageDefault[token.toLowerCase()];
-    } else {
-        return token.toLowerCase();
     }
 }

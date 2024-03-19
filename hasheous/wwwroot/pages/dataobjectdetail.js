@@ -1,10 +1,12 @@
+let pageType = getQueryString('type', 'string');
+
 ajaxCall(
-    '/api/v1/Companies/' + getQueryString('id', 'int'),
+    '/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int'),
     'GET',
     function (success) {
         console.log(success);
         setPageTitle(success.name, true);
-        document.getElementById('company_name').innerHTML = success.name;
+        document.getElementById('dataObject_object_name').innerHTML = success.name;
         document.getElementById('page_date_box_createdDate').innerHTML = moment(success.createdDate + 'Z').format('lll');
         document.getElementById('page_date_box_updatedDate').innerHTML = moment(success.updatedDate + 'Z').format('lll');
 
@@ -14,6 +16,6 @@ ajaxCall(
             'id',
             false
         );
-        document.getElementById('companyMetadataMap').appendChild(newMetadataMapTable);
+        document.getElementById('dataObjectMetadataMap').appendChild(newMetadataMapTable);
     }
 );
