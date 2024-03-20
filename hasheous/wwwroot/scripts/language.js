@@ -1,5 +1,5 @@
 class language {
-    locale = window.navigator.userLanguage || window.navigator.language;
+    locale = undefined;
 
     languageDefault = undefined;
     languageOverlay = undefined;
@@ -15,11 +15,17 @@ class language {
 
     async Init(callback) {
         // load base language
+        if (getCookie("userLocale")) {
+            this.locale = getCookie("userLocale");
+        } else {
+            this.locale = window.navigator.userLanguage || window.navigator.language;
+        }
         let language = this.locale.split("-")[0];
         let localisation = this.locale.split("-")[1];
         try {
             this.languageDefault = JSON.parse(await (await fetch('/localisation/' + language + '.json')).text());
         } catch (e) {
+            // something went wrong - default to en
             this.languageDefault = JSON.parse(await (await fetch('/localisation/en.json')).text());
             console.warn("No suitable language file for " + language + ". Falling back to en");
             language = "en";

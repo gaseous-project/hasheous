@@ -405,3 +405,4 @@ ASALocalRun/
 .localhistory/
 
 .devcontainer/.env
+.mono/
