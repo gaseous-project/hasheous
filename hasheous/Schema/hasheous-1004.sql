@@ -43,3 +43,16 @@ CREATE TABLE `DataObject_MetadataMap` (
   KEY `DataObjectId` (`DataObjectId`),
   CONSTRAINT `DataObject_MetadataMap_ibfk_1` FOREIGN KEY (`DataObjectId`) REFERENCES `DataObject` (`Id`) ON DELETE CASCADE
 );
+
+CREATE TABLE `DataObject_Attributes` (
+    `AttributeId` BIGINT AUTO_INCREMENT,
+    `DataObjectId` bigint(20) NOT NULL,
+    `AttributeType` int(11) NOT NULL,
+    `AttributeName` int(11) NOT NULL, 
+    `AttributeValue` longtext DEFAULT NULL,
+    `AttributeRelation` bigint(20) NULL,
+    `AttributeRelationType` int(11) DEFAULT NULL,
+    PRIMARY KEY (`AttributeId`),
+    INDEX (`DataObjectId`, `AttributeType`, `AttributeName`, `AttributeRelation`),
+    CONSTRAINT `DataObject_Attributes_ibfk_1` FOREIGN KEY (`DataObjectId`) REFERENCES `DataObject` (`Id`) ON DELETE CASCADE
+);

@@ -8,6 +8,7 @@ namespace hasheous_server.Models
         public long Id { get; set; }
         public List<Dictionary<string, object>>? SignatureDataObjects { get; set; }
         public List<MetadataItem>? Metadata { get; set; }
+        public List<AttributeItem>? Attributes { get; set; }
 
         public class MetadataItem
         {

@@ -37,5 +37,6 @@
     "igdb": "Internet Game Database (IGDB)",
     "nomatch": "Unmatched",
     "automatic": "Automatic Match",
-    "automatictoomanymatches": "Too many results to automatically match"
+    "automatictoomanymatches": "Too many results to automatically match",
+    "description": "Description"
 }

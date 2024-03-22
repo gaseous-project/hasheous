@@ -345,3 +345,8 @@ td {
     width: 16px;
     height: 16px;
 }
+
+.descriptionspan {
+    display: block;
+    margin-bottom: 5px;
+}

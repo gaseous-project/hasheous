@@ -4,6 +4,7 @@ using Classes;
 using hasheous_server.Classes.Metadata.IGDB;
 using hasheous_server.Models;
 using IGDB;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NuGet.Common;
 using static hasheous_server.Classes.Metadata.IGDB.Communications;
 
@@ -34,7 +35,8 @@ namespace hasheous_server.Classes
                 Models.DataObjectItem item = BuildDataObject(
                     objectType,
                     (long)row["Id"],
-                    row
+                    row,
+                    false
                 );
 
                 DataObjects.Add(item);
@@ -56,7 +58,7 @@ namespace hasheous_server.Classes
 
             if (data.Rows.Count > 0)
             {
-                DataObjectItem item = BuildDataObject(objectType, id, data.Rows[0]);
+                DataObjectItem item = BuildDataObject(objectType, id, data.Rows[0], true);
 
                 return item;
             }
@@ -66,21 +68,56 @@ namespace hasheous_server.Classes
             }
         }
 
-        private Models.DataObjectItem BuildDataObject(DataObjectType ObjectType, long id, DataRow row)
+        private Models.DataObjectItem BuildDataObject(DataObjectType ObjectType, long id, DataRow row, bool GetChildRelations = false)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql;
             Dictionary<string, object> dbDict = new Dictionary<string, object>{
                 { "id", id }
             };
+            DataTable data;
+            
+            // get attributes
+            sql = "SELECT * FROM DataObject_Attributes WHERE DataObjectId = @id";
+            data = db.ExecuteCMD(sql, dbDict);
+            List<AttributeItem> attributes = new List<AttributeItem>();
+            foreach (DataRow dataRow in data.Rows)
+            {
+                AttributeItem attributeItem = BuildAttributeItem(dataRow, GetChildRelations);
+                attributes.Add(attributeItem);
+            }
 
-            // get signature publishers
-            sql = "SELECT * FROM DataObject_SignatureMap WHERE DataObjectId = @id";
-            List<Dictionary<string, object>> signaturePublishers = db.ExecuteCMDDict(sql, dbDict);
+            // get signature items
+            switch (ObjectType)
+            {
+                case DataObjectType.Company:
+                    sql = "SELECT DataObject_SignatureMap.SignatureId, Signatures_Publishers.Publisher FROM DataObject_SignatureMap JOIN Signatures_Publishers ON DataObject_SignatureMap.SignatureId = Signatures_Publishers.Id WHERE DataObject_SignatureMap.DataObjectId = @id ORDER BY Signatures_Publishers.Publisher;";
+                    break;
+
+                case DataObjectType.Platform:
+                    sql = "SELECT DataObject_SignatureMap.SignatureId, Signatures_Platforms.Platform FROM DataObject_SignatureMap JOIN Signatures_Platforms ON DataObject_SignatureMap.SignatureId = Signatures_Platforms.Id WHERE DataObject_SignatureMap.DataObjectId = @id ORDER BY Signatures_Platforms.Platform;";
+                    break;
+
+                case DataObjectType.Game:
+                    sql = @"SELECT 
+                            DataObject_SignatureMap.SignatureId,
+                            CASE 
+                                WHEN (Signatures_Games.Year IS NULL OR Signatures_Games.Year = '') THEN Signatures_Games.Name
+                                ELSE CONCAT(Signatures_Games.Name, ' (', Signatures_Games.Year, ')'
+                            END AS `Name`
+                        FROM 
+                            DataObject_SignatureMap 
+                        JOIN 
+                            Signatures_Games ON DataObject_SignatureMap.SignatureId = Signatures_Games.Id 
+                        WHERE DataObject_SignatureMap.DataObjectId = @id 
+                        ORDER BY Signatures_Games.Name;";
+                    break;
+            }
+            List<Dictionary<string, object>> signatureItems = db.ExecuteCMDDict(sql, dbDict);
 
             // get metadata matches
             sql = "SELECT * FROM DataObject_MetadataMap WHERE DataObjectId = @id ORDER BY SourceId";
-            DataTable data = db.ExecuteCMD(sql, dbDict);
+            data = db.ExecuteCMD(sql, dbDict);
             List<DataObjectItem.MetadataItem> metadataItems = new List<DataObjectItem.MetadataItem>();
             foreach (DataRow dataRow in data.Rows)
             {
@@ -101,7 +138,8 @@ namespace hasheous_server.Classes
                 CreatedDate = (DateTime)row["CreatedDate"],
                 UpdatedDate = (DateTime)row["UpdatedDate"],
                 Metadata = metadataItems,
-                SignatureDataObjects = signaturePublishers
+                SignatureDataObjects = signatureItems,
+                Attributes = attributes
             };
 
             return item;
@@ -156,21 +194,6 @@ namespace hasheous_server.Classes
             };
 
             db.ExecuteNonQuery(sql, dbDict);
-
-            if (model.SignatureDataObjects != null)
-            {
-                sql = "DELETE FROM DataObject_SignatureMap WHERE DataObjectId=@id;";
-                db.ExecuteNonQuery(sql, dbDict);
-                foreach (int SignatureId in model.SignatureDataObjects)
-                {
-                    sql = "INSERT INTO DataObject_SignatureMap (DataObjectId, SignatureId) VALUES (@id, @signatureid);";
-                    dbDict = new Dictionary<string, object>{
-                        { "id", id },
-                        { "signatureid", SignatureId }
-                    };
-                    db.ExecuteNonQuery(sql, dbDict);
-                }
-            }
 
             return GetDataObject(objectType, id);
         }
@@ -305,6 +328,105 @@ namespace hasheous_server.Classes
         {
             public BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod MatchMethod { get; set; } = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch;
             public string MetadataId { get; set; } = "";
+        }
+
+        public AttributeItem AddAttribute(long DataObjectId, AttributeItem attribute)
+        {
+            object? attributeValue = null;
+            long? attributeRelation = null;
+
+            switch (attribute.attributeType)
+            {
+                case AttributeItem.AttributeType.ObjectRelationship:
+                    attributeRelation = (long?)attribute.Value;
+                    break;
+
+                default:
+                    attributeValue = attribute.Value;
+                    break;
+
+            }
+
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql = "INSERT INTO DataObject_Attributes (DataObjectId, AttributeType, AttributeName, AttributeValue, AttributeRelation, AttributeRelationType) VALUES (@id, @attributetype, @attributename, @attributevalue, @attributerelation, @attributerelationtype); SELECT LAST_INSERT_ID();";
+            DataTable data = db.ExecuteCMD(sql, new Dictionary<string, object>{
+                { "id", DataObjectId },
+                { "attributetype", attribute.attributeType },
+                { "attributename", attribute.attributeName },
+                { "attributevalue", attributeValue },
+                { "attributerelation", attributeRelation },
+                { "attributerelationtype", attribute.attributeRelationType }
+            });
+
+            sql = "SELECT * FROM DataObject_Attributes WHERE AttributeId=@id";
+            DataTable returnValue = db.ExecuteCMD(sql, new Dictionary<string, object>{
+                { "id", data.Rows[0][0] }
+            });
+            AttributeItem attributeItem = BuildAttributeItem(returnValue.Rows[0], true);
+
+            return attributeItem;
+        }
+
+        public void DeleteAttribute(long DataObjectId, long AttributeId)
+        {
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql = "DELETE FROM DataObject_Attributes WHERE DataObjectId=@id AND AttributeId=@attrid;";
+            db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                { "id", DataObjectId },
+                { "attrid", AttributeId }
+            });
+        }
+
+        private AttributeItem BuildAttributeItem(DataRow row, bool GetChildRelations = false)
+        {
+            AttributeItem attributeItem = new AttributeItem(){
+                Id = (long)row["AttributeId"],
+                attributeType = (AttributeItem.AttributeType)row["AttributeType"],
+                attributeName = (AttributeItem.AttributeName)row["AttributeName"]
+            };
+            switch (attributeItem.attributeType)
+            {
+                case AttributeItem.AttributeType.ObjectRelationship:
+                    DataObjectType relationType = (DataObjectType)row["AttributeRelationType"];
+                    if (GetChildRelations == true)
+                    {   
+                        attributeItem.Value = GetDataObject(relationType, (long)row["AttributeRelation"]);
+                    }
+                    else
+                    {
+                        RelationItem relationItem = new RelationItem(){
+                            relationType = relationType,
+                            relationId = (long)row["AttributeRelation"]
+                        };
+                        attributeItem.Value = relationItem;
+                    }
+                    break;
+                default:
+                    attributeItem.Value = (string)row["AttributeValue"];
+                    break;
+            }
+
+            return attributeItem;
+        }
+
+        public void AddSignature(long DataObjectId, long SignatureId)
+        {
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql = "INSERT INTO DataObject_SignatureMap (DataObjectId, SignatureId) VALUES (@id, @sigid);";
+            db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                { "id", DataObjectId },
+                { "sigid", SignatureId }
+            });
+        }
+
+        public void DeleteSignature(long DataObjectId, long SignatureId)
+        {
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql = "DELETE FROM DataObject_SignatureMap WHERE DataObjectId=@id AND SignatureId=@sigid);";
+            db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                { "id", DataObjectId },
+                { "sigid", SignatureId }
+            });
         }
     }
 }

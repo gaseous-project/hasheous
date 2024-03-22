@@ -89,5 +89,51 @@ namespace hasheous_server.Controllers.v1_0
                 return Ok(DataObject);
             }
         }
+
+        [MapToApiVersion("1.0")]
+        [HttpPost]
+        [Authorize(Roles = "Admin")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [Route("{ObjectType}/{Id}/Attributes")]
+        public async Task<IActionResult> NewDataObjectAttribute(Classes.DataObjects.DataObjectType ObjectType, long Id, AttributeItem model)
+        {
+            hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
+
+            Models.DataObjectItem? DataObject = DataObjects.GetDataObject(ObjectType, Id);
+
+            if (DataObject == null)
+            {
+                return NotFound();
+            }
+            else
+            {
+                AttributeItem attributeItem = DataObjects.AddAttribute(Id, model);
+
+                return Ok(attributeItem);
+            }
+        }
+
+        [MapToApiVersion("1.0")]
+        [HttpDelete]
+        [Authorize(Roles = "Admin")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [Route("{ObjectType}/{Id}/Attributes/{AttributeId}")]
+        public async Task<IActionResult> DeleteDataObjectAttribute(Classes.DataObjects.DataObjectType ObjectType, long Id, long AttributeId)
+        {
+            hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
+
+            Models.DataObjectItem? DataObject = DataObjects.GetDataObject(ObjectType, Id);
+
+            if (DataObject == null)
+            {
+                return NotFound();
+            }
+            else
+            {
+                DataObjects.DeleteAttribute(Id, AttributeId);
+
+                return Ok();
+            }
+        }
     }
 }
