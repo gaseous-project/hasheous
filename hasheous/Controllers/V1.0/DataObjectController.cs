@@ -135,5 +135,51 @@ namespace hasheous_server.Controllers.v1_0
                 return Ok();
             }
         }
+
+        [MapToApiVersion("1.0")]
+        [HttpPost]
+        [Authorize(Roles = "Admin")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [Route("{ObjectType}/{Id}/SignatureMap")]
+        public async Task<IActionResult> NewDataObjectSignatureMap(Classes.DataObjects.DataObjectType ObjectType, long Id, long SignatureId)
+        {
+            hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
+
+            Models.DataObjectItem? DataObject = DataObjects.GetDataObject(ObjectType, Id);
+
+            if (DataObject == null)
+            {
+                return NotFound();
+            }
+            else
+            {
+                DataObjects.AddSignature(Id, ObjectType, SignatureId);
+
+                return Ok(SignatureId);
+            }
+        }
+
+        [MapToApiVersion("1.0")]
+        [HttpDelete]
+        [Authorize(Roles = "Admin")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [Route("{ObjectType}/{Id}/SignatureMap/{SignatureMapId}")]
+        public async Task<IActionResult> DeleteDataObjectSignatureMap(Classes.DataObjects.DataObjectType ObjectType, long Id, long SignatureId)
+        {
+            hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
+
+            Models.DataObjectItem? DataObject = DataObjects.GetDataObject(ObjectType, Id);
+
+            if (DataObject == null)
+            {
+                return NotFound();
+            }
+            else
+            {
+                DataObjects.DeleteSignature(Id, ObjectType, SignatureId);
+
+                return Ok();
+            }
+        }
     }
 }

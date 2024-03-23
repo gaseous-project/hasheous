@@ -38,5 +38,7 @@
     "nomatch": "Unmatched",
     "automatic": "Automatic Match",
     "automatictoomanymatches": "Too many results to automatically match",
-    "description": "Description"
+    "description": "Description",
+    "attributes": "Attributes",
+    "signatures": "Signature Mapping"
 }

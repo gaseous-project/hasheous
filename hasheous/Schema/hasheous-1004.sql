@@ -25,11 +25,11 @@ CREATE TABLE `DataObject` (
 
 CREATE TABLE `DataObject_SignatureMap` (
   `DataObjectId` bigint(20) NOT NULL,
+  `DataObjectTypeId` int NOT NULL,
   `SignatureId` int NOT NULL,
-  PRIMARY KEY (`DataObjectId`, `SignatureId`),
+  PRIMARY KEY (`DataObjectId`, `DataObjectTypeId`, `SignatureId`),
   KEY `SignatureId` (`SignatureId`), 
-  CONSTRAINT `DataObject_SignatureMap_ibfk_1` FOREIGN KEY (`DataObjectId`) REFERENCES `DataObject` (`Id`) ON DELETE CASCADE, 
-  CONSTRAINT `DataObject_SignatureMap_ibfk_2` FOREIGN KEY (`SignatureId`) REFERENCES `Signatures_Publishers` (`Id`) ON DELETE CASCADE
+  CONSTRAINT `DataObject_SignatureMap_ibfk_1` FOREIGN KEY (`DataObjectId`) REFERENCES `DataObject` (`Id`) ON DELETE CASCADE
 );
 
 CREATE TABLE `DataObject_MetadataMap` (

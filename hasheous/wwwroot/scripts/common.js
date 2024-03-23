@@ -98,6 +98,10 @@ function formatBytes(bytes, decimals = 2) {
 }
 
 function generateTable(resultSet, columns, indexColumn, hideIndex, rowClickCallback) {
+    if (hideIndex == undefined) {
+        hideIndex = false;
+    }
+
     if (resultSet.length == 0) {
         let errorMessage = document.createElement('span');
         errorMessage.innerHTML = "No records returned";
@@ -119,6 +123,7 @@ function generateTable(resultSet, columns, indexColumn, hideIndex, rowClickCallb
                 ) {
                 let headerCell = document.createElement('th');
                 headerCell.innerHTML = headerName;
+                headerCell.classList.add('tableheadcell');
                 headerRow.appendChild(headerCell);
             }
         }
@@ -166,6 +171,7 @@ function generateTable(resultSet, columns, indexColumn, hideIndex, rowClickCallb
                     (hideIndex === false)
                 ) {
                     let cell = document.createElement('td');
+                    cell.classList.add('tablecell');
                     cell.innerHTML = cellContent;
                     dataRow.appendChild(cell);
                 }

@@ -68,12 +68,23 @@ namespace hasheous_server.Classes
             }
         }
 
+        private void UpdateDataObjectDate(long DataObjectId)
+        {
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql = "UPDATE DataObject SET UpdatedDate=@updateddate WHERE Id=@id;";
+            db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                { "id", DataObjectId },
+                { "updateddate", DateTime.UtcNow }
+            });
+        }
+
         private Models.DataObjectItem BuildDataObject(DataObjectType ObjectType, long id, DataRow row, bool GetChildRelations = false)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql;
             Dictionary<string, object> dbDict = new Dictionary<string, object>{
-                { "id", id }
+                { "id", id },
+                { "typeid", ObjectType }
             };
             DataTable data;
             
@@ -91,11 +102,11 @@ namespace hasheous_server.Classes
             switch (ObjectType)
             {
                 case DataObjectType.Company:
-                    sql = "SELECT DataObject_SignatureMap.SignatureId, Signatures_Publishers.Publisher FROM DataObject_SignatureMap JOIN Signatures_Publishers ON DataObject_SignatureMap.SignatureId = Signatures_Publishers.Id WHERE DataObject_SignatureMap.DataObjectId = @id ORDER BY Signatures_Publishers.Publisher;";
+                    sql = "SELECT DataObject_SignatureMap.SignatureId, Signatures_Publishers.Publisher FROM DataObject_SignatureMap JOIN Signatures_Publishers ON DataObject_SignatureMap.SignatureId = Signatures_Publishers.Id WHERE DataObject_SignatureMap.DataObjectId = @id AND DataObject_SignatureMap.DataObjectTypeId = @typeid ORDER BY Signatures_Publishers.Publisher;";
                     break;
 
                 case DataObjectType.Platform:
-                    sql = "SELECT DataObject_SignatureMap.SignatureId, Signatures_Platforms.Platform FROM DataObject_SignatureMap JOIN Signatures_Platforms ON DataObject_SignatureMap.SignatureId = Signatures_Platforms.Id WHERE DataObject_SignatureMap.DataObjectId = @id ORDER BY Signatures_Platforms.Platform;";
+                    sql = "SELECT DataObject_SignatureMap.SignatureId, Signatures_Platforms.Platform FROM DataObject_SignatureMap JOIN Signatures_Platforms ON DataObject_SignatureMap.SignatureId = Signatures_Platforms.Id WHERE DataObject_SignatureMap.DataObjectId = @id AND DataObject_SignatureMap.DataObjectTypeId = @typeid ORDER BY Signatures_Platforms.Platform;";
                     break;
 
                 case DataObjectType.Game:
@@ -104,12 +115,12 @@ namespace hasheous_server.Classes
                             CASE 
                                 WHEN (Signatures_Games.Year IS NULL OR Signatures_Games.Year = '') THEN Signatures_Games.Name
                                 ELSE CONCAT(Signatures_Games.Name, ' (', Signatures_Games.Year, ')'
-                            END AS `Name`
+                            END AS `Game`
                         FROM 
                             DataObject_SignatureMap 
                         JOIN 
                             Signatures_Games ON DataObject_SignatureMap.SignatureId = Signatures_Games.Id 
-                        WHERE DataObject_SignatureMap.DataObjectId = @id 
+                        WHERE DataObject_SignatureMap.DataObjectId = @id AND DataObject_SignatureMap.DataObjectTypeId = @typeid
                         ORDER BY Signatures_Games.Name;";
                     break;
             }
@@ -153,7 +164,7 @@ namespace hasheous_server.Classes
                 { "name", model.Name },
                 { "objecttype", objectType },
                 { "createddate", DateTime.UtcNow },
-                { "updateddate", DateTime.UtcNow}
+                { "updateddate", DateTime.UtcNow }
             };
 
             DataTable data = db.ExecuteCMD(sql, dbDict);
@@ -189,7 +200,6 @@ namespace hasheous_server.Classes
                 { "id", id },
                 { "name", model.Name },
                 { "objecttype", objectType },
-                { "createddate", DateTime.UtcNow },
                 { "updateddate", DateTime.UtcNow }
             };
 
@@ -290,6 +300,8 @@ namespace hasheous_server.Classes
                     }
                 }
             }
+
+            UpdateDataObjectDate((long)id);
         }
 
         private async Task<MatchItem> GetDataObject<T>(MetadataSources Source, string Endpoint, string Fields, string Query)
@@ -364,6 +376,8 @@ namespace hasheous_server.Classes
             });
             AttributeItem attributeItem = BuildAttributeItem(returnValue.Rows[0], true);
 
+            UpdateDataObjectDate(DataObjectId);
+
             return attributeItem;
         }
 
@@ -375,6 +389,8 @@ namespace hasheous_server.Classes
                 { "id", DataObjectId },
                 { "attrid", AttributeId }
             });
+
+            UpdateDataObjectDate(DataObjectId);
         }
 
         private AttributeItem BuildAttributeItem(DataRow row, bool GetChildRelations = false)
@@ -409,24 +425,30 @@ namespace hasheous_server.Classes
             return attributeItem;
         }
 
-        public void AddSignature(long DataObjectId, long SignatureId)
+        public void AddSignature(long DataObjectId, DataObjectType dataObjectType, long SignatureId)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql = "INSERT INTO DataObject_SignatureMap (DataObjectId, SignatureId) VALUES (@id, @sigid);";
+            string sql = "INSERT INTO DataObject_SignatureMap (DataObjectId, DataObjectTypeId, SignatureId) VALUES (@id, @typeid, @sigid);";
             db.ExecuteNonQuery(sql, new Dictionary<string, object>{
                 { "id", DataObjectId },
+                { "typeid", dataObjectType },
                 { "sigid", SignatureId }
             });
+
+            UpdateDataObjectDate(DataObjectId);
         }
 
-        public void DeleteSignature(long DataObjectId, long SignatureId)
+        public void DeleteSignature(long DataObjectId, DataObjectType dataObjectType, long SignatureId)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql = "DELETE FROM DataObject_SignatureMap WHERE DataObjectId=@id AND SignatureId=@sigid);";
+            string sql = "DELETE FROM DataObject_SignatureMap WHERE DataObjectId=@id AND DataObjectTypeId=@typeid AND SignatureId=@sigid);";
             db.ExecuteNonQuery(sql, new Dictionary<string, object>{
                 { "id", DataObjectId },
+                { "typeid", dataObjectType },
                 { "sigid", SignatureId }
             });
+
+            UpdateDataObjectDate(DataObjectId);
         }
     }
 }
