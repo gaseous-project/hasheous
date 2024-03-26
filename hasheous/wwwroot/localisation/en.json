@@ -36,9 +36,13 @@
     "matchmethod": "Match Method",
     "igdb": "Internet Game Database (IGDB)",
     "nomatch": "Unmatched",
+    "manual": "Manual",
     "automatic": "Automatic Match",
     "automatictoomanymatches": "Too many results to automatically match",
     "description": "Description",
     "attributes": "Attributes",
-    "signatures": "Signature Mapping"
+    "signatures": "Signature Mapping",
+    "game": "Game",
+    "newgame": "New Game",
+    "games": "Games"
 }

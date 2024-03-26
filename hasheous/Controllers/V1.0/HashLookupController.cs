@@ -37,5 +37,24 @@ namespace hasheous_server.Controllers.v1_0
                 return Ok(hashLookup);
             }
         }
+
+        [MapToApiVersion("1.0")]
+        [HttpPost]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [Route("Lookup2")]
+        public async Task<IActionResult> Lookup2(HashLookupModel model)
+        {
+            HashLookup2 hashLookup = new HashLookup2(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), model);
+
+            if (hashLookup == null)
+            {
+                return NotFound();
+            }
+            else
+            {
+                return Ok(hashLookup);
+            }
+        }
     }
 }

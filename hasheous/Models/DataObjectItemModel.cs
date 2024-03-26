@@ -23,7 +23,11 @@ namespace hasheous_server.Models
             Description = 0,
             Manufacturer = 1,
             Publisher = 2,
-            Logo = 3
+            Logo = 3,
+            Platform = 4,
+            Year = 5,
+            Country = 6,
+            Language = 7
         }
 
         public long? Id { get; set; }

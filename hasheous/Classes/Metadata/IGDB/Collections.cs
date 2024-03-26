@@ -98,7 +98,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
         private static async Task<Collection> GetObjectFromServer(string WhereClause)
         {
             // get Collections metadata
-            Communications comms = new Communications();
+            Communications comms = new Communications(Communications.MetadataSources.IGDB);
             var results = await comms.APIComm<Collection>(IGDBClient.Endpoints.Collections, fieldList, WhereClause);
             var result = results.First();
 

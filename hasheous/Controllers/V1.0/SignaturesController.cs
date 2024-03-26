@@ -16,21 +16,17 @@ namespace hasheous_server.Controllers.v1_0
     public class SignaturesController : ControllerBase
     {
         [MapToApiVersion("1.0")]
-        [HttpGet]
-        [Authorize(Roles = "Admin")]
-        [Route("Publishers")]
+        [HttpPost]
+        [AllowAnonymous]
+        [Route("Search")]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetPublishers(string searchString)
+        public async Task<IActionResult> GetSearch(SignatureSearchModel model)
         {
-            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql = "SELECT * FROM Signatures_Publishers WHERE Publisher LIKE @name";
-            Dictionary<string, object> dbDict = new Dictionary<string, object>{
-                { "name", '%' + searchString + '%' }
-            };
+            SignatureManagement signature = new SignatureManagement();
 
-            List<Dictionary<string, object>> data = db.ExecuteCMDDict(sql, dbDict);
+            object[] objects = signature.SearchSignatures(model);
 
-            return Ok(data);
+            return Ok(objects);
         }
     }
 }

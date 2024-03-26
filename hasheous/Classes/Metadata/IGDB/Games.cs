@@ -275,7 +275,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
         private static async Task<Game> GetObjectFromServer(string WhereClause)
         {
             // get Game metadata
-            Communications comms = new Communications();
+            Communications comms = new Communications(Communications.MetadataSources.IGDB);
             var results = await comms.APIComm<Game>(IGDBClient.Endpoints.Games, fieldList, WhereClause);
             var result = results.First();
 
@@ -308,7 +308,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
             
 
             // get Game metadata
-            Communications comms = new Communications();
+            Communications comms = new Communications(Communications.MetadataSources.IGDB);
             var results = await comms.APIComm<Game>(IGDBClient.Endpoints.Games, searchFields, searchBody);
 
             return results;

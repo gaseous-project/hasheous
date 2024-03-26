@@ -212,7 +212,7 @@ namespace BackgroundMetadataMatcher
 
         private async Task<Platform[]> SearchForPlatform(string PlatformName)
         {
-            Communications comms = new Communications();
+            Communications comms = new Communications(Communications.MetadataSources.IGDB);
             string searchBody = "search \"" + PlatformName + "\";";
             var results = await comms.APIComm<Platform>(IGDBClient.Endpoints.Platforms, "fields *;", searchBody);
 

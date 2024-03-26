@@ -62,6 +62,11 @@ class language {
                     {
                         "dataobject_objects": "platforms",
                         "dataobject_new": "newplatform"
+                    },
+                    "game":
+                    {
+                        "dataobject_objects": "games",
+                        "dataobject_new": "newgame"
                     }
                 };
                 

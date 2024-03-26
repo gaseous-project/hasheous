@@ -38,7 +38,8 @@ CREATE TABLE `Signatures_Games` (
   UNIQUE KEY `Id_UNIQUE` (`Id`),
   KEY `publisher_Idx` (`PublisherId`),
   KEY `system_Idx` (`SystemId`),
-  KEY `ingest_Idx` (`Name`,`Year`,`PublisherId`,`SystemId`) USING BTREE
+  KEY `ingest_Idx` (`Name`,`Year`,`PublisherId`,`SystemId`) USING BTREE,
+  INDEX `name_Idx` (`Name` ASC) VISIBLE
 );
 
 CREATE TABLE `Signatures_Games_Countries` (

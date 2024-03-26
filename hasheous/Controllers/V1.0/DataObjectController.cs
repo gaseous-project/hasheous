@@ -91,6 +91,27 @@ namespace hasheous_server.Controllers.v1_0
         }
 
         [MapToApiVersion("1.0")]
+        [HttpGet]
+        [AllowAnonymous]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [Route("{ObjectType}/{Id}/Attributes")]
+        public async Task<IActionResult> GetDataObjectAttributes(Classes.DataObjects.DataObjectType ObjectType, long Id)
+        {
+            hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
+
+            Models.DataObjectItem? DataObject = DataObjects.GetDataObject(ObjectType, Id);
+
+            if (DataObject == null)
+            {
+                return NotFound();
+            }
+            else
+            {
+                return Ok(DataObjects.GetAttributes(Id, true));
+            }
+        }
+
+        [MapToApiVersion("1.0")]
         [HttpPost]
         [Authorize(Roles = "Admin")]
         [ProducesResponseType(StatusCodes.Status200OK)]
@@ -137,6 +158,27 @@ namespace hasheous_server.Controllers.v1_0
         }
 
         [MapToApiVersion("1.0")]
+        [HttpGet]
+        [AllowAnonymous]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [Route("{ObjectType}/{Id}/SignatureMap")]
+        public async Task<IActionResult> GetDataObjectSignatureMap(Classes.DataObjects.DataObjectType ObjectType, long Id)
+        {
+            hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
+
+            Models.DataObjectItem? DataObject = DataObjects.GetDataObject(ObjectType, Id);
+
+            if (DataObject == null)
+            {
+                return NotFound();
+            }
+            else
+            {
+                return Ok(DataObjects.GetSignatures(ObjectType, Id));
+            }
+        }
+
+        [MapToApiVersion("1.0")]
         [HttpPost]
         [Authorize(Roles = "Admin")]
         [ProducesResponseType(StatusCodes.Status200OK)]
@@ -179,6 +221,27 @@ namespace hasheous_server.Controllers.v1_0
                 DataObjects.DeleteSignature(Id, ObjectType, SignatureId);
 
                 return Ok();
+            }
+        }
+
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [AllowAnonymous]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [Route("{ObjectType}/{Id}/MetadataMap")]
+        public async Task<IActionResult> GetDataObjectMetadataMap(Classes.DataObjects.DataObjectType ObjectType, long Id)
+        {
+            hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
+
+            Models.DataObjectItem? DataObject = DataObjects.GetDataObject(ObjectType, Id);
+
+            if (DataObject == null)
+            {
+                return NotFound();
+            }
+            else
+            {
+                return Ok(DataObjects.GetMetadataMap(ObjectType, Id));
             }
         }
     }

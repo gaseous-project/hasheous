@@ -44,6 +44,8 @@ namespace hasheous_server.Models
 
 			public long SystemId { get; set; }
 
+            public long PublisherId { get; set; }
+
             public Dictionary<string, string> Countries = new Dictionary<string, string>();
             public Dictionary<string, string> Languages = new Dictionary<string, string>();
 

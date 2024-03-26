@@ -110,7 +110,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
             // get InvolvedCompanies metadata
             try
             {
-                Communications comms = new Communications();
+                Communications comms = new Communications(Communications.MetadataSources.IGDB);
             var results = await comms.APIComm<InvolvedCompany>(IGDBClient.Endpoints.InvolvedCompanies, fieldList, WhereClause);
                 var result = results.First();
 

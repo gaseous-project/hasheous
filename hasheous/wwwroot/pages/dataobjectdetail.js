@@ -107,7 +107,7 @@ ajaxCall(
 
         let newMetadataMapTable = generateTable(
             success.metadata,
-            [ 'source:lang', 'matchMethod:lang', 'id', 'link:link' ],
+            [ 'source:lang', 'matchMethod:lang', 'link:link' ],
             'id',
             false
         );

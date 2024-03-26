@@ -13,11 +13,6 @@ namespace hasheous_server.Classes.Metadata.IGDB
     /// </summary>
     public class Communications
     {
-        public Communications()
-        {
-
-        }
-
         public Communications(MetadataSources Source)
         {
             MetadataSource = Source;
