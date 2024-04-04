@@ -568,7 +568,10 @@ namespace hasheous_server.Classes
 
         private async Task<MatchItem?> _DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch)
         {
-            MatchItem? DataObjectSearchResults = null;
+            MatchItem? DataObjectSearchResults = new MatchItem{
+                MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
+                MetadataId = ""
+            };
 
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql;
