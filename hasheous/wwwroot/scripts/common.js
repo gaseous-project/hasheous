@@ -104,7 +104,7 @@ function generateTable(resultSet, columns, indexColumn, hideIndex, rowClickCallb
 
     if (resultSet.length == 0) {
         let errorMessage = document.createElement('span');
-        errorMessage.innerHTML = "No records returned";
+        errorMessage.innerHTML = lang.getLang('norecords');
         
         return errorMessage;
     } else {

@@ -1,7 +1,12 @@
 // set up banner UI elements
-$('#banner_search_field').select2({
-    placeholder: lang.getLang("search"),
-    allowClear: true
+let searchBox = document.getElementById('banner_search_field');
+searchBox.placeholder = lang.getLang("search");
+searchBox.addEventListener("keypress", function(e) {
+    let key = e.code;
+    if (key == 'Enter') {
+        e.preventDefault();
+        window.location.href = 'https://localhost:7157/index.html?page=search&query=' + encodeURIComponent(searchBox.value);
+    }
 });
 
 // user menu drop down menu

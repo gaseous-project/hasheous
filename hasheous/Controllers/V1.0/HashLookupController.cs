@@ -45,15 +45,22 @@ namespace hasheous_server.Controllers.v1_0
         [Route("Lookup2")]
         public async Task<IActionResult> Lookup2(HashLookupModel model)
         {
-            HashLookup2 hashLookup = new HashLookup2(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), model);
+            try
+            {
+                HashLookup2 hashLookup = new HashLookup2(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), model);
 
-            if (hashLookup == null)
-            {
-                return NotFound();
+                if (hashLookup == null)
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    return Ok(hashLookup);
+                }
             }
-            else
+            catch (HashLookup2.HashNotFoundException hnfEx)
             {
-                return Ok(hashLookup);
+                return NotFound("The provided hash was not found in the signature database.");
             }
         }
     }

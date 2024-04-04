@@ -13,6 +13,23 @@ namespace Classes
 {
 	public class HashLookup2
     {
+        public class HashNotFoundException : Exception
+        {
+            public HashNotFoundException()
+            {
+            }
+
+            public HashNotFoundException(string message)
+                : base(message)
+            {
+            }
+
+            public HashNotFoundException(string message, Exception inner)
+                : base(message, inner)
+            {
+            }
+        }
+
         public HashLookup2()
         {
 
@@ -28,8 +45,7 @@ namespace Classes
             Signatures_Games_2 discoveredSignature = new Signatures_Games_2();
             if (rawSignatures.Count == 0)
             {
-                Signature = null;
-                Metadata = null;
+                throw new HashNotFoundException("The provided hash was not found in any signature database.");
             }
             else
             {
@@ -124,6 +140,7 @@ namespace Classes
                 }
 
                 // build return item
+                this.Id = game.Id;
                 this.Name = game.Name;
                 this.Platform = new MiniDataObjectItem{
                     Name = platform.Name,
@@ -172,6 +189,7 @@ namespace Classes
             }
         }
 
+        public long Id { get; set; }
         public string Name { get; set; }
         public MiniDataObjectItem Platform { get; set; }
         public MiniDataObjectItem Publisher { get; set; }

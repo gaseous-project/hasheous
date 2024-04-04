@@ -13,7 +13,8 @@
     "newplatform": "New Platform",
     "companies": "Companies",
     "newcompany": "New Company",
-    "search": "Game Search - Name / MD5 Hash",
+    "search": "Search",
+    "searchresults": "Search Results",
     "id": "ID",
     "name": "Name",
     "size": "Size",
@@ -56,5 +57,6 @@
     "delete": "Delete",
     "publisher": "Publisher",
     "platform": "Platform",
-    "manufacturer": "Manufacturer"
+    "manufacturer": "Manufacturer",
+    "norecords": "No records returned"
 }
