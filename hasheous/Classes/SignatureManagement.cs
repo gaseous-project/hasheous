@@ -121,26 +121,31 @@ namespace Classes
                 }
             }
 
+            string orderBy = "";
             switch(model.SearchType)
             {
                 case SignatureSearchModel.SignatureSearchTypes.Publisher:
                     sql = "SELECT * FROM Signatures_Publishers";
                     whereNameField = "Publisher";
+                    orderBy = "Publisher";
                     break;
 
                 case SignatureSearchModel.SignatureSearchTypes.Platform:
                     sql = "SELECT * FROM Signatures_Platforms";
                     whereNameField = "Platform";
+                    orderBy = "Platform";
                     break;
 
                 case SignatureSearchModel.SignatureSearchTypes.Game:
                     sql = "SELECT Signatures_Games.*, Signatures_Publishers.Publisher, Signatures_Platforms.Id AS PlatformId, Signatures_Platforms.Platform AS Platform FROM Signatures_Games LEFT JOIN Signatures_Publishers ON Signatures_Games.PublisherId = Signatures_Publishers.Id LEFT JOIN Signatures_Platforms ON Signatures_Games.SystemId = Signatures_Platforms.Id";
                     whereNameField = "Name";
+                    orderBy = "Signatures_Platforms.Platform, Signatures_Games.`Name`";
                     break;
 
                 case SignatureSearchModel.SignatureSearchTypes.Rom:
                     sql = "SELECT * FROM Signatures_Roms";
                     whereNameField = "Name";
+                    orderBy = "Name";
                     break;
                 
                 default:
@@ -174,6 +179,8 @@ namespace Classes
             {
                 sql += whereClause_Name;
             }
+            // add order by
+            sql += " ORDER BY " + orderBy;
 
             // limit to 100 rows
             sql += " LIMIT 100;";
@@ -204,7 +211,7 @@ namespace Classes
             }
         }
 
-        private Signatures_Games_2.GameItem BuildGameItem(DataRow sigDbRow)
+        public Signatures_Games_2.GameItem BuildGameItem(DataRow sigDbRow)
         {
             return new Signatures_Games_2.GameItem
             {
@@ -225,7 +232,7 @@ namespace Classes
             };
         }
 
-        private Signatures_Games_2.RomItem BuildRomItem(DataRow sigDbRow)
+        public Signatures_Games_2.RomItem BuildRomItem(DataRow sigDbRow)
         {
             return new Signatures_Games_2.RomItem
             {
@@ -244,7 +251,7 @@ namespace Classes
             };
         }
 
-        private static Dictionary<string, string> GetLookup(LookupTypes LookupType, long GameId)
+        public Dictionary<string, string> GetLookup(LookupTypes LookupType, long GameId)
         {
             string tableName = "";
             switch (LookupType)

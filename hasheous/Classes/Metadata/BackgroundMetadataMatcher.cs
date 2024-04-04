@@ -41,7 +41,12 @@ namespace BackgroundMetadataMatcher
             /// <summary>
             /// Too many matches to successfully match
             /// </summary>
-            AutomaticTooManyMatches = 3
+            AutomaticTooManyMatches = 3,
+
+            /// <summary>
+            /// Manually set by an admin - will never change unless set by an admin
+            /// </summary>
+            ManualByAdmin = 4
         }
 
         public async void StartMatcher()

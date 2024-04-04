@@ -1,0 +1,72 @@
+<div id="editbanner">
+    <div id="editbannerbuttons">
+        <button id="dataObjectSave"><span data-lang="save"></span> <img src="/images/save.svg" class="buttonicon" /></button>
+        <button id="dataObjectCancel"><span data-lang="cancel"></span> <img src="/images/delete.svg" class="buttonicon" /></button>
+    </div>
+    <span id="editbannerlabel" data-lang="inEditMode"></span>
+</div>
+
+<h2 data-lang="name"></h2>
+<input type="text" id="dataObject_object_name"></h1>
+
+<h2 data-lang="attributes"></h2>
+<div id="dataObjectAttributes" class="table_container">
+    <table>
+        <tr>
+            <th class="tableheadcell" data-lang="attribute"></th>
+            <th class="tableheadcell" data-lang="value"></th>
+        </tr>
+        <tr id="attributedescription">
+            <td class="tablecell" data-lang="description"></td>
+            <td class="tablecell">
+                <textarea id="attributedescriptioninput"></textarea>
+            </td>
+        </tr>
+        <tr id="attributepublisher" style="display: none;">
+            <td class="tablecell" data-lang="publisher"></td>
+            <td class="tablecell">
+                <select id="attributepublisherselect" class="attributeeditselect">
+                    <option value=""> </option>
+                </select>
+            </td>
+        </tr>
+        <tr id="attributemanufacturer" style="display: none;">
+            <td class="tablecell" data-lang="manufacturer"></td>
+            <td class="tablecell">
+                <select id="attributemanufacturerselect" class="attributeeditselect">
+                    <option value=""> </option>
+                </select>
+            </td>
+        </tr>
+        <tr id="attributeplatform" style="display: none;">
+            <td class="tablecell" data-lang="platform"></td>
+            <td class="tablecell">
+                <select id="attributeplatformselect" class="attributeeditselect">
+                    <option value=""> </option>
+                </select>
+            </td>
+        </tr>
+
+    </table>
+</div>
+
+<h2 data-lang="metadatamap"></h2>
+<div id="dataObjectMetadataMap" class="table_container">
+    <table>
+        <tr>
+            <th class="tableheadcell" data-lang="source"></th>
+            <th class="tableheadcell" data-lang="mapping"></th>
+        </tr>
+        <tr>
+            <td class="tablecell" data-lang="igdb"></td>
+            <td class="tablecell"><input id="metadatamapigdb" type="text" class="attributeeditselect"></td>
+        </tr>
+    </table>
+</div>
+
+<h2 data-lang="signatures"></h2>
+<div id="dataObjectSignatures">
+    <select id="signaturesselect" multiple="multiple" class="attributeeditselect">
+
+    </select>
+</div>

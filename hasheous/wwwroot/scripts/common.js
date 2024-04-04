@@ -141,27 +141,35 @@ function generateTable(resultSet, columns, indexColumn, hideIndex, rowClickCallb
                     cellType = cellDetails[1];
                 }
                 
-                let cellContent;
+                let cellContent = document.createElement('span');
                 switch (cellType) {
                     case "date":
-                        cellContent = moment(resultSet[i][cellName] + "Z").format('llll');
+                        cellContent.innerHTML = moment(resultSet[i][cellName] + "Z").format('llll');
                         break;
                     
                     case "lang":
-                        cellContent = lang.getLang(resultSet[i][cellName]);
+                        cellContent.innerHTML = lang.getLang(resultSet[i][cellName]);
                         break;
 
                     case "link":
                         if (resultSet[i][cellName].length > 0) {
-                            cellContent = "<a href=\"" + resultSet[i][cellName] + "\" target=\"_blank\" rel=\"noopener noreferrer\">" + resultSet[i][cellName] + "<img src=\"/images/link.svg\" class=\"linkicon\" /></a>";
+                            cellContent.innerHTML = "<a href=\"" + resultSet[i][cellName] + "\" target=\"_blank\" rel=\"noopener noreferrer\">" + resultSet[i][cellName] + "<img src=\"/images/link.svg\" class=\"linkicon\" /></a>";
                         } else {
-                            cellContent = "";
+                            cellContent.innerHTML = "";
                         }
+                        break;
+
+                    case "bytes":
+                        cellContent.innerHTML = formatBytes(resultSet[i][cellName], 1);
+                        break;
+
+                    case "object":
+                        cellContent = resultSet[i][cellName];
                         break;
 
                     default:
                         // default to plain text
-                        cellContent = resultSet[i][cellName];
+                        cellContent.innerHTML = resultSet[i][cellName];
                         break;
 
                 }
@@ -172,13 +180,13 @@ function generateTable(resultSet, columns, indexColumn, hideIndex, rowClickCallb
                 ) {
                     let cell = document.createElement('td');
                     cell.classList.add('tablecell');
-                    cell.innerHTML = cellContent;
+                    cell.appendChild(cellContent);
                     dataRow.appendChild(cell);
                 }
 
                 if (Object.keys(resultSet[0])[x] == indexColumn) {
-                    dataRow.setAttribute('data-' + cellName, cellContent);
-                    rowId = cellContent;
+                    dataRow.setAttribute('data-' + cellName, cellContent.innerHTML);
+                    rowId = cellContent.innerHTML;
                 }
             }
 

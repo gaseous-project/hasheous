@@ -6,9 +6,13 @@
     --element-border-color: rgb(190, 190, 190);
     --element-border-radius: 5px;
     --element-highlight: #ddd;
-    --field-background-color: #ffffff;
-    --field-text-color: #000000;
-    --field-border-color: #000000;
+    --element-alert-background-color: rgb(252, 255, 235);
+    --element-alert-border-color: rgb(132, 92, 0);
+    --element-alert-text-color: rgb(0, 0, 0);
+    --field-background-color: rgb(255, 255, 255);
+    --field-text-color: rgb(0, 0, 0);
+    --field-border-color: rgb(190, 190, 190);
+    --field-border-color-highlight: rgb(190, 190, 255);
     --button-color: #555;
     --button-text-color: #ffffff;
     --button-color-hover: #888;
@@ -51,7 +55,7 @@ a:hover {
     text-decoration: underline;
 }
 
-input[type='text'], input[type='number'], input[type="email"], input[type="password"], input[type="datetime-local"] {
+input[type='text'], input[type='number'], input[type="email"], input[type="password"], input[type="datetime-local"], textarea {
     background-color: var(--field-background-color);
     color: var(--field-text-color);
     padding: 4px;
@@ -68,7 +72,7 @@ input[type='text'], input[type='number'], input[type="email"], input[type="passw
 }
 
 input[type='text']:hover, input[type='number']:hover, input[type="email"]:hover, input[type="password"]:hover, input[type="datetime-local"]:hover {
-    
+    border-color: var(--field-border-color-highlight);
 }
 
 input[type='button'], button {
@@ -380,4 +384,57 @@ td {
     margin-bottom: 5px;
     margin-right: 5px;
     display: inline-block;
+}
+
+#dataObjectAdminControlsRow {
+    text-align: center;
+}
+
+.buttonicon {
+    width: 12px;
+    height: 12px;
+    filter: invert(100%);
+}
+
+.buttonicon13 {
+    width: 13px;
+    height: 13px;
+}
+
+#editbanner {
+    display: table;
+    width: 100%;
+    background-color: var(--element-alert-background-color);
+    border-color: var(--element-alert-border-color);
+    border-radius: var(--element-border-radius);
+    color: var(--element-alert-text-color);
+    border-width: 1px;
+    border-style: solid;
+    padding: 10px 10px 10px 20px;
+    margin-bottom: 10px;
+    clear: both;
+    line-height: 30px;
+}
+
+#editbannerlabel {
+    display: inline-block;
+    vertical-align: middle;
+    line-height: normal;
+}
+
+#editbannerbuttons {
+    float: right;
+}
+
+#dataObject_object_name {
+    width: 100%;
+}
+
+#attributedescriptioninput {
+    width: 90%;
+    height: 50px;
+}
+
+.attributeeditselect {
+    width: 90%;
 }

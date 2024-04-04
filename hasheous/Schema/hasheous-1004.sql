@@ -45,14 +45,16 @@ CREATE TABLE `DataObject_MetadataMap` (
 );
 
 CREATE TABLE `DataObject_Attributes` (
-    `AttributeId` BIGINT AUTO_INCREMENT,
     `DataObjectId` bigint(20) NOT NULL,
     `AttributeType` int(11) NOT NULL,
-    `AttributeName` int(11) NOT NULL, 
+    `AttributeName` int(11) NOT NULL,
     `AttributeValue` longtext DEFAULT NULL,
-    `AttributeRelation` bigint(20) NULL,
+    `AttributeRelation` bigint(20) DEFAULT NULL,
     `AttributeRelationType` int(11) DEFAULT NULL,
-    PRIMARY KEY (`AttributeId`),
-    INDEX (`DataObjectId`, `AttributeType`, `AttributeName`, `AttributeRelation`),
-    CONSTRAINT `DataObject_Attributes_ibfk_1` FOREIGN KEY (`DataObjectId`) REFERENCES `DataObject` (`Id`) ON DELETE CASCADE
+    PRIMARY KEY (`AttributeId`), KEY `DataObjectId` (
+        `DataObjectId`, `AttributeType`, `AttributeName`, `AttributeRelation`
+    ),
+    KEY `AttributeRelation` (`AttributeRelation`),
+    CONSTRAINT `DataObject_Attributes_ibfk_1` FOREIGN KEY (`DataObjectId`) REFERENCES `DataObject` (`Id`) ON DELETE CASCADE,
+    CONSTRAINT `DataObject_Attributes_ibfk_2` FOREIGN KEY (`AttributeRelation`) REFERENCES `DataObject` (`Id`) ON DELETE CASCADE
 );

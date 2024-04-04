@@ -18,11 +18,11 @@ namespace hasheous_server.Controllers.v1_0
         [ProducesResponseType(StatusCodes.Status200OK)]
         [AllowAnonymous]
         [Route("{ObjectType}")]
-        public async Task<IActionResult> DataObjectsList(Classes.DataObjects.DataObjectType ObjectType)
+        public async Task<IActionResult> DataObjectsList(Classes.DataObjects.DataObjectType ObjectType, string? search)
         {
             hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
-            return Ok(DataObjects.GetDataObjects(ObjectType));
+            return Ok(DataObjects.GetDataObjects(ObjectType, search));
         }
 
         [MapToApiVersion("1.0")]
@@ -69,12 +69,57 @@ namespace hasheous_server.Controllers.v1_0
         }
 
         [MapToApiVersion("1.0")]
+        [HttpDelete]
+        [Authorize(Roles = "Admin")]
+        [Route("{ObjectType}/{Id}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> EditDataObject(Classes.DataObjects.DataObjectType ObjectType, long Id)
+        {
+            hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
+
+            Models.DataObjectItem? DataObject = DataObjects.GetDataObject(ObjectType, Id);
+
+            if (DataObject == null)
+            {
+                return NotFound();
+            }
+            else
+            {
+                DataObjects.DeleteDataObject(ObjectType, Id);
+                return Ok();
+            }
+        }
+
+        [MapToApiVersion("1.0")]
         [HttpPut]
         [Authorize(Roles = "Admin")]
         [Route("{ObjectType}/{Id}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> EditDataObject(Classes.DataObjects.DataObjectType ObjectType, long Id, Models.DataObjectItemModel model)
+        {
+            hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
+
+            Models.DataObjectItem? DataObject = DataObjects.EditDataObject(ObjectType, Id, model);
+
+            if (DataObject == null)
+            {
+                return NotFound();
+            }
+            else
+            {
+                return Ok(DataObject);
+            }
+        }
+
+        [MapToApiVersion("1.0")]
+        [HttpPut]
+        [Authorize(Roles = "Admin")]
+        [Route("{ObjectType}/{Id}/FullObject")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> EditDataObject(Classes.DataObjects.DataObjectType ObjectType, long Id, Models.DataObjectItem model)
         {
             hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
@@ -242,6 +287,27 @@ namespace hasheous_server.Controllers.v1_0
             else
             {
                 return Ok(DataObjects.GetMetadataMap(ObjectType, Id));
+            }
+        }
+
+        [MapToApiVersion("1.0")]
+        [HttpPost]
+        [Authorize(Roles = "Admin")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [Route("{ObjectType}/{Id}/SignatureSearch/")]
+        public async Task<IActionResult> GetSignatureSearch(Classes.DataObjects.DataObjectType ObjectType, long Id, string SearchString)
+        {
+            hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
+
+            Models.DataObjectItem? DataObject = DataObjects.GetDataObject(ObjectType, Id);
+
+            if (DataObject == null)
+            {
+                return NotFound();
+            }
+            else
+            {
+                return Ok(DataObjects.SignatureSearch(Id, ObjectType, SearchString));
             }
         }
     }

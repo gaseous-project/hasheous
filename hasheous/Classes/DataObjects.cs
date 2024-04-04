@@ -14,22 +14,49 @@ namespace hasheous_server.Classes
 {
     public class DataObjects
     {
+        public class DataObjectsBadSearchCriteriaException : Exception
+        {
+            public DataObjectsBadSearchCriteriaException()
+            {
+            }
+
+            public DataObjectsBadSearchCriteriaException(string message)
+                : base(message)
+            {
+            }
+
+            public DataObjectsBadSearchCriteriaException(string message, Exception inner)
+                : base(message, inner)
+            {
+            }
+        }
+
         public enum DataObjectType
         {
             Company = 0,
             Platform = 1,
-            Game = 2
+            Game = 2,
+            ROM = 3,
+            None = 100
         }
 
-        public List<Models.DataObjectItem> GetDataObjects(DataObjectType objectType)
+        public List<Models.DataObjectItem> GetDataObjects(DataObjectType objectType, string? search = null)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql = "SELECT * FROM DataObject WHERE ObjectType = @objecttype ORDER BY `Name`;";
-            DataTable data = db.ExecuteCMD(sql, new Dictionary<string, object>
+            string sql;
+            Dictionary<string, object> dbDict = new Dictionary<string, object>{
+                { "objecttype", objectType },
+            };
+            if (search == null)
             {
-                { "objecttype", objectType }
+                sql = "SELECT * FROM DataObject WHERE ObjectType = @objecttype ORDER BY `Name`;";
             }
-            );
+            else
+            {
+                sql = "SELECT * FROM DataObject WHERE ObjectType = @objecttype AND `Name` LIKE @search ORDER BY `Name`;";
+                dbDict.Add("search", "%" + search + "%");
+            }
+            DataTable data = db.ExecuteCMD(sql, dbDict);
 
             List<Models.DataObjectItem> DataObjects = new List<Models.DataObjectItem>();
             foreach (DataRow row in data.Rows)
@@ -88,6 +115,13 @@ namespace hasheous_server.Classes
             // get signature items
             List<Dictionary<string, object>> signatureItems = GetSignatures(ObjectType, id);
 
+            // get extra attributes if dataobjecttype is game
+            if (ObjectType == DataObjectType.Game)
+            {
+                attributes.Add(GetRoms(signatureItems));
+                attributes.AddRange(GetCountriesAndLanguagesForGame(signatureItems));
+            }
+
             // get metadata matches
             List<DataObjectItem.MetadataItem> metadataItems = GetMetadataMap(ObjectType, id);
 
@@ -125,6 +159,8 @@ namespace hasheous_server.Classes
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "";
+            Dictionary<string, object> dbDict = new Dictionary<string, object>{};
+
             switch (ObjectType)
             {
                 case DataObjectType.Company:
@@ -136,20 +172,25 @@ namespace hasheous_server.Classes
                     break;
 
                 case DataObjectType.Game:
-                    sql = @"SELECT 
-                            DataObject_SignatureMap.SignatureId,
+                    sql = @"SELECT
+                            DataObject_SignatureMap.`SignatureId`,
                             CASE 
-                                WHEN (Signatures_Games.Year IS NULL OR Signatures_Games.Year = '') THEN Signatures_Games.Name
-                                ELSE CONCAT(Signatures_Games.Name, ' (', Signatures_Games.Year, ')')
+                                WHEN ((Signatures_Games.`Year` IS NOT NULL OR Signatures_Games.`Year` <> '') AND (Signatures_Platforms.`Platform` IS NULL)) THEN CONCAT(Signatures_Games.`Name`, ' (', Signatures_Games.`Year`, ')')
+                                WHEN ((Signatures_Games.`Year` IS NOT NULL OR Signatures_Games.`Year` <> '') AND (Signatures_Platforms.`Platform` IS NOT NULL)) THEN CONCAT(Signatures_Games.`Name`, ' (', Signatures_Games.`Year`, ')', ' - ', Signatures_Platforms.`Platform`)
+                                WHEN ((Signatures_Games.`Year` IS NULL OR Signatures_Games.`Year` = '') AND (Signatures_Platforms.`Platform` IS NOT NULL)) THEN CONCAT(Signatures_Games.`Name`, ' - ', Signatures_Platforms.`Platform`)
+                                ELSE Signatures_Games.`Name`
                             END AS `Game`
                         FROM 
                             DataObject_SignatureMap 
                         JOIN 
-                            Signatures_Games ON DataObject_SignatureMap.SignatureId = Signatures_Games.Id 
-                        WHERE DataObject_SignatureMap.DataObjectId = @id AND DataObject_SignatureMap.DataObjectTypeId = @typeid
-                        ORDER BY Signatures_Games.Name;";
+                            Signatures_Games ON DataObject_SignatureMap.`SignatureId` = Signatures_Games.`Id`
+                        LEFT JOIN
+                            Signatures_Platforms ON Signatures_Games.`SystemId` = Signatures_Platforms.`Id`
+                        WHERE DataObject_SignatureMap.`DataObjectId` = @id AND DataObject_SignatureMap.`DataObjectTypeId` = @typeid
+                        ORDER BY Signatures_Games.`Name`;";
                     break;
             }
+            
             List<Dictionary<string, object>> signatureItems = db.ExecuteCMDDict(sql, new Dictionary<string, object>{
                 { "id", DataObjectId },
                 { "typeid", ObjectType }
@@ -180,6 +221,134 @@ namespace hasheous_server.Classes
             }
 
             return metadataItems;
+        }
+
+        public List<AttributeItem> GetCountriesAndLanguagesForGame(List<Dictionary<string, object>> GameSignatures)
+        {
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+
+            SignatureManagement signature = new SignatureManagement();
+
+            Dictionary<string, object> countries = new Dictionary<string, object>();
+            Dictionary<string, object> languages = new Dictionary<string, object>();
+
+            foreach (Dictionary<string, object> GameSignature in GameSignatures)
+            {
+                Dictionary<string, object> dbDict = new Dictionary<string, object>{
+                    { "sigid", GameSignature["SignatureId"] }
+                };
+
+                // get country
+                Dictionary<string, string> gameCountries = signature.GetLookup(Common.LookupTypes.Country, long.Parse(GameSignature["SignatureId"].ToString()));
+                foreach (KeyValuePair<string, string> gameCountry in gameCountries)
+                {
+                    if (!countries.ContainsKey(gameCountry.Key))
+                    {
+                        countries.Add(gameCountry.Key, gameCountry.Value);
+                    }
+                }
+
+                // get language
+                Dictionary<string, string> gameLanguages = signature.GetLookup(Common.LookupTypes.Language, long.Parse(GameSignature["SignatureId"].ToString()));
+                foreach (KeyValuePair<string, string> gameLanguage in gameLanguages)
+                {
+                    if (!languages.ContainsKey(gameLanguage.Key))
+                    {
+                        languages.Add(gameLanguage.Key, gameLanguage.Value);
+                    }
+                }
+            }
+
+            List<AttributeItem> attributeItems = new List<AttributeItem>();
+
+            // compile countries
+            if (countries.Count > 0)
+            {
+                AttributeItem countryAttributes = new AttributeItem{
+                    attributeName = AttributeItem.AttributeName.Country,
+                    attributeType = AttributeItem.AttributeType.ShortString,
+                    attributeRelationType = DataObjectType.None
+                };
+                for (int i = 0; i < countries.Count; i++)
+                {
+                    if (i > 0)
+                    {
+                        countryAttributes.Value += ", ";
+                    }
+                    countryAttributes.Value += countries.ElementAt(i).Value + " (" + countries.ElementAt(i).Key + ")";
+                }
+                attributeItems.Add(countryAttributes);
+            }
+
+            // compile languages
+            if (languages.Count > 0)
+            {
+                AttributeItem languageAttributes = new AttributeItem{
+                    attributeName = AttributeItem.AttributeName.Language,
+                    attributeType = AttributeItem.AttributeType.ShortString,
+                    attributeRelationType = DataObjectType.None
+                };
+                for (int i = 0; i < languages.Count; i++)
+                {
+                    if (i > 0)
+                    {
+                        languageAttributes.Value += ", ";
+                    }
+                    languageAttributes.Value += languages.ElementAt(i).Value.ToString();
+                }
+                attributeItems.Add(languageAttributes);
+            }
+
+            return attributeItems;
+        }
+
+        public AttributeItem GetRoms(List<Dictionary<string, object>> GameSignatures)
+        {
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+
+            SignatureManagement signature = new SignatureManagement();
+            
+            List<Signatures_Games_2.RomItem> roms = new List<Signatures_Games_2.RomItem>();
+
+            foreach (Dictionary<string, object> GameSignature in GameSignatures)
+            {
+                string sql = @"SELECT
+                        `Id` AS romid,
+                        `Name` AS romname,
+                        `Size`,
+                        `CRC`,
+                        `MD5`,
+                        `SHA1`,
+                        `DevelopmentStatus`,
+                        `Attributes`,
+                        `RomType`,
+                        `RomTypeMedia`,
+                        `MediaLabel`,
+                        `MetadataSource`
+                    FROM
+                        Signatures_Roms
+                    WHERE
+                        GameId=@gameid
+                    ORDER BY `Name`;";
+                DataTable data = db.ExecuteCMD(sql, new Dictionary<string, object>{
+                    { "gameid", GameSignature["SignatureId"] }
+                });
+
+                foreach (DataRow row in data.Rows)
+                {
+                    Signatures_Games_2.RomItem rom = signature.BuildRomItem(row);
+                    roms.Add(rom);
+                }
+            }
+
+            AttributeItem attribute = new AttributeItem{
+                attributeName = AttributeItem.AttributeName.ROMs,
+                attributeType = AttributeItem.AttributeType.EmbeddedList,
+                attributeRelationType = DataObjectType.ROM,
+                Value = roms
+            };
+
+            return attribute;
         }
 
         public Models.DataObjectItem NewDataObject(DataObjectType objectType, Models.DataObjectItemModel model)
@@ -236,25 +405,171 @@ namespace hasheous_server.Classes
             return GetDataObject(objectType, id);
         }
 
+        public void DeleteDataObject(DataObjectType objectType, long id)
+        {
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql = "DELETE FROM DataObject WHERE ObjectType=@objecttype AND Id=@id";
+            Dictionary<string, object> dbDict = new Dictionary<string, object>{
+                { "id", id },
+                { "objecttype", objectType },
+                { "updateddate", DateTime.UtcNow }
+            };
+
+            db.ExecuteNonQuery(sql, dbDict);
+        }
+
+        public Models.DataObjectItem EditDataObject(DataObjectType objectType, long id, Models.DataObjectItem model)
+        {
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql = "UPDATE DataObject SET `Name`=@name, `UpdatedDate`=@updateddate WHERE ObjectType=@objecttype AND Id=@id";
+            Dictionary<string, object> dbDict = new Dictionary<string, object>{
+                { "id", id },
+                { "name", model.Name },
+                { "objecttype", objectType },
+                { "updateddate", DateTime.UtcNow }
+            };
+
+            db.ExecuteNonQuery(sql, dbDict);
+
+            DataObjectItem EditedObject = GetDataObject(objectType, id);
+
+            // update attributes
+            foreach (AttributeItem newAttribute in model.Attributes)
+            {
+                bool attributeFound = false;
+                foreach (AttributeItem existingAttribute in EditedObject.Attributes)
+                {
+                    if (
+                        (newAttribute.attributeType == existingAttribute.attributeType) &&
+                        (newAttribute.attributeName == existingAttribute.attributeName)
+                    )
+                    {
+                        attributeFound = true;
+
+                        string compareValue = "";
+                        string sqlField;
+                        switch (existingAttribute.attributeType)
+                        {
+                            case AttributeItem.AttributeType.ObjectRelationship:
+                                sqlField = "AttributeRelation";
+                                DataObjectItem tempCompare = (DataObjectItem)existingAttribute.Value;
+                                if (tempCompare != null)
+                                {
+                                    compareValue = tempCompare.Id.ToString();
+                                }
+                                break;
+
+                            default:
+                                sqlField = "AttributeValue";
+                                compareValue = (string)existingAttribute.Value;
+                                break;
+
+                        }
+
+                        if (compareValue != (string)newAttribute.Value)
+                        {
+                            // update existing value
+                            sql = "UPDATE DataObject_Attributes SET " + sqlField + "=@value WHERE DataObjectId=@id AND AttributeId=@attrid;";
+                            db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                                { "id", id },
+                                { "attrid", existingAttribute.Id },
+                                { "value", newAttribute.Value }
+                            });
+                        } else {
+                            if (newAttribute.Value == "")
+                            {
+                                // blank value - delete it
+                                DeleteAttribute(id, (long)existingAttribute.Id);
+                            }
+                        }
+                    }
+                }
+
+                if (attributeFound == false)
+                {
+                    if (newAttribute.Value != "")
+                    {
+                        // create a new attribute
+                        AddAttribute(id, newAttribute);
+                    }
+                }
+            }
+
+            // update metadata map
+            foreach (DataObjectItem.MetadataItem newMetadataItem in model.Metadata)
+            {
+                bool metadataFound = false;
+                foreach (DataObjectItem.MetadataItem existingMetadataItem in EditedObject.Metadata)
+                {
+                    if (newMetadataItem.Source == existingMetadataItem.Source)
+                    {
+                        metadataFound = true;
+                        if (newMetadataItem.Id != existingMetadataItem.Id)
+                        {
+                            // change to manually set
+                            sql = "UPDATE DataObject_MetadataMap SET MatchMethod=@match, MetadataId=@metaid WHERE DataObjectId=@id AND SourceId=@source;";
+                            db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                                { "id", id },
+                                { "match", BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin },
+                                { "metaid", newMetadataItem.Id },
+                                { "source", existingMetadataItem.Source }
+                            });
+                        }
+                    }
+                }
+
+                if (metadataFound == false)
+                {
+                    sql = "INSERT INTO DataObject_MetadataMap (DataObjectId, MetadataId, SourceId, MatchMethod, LastSearched, NextSearch) VALUES (@id, @metaid, @source, @match, @last, @next);";
+                    db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                        { "id", id },
+                        { "match", BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin },
+                        { "metaid", newMetadataItem.Id },
+                        { "source", newMetadataItem.Source },
+                        { "last", DateTime.UtcNow },
+                        { "next", DateTime.UtcNow.AddMonths(1) }
+                    });
+                }
+            }
+
+            // signatures
+            sql = "DELETE FROM DataObject_SignatureMap WHERE DataObjectId=@id";
+            db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                { "id", id }
+            });
+            foreach (Dictionary<string, object>? signature in model.SignatureDataObjects)
+            {
+                AddSignature(id, objectType, long.Parse(signature["SignatureId"].ToString()));
+            }
+
+            return GetDataObject(objectType, id);
+        }
+
         /// <summary>
         /// Performs a metadata look up on DataObjects with no match metadata
         /// </summary>
-        public void DataObjectMetadataSearch(DataObjectType objectType, bool ForceSearch = false)
+        public MatchItem? DataObjectMetadataSearch(DataObjectType objectType, bool ForceSearch = false)
         {
-            _DataObjectMetadataSearch(objectType, null, ForceSearch);
+            var retVal = _DataObjectMetadataSearch(objectType, null, ForceSearch);
+            retVal.Wait(new TimeSpan(0, 0, 15));
+            return retVal.Result;
         }
 
         /// <summary>
         /// Performs a metadata look up on the selected DataObject if it has no metadata match
         /// </summary>
         /// <param name="id"></param>
-        public void DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch = false)
+        public MatchItem? DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch = false)
         {
-            _DataObjectMetadataSearch(objectType, id, ForceSearch);
+            var retVal = _DataObjectMetadataSearch(objectType, id, ForceSearch);
+            retVal.Wait(new TimeSpan(0, 0, 15));
+            return retVal.Result;
         }
 
-        private async void _DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch)
+        private async Task<MatchItem?> _DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch)
         {
+            MatchItem? DataObjectSearchResults = null;
+
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql;
             Dictionary<string, object> dbDict;
@@ -295,7 +610,6 @@ namespace hasheous_server.Classes
                         switch (metadata.Source)
                         {
                             case Metadata.IGDB.Communications.MetadataSources.IGDB:
-                                MatchItem? DataObjectSearchResults = null;
                                 switch (objectType)
                                 {
                                     case DataObjectType.Company:
@@ -319,7 +633,8 @@ namespace hasheous_server.Classes
                                                     {
                                                         if (provider.Source == MetadataSources.IGDB && (
                                                             provider.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic || 
-                                                            provider.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Manual
+                                                            provider.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Manual ||
+                                                            provider.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin
                                                             )
                                                         )
                                                         {
@@ -404,6 +719,8 @@ namespace hasheous_server.Classes
             }
 
             UpdateDataObjectDate((long)id);
+
+            return DataObjectSearchResults;
         }
 
         private static List<string> GetSearchCandidates(string GameName)
@@ -474,7 +791,7 @@ namespace hasheous_server.Classes
             }
         }
 
-        private class MatchItem
+        public class MatchItem
         {
             public BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod MatchMethod { get; set; } = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch;
             public string MetadataId { get; set; } = "";
@@ -488,7 +805,7 @@ namespace hasheous_server.Classes
             switch (attribute.attributeType)
             {
                 case AttributeItem.AttributeType.ObjectRelationship:
-                    attributeRelation = (long?)attribute.Value;
+                    attributeRelation = long.Parse(attribute.Value.ToString());
                     break;
 
                 default:
@@ -588,6 +905,110 @@ namespace hasheous_server.Classes
             });
 
             UpdateDataObjectDate(DataObjectId);
+        }
+
+        /// <summary>
+        /// Fetch signatures relevant to the selected DataObjectType
+        /// </summary>
+        /// <param name="ObjectType">The ObjectType to search signatures for</param>
+        /// <param name="SearchString">The search term</param>
+        /// <returns>A list of signatures</returns>
+        public List<Dictionary<string, object>> SignatureSearch(long DataObjectId, DataObjectType ObjectType, string SearchString)
+        {
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string tableName;
+            string fieldName;
+            string customWhere = "";
+
+            Dictionary<string, object> dbDict = new Dictionary<string, object>{
+                { "typeid", ObjectType },
+                { "searchstring", SearchString }
+            };
+
+            // any signature returned should be relevant to the ObjectType, and not be used anywhere else
+            switch (ObjectType)
+            {
+                case DataObjectType.Company:
+                    tableName = "Publishers";
+                    fieldName = "Publisher";
+                    break;
+
+                case DataObjectType.Platform:
+                    tableName = "Platforms";
+                    fieldName = "Platform";
+                    break;
+
+                case DataObjectType.Game:
+                    tableName = "Games";
+                    fieldName = "`Name`";
+
+                    // get a list of platform signature ids to filter results on
+                    List<AttributeItem> attributes = GetAttributes(DataObjectId, true);
+
+                    List<int> platformIds = new List<int>();
+
+                    foreach (AttributeItem attribute in attributes)
+                    {
+                        if (
+                            attribute.attributeType == AttributeItem.AttributeType.ObjectRelationship &&
+                            attribute.attributeName == AttributeItem.AttributeName.Platform &&
+                            attribute.attributeRelationType == DataObjectType.Platform
+                            )
+                        {
+                            DataObjectItem platformObject = (DataObjectItem)attribute.Value;
+                            
+                            List<Dictionary<string, object>> platformSignatures = GetSignatures(DataObjectType.Platform, platformObject.Id);
+                            foreach (Dictionary<string, object> platformSignature in platformSignatures)
+                            {
+                                platformIds.Add(int.Parse((string)platformSignature["SignatureId"]));
+                            }
+                        }
+                    }
+                    
+                    // construct where clause
+                    if (platformIds.Count > 0)
+                    {
+                        customWhere = "Signatures_<TableName>.SystemId IN ( ";
+                        for (int i = 0; i < platformIds.Count; i++)
+                        {
+                            if (i > 0)
+                            {
+                                customWhere += ", ";
+                            }
+
+                            customWhere += "@id" + i;
+                            dbDict.Add("id" + i, platformIds[i]);
+                        }
+                        customWhere += " ) AND ";
+                    }
+
+                    break;
+
+                default:
+                    throw new DataObjectsBadSearchCriteriaException("Invalid ObjectType");
+            }
+
+            string sql = @"SELECT
+                            Signatures_<TableName>.* 
+                        FROM
+                            Signatures_<TableName>
+                        LEFT JOIN
+                            (
+                                SELECT
+                                    *
+                                FROM
+                                    DataObject_SignatureMap
+                                WHERE
+                                    DataObjectTypeId = @typeid
+                            ) DataObject_SignatureMap ON Signatures_<TableName>.Id = DataObject_SignatureMap.SignatureId
+                        WHERE
+                            DataObject_SignatureMap.SignatureId IS NULL AND " + customWhere + @"
+                            Signatures_<TableName>.<FieldName> LIKE CONCAT('%', @searchstring, '%');";
+            sql = sql.Replace("<TableName>", tableName).Replace("<FieldName>", fieldName);
+
+            List<Dictionary<string, object>> results = db.ExecuteCMDDict(sql, dbDict);
+
+            return results;
         }
     }
 }

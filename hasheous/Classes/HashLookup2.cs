@@ -29,7 +29,7 @@ namespace Classes
             if (rawSignatures.Count == 0)
             {
                 Signature = null;
-                MetadataResults = null;
+                Metadata = null;
             }
             else
             {
@@ -64,6 +64,12 @@ namespace Classes
                     });
                     // add signature mappinto to publisher
                     dataObjects.AddSignature(publisher.Id, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
+
+                    // force metadata search
+                    dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Company, publisher.Id, true);
+
+                    // re-get the publisher
+                    publisher = dataObjects.GetDataObject(DataObjects.DataObjectType.Company, publisher.Id);
                 }
 
                 // platform
@@ -76,6 +82,12 @@ namespace Classes
                     });
                     // add signature mapping to platform
                     dataObjects.AddSignature(platform.Id, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId);
+
+                    // force metadata search
+                    dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Platform, platform.Id, true);
+
+                    // re-get the platform
+                    platform = dataObjects.GetDataObject(DataObjects.DataObjectType.Platform, platform.Id);
                 }
 
                 // game
@@ -89,24 +101,6 @@ namespace Classes
                     // add signature mapping to game
                     dataObjects.AddSignature(game.Id, DataObjects.DataObjectType.Game, long.Parse(discoveredSignature.Game.Id));
                     
-                    // add country attribute
-                    if (discoveredSignature.Game.Countries != null)
-                    {
-                        dataObjects.AddAttribute(game.Id, new AttributeItem{
-                            attributeName = AttributeItem.AttributeName.Country,
-                            attributeType = AttributeItem.AttributeType.ShortString,
-                            Value = string.Join("; ", discoveredSignature.Game.Countries.Select(x => x.Value + " (" + x.Key + ")").ToArray())
-                        });
-                    }
-                    // add language attribute
-                    if (discoveredSignature.Game.Languages != null)
-                    {
-                        dataObjects.AddAttribute(game.Id, new AttributeItem{
-                            attributeName = AttributeItem.AttributeName.Language,
-                            attributeType = AttributeItem.AttributeType.ShortString,
-                            Value = string.Join("; ", discoveredSignature.Game.Languages.Select(x => x.Value).ToArray())
-                        });
-                    }
                     // add platform reference
                     dataObjects.AddAttribute(game.Id, new AttributeItem{
                         attributeName = AttributeItem.AttributeName.Platform,
@@ -124,11 +118,23 @@ namespace Classes
 
                     // force metadata search
                     dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true);
+
+                    // re-get the game
+                    game = dataObjects.GetDataObject(DataObjects.DataObjectType.Game, game.Id);
                 }
 
                 // build return item
-                Signature = new SignatureLookupItem.SignatureResult(discoveredSignature);
-                
+                this.Name = game.Name;
+                this.Platform = new MiniDataObjectItem{
+                    Name = platform.Name,
+                    metadata = platform.Metadata
+                };
+                this.Publisher = new MiniDataObjectItem{
+                    Name = publisher.Name,
+                    metadata = publisher.Metadata
+                };
+                this.Signature = new SignatureLookupItem.SignatureResult(discoveredSignature);
+                this.Metadata = game.Metadata;
             }
         }
 
@@ -166,9 +172,17 @@ namespace Classes
             }
         }
 
-        public SignatureLookupItem.SignatureResult? Signature { get; set; }
-        public List<SignatureLookupItem.MetadataResult>? MetadataResults { get; set; }
+        public string Name { get; set; }
+        public MiniDataObjectItem Platform { get; set; }
+        public MiniDataObjectItem Publisher { get; set; }
 
-        
+        public SignatureLookupItem.SignatureResult? Signature { get; set; }
+        public List<DataObjectItem.MetadataItem>? Metadata { get; set; }
+
+        public class MiniDataObjectItem
+        {
+            public string Name { get; set; }
+            public List<DataObjectItem.MetadataItem> metadata { get; set; }
+        }
     }
 }

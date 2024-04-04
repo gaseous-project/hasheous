@@ -15,7 +15,8 @@ namespace hasheous_server.Models
             ShortString = 1,
             DateTime = 2,
             ImageId = 3,
-            ObjectRelationship = 10
+            ObjectRelationship = 10,
+            EmbeddedList = 11
         }
 
         public enum AttributeName
@@ -27,7 +28,8 @@ namespace hasheous_server.Models
             Platform = 4,
             Year = 5,
             Country = 6,
-            Language = 7
+            Language = 7,
+            ROMs = 8
         }
 
         public long? Id { get; set; }
