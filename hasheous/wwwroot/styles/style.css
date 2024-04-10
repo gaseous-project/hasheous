@@ -1,4 +1,5 @@
 :root {
+    --page-background: #ffffff;
     --link-color: rgb(0, 0, 120);
     --link-color-highlight: rgb(0, 0, 230);
     --element-background-color: rgba(240, 240, 240);
@@ -36,6 +37,7 @@ body {
     font-style: normal;
     font-weight: 100;
     font-size: 13px;
+    background-color: var(--page-background);
 }
 
 h1 {
@@ -386,6 +388,11 @@ td {
     display: inline-block;
 }
 
+.signatureitem.selectable:hover {
+    background-color: var(--button-color);
+    cursor: pointer;
+}
+
 #dataObjectAdminControlsRow {
     text-align: center;
 }
@@ -437,4 +444,51 @@ td {
 
 .attributeeditselect {
     width: 90%;
+}
+
+.tablefooter {
+    position: relative;
+    display: flexbox;
+    height: 30px;
+    padding: 5px;
+    margin-top: 10px;
+}
+
+.tablefootercount {
+    position: absolute;
+    display: inline;
+    left: 5px;
+    top: 5px;
+}
+
+.tablefooterpager {
+    position: absolute;
+    display: inline;
+    right: 5px;
+    top: 5px;
+}
+
+.pageitem {
+    display: inline;
+    padding: 2px 4px 2px 4px;
+    border-color: var(--page-background);
+    border-width: 1px;
+    border-style: solid;
+    border-radius: var(--element-border-radius);
+    margin-right: 2px;
+}
+
+.pageitem:hover {
+    border-color: var(--element-border-color);
+    cursor: pointer;
+}
+
+.pageitem.selected {
+    background-color: var(--element-background-color);
+    border-color: var(--element-background-color);
+}
+
+.pageitem.selected:hover {
+    border-color: var(--element-background-color);
+    cursor: default;
 }

@@ -97,6 +97,14 @@ namespace Classes
             }
         }
 
+        public static ConfigFile.EmailSMTP EmailSMTPConfiguration
+        {
+            get
+            {
+                return _config.EmailSMTPConfiguration;
+            }
+        }
+
         static Config()
         {
             if (_config == null)
@@ -249,6 +257,8 @@ namespace Classes
             public IGDB IGDBConfiguration = new IGDB();
 
             public Logging LoggingConfiguration = new Logging();
+
+            public EmailSMTP EmailSMTPConfiguration = new EmailSMTP();
 
             public class Database
             {
@@ -480,6 +490,16 @@ namespace Classes
                 public int LogRetention = 7;
 
                 public bool AlwaysLogToDisk = false;
+            }
+
+            public class EmailSMTP
+            {
+                public string Host = "";
+                public int Port = 587;
+                public bool EnableSSL = true;
+                public string UserName = "";
+                public string Password = "";
+                public string SendAs = "";
             }
         }
     }

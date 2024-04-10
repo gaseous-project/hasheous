@@ -37,6 +37,11 @@ if (userProfile == null) {
 } else {
     buttonProfile.style.display = '';
     buttonLogin.style.display = 'none';
+
+    if (userProfile.Roles.includes('Admin') || userProfile.Roles.includes('Moderator')) {
+        document.getElementById('banner_company').style.display = '';
+        document.getElementById('banner_game').style.display = '';
+    }
 }
 
 function userLogoff() {
@@ -73,9 +78,9 @@ switch (targetPage) {
                 pageScriptElement.setAttribute('src', '/pages/' + targetPage + '.js');
                 pageScriptDiv.appendChild(pageScriptElement);
 
-                // set page headers
                 setPageElementInnerHTMLLanguage(document.getElementsByTagName('h1'));
                 setPageElementInnerHTMLLanguage(document.getElementsByTagName('h2'));
+                setPageElementInnerHTMLLanguage(document.getElementsByTagName('h3'));
                 setPageElementInnerHTMLLanguage(document.getElementsByTagName('span'));
                 setPageElementInnerHTMLLanguage(document.getElementsByTagName('p'));
                 setPageElementInnerHTMLLanguage(document.getElementsByTagName('div'));

@@ -97,111 +97,265 @@ function formatBytes(bytes, decimals = 2) {
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`
 }
 
-function generateTable(resultSet, columns, indexColumn, hideIndex, rowClickCallback) {
-    if (hideIndex == undefined) {
-        hideIndex = false;
+class generateTable {
+    resultSet = undefined;
+
+    table = undefined;
+
+    constructor(dataSet, columns, indexColumn, hideIndex, rowClickCallback, recordCount, pageNumber, pageCount, pagingCallback) {
+        this.resultSet = dataSet;
+
+        if (hideIndex == undefined) {
+            hideIndex = false;
+        }
+    
+        if (this.resultSet.length == 0) {
+            let errorMessage = document.createElement('span');
+            errorMessage.innerHTML = lang.getLang('norecords');
+            this.table = errorMessage;
+            
+            return this.table;
+        } else {
+            this.table = document.createElement('div');
+
+            let genTable = document.createElement('table');
+            
+            // create header from attribute names in columns
+            let headerRow = document.createElement('tr');
+            if (!indexColumn) {
+                indexColumn = "";
+            }
+            for (let i = 0; i < columns.length; i++) {
+                let headerName;
+                if (columns[i].name) {
+                    headerName = lang.getLang(columns[i].name);
+                } else {
+                    headerName = lang.getLang(columns[i].split(":")[0]);
+                }
+                if (
+                    (hideIndex === true && (headerName.toLowerCase() !== indexColumn.toLowerCase())) ||
+                    (hideIndex === false)
+                    ) {
+                    let headerCell = document.createElement('th');
+                    headerCell.innerHTML = headerName;
+                    headerCell.classList.add('tableheadcell');
+                    headerRow.appendChild(headerCell);
+                }
+            }
+            genTable.appendChild(headerRow);
+    
+            for (let i = 0; i < this.resultSet.length; i++) {
+                let dataRow = document.createElement('tr');
+                let rowId = null;
+    
+                for (let x = 0; x < columns.length; x++) {
+                    let cellDetails;
+                    if (columns[x].column) {
+                        cellDetails = columns[x].column.split(":");
+                    } else {
+                        cellDetails = columns[x].split(":");
+                    }
+                    let cellName = cellDetails[0];
+                    let cellType = '';
+                    if (cellDetails[1]) {
+                        cellType = cellDetails[1];
+                    }
+
+                    let rawCellValue = this.resultSet[i];
+
+                    let cellValue = this.#processValue(cellName, rawCellValue, cellType);
+                    
+                    let cellContent = document.createElement('span');
+                    switch (cellType) {
+                        case "date":
+                            cellContent.innerHTML = moment(cellValue + "Z").format('llll');
+                            break;
+                        
+                        case "lang":
+                            cellContent.innerHTML = lang.getLang(cellValue);
+                            break;
+    
+                        case "link":
+                            if (cellValue.length > 0) {
+                                cellContent.innerHTML = "<a href=\"" + cellValue + "\" target=\"_blank\" rel=\"noopener noreferrer\">" + cellValue + "<img src=\"/images/link.svg\" class=\"linkicon\" /></a>";
+                            } else {
+                                cellContent.innerHTML = "";
+                            }
+                            break;
+    
+                        case "bytes":
+                            cellContent.innerHTML = formatBytes(cellValue, 1);
+                            break;
+    
+                        case "object":
+                            cellContent = cellValue;
+                            break;
+    
+                        default:
+                            // default to plain text
+                            cellContent.innerHTML = cellValue;
+                            break;
+    
+                    }
+    
+                    if (
+                        (hideIndex === true && (cellName.toLowerCase() !== indexColumn.toLowerCase())) ||
+                        (hideIndex === false)
+                    ) {
+                        let cell = document.createElement('td');
+                        cell.classList.add('tablecell');
+                        cell.appendChild(cellContent);
+                        dataRow.appendChild(cell);
+                    }
+    
+                    if (Object.keys(this.resultSet[0])[x] == indexColumn) {
+                        dataRow.setAttribute('data-' + cellName, cellContent.innerHTML);
+                        rowId = cellContent.innerHTML;
+                    }
+                }
+    
+                if (rowId != null) {
+                    if (rowClickCallback) {
+                        dataRow.classList.add('tablerowhighlight');
+                        dataRow.addEventListener("click", function() {
+                            rowClickCallback(rowId);
+                        }, true);
+                    }
+                }
+    
+                genTable.appendChild(dataRow);
+            }
+
+            this.table.appendChild(genTable);
+
+            // create table footer
+            if (recordCount || pageCount) {
+                let footer = document.createElement('div');
+                footer.classList.add('tablefooter');
+
+                if (recordCount) {
+                    // display a label with the number of records returned
+                    let footerRecordCount = document.createElement('div');
+                    footerRecordCount.classList.add('tablefootercount');
+                    let footerRecordCountLabel = document.createElement('span');
+                    footerRecordCountLabel.innerHTML = lang.getLang('recordcount') + ' ' + recordCount;
+                    footerRecordCount.appendChild(footerRecordCountLabel);
+
+                    footer.appendChild(footerRecordCount);
+                }
+
+                if (pageCount > 1) {
+                    // display a pager
+                    let footerPager = document.createElement('div');
+                    footerPager.classList.add('tablefooterpager');
+
+                    // insert first page button
+                    footerPager.appendChild(this.#createPageButton("|&lt;", 1, pageNumber, pageCount, pagingCallback));
+                    
+                    // insert previous page button
+                    footerPager.appendChild(this.#createPageButton("&lt;", pageNumber - 1, pageNumber, pageCount, pagingCallback));
+                    
+                    for (let i = 0; i < pageCount; i++) {
+                        let thisPage = (i + 1);
+                        
+                        // insert page number button
+                        footerPager.appendChild(this.#createPageButton(thisPage, thisPage, pageNumber, pageCount, pagingCallback));
+                    }
+                    
+                    // insert next page button
+                    footerPager.appendChild(this.#createPageButton("&gt;", pageNumber + 1, pageNumber, pageCount, pagingCallback));
+
+                    // insert last page button
+                    footerPager.appendChild(this.#createPageButton("&gt;|", pageCount, pageNumber, pageCount, pagingCallback));
+                    
+                    footer.appendChild(footerPager);
+                }
+
+                this.table.appendChild(footer);
+            }
+
+            return this.table;
+        }
     }
 
-    if (resultSet.length == 0) {
-        let errorMessage = document.createElement('span');
-        errorMessage.innerHTML = lang.getLang('norecords');
-        
-        return errorMessage;
-    } else {
-        let table = document.createElement('table');
-        
-        // create header from attribute names in columns
-        let headerRow = document.createElement('tr');
-        if (!indexColumn) {
-            indexColumn = "";
+    #processValue(pattern, value, type) {
+        let patternName = pattern;
+        let patternParts = pattern.split('.');
+            
+        let filter = null;
+        if (patternParts[0].includes('[')) {
+            patternName = patternParts[0].substring(0, patternParts[0].indexOf('['));
+            
+            let tempFilter = patternParts[0].substring(
+                patternParts[0].indexOf("[") + 1, 
+                patternParts[0].lastIndexOf("]")
+            );
+
+            filter = {
+                key: tempFilter.split('=')[0],
+                value: tempFilter.split('=')[1]
+            };
+        } else {
+            patternName = patternParts[0];
         }
-        for (let i = 0; i < columns.length; i++) {
-            let headerName = lang.getLang(columns[i].split(":")[0]);
-            if (
-                (hideIndex === true && (headerName.toLowerCase() !== indexColumn.toLowerCase())) ||
-                (hideIndex === false)
-                ) {
-                let headerCell = document.createElement('th');
-                headerCell.innerHTML = headerName;
-                headerCell.classList.add('tableheadcell');
-                headerRow.appendChild(headerCell);
-            }
-        }
-        table.appendChild(headerRow);
 
-        for (let i = 0; i < resultSet.length; i++) {
-            let dataRow = document.createElement('tr');
-            let rowId = null;
+        if (value[patternName]) {
+            if (Array.isArray(value[patternName])) {
+                let returnValue = '';
+                for (let i = 0; i < value[patternName].length; i++) {
+                    let obj = value[patternName][i];
+                    if (filter != null) {
+                        if (obj[filter.key]) {
+                            if (obj[filter.key] == filter.value) {
+                                // process this element
+                                let tempPatternParts = patternParts;
+                                tempPatternParts.shift();
 
-            for (let x = 0; x < columns.length; x++) {
-                let cellDetails = columns[x].split(":");
-                let cellName = cellDetails[0];
-                let cellType = '';
-                if (cellDetails[1]) {
-                    cellType = cellDetails[1];
-                }
-                
-                let cellContent = document.createElement('span');
-                switch (cellType) {
-                    case "date":
-                        cellContent.innerHTML = moment(resultSet[i][cellName] + "Z").format('llll');
-                        break;
-                    
-                    case "lang":
-                        cellContent.innerHTML = lang.getLang(resultSet[i][cellName]);
-                        break;
-
-                    case "link":
-                        if (resultSet[i][cellName].length > 0) {
-                            cellContent.innerHTML = "<a href=\"" + resultSet[i][cellName] + "\" target=\"_blank\" rel=\"noopener noreferrer\">" + resultSet[i][cellName] + "<img src=\"/images/link.svg\" class=\"linkicon\" /></a>";
-                        } else {
-                            cellContent.innerHTML = "";
+                                returnValue = this.#processValue(
+                                    tempPatternParts.join("."),
+                                    obj,
+                                    type
+                                );
+                            }
                         }
-                        break;
-
-                    case "bytes":
-                        cellContent.innerHTML = formatBytes(resultSet[i][cellName], 1);
-                        break;
-
-                    case "object":
-                        cellContent = resultSet[i][cellName];
-                        break;
-
-                    default:
-                        // default to plain text
-                        cellContent.innerHTML = resultSet[i][cellName];
-                        break;
-
+                    }
                 }
 
-                if (
-                    (hideIndex === true && (cellName.toLowerCase() !== indexColumn.toLowerCase())) ||
-                    (hideIndex === false)
-                ) {
-                    let cell = document.createElement('td');
-                    cell.classList.add('tablecell');
-                    cell.appendChild(cellContent);
-                    dataRow.appendChild(cell);
-                }
+                return returnValue;
+            } else if (patternParts.length > 1) {
+                let tempPatternParts = patternParts;
+                tempPatternParts.shift();
 
-                if (Object.keys(resultSet[0])[x] == indexColumn) {
-                    dataRow.setAttribute('data-' + cellName, cellContent.innerHTML);
-                    rowId = cellContent.innerHTML;
-                }
+                return(this.#processValue(
+                    tempPatternParts.join("."),
+                    value[patternName],
+                    type
+                ));
+            } else {
+                return value[patternName];
             }
+        } else {
+            return '';
+        }
+    }
 
-            if (rowId != null) {
-                if (rowClickCallback) {
-                    dataRow.classList.add('tablerowhighlight');
-                    dataRow.addEventListener("click", function() {
-                        rowClickCallback(rowId);
-                    }, true);
-                }
-            }
+    #createPageButton(displayText, targetPageNumber, currentPage, pageCount, callback) {
+        let pageItem = document.createElement('span');
+        pageItem.innerHTML = displayText;
+        pageItem.classList.add('pageitem');
 
-            table.appendChild(dataRow);
+        if (
+            targetPageNumber < 1 ||
+            targetPageNumber == currentPage ||
+            targetPageNumber > pageCount
+        ) {
+            pageItem.classList.add('selected');
+        } else {
+            pageItem.addEventListener("click", function(ev) {
+                callback(targetPageNumber);
+            });
         }
 
-        return table;
+        return pageItem;
     }
 }

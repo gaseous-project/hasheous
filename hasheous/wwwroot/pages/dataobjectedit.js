@@ -2,6 +2,8 @@ let pageType = getQueryString('type', 'string').toLowerCase();
 let dataObject = undefined;
 let editMode = false;
 
+let selectedPlatform = undefined;
+
 let mustRedirect = true;
 if (userProfile != null) {
     if (userProfile.Roles != null) {
@@ -86,6 +88,7 @@ ajaxCall(
 function renderContent() {
     setPageTitle(dataObject.name, true);
     document.getElementById('dataObject_object_name').value = dataObject.name;
+    GetSuggestedSignatures();
 
     // show required fields for this page type
     switch (pageType) {
@@ -126,6 +129,7 @@ function renderContent() {
                             selectElement = document.getElementById('attributepublisherselect');
                             break;
                         case "Platform":
+                            selectedPlatform = dataObject.attributes[i].value;
                             selectElement = document.getElementById('attributeplatformselect')
                             break;
                     }
@@ -262,6 +266,12 @@ function renderContent() {
             }
         }
     });
+    $(signatureElement).on('select2:select', function (e) {
+        GetSuggestedSignatures();
+    });
+    $(signatureElement).on('select2:unselect', function (e) {
+        GetSuggestedSignatures();
+    });
 
     // metadata
     if (dataObject.metadata.length > 0) {
@@ -325,10 +335,11 @@ function SetupObjectMenus(dropdownName, endpoint) {
                     text: "None"
                 });
 
-                for (var i = 0; i < data.length; i++) {
+                for (var i = 0; i < data.objects.length; i++) {
                     arr.push({
-                        id: data[i].id,
-                        text: data[i].name
+                        id: data.objects[i].id,
+                        text: data.objects[i].name,
+                        fullObject: data.objects[i]
                     });
                 }
 
@@ -338,4 +349,153 @@ function SetupObjectMenus(dropdownName, endpoint) {
             }
         }
     });
+
+    switch (endpoint) {
+        case "Platform":
+            $("#" + dropdownName).on('select2:select', function (e) {
+                var data = e.params.data;
+                selectedPlatform = data.fullObject;
+                GetSuggestedSignatures();
+            });
+            break;
+    }
+}
+
+function GetSuggestedSignatures() {
+    // get the name of the data object
+    let searchName = document.getElementById('dataObject_object_name');
+
+    let searchType;
+    switch (pageType.toLowerCase()) {
+        case "company":
+            searchType = "Publisher";
+            break;
+
+        default:
+            searchType = pageType;
+            break;
+    }
+
+    // search
+    let url = '/api/v1/Signatures/Search';
+    let searchModel = {
+        "searchType": searchType,
+        "name": searchName.value
+    };
+
+    if (searchName.value.length > 3) {
+        // get search results
+        ajaxCall(
+            url,
+            'POST',
+            function(success) {
+                if (success.length > 0) {
+                    let signatureElement = document.getElementById('dataObjectSuggestedSignatures');
+                    signatureElement.innerHTML = '';
+                    
+                    let selectedSignatures = [];
+                    let selectedSignaturesObj = $('#signaturesselect').select2('data');
+                    for (let i = 0; i < selectedSignaturesObj.length; i++) {
+                        let selectedValue = selectedSignaturesObj[i].id;
+                        selectedSignatures.push(selectedValue);
+                    }
+
+                    for (let i = 0; i < success.length; i++) {
+                        let resultid;
+                        switch (pageType) {
+                            case "game":
+                                resultid = success[i].id;
+                                break;
+                            default:
+                                resultid = success[i].Id;
+                                break;
+                        }
+
+                        if (!selectedSignatures.includes(resultid)) {
+                            let sigItem = document.createElement('span');
+                            sigItem.classList.add('signatureitem');
+                            sigItem.classList.add('selectable');
+
+                            let useSig = true;
+                            switch (pageType) {
+                                case "company":
+                                    sigItem.setAttribute('data-id', success[i].Id);
+                                    sigItem.innerHTML = success[i].Publisher;
+                                    break;
+                
+                                case "platform":
+                                    sigItem.setAttribute('data-id', success[i].Id);
+                                    sigItem.innerHTML = success[i].Platform;
+                                    break;
+                
+                                case "game":
+                                    // check the selected platform, and filter accordingly
+                                    useSig = false;
+                                    if (selectedPlatform) {
+                                        if (selectedPlatform.id != "") {
+                                            if (selectedPlatform.signatureDataObjects) {
+                                                for (let s = 0; s < selectedPlatform.signatureDataObjects.length; s++) {
+                                                    if (
+                                                        selectedPlatform.signatureDataObjects[s].SignatureId == success[i].systemId
+                                                    ) {
+                                                        useSig = true;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    if (useSig == true) {
+                                        sigItem.setAttribute('data-id', success[i].id);
+
+                                        let year = "";
+                                        if (success[i].year) {
+                                            if (success[i].year != "") {
+                                                year = " (" + success[i].year + ")";
+                                            }
+                                        }
+
+                                        let system = "";
+                                        if (success[i].system) {
+                                            if (success[i].system != "") {
+                                                system = " - " + success[i].system;
+                                            }
+                                        }
+
+                                        sigItem.innerHTML = success[i].name + year + system;
+                                    }
+                                    
+                                    break;
+                
+                            }
+                
+                            if (useSig == true) {
+                                sigItem.addEventListener('click', function(e) {
+                                    let signatureId = this.getAttribute('data-id');
+                                    let signatureLabel = this.innerText;
+
+                                    if ($('#signaturesselect').find("option[value='" + signatureId + "']").length) {
+                                        $('#signaturesselect').val(signatureId).trigger('change');
+                                    } else { 
+                                        // Create a DOM Option and pre-select by default
+                                        var newOption = new Option(signatureLabel, signatureId, true, true);
+                                        // Append it to the select
+                                        $('#signaturesselect').append(newOption).trigger('change');
+                                    } 
+
+                                    GetSuggestedSignatures();
+                                });
+
+                                signatureElement.appendChild(sigItem);
+                            }
+                        }
+                    }
+                }
+            },
+            function(error) {
+                console.log(error);
+            },
+            JSON.stringify(searchModel)
+        );
+    }
 }

@@ -183,7 +183,7 @@ namespace Classes
             sql += " ORDER BY " + orderBy;
 
             // limit to 100 rows
-            sql += " LIMIT 100;";
+            sql += " LIMIT 1000;";
 
             // execute search
             switch(model.SearchType)

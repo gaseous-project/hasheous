@@ -9,25 +9,71 @@ pageSearchBox.addEventListener("keypress", function(e) {
     }
 });
 
-function createDataObjectsTable(targetDiv, pageType) {
+function createDataObjectsTable(targetDiv, pageType, pageNumber, pageSize) {
     let resultDiv = document.getElementById(targetDiv);
     resultDiv.innerHTML = '';
+
+    if (!pageNumber) {
+        pageNumber = 1;
+    }
+    if (!pageSize) {
+        pageSize = 5;
+    }
 
     if (pageSearchBox.value.length >= 3) {
         let progressObj = document.createElement('progress');
         resultDiv.appendChild(progressObj);
 
         ajaxCall(
-            '/api/v1/DataObjects/' + pageType + '?search=' + encodeURIComponent(pageSearchBox.value),
+            '/api/v1/DataObjects/' + pageType + '?search=' + encodeURIComponent(pageSearchBox.value) + '&pageSize=' + pageSize + '&pageNumber=' + pageNumber + '&getchildrelations=true',
             'GET',
             function(success) {
-                let newTable = generateTable(
-                    success,
-                    [ 'id', 'name' ],
+                let columns;
+                switch (pageType) {
+                    case "game":
+                        columns = [
+                            'id',
+                            'name',
+                            {
+                                column: 'attributes[attributeName=Platform].value.name',
+                                name: 'platform'
+                            }
+                        ];
+                        break;
+
+                    case "platform":
+                        columns = [
+                            'id',
+                            'name',
+                            {
+                                column: 'attributes[attributeName=Manufacturer].value.name',
+                                name: 'manufacturer'
+                            }
+                        ];
+                        break;
+
+                    default:
+                        case "company":
+                        columns = [
+                            'id',
+                            'name'
+                        ];
+                        break;
+                }
+
+                let newTable = new generateTable(
+                    success.objects,
+                    columns,
                     'id',
                     true,
                     function(id) {
                         window.location = '/index.html?page=dataobjectdetail&type=' + pageType + '&id=' + id;
+                    },
+                    success.count,
+                    success.pageNumber,
+                    success.totalPages,
+                    function(p) {
+                        createDataObjectsTable(targetDiv, pageType, p, pageSize);
                     }
                 );
                 let resultDiv = document.getElementById(targetDiv);
@@ -68,17 +114,23 @@ function createDataObjectsTableFromMD5Search(hashType) {
     }
 
     ajaxCall(
-        '/api/v1/HashLookup/Lookup2',
+        '/api/v1/HashLookup/Lookup2?getchildrelations=true',
         'POST',
         function(success) {
             let resultDiv = document.getElementById('gamesearchresults');
-            console.log(success);
-
+            
             if (success) {
                 let arr = [success];
-                let newTable = generateTable(
+                let newTable = new generateTable(
                     arr,
-                    [ 'id', 'name' ],
+                    [
+                        'id',
+                        'name',
+                        {
+                            column: 'platform.name',
+                            name: 'platform'
+                        }
+                    ],
                     'id',
                     true,
                     function(id) {

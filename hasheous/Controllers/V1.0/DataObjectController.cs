@@ -18,11 +18,11 @@ namespace hasheous_server.Controllers.v1_0
         [ProducesResponseType(StatusCodes.Status200OK)]
         [AllowAnonymous]
         [Route("{ObjectType}")]
-        public async Task<IActionResult> DataObjectsList(Classes.DataObjects.DataObjectType ObjectType, string? search)
+        public async Task<IActionResult> DataObjectsList(Classes.DataObjects.DataObjectType ObjectType, string? search, int pageNumber = 0, int pageSize = 0, bool getchildrelations = false)
         {
             hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
-            return Ok(DataObjects.GetDataObjects(ObjectType, search));
+            return Ok(DataObjects.GetDataObjects(ObjectType, pageNumber, pageSize, search, getchildrelations));
         }
 
         [MapToApiVersion("1.0")]

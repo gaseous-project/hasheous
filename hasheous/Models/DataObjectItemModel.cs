@@ -29,7 +29,8 @@ namespace hasheous_server.Models
             Year = 5,
             Country = 6,
             Language = 7,
-            ROMs = 8
+            ROMs = 8,
+            ManagedId = 9
         }
 
         public long? Id { get; set; }

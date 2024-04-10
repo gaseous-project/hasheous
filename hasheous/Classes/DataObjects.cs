@@ -40,7 +40,7 @@ namespace hasheous_server.Classes
             None = 100
         }
 
-        public List<Models.DataObjectItem> GetDataObjects(DataObjectType objectType, string? search = null)
+        public DataObjectsList GetDataObjects(DataObjectType objectType, int pageNumber = 0, int pageSize = 0, string? search = null, bool GetChildRelations = false)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql;
@@ -59,19 +59,39 @@ namespace hasheous_server.Classes
             DataTable data = db.ExecuteCMD(sql, dbDict);
 
             List<Models.DataObjectItem> DataObjects = new List<Models.DataObjectItem>();
-            foreach (DataRow row in data.Rows)
+
+            // compile data for return
+            int pageOffset = pageSize * (pageNumber - 1);
+            for (int i = pageOffset; i < data.Rows.Count; i++)
             {
+                if (pageNumber != 0 && pageSize != 0)
+                {
+                    if (i >= (pageOffset + pageSize))
+                    {
+                        break;
+                    }
+                }
+
                 Models.DataObjectItem item = BuildDataObject(
                     objectType,
-                    (long)row["Id"],
-                    row,
-                    false
+                    (long)data.Rows[i]["Id"],
+                    data.Rows[i],
+                    GetChildRelations
                 );
 
                 DataObjects.Add(item);
             }
 
-            return DataObjects;
+            float pageCount = (float)data.Rows.Count / (float)pageSize;
+            DataObjectsList objectsList = new DataObjectsList{
+                Objects = DataObjects,
+                Count = data.Rows.Count,
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                TotalPages = (int)Math.Ceiling(pageCount)
+            };
+
+            return objectsList;
         }
 
         public Models.DataObjectItem? GetDataObject(DataObjectType objectType, long id)
@@ -118,8 +138,11 @@ namespace hasheous_server.Classes
             // get extra attributes if dataobjecttype is game
             if (ObjectType == DataObjectType.Game)
             {
-                attributes.Add(GetRoms(signatureItems));
-                attributes.AddRange(GetCountriesAndLanguagesForGame(signatureItems));
+                if (GetChildRelations == true)
+                {
+                    attributes.Add(GetRoms(signatureItems));
+                    attributes.AddRange(GetCountriesAndLanguagesForGame(signatureItems));
+                }
             }
 
             // get metadata matches
@@ -468,13 +491,21 @@ namespace hasheous_server.Classes
 
                         if (compareValue != (string)newAttribute.Value)
                         {
-                            // update existing value
-                            sql = "UPDATE DataObject_Attributes SET " + sqlField + "=@value WHERE DataObjectId=@id AND AttributeId=@attrid;";
-                            db.ExecuteNonQuery(sql, new Dictionary<string, object>{
-                                { "id", id },
-                                { "attrid", existingAttribute.Id },
-                                { "value", newAttribute.Value }
-                            });
+                            if (newAttribute.Value == "")
+                            {
+                                // blank value - delete it
+                                DeleteAttribute(id, (long)existingAttribute.Id);
+                            }
+                            else
+                            {
+                                // update existing value
+                                sql = "UPDATE DataObject_Attributes SET " + sqlField + "=@value WHERE DataObjectId=@id AND AttributeId=@attrid;";
+                                db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                                    { "id", id },
+                                    { "attrid", existingAttribute.Id },
+                                    { "value", newAttribute.Value }
+                                });
+                            }
                         } else {
                             if (newAttribute.Value == "")
                             {
@@ -585,7 +616,7 @@ namespace hasheous_server.Classes
             }
             else
             {
-                DataObjectsToProcess.AddRange(GetDataObjects(objectType));
+                DataObjectsToProcess.AddRange(GetDataObjects(objectType).Objects);
             }
 
             // search for metadata

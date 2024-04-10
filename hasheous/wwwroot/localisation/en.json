@@ -48,6 +48,7 @@
     "description": "Description",
     "attributes": "Attributes",
     "signatures": "Signature Mapping",
+    "suggestedsignatures": "Suggested Signatures",
     "game": "Game",
     "newgame": "New Game",
     "games": "Games",
@@ -58,5 +59,7 @@
     "publisher": "Publisher",
     "platform": "Platform",
     "manufacturer": "Manufacturer",
-    "norecords": "No records returned"
+    "norecords": "No records returned",
+    "recordcount": "Count:",
+    "managedid": "Management Id"
 }

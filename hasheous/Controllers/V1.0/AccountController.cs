@@ -169,43 +169,14 @@ namespace hasheous_server.Controllers.v1_0
             return NotFound();
         }
 
-        [HttpGet]
-        [Route("Users")]
-        [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> GetAllUsers()
-        {
-            List<UserViewModel> users = new List<UserViewModel>();
-
-            foreach (ApplicationUser rawUser in _userManager.Users)
-            {
-                UserViewModel user = new UserViewModel();
-                user.Id = rawUser.Id;
-                user.EmailAddress = rawUser.NormalizedEmail.ToLower();
-                user.LockoutEnabled = rawUser.LockoutEnabled;
-                user.LockoutEnd = rawUser.LockoutEnd;
-                user.SecurityProfile = rawUser.SecurityProfile;
-                
-                // get roles
-                ApplicationUser? aUser = await _userManager.FindByIdAsync(rawUser.Id);
-                if (aUser != null)
-                {
-                    IList<string> aUserRoles = await _userManager.GetRolesAsync(aUser);
-                    user.Roles = aUserRoles.ToList();
-
-                    user.Roles.Sort();
-                }
-
-                users.Add(user);
-            }
-
-            return Ok(users);
-        }
-
+        //
+        // POST: /Account/Register
         [HttpPost]
-        [Route("Users")]
-        [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> NewUser(RegisterViewModel model)
+        [AllowAnonymous]
+        [Route("Register")]
+        public async Task<IActionResult> Register(RegisterViewModel model, string returnUrl = null)
         {
+            // ViewData["ReturnUrl"] = returnUrl;
             if (ModelState.IsValid)
             {
                 ApplicationUser user = new ApplicationUser
@@ -218,176 +189,80 @@ namespace hasheous_server.Controllers.v1_0
                 var result = await _userManager.CreateAsync(user, model.Password);
                 if (result.Succeeded)
                 {
-                    // add new users to the player role
-                    await _userManager.AddToRoleAsync(user, "Player");
+                    // For more information on how to enable account confirmation and password reset please visit http://go.microsoft.com/fwlink/?LinkID=532713
+                    // Send an email with this link
+                    var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+                    var callbackUrl = Url.Action("ConfirmEmail", "Account", new { userId = user.Id, code = code }, protocol: HttpContext.Request.Scheme);
+                    await _emailSender.SendEmailAsync(model.Email, "Confirm your account",
+                       "Please confirm your account by clicking this link: <a href=\"" + callbackUrl + "\">link</a>");
 
-                    Logging.Log(Logging.LogType.Information, "User Management", User.FindFirstValue(ClaimTypes.Name) + " created user " + model.Email + " with password.");
+                    // add all users to the member role
+                    await _userManager.AddToRoleAsync(user, "Member");
 
-                    return Ok(result);
+                    await _signInManager.SignInAsync(user, isPersistent: false);
+                    _logger.LogInformation(3, "User created a new account with password.");
+
+                    Logging.Log(Logging.LogType.Information, "User Management", "New user " + model.Email + " created with password.");
+
+                    return Ok(returnUrl);
                 }
                 else
                 {
                     return Ok(result);
                 }
-            }   
+            }
             else
             {
                 return NotFound();
             }
         }
 
+        // GET: /Account/ConfirmEmail
         [HttpGet]
-        [Route("Users/{UserId}")]
-        [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> GetUser(string UserId)
+        [AllowAnonymous]
+        [Route("ConfirmEmail")]
+        public async Task<IActionResult> ConfirmEmail(string userId, string code)
         {
-            ApplicationUser? rawUser = await _userManager.FindByIdAsync(UserId);
-            
-            if (rawUser != null)
+            if (userId == null || code == null)
             {
-                UserViewModel user = new UserViewModel();
-                user.Id = rawUser.Id;
-                user.EmailAddress = rawUser.NormalizedEmail.ToLower();
-                user.LockoutEnabled = rawUser.LockoutEnabled;
-                user.LockoutEnd = rawUser.LockoutEnd;
-                user.SecurityProfile = rawUser.SecurityProfile;
-                
-                // get roles
-                IList<string> aUserRoles = await _userManager.GetRolesAsync(rawUser);
-                user.Roles = aUserRoles.ToList();
-
-                user.Roles.Sort();
-
-                return Ok(user);
+                return Unauthorized("Error");
             }
-            else
-            {
-                return NotFound();
-            }
-        }
-
-        [HttpDelete]
-        [Route("Users/{UserId}")]
-        [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> DeleteUser(string UserId)
-        {
-            // get user
-            ApplicationUser? user = await _userManager.FindByIdAsync(UserId);
-
+            var user = await _userManager.FindByIdAsync(userId);
             if (user == null)
             {
-                return NotFound();
+                return Unauthorized("Error");
             }
-            else
-            {
-                await _userManager.DeleteAsync(user);
-                Logging.Log(Logging.LogType.Information, "User Management", User.FindFirstValue(ClaimTypes.Name) + " deleted user " + user.Email);
-                return Ok();
-            }
+            var result = await _userManager.ConfirmEmailAsync(user, code);
+            return Ok(result.Succeeded ? "ConfirmEmail" : "Error");
         }
 
+        //
+        // POST: /Account/ForgotPassword
         [HttpPost]
-        [Route("Users/{UserId}/Roles")]
-        [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> SetUserRoles(string UserId, string RoleName)
-        {
-            ApplicationUser? user = await _userManager.FindByIdAsync(UserId);
-            
-            if (user != null)
-            {
-                // get roles
-                List<string> userRoles = (await _userManager.GetRolesAsync(user)).ToList();
-                
-                // delete all roles
-                foreach (string role in userRoles)
-                {
-                    if ((new string[] { "Admin", "Member" }).Contains(role) )
-                    {
-                        await _userManager.RemoveFromRoleAsync(user, role);
-                    }
-                }
-
-                // add only requested roles
-                switch (RoleName)
-                {
-                    case "Admin":
-                        await _userManager.AddToRoleAsync(user, "Admin");
-                        await _userManager.AddToRoleAsync(user, "Member");
-                        break;
-                    case "Member":
-                        await _userManager.AddToRoleAsync(user, "Member");
-                        break;
-                    default:
-                        await _userManager.AddToRoleAsync(user, RoleName);
-                        break;
-                }
-                
-                return Ok();
-            }
-            else
-            {
-                return NotFound();
-            }
-        }
-
-        [HttpPost]
-        [Route("Users/{UserId}/SecurityProfile")]
-        [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> SetUserSecurityProfile(string UserId, SecurityProfileViewModel securityProfile)
+        [AllowAnonymous]
+        [Route("ForgotPassword")]
+        public async Task<IActionResult> ForgotPassword(ForgotPasswordViewModel model)
         {
             if (ModelState.IsValid)
             {
-                ApplicationUser? user = await _userManager.FindByIdAsync(UserId);
-                
-                if (user != null)
+                var user = await _userManager.FindByEmailAsync(model.Email);
+                if (user == null || !(await _userManager.IsEmailConfirmedAsync(user)))
                 {
-                    user.SecurityProfile = securityProfile;
-                    await _userManager.UpdateAsync(user);
-                    
+                    // Don't reveal that the user does not exist or is not confirmed
                     return Ok();
                 }
-                else
-                {
-                    return NotFound();
-                }
-            }
-            else
-            {
-                return NotFound();
-            }
-        }
 
-        [HttpPost]
-        [Route("Users/{UserId}/Password")]
-        [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> ResetPassword(string UserId, SetPasswordViewModel model)
-        {
-            if (ModelState.IsValid)
-            {
-                // we can reset the users password
-                ApplicationUser? user = await _userManager.FindByIdAsync(UserId);
-                if (user != null)
-                {
-                    string resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
-                    IdentityResult passwordChangeResult = await _userManager.ResetPasswordAsync(user, resetToken, model.NewPassword);
-                    if (passwordChangeResult.Succeeded == true)
-                    {
-                        return Ok(passwordChangeResult);
-                    }
-                    else
-                    {
-                        return Ok(passwordChangeResult);
-                    }
-                }
-                else
-                {
-                    return NotFound();
-                }
+                // For more information on how to enable account confirmation and password reset please visit http://go.microsoft.com/fwlink/?LinkID=532713
+                // Send an email with this link
+                var code = await _userManager.GeneratePasswordResetTokenAsync(user);
+                var callbackUrl = Url.Action("ResetPassword", "Account", new { userId = user.Id, code = code }, protocol: HttpContext.Request.Scheme);
+                await _emailSender.SendEmailAsync(model.Email, "Reset Password",
+                  "Please reset your password by clicking here: <a href=\"" + callbackUrl + "\">link</a>");
+                return Ok();
             }
-            else
-            {
-                return NotFound();
-            }
+
+            // If we got this far, something failed, redisplay form
+            return Ok();
         }
     }
 }

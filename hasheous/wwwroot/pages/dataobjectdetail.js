@@ -87,7 +87,7 @@ function renderContent() {
                                 romHeader.innerHTML = lang.getLang('associatedroms');
                                 romBox.appendChild(romHeader);
 
-                                romBox.appendChild(generateTable(dataObject.attributes[i].value, [ 'name', 'size:bytes', 'md5', 'sha1', 'signatureSource']));
+                                romBox.appendChild(new generateTable(dataObject.attributes[i].value, [ 'name', 'size:bytes', 'md5', 'sha1', 'signatureSource']));
 
                                 break;
                         }
@@ -118,7 +118,7 @@ function renderContent() {
         document.getElementById('dataObjectAttributesSection').style.display = '';
 
         let attributeElement = document.getElementById('dataObjectAttributes');
-        attributeElement.appendChild(generateTable(attributeValues, [ 'attribute', 'value' ]));
+        attributeElement.appendChild(new generateTable(attributeValues, [ 'attribute', 'value' ]));
     }
 
     if (dataObject.signatureDataObjects.length > 0) {
@@ -148,7 +148,7 @@ function renderContent() {
         }
     }
 
-    let newMetadataMapTable = generateTable(
+    let newMetadataMapTable = new generateTable(
         dataObject.metadata,
         [ 'source:lang', 'matchMethod:lang', 'link:link' ],
         'id',

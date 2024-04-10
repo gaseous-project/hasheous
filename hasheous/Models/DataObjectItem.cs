@@ -3,6 +3,15 @@ using hasheous_server.Classes.Metadata.IGDB;
 
 namespace hasheous_server.Models
 {
+    public class DataObjectsList
+    {
+        public List<DataObjectItem> Objects { get; set; }
+        public int Count { get; set; }
+        public int PageNumber { get; set; }
+        public int PageSize { get; set; }
+        public int TotalPages { get; set; }
+    }
+
     public class DataObjectItem : DataObjectItemModel
     {
         public long Id { get; set; }

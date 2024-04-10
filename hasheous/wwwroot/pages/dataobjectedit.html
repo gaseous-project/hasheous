@@ -7,7 +7,7 @@
 </div>
 
 <h2 data-lang="name"></h2>
-<input type="text" id="dataObject_object_name"></h1>
+<input type="text" id="dataObject_object_name" onkeyup="GetSuggestedSignatures();"></h1>
 
 <h2 data-lang="attributes"></h2>
 <div id="dataObjectAttributes" class="table_container">
@@ -69,4 +69,9 @@
     <select id="signaturesselect" multiple="multiple" class="attributeeditselect">
 
     </select>
+</div>
+
+<h3 data-lang="suggestedsignatures"></h3>
+<div id="dataObjectSuggestedSignatures">
+    
 </div>

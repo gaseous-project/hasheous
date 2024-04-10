@@ -15,6 +15,9 @@ using hasheous_server.Classes.Metadata.IGDB;
 using Microsoft.AspNetCore.Mvc.NewtonsoftJson;
 using static Classes.Common;
 using Newtonsoft.Json.Converters;
+using System.Net.Mail;
+using System.Net;
+using System.Configuration;
 
 Logging.WriteToDiskOnly = true;
 Logging.Log(Logging.LogType.Information, "Startup", "Starting Hasheous Server " + Assembly.GetExecutingAssembly().GetName().Version);
@@ -99,6 +102,16 @@ builder.Services.AddControllers(options =>
             Location = ResponseCacheLocation.Any
         });
 });
+
+// email configuration
+var smtpClient = new SmtpClient(Config.EmailSMTPConfiguration.Host)
+{
+    Port = Config.EmailSMTPConfiguration.Port,
+    Credentials = new NetworkCredential(Config.EmailSMTPConfiguration.UserName, Config.EmailSMTPConfiguration.Password),
+    EnableSsl = Config.EmailSMTPConfiguration.EnableSSL,
+};
+builder.Services.AddSingleton(smtpClient);
+builder.Services.AddTransient<IEmailSender, SmtpEmailSender>();
 
 // rate limiting
 builder.Services.AddRateLimiter(options =>
@@ -218,6 +231,7 @@ builder.Services.AddTransient<IRoleStore<ApplicationRole>, RoleStore>();
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("Admin", policy => policy.RequireRole("Admin"));
+    options.AddPolicy("Moderator", policy => policy.RequireRole("Moderator"));
     options.AddPolicy("Member", policy => policy.RequireRole("Member"));
 });
 
@@ -242,7 +256,7 @@ app.UseResponseCaching();
 using (var scope = app.Services.CreateScope())
 {
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleStore>();
-    var roles = new[] { "Admin", "Member" };
+    var roles = new[] { "Admin", "Moderator", "Member" };
  
     foreach (var role in roles)
     {
@@ -274,6 +288,7 @@ using (var scope = app.Services.CreateScope())
 
         await userManager.CreateAsync(adminUser, CancellationToken.None);
         await userManager.AddToRoleAsync(adminUser, "Admin", CancellationToken.None);
+        await userManager.AddToRoleAsync(adminUser, "Moderator", CancellationToken.None);
     }
 }
 
