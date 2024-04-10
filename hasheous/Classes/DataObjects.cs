@@ -887,21 +887,20 @@ namespace hasheous_server.Classes
             AttributeItem attributeItem = new AttributeItem(){
                 Id = (long)row["AttributeId"],
                 attributeType = (AttributeItem.AttributeType)row["AttributeType"],
-                attributeName = (AttributeItem.AttributeName)row["AttributeName"]
+                attributeName = (AttributeItem.AttributeName)row["AttributeName"],
+                attributeRelationType = (DataObjectType)row["AttributeRelationType"]
             };
             switch (attributeItem.attributeType)
             {
                 case AttributeItem.AttributeType.ObjectRelationship:
-                    DataObjectType relationType = (DataObjectType)row["AttributeRelationType"];
-                    attributeItem.attributeRelationType = relationType;
                     if (GetChildRelations == true)
                     {   
-                        attributeItem.Value = GetDataObject(relationType, (long)row["AttributeRelation"]);
+                        attributeItem.Value = GetDataObject(attributeItem.attributeRelationType, (long)row["AttributeRelation"]);
                     }
                     else
                     {
                         RelationItem relationItem = new RelationItem(){
-                            relationType = relationType,
+                            relationType = attributeItem.attributeRelationType,
                             relationId = (long)row["AttributeRelation"]
                         };
                         attributeItem.Value = relationItem;

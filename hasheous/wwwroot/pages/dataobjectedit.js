@@ -45,6 +45,9 @@ document.getElementById('dataObjectSave').addEventListener("click", function(e) 
     attributes.push(
         newAttributeObject('ObjectRelationship', 'Platform', 'Platform', document.getElementById('attributeplatformselect').value)
     );
+    attributes.push(
+        newAttributeObject('ShortString', 'VIMMManualId', 'None', document.getElementById('attributevimmmanualidinput').value)
+    );
 
     // compile final model
     let model = {
@@ -117,6 +120,15 @@ function renderContent() {
                         document.getElementById('attributedescriptioninput').innerHTML = dataObject.attributes[i].value;
                         break;
                 }
+                break;
+
+            case "ShortString":
+                switch (dataObject.attributes[i].attributeName) {
+                    case "VIMMManualId":
+                        document.getElementById('attributevimmmanualidinput').value = dataObject.attributes[i].value;
+                        break;
+                }
+                break;
 
             case "ObjectRelationship":
                 let selectElement = null;

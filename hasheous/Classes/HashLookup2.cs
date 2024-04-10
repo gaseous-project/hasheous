@@ -152,6 +152,31 @@ namespace Classes
                 };
                 this.Signature = new SignatureLookupItem.SignatureResult(discoveredSignature);
                 this.Metadata = game.Metadata;
+
+                // attributes
+                this.Attributes = new List<AttributeItemCompiled>();
+                foreach (AttributeItem attribute in game.Attributes)
+                {
+                    switch (attribute.attributeName)
+                    {
+                        case AttributeItem.AttributeName.Publisher:
+                        case AttributeItem.AttributeName.Platform:
+                        case AttributeItem.AttributeName.ROMs:
+                        case AttributeItem.AttributeName.Country:
+                            break;
+
+                        default:
+                            AttributeItemCompiled attributeItemCompiled = new AttributeItemCompiled{
+                                Id = attribute.Id,
+                                attributeName = attribute.attributeName,
+                                attributeRelationType = attribute.attributeRelationType,
+                                attributeType = attribute.attributeType,
+                                Value = attribute.Value
+                            };
+                            this.Attributes.Add(attributeItemCompiled);
+                            break;
+                    }
+                }
             }
         }
 
@@ -196,6 +221,7 @@ namespace Classes
 
         public SignatureLookupItem.SignatureResult? Signature { get; set; }
         public List<DataObjectItem.MetadataItem>? Metadata { get; set; }
+        public List<AttributeItemCompiled>? Attributes { get; set; }
 
         public class MiniDataObjectItem
         {

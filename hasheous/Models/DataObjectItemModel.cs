@@ -30,7 +30,7 @@ namespace hasheous_server.Models
             Country = 6,
             Language = 7,
             ROMs = 8,
-            ManagedId = 9
+            VIMMManualId = 9
         }
 
         public long? Id { get; set; }
@@ -38,6 +38,31 @@ namespace hasheous_server.Models
         public AttributeName attributeName { get; set; }
         public Classes.DataObjects.DataObjectType attributeRelationType { get; set; }
         public object Value { get; set; }
+    }
+
+    public class AttributeItemCompiled : AttributeItem
+    {
+        public string? Link
+        {
+            get
+            {
+                switch (attributeType)
+                {
+                    case AttributeType.ShortString:
+                        switch (attributeName)
+                        {
+                            case AttributeName.VIMMManualId:
+                                return "https://vimm.net/manual/" + Value.ToString();
+
+                            default:
+                                return null;
+                        }
+
+                    default:
+                        return null;
+                }
+            }
+        }
     }
 
     public class RelationItem

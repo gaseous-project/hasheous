@@ -63,6 +63,15 @@ function renderContent() {
                 descriptionElement.appendChild(descBody);
 
                 break;
+
+            case "VIMMManualId":
+                attributeValues.push(
+                    {
+                        "attribute": dataObject.attributes[i].attributeName,
+                        "value": "<a href=\"https://vimm.net/manual/" + dataObject.attributes[i].value + "\" target=\"_blank\" rel=\"noopener noreferrer\">https://vimm.net/manual/" + dataObject.attributes[i].value + "<img src=\"/images/link.svg\" class=\"linkicon\"></a>"
+                    }
+                )
+                break;
             
             default:
                 switch (dataObject.attributes[i].attributeType) {
@@ -118,7 +127,7 @@ function renderContent() {
         document.getElementById('dataObjectAttributesSection').style.display = '';
 
         let attributeElement = document.getElementById('dataObjectAttributes');
-        attributeElement.appendChild(new generateTable(attributeValues, [ 'attribute', 'value' ]));
+        attributeElement.appendChild(new generateTable(attributeValues, [ 'attribute:lang', 'value' ]));
     }
 
     if (dataObject.signatureDataObjects.length > 0) {

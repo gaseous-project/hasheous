@@ -61,5 +61,6 @@
     "manufacturer": "Manufacturer",
     "norecords": "No records returned",
     "recordcount": "Count:",
-    "managedid": "Management Id"
+    "vimmmanualid": "Vimm's Lair Game Manual",
+    "country": "Country"
 }
