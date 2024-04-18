@@ -199,7 +199,7 @@ builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
         {
             options.Password.RequireDigit = true;
             options.Password.RequireLowercase = true;
-            options.Password.RequireNonAlphanumeric = false;
+            options.Password.RequireNonAlphanumeric = true;
             options.Password.RequireUppercase = true;
             options.Password.RequiredLength = 10;
             options.User.AllowedUserNameCharacters = null;
@@ -207,7 +207,7 @@ builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
             options.SignIn.RequireConfirmedPhoneNumber = false;
             options.SignIn.RequireConfirmedEmail = false;
             options.SignIn.RequireConfirmedAccount = false;
-        })
+    })
     .AddUserStore<UserStore>()
     .AddRoleStore<RoleStore>()
     .AddDefaultTokenProviders()

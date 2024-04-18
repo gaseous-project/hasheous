@@ -45,7 +45,7 @@ namespace hasheous_server.Controllers.v1_0
             {
                 // This doesn't count login failures towards account lockout
                 // To enable password failures to trigger account lockout, set lockoutOnFailure: true
-                var result = await _signInManager.PasswordSignInAsync(model.Email, model.Password, model.RememberMe, lockoutOnFailure: false);
+                var result = await _signInManager.PasswordSignInAsync(model.Email, model.Password, model.RememberMe, lockoutOnFailure: true);
                 if (result.Succeeded)
                 {
                     Logging.Log(Logging.LogType.Information, "Login", model.Email + " has logged in, from IP: " + HttpContext.Connection.RemoteIpAddress?.ToString());
@@ -186,6 +186,17 @@ namespace hasheous_server.Controllers.v1_0
                     Email = model.Email,
                     NormalizedEmail = model.Email.ToUpper()
                 };
+                // check for a duplicate email address
+                if (_userManager.Options.User.RequireUniqueEmail == true) {
+                    var existingUser = await _userManager.FindByEmailAsync(user.NormalizedEmail);
+                    if (existingUser != null)
+                    {
+                        IdentityError identityError = new IdentityError{ Code = "NotUniqueEmail", Description = user.UserName + " is already taken" };
+                        IdentityResult identityResult = IdentityResult.Failed(identityError);
+                        Logging.Log(Logging.LogType.Information, "User Management", "Unable to create new user " + model.Email + ". Account already exists.");
+                        return Ok(identityResult);
+                    }
+                }
                 var result = await _userManager.CreateAsync(user, model.Password);
                 if (result.Succeeded)
                 {
@@ -199,12 +210,18 @@ namespace hasheous_server.Controllers.v1_0
                     // add all users to the member role
                     await _userManager.AddToRoleAsync(user, "Member");
 
-                    await _signInManager.SignInAsync(user, isPersistent: false);
-                    _logger.LogInformation(3, "User created a new account with password.");
-
+                    //await _signInManager.SignInAsync(user, isPersistent: false);
+                    
                     Logging.Log(Logging.LogType.Information, "User Management", "New user " + model.Email + " created with password.");
 
-                    return Ok(returnUrl);
+                    if (returnUrl != null)
+                    {
+                        return Ok(returnUrl);
+                    }
+                    else
+                    {
+                        return Ok(result);
+                    }
                 }
                 else
                 {
@@ -233,7 +250,14 @@ namespace hasheous_server.Controllers.v1_0
                 return Unauthorized("Error");
             }
             var result = await _userManager.ConfirmEmailAsync(user, code);
-            return Ok(result.Succeeded ? "ConfirmEmail" : "Error");
+            if (result.Succeeded == true)
+            {
+                return new RedirectResult("/index.html?page=emailconfirmed");
+            }
+            else
+            {
+                return Ok(result);
+            }
         }
 
         //
@@ -255,13 +279,39 @@ namespace hasheous_server.Controllers.v1_0
                 // For more information on how to enable account confirmation and password reset please visit http://go.microsoft.com/fwlink/?LinkID=532713
                 // Send an email with this link
                 var code = await _userManager.GeneratePasswordResetTokenAsync(user);
-                var callbackUrl = Url.Action("ResetPassword", "Account", new { userId = user.Id, code = code }, protocol: HttpContext.Request.Scheme);
+                //var callbackUrl = Url.Action("ResetPassword", "Account", new { userId = user.Id, code = code }, protocol: HttpContext.Request.Scheme);
+                var callbackUrl = new Uri(string.Format("{0}://{1}{2}&userId={3}&code={4}", [ Request.Scheme, Request.Host, "/index.html?page=resetpassword", user.Id, code ]));
                 await _emailSender.SendEmailAsync(model.Email, "Reset Password",
                   "Please reset your password by clicking here: <a href=\"" + callbackUrl + "\">link</a>");
                 return Ok();
             }
 
             // If we got this far, something failed, redisplay form
+            return Ok();
+        }
+
+        //
+        // POST: /Account/ResetPassword
+        [HttpPost]
+        [AllowAnonymous]
+        [Route("ResetPassword")]
+        public async Task<IActionResult> ResetPassword(ResetPasswordViewModel model)
+        {
+            if (!ModelState.IsValid)
+            {
+                return Ok();
+            }
+            var user = await _userManager.FindByEmailAsync(model.Email);
+            if (user == null)
+            {
+                // Don't reveal that the user does not exist
+                return Ok();
+            }
+            var result = await _userManager.ResetPasswordAsync(user, model.Code, model.Password);
+            if (result.Succeeded)
+            {
+                return Ok(result);
+            }
             return Ok();
         }
     }

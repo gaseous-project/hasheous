@@ -44,7 +44,7 @@ class language {
         }
     }
 
-    getLang(token) {
+    getLang(token, substituteArray) {
         let page = getQueryString('page', 'string');
         switch (page) {
             case "dataobjects":
@@ -83,16 +83,33 @@ class language {
 
         if (this.languageOverlay) {
             if (token.toLowerCase() in this.languageOverlay) {
-                return this.languageOverlay[token.toLowerCase()];
+                return this.#replaceTokens(this.languageOverlay[token.toLowerCase()], substituteArray);
             }
         }
         
         if (this.languageDefault) {
             if (token.toLowerCase() in this.languageDefault) {
-                return this.languageDefault[token.toLowerCase()];
+                return this.#replaceTokens(this.languageDefault[token.toLowerCase()], substituteArray);
             } else {
                 return token.toLowerCase();
             }
+        }
+    }
+
+    #replaceTokens(text, substituteArray) {
+        let workText = text;
+        if (substituteArray) {
+            if (Array.isArray(substituteArray)) {
+                // handle as an array
+                for (let i = 0; i < substituteArray.length; i++) {
+                    workText = workText.replace('{' + i + '}', substituteArray[i]);
+                }
+                return workText;
+            } else {
+                return text.replace('{0}', substituteArray);
+            }
+        } else {
+            return text;
         }
     }
 }

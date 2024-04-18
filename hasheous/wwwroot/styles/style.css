@@ -24,6 +24,8 @@
     --redbutton-color-hover: red;
     --max-page-width: 1122px;
     --banner-height: 40px;
+    --valid-color: #00b50c;
+    --invalid-color: #b21a1a;
 }
 
 @font-face {
@@ -73,8 +75,12 @@ input[type='text'], input[type='number'], input[type="email"], input[type="passw
     height: 21px;
 }
 
-input[type='text']:hover, input[type='number']:hover, input[type="email"]:hover, input[type="password"]:hover, input[type="datetime-local"]:hover {
+input[type='text']:hover, input[type='number']:hover, input[type="email"]:hover, input[type="password"]:hover, input[type="datetime-local"]:hover, textarea:hover {
     border-color: var(--field-border-color-highlight);
+}
+
+input[type='text']:focus, input[type='number']:focus, input[type="email"]:focus, input[type="password"]:focus, input[type="datetime-local"]:focus, textarea:focus {
+    outline: none;
 }
 
 input[type='button'], button {
@@ -293,7 +299,7 @@ input[type='button']:disabled, button:disabled {
     text-align: left;
 }
 
-#login_email, #login_password {
+#login_email, #login_password, #register_email, #register_password, #register_confirmpassword {
     width: 250px;
 }
 
@@ -491,4 +497,20 @@ td {
 .pageitem.selected:hover {
     border-color: var(--element-background-color);
     cursor: default;
+}
+
+.valid-border-color {
+    -webkit-box-shadow: 0px 0px 5px 1px var(--valid-color);
+    -moz-box-shadow: 0px 0px 5px 1px var(--valid-color);
+    box-shadow: 0px 0px 5px 1px var(--valid-color);
+}
+
+.invalid-border-color {
+    -webkit-box-shadow: 0px 0px 5px 1px var(--invalid-color);
+    -moz-box-shadow: 0px 0px 5px 1px var(--invalid-color);
+    box-shadow: 0px 0px 5px 1px var(--invalid-color);
+}
+
+.errorlabel-error {
+    color: var(--invalid-color);
 }

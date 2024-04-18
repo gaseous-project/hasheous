@@ -1,0 +1,41 @@
+<div class="loginwindow">
+    <div id="loginform" class="loginwindow-content">
+        <div id="registerpanel">
+            <img src="/images/logo.svg" style="display: block; margin: 20px auto; width: 100px;" />
+
+            <div class="header_label" style="display: block; text-align: center;" data-lang="hasheous">Hasheous</div>
+
+            <table style="width: 100%; margin-top: 20px;" cellpadding="5px">
+                <tr>
+                    <th data-lang="email">Email</th>
+                    <td><input type="email" id="register_email" /></td>
+                </tr>
+                <tr>
+                    <th data-lang="password">Password</th>
+                    <td><input type="password" id="register_password" /></td>
+                </tr>
+                <tr>
+                    <th data-lang="confirmpassword">Confirm Password</th>
+                    <td><input type="password" id="register_confirmpassword" /></td>
+                </tr>
+                <tr>
+                    <td colspan="2" id="register_errorlabel" style="color: red;"></td>
+                </tr>
+                <tr>
+                    <td colspan="2" style="padding-top: 20px;">
+                        <button id="registernewaccount" type="button" value="Register Account" class="bigbutton" disabled="disabled" data-lang="registeraccount">Register Account</button>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <table id="registrationcomplete" style="width: 100%; margin-top: 20px; display: none;" cellpadding="5px;">
+            <tr>
+                <td><h1 data-lang="registrationcompleteheading"></h1></td>
+            </tr>
+            <tr>
+                <td><span data-lang="registrationcomplete"></span></td>
+            </tr>
+        </table>
+    </div>
+</div>

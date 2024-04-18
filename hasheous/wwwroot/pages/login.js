@@ -29,7 +29,7 @@ function UserLogin() {
                 break;
             default:
                 // login failed
-                document.getElementById('login_errorlabel').innerHTML = 'Incorrect password';
+                document.getElementById('login_errorlabel').innerHTML = lang.getLang('incorrectpassword');
                 break;
         }
     }

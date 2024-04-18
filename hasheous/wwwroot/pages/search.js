@@ -114,7 +114,7 @@ function createDataObjectsTableFromMD5Search(hashType) {
     }
 
     ajaxCall(
-        '/api/v1/HashLookup/Lookup2?getchildrelations=true',
+        '/api/v1/HashLookup/?getchildrelations=true',
         'POST',
         function(success) {
             let resultDiv = document.getElementById('gamesearchresults');
