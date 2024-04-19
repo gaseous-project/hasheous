@@ -1,6 +1,8 @@
 using System.Data;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Encodings.Web;
+using System.Web;
 using Authentication;
 using Classes;
 using hasheous_server.Classes;
@@ -280,7 +282,7 @@ namespace hasheous_server.Controllers.v1_0
                 // Send an email with this link
                 var code = await _userManager.GeneratePasswordResetTokenAsync(user);
                 //var callbackUrl = Url.Action("ResetPassword", "Account", new { userId = user.Id, code = code }, protocol: HttpContext.Request.Scheme);
-                var callbackUrl = new Uri(string.Format("{0}://{1}{2}&userId={3}&code={4}", [ Request.Scheme, Request.Host, "/index.html?page=resetpassword", user.Id, code ]));
+                var callbackUrl = new Uri(string.Format("{0}://{1}{2}&userId={3}&code={4}", [ Request.Scheme, Request.Host, "/index.html?page=resetpassword", user.Id, HttpUtility.UrlEncode(code) ]));
                 await _emailSender.SendEmailAsync(model.Email, "Reset Password",
                   "Please reset your password by clicking here: <a href=\"" + callbackUrl + "\">link</a>");
                 return Ok();

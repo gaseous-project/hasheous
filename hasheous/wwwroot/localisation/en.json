@@ -17,6 +17,8 @@
     "resetpasswordlabel_newpassword": "New password:",
     "resetpasswordlabel_newconfirmpassword": "Confirm password:",
     "resetpasswordsubmit": "Reset Password",
+    "resetpasswordconfirmationcompleteheading": "Reset your password complete",
+    "resetpasswordconfirmationcomplete": "If your password reset was successful, you will now be able to login with your new password. You will be redirected in {0} seconds, or go {1}.",
     "createanaccount": "Create an account",
     "invalidemail": "The email address is invalid",
     "sources": "Data Sources",

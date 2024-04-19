@@ -129,14 +129,6 @@ if (user && code) {
 }
 
 function resetPasswordCallback(result) {
-    switch(result.status) {
-        case 200:
-            console.log("password reset successful");
-            window.location.replace('/');
-            break;
-        default:
-            console.log(`password reset failed: ${result.status} - ${result.responseText}`);
-            break;
-    }
+    window.location.replace('/?page=resetpasswordconfirmed');
 }
 
