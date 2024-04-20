@@ -316,5 +316,24 @@ namespace hasheous_server.Controllers.v1_0
             }
             return Ok();
         }
+
+        //
+        // POST: /Account/Delete
+        [HttpPost]
+        [Route("Delete")]
+        public async Task<IActionResult> Delete()
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return BadRequest();
+            }
+            else
+            {
+                await _signInManager.SignOutAsync();
+                var result = await _userManager.DeleteAsync(user);
+                return Ok();
+            }
+        }
     }
 }
