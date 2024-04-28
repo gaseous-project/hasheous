@@ -1,6 +1,6 @@
 // set up banner UI elements
 let searchBox = document.getElementById('banner_search_field');
-searchBox.placeholder = lang.getLang("search");
+searchBox.placeholder = lang.getLang("searchfieldlabel");
 searchBox.addEventListener("keypress", function(e) {
     let key = e.code;
     if (key == 'Enter') {

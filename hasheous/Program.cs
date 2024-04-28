@@ -4,20 +4,16 @@ using Classes;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Versioning;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.OpenApi.Models;
 using Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using System.Threading.RateLimiting;
-using hasheous_server.Classes.Metadata.IGDB;
-using Microsoft.AspNetCore.Mvc.NewtonsoftJson;
 using static Classes.Common;
-using Newtonsoft.Json.Converters;
 using System.Net.Mail;
 using System.Net;
-using System.Configuration;
+using static Authentication.ApiKey;
 
 Logging.WriteToDiskOnly = true;
 Logging.Log(Logging.LogType.Information, "Startup", "Starting Hasheous Server " + Assembly.GetExecutingAssembly().GetName().Version);
@@ -235,6 +231,10 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("Member", policy => policy.RequireRole("Member"));
 });
 
+// setup api key
+builder.Services.AddSingleton<ApiKeyAuthorizationFilter>();
+builder.Services.AddSingleton<IApiKeyValidator, ApiKeyValidator>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -330,6 +330,17 @@ ProcessQueue.QueueItems.Add(
     new ProcessQueue.QueueItem(
         ProcessQueue.QueueItemType.SignatureIngestor, 
         60,
+        new List<ProcessQueue.QueueItemType>
+        {
+            
+        }
+        )
+    );
+
+ProcessQueue.QueueItems.Add(
+    new ProcessQueue.QueueItem(
+        ProcessQueue.QueueItemType.TallyVotes, 
+        1440,
         new List<ProcessQueue.QueueItemType>
         {
             

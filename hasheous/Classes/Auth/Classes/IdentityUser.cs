@@ -1,6 +1,7 @@
 ﻿using hasheous_server.Classes;
 using Microsoft.AspNetCore.Identity;
 using System;
+using System.Security.Claims;
 
 namespace Authentication
 {
@@ -11,5 +12,10 @@ namespace Authentication
     public class ApplicationUser : IdentityUser
     {
         public SecurityProfileViewModel SecurityProfile { get; set; }
+
+        public static implicit operator ClaimsPrincipal?(ApplicationUser? v)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

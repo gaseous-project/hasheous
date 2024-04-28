@@ -1,5 +1,36 @@
 const login = new loginTools();
 
+// setup submission api key
+let submissionApiKeyField = document.getElementById('submissionapikey');
+function GetApiKey() {
+    ajaxCall(
+        '/api/v1/Account/APIKey',
+        'GET',
+        function (success) {
+            submissionApiKeyField.value = success;
+        },
+        function (error) {
+            submissionApiKeyField.value = error.responseText;
+        }
+    );
+}
+GetApiKey();
+
+// setup submission api key reset
+document.getElementById('submissionapikeyresetbutton').addEventListener('click', function (e) {
+    ajaxCall(
+        '/api/v1/Account/APIKey',
+        'POST',
+        function (success) {
+            GetApiKey();
+        },
+        function (error) {
+            GetApiKey();
+        }
+    );
+});
+
+// setup password change
 let errorlabel = document.getElementById('changepassword_errorlabel');
 let passwordValidated = false;
 let resetPasswordButton = document.getElementById('changepasswordsubmit');

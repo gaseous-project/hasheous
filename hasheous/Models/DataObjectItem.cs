@@ -68,6 +68,22 @@ namespace hasheous_server.Models
             }
             public DateTime LastSearch { get; set; }
             public DateTime NextSearch { get; set; }
+            public int WinningVoteCount { get; set; }
+            public int TotalVoteCount { get; set; }
+            public uint WinningVotePercent
+            {
+                get
+                {
+                    if (WinningVoteCount == 0 || TotalVoteCount == 0)
+                    {
+                        return 0;
+                    }
+                    else
+                    {
+                        return (uint)Math.Round((decimal)((WinningVoteCount / TotalVoteCount) * 100), 0);
+                    }
+                }
+            }
         }
         public DateTime CreatedDate { get; set; }
         public DateTime UpdatedDate { get; set; }

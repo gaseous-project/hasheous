@@ -46,7 +46,12 @@ namespace BackgroundMetadataMatcher
             /// <summary>
             /// Manually set by an admin - will never change unless set by an admin
             /// </summary>
-            ManualByAdmin = 4
+            ManualByAdmin = 4,
+
+            /// <summary>
+            /// Match made by vote
+            /// </summary>
+            Voted = 5
         }
 
         public async void StartMatcher()

@@ -237,7 +237,9 @@ namespace hasheous_server.Classes
                     MatchMethod = (BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod)dataRow["MatchMethod"],
                     Source = (Metadata.IGDB.Communications.MetadataSources)dataRow["SourceId"],
                     LastSearch = (DateTime)dataRow["LastSearched"],
-                    NextSearch = (DateTime)dataRow["NextSearch"]
+                    NextSearch = (DateTime)dataRow["NextSearch"],
+                    WinningVoteCount = (int)Common.ReturnValueIfNull(dataRow["WinningVoteCount"], 0),
+                    TotalVoteCount = (int)Common.ReturnValueIfNull(dataRow["TotalVoteCount"], 0)
                 };
 
                 metadataItems.Add(metadataItem);
@@ -538,12 +540,14 @@ namespace hasheous_server.Classes
                         if (newMetadataItem.Id != existingMetadataItem.Id)
                         {
                             // change to manually set
-                            sql = "UPDATE DataObject_MetadataMap SET MatchMethod=@match, MetadataId=@metaid WHERE DataObjectId=@id AND SourceId=@source;";
+                            sql = "UPDATE DataObject_MetadataMap SET MatchMethod=@match, MetadataId=@metaid, WinningVoteCount=@winningvotecount, TotalVoteCount=@totalvotecount WHERE DataObjectId=@id AND SourceId=@source;";
                             db.ExecuteNonQuery(sql, new Dictionary<string, object>{
                                 { "id", id },
                                 { "match", BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin },
                                 { "metaid", newMetadataItem.Id },
-                                { "source", existingMetadataItem.Source }
+                                { "source", existingMetadataItem.Source },
+                                { "winningvotecount", null },
+                                { "totalvotecount", null }
                             });
                         }
                     }

@@ -51,4 +51,12 @@ CREATE TABLE `UserRoles` (
   KEY `IdentityRole_Users` (`RoleId`),
   CONSTRAINT `ApplicationUser_Roles` FOREIGN KEY (`UserId`) REFERENCES `Users` (`Id`) ON DELETE CASCADE ON UPDATE NO ACTION,
   CONSTRAINT `IdentityRole_Users` FOREIGN KEY (`RoleId`) REFERENCES `Roles` (`Id`) ON DELETE CASCADE ON UPDATE NO ACTION
-) ;
+);
+
+CREATE TABLE `UserAPIKeys` (
+    `UserId` varchar(128) NOT NULL,
+    `Key` varchar(128) NOT NULL,
+    PRIMARY KEY (`UserId`),
+    UNIQUE KEY `Key` (`Key`),
+    CONSTRAINT `ApplicationUser_APIKeys` FOREIGN KEY (`UserId`) REFERENCES `Users` (`Id`) ON DELETE CASCADE ON UPDATE NO ACTION
+);

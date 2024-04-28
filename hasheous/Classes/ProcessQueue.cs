@@ -1,5 +1,6 @@
 ﻿using System;
 using Classes;
+using hasheous_server.Classes;
 using static Classes.Common;
 
 namespace Classes
@@ -139,9 +140,14 @@ namespace Classes
                                     
                                     break;
 
-                                case QueueItemType.SignatureMetadataMatcher:
-                                    BackgroundMetadataMatcher.BackgroundMetadataMatcher backgroundMetadataMatcher = new BackgroundMetadataMatcher.BackgroundMetadataMatcher();
-                                    backgroundMetadataMatcher.StartMatcher();
+                                // case QueueItemType.SignatureMetadataMatcher:
+                                //     BackgroundMetadataMatcher.BackgroundMetadataMatcher backgroundMetadataMatcher = new BackgroundMetadataMatcher.BackgroundMetadataMatcher();
+                                //     backgroundMetadataMatcher.StartMatcher();
+                                //     break;
+
+                                case QueueItemType.TallyVotes:
+                                    Submissions submissions = new Submissions();
+                                    submissions.TallyVotes();
                                     break;
 
                             }
@@ -192,9 +198,9 @@ namespace Classes
             SignatureIngestor,
 
             /// <summary>
-            /// Matches metadata provided by signatures to supported metadata providers
+            /// Tallys all votes in the database
             /// </summary>
-            SignatureMetadataMatcher
+            TallyVotes
         }
 
         public enum QueueItemState

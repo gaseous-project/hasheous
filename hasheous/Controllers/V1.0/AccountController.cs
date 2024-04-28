@@ -335,5 +335,47 @@ namespace hasheous_server.Controllers.v1_0
                 return Ok();
             }
         }
+
+        [HttpGet]
+        [Route("APIKey")]
+        public async Task<IActionResult> GetAPIKey()
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return BadRequest();
+            }
+            else
+            {
+                Authentication.ApiKey apiKey = new ApiKey();
+                string? userKey = apiKey.GetApiKey(user.Id);
+                if (userKey != null) 
+                {
+                    return Ok(userKey);
+                }
+                else
+                {
+                    userKey = apiKey.SetApiKey(user.Id);
+                    return Ok(userKey);
+                }
+            }
+        }
+
+        [HttpPost]
+        [Route("APIKey")]
+        public async Task<IActionResult> SetAPIKey()
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return BadRequest();
+            }
+            else
+            {
+                Authentication.ApiKey apiKey = new ApiKey();
+                string? userKey = apiKey.SetApiKey(user.Id);
+                return Ok(userKey);
+            }
+        }
     }
 }

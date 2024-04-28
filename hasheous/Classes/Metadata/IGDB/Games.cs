@@ -77,13 +77,16 @@ namespace hasheous_server.Classes.Metadata.IGDB
 
             // set up where clause
             string WhereClause = "";
+            string WhereClauseField = "";
             switch (searchUsing)
             {
                 case SearchUsing.id:
                     WhereClause = "where id = " + searchValue;
+                    WhereClauseField = "id";
                     break;
                 case SearchUsing.slug:
-                    WhereClause = "where slug = " + searchValue;
+                    WhereClause = "where slug = \"" + searchValue + "\"";
+                    WhereClauseField = "slug";
                     break;
                 default:
                     throw new Exception("Invalid search type");
@@ -106,11 +109,11 @@ namespace hasheous_server.Classes.Metadata.IGDB
                     catch (Exception ex)
                     {
                         Console.Error.WriteLine("Metadata: " + returnValue.GetType().Name + ": An error occurred while connecting to IGDB. WhereClause: " + WhereClause + ex.ToString());
-                        returnValue = Storage.GetCacheValue<Game>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
+                        returnValue = Storage.GetCacheValue<Game>(returnValue, Storage.TablePrefix.IGDB, WhereClauseField, searchValue);
                     }
                     return returnValue;
                 case Storage.CacheStatus.Current:
-                    return Storage.GetCacheValue<Game>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
+                    return Storage.GetCacheValue<Game>(returnValue, Storage.TablePrefix.IGDB, WhereClauseField, searchValue);
                 default:
                     throw new Exception("How did you get here?");
             }

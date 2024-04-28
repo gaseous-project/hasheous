@@ -39,6 +39,8 @@ CREATE TABLE `DataObject_MetadataMap` (
   `MatchMethod` int(11) NOT NULL,
   `LastSearched` datetime NOT NULL,
   `NextSearch` datetime NOT NULL,
+  `WinningVoteCount` int(10) DEFAULT NULL,
+  `TotalVoteCount` int(10) DEFAULT NULL
   PRIMARY KEY (`DataObjectId`,`SourceId`),
   KEY `DataObjectId` (`DataObjectId`),
   CONSTRAINT `DataObject_MetadataMap_ibfk_1` FOREIGN KEY (`DataObjectId`) REFERENCES `DataObject` (`Id`) ON DELETE CASCADE
@@ -57,4 +59,13 @@ CREATE TABLE `DataObject_Attributes` (
     KEY `AttributeRelation` (`AttributeRelation`),
     CONSTRAINT `DataObject_Attributes_ibfk_1` FOREIGN KEY (`DataObjectId`) REFERENCES `DataObject` (`Id`) ON DELETE CASCADE,
     CONSTRAINT `DataObject_Attributes_ibfk_2` FOREIGN KEY (`AttributeRelation`) REFERENCES `DataObject` (`Id`) ON DELETE CASCADE
+);
+
+CREATE TABLE `MatchUserVotes`(  
+    `DataObjectId` BIGINT NOT NULL,
+    `UserId` VARCHAR(128) NOT NULL,
+    `MetadataSourceId` INT NOT NULL,
+    `MetadataPlatformId` VARCHAR(50) NOT NULL,
+    `MetadataGameId` VARCHAR(50) NOT NULL,
+    PRIMARY KEY (`DataObjectId`, `UserId`, `MetadataSourceId`)
 );
