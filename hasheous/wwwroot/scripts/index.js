@@ -5,7 +5,7 @@ searchBox.addEventListener("keypress", function(e) {
     let key = e.code;
     if (key == 'Enter') {
         e.preventDefault();
-        window.location.href = 'https://localhost:7157/index.html?page=search&query=' + encodeURIComponent(searchBox.value);
+        window.location.href = '/index.html?page=search&query=' + encodeURIComponent(searchBox.value);
     }
 });
 
