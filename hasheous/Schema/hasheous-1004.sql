@@ -47,6 +47,7 @@ CREATE TABLE `DataObject_MetadataMap` (
 );
 
 CREATE TABLE `DataObject_Attributes` (
+    `AttributeId` bigint(20) NOT NULL AUTO_INCREMENT,
     `DataObjectId` bigint(20) NOT NULL,
     `AttributeType` int(11) NOT NULL,
     `AttributeName` int(11) NOT NULL,
