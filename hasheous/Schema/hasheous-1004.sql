@@ -40,7 +40,7 @@ CREATE TABLE `DataObject_MetadataMap` (
   `LastSearched` datetime NOT NULL,
   `NextSearch` datetime NOT NULL,
   `WinningVoteCount` int(10) DEFAULT NULL,
-  `TotalVoteCount` int(10) DEFAULT NULL
+  `TotalVoteCount` int(10) DEFAULT NULL,
   PRIMARY KEY (`DataObjectId`,`SourceId`),
   KEY `DataObjectId` (`DataObjectId`),
   CONSTRAINT `DataObject_MetadataMap_ibfk_1` FOREIGN KEY (`DataObjectId`) REFERENCES `DataObject` (`Id`) ON DELETE CASCADE
