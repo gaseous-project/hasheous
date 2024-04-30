@@ -111,8 +111,20 @@ namespace Classes
                 if (game == null)
                 {
                     // no returned game! create one
+
+                    // remove version numbers from name
+                    string gameName = discoveredSignature.Game.Name;
+                    gameName = Regex.Replace(gameName, @"v(\d+\.)?(\d+\.)?(\*|\d+)$", "").Trim();
+                    gameName = Regex.Replace(gameName, @"Rev (\d+\.)?(\d+\.)?(\*|\d+)$", "").Trim();
+
+                    // assumption: no games have () in their titles so we'll remove them
+                    int idx = gameName.IndexOf('(');
+                    if (idx >= 0) {
+                        gameName = gameName.Substring(0, idx);
+                    }
+
                     game = dataObjects.NewDataObject(DataObjects.DataObjectType.Game, new DataObjectItemModel{
-                        Name = discoveredSignature.Game.Name
+                        Name = gameName
                     });
                     // add signature mapping to game
                     dataObjects.AddSignature(game.Id, DataObjects.DataObjectType.Game, long.Parse(discoveredSignature.Game.Id));
