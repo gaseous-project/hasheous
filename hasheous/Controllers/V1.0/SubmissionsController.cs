@@ -42,20 +42,5 @@ namespace hasheous_server.Controllers.v1_0
             Submissions submissions = new Submissions();
             return Ok(submissions.AddVote(_userManager.GetUserId(HttpContext.User), model));
         }
-
-
-
-
-
-
-        [MapToApiVersion("1.0")]
-        [HttpGet]
-        [Route("Test")]
-        [ApiKey()]
-        public async Task<IActionResult> Test()
-        {
-            var userStuff = HttpContext.User;
-            return Ok("Awesome sauce");
-        }
     }
 }
