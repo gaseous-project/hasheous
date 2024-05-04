@@ -1,7 +1,9 @@
 <div id="editbanner">
     <div id="editbannerbuttons">
-        <button id="dataObjectSave"><span data-lang="save"></span> <img src="/images/save.svg" class="buttonicon" /></button>
-        <button id="dataObjectCancel"><span data-lang="cancel"></span> <img src="/images/delete.svg" class="buttonicon" /></button>
+        <button id="dataObjectSave"><span data-lang="save"></span> <img src="/images/save.svg"
+                class="buttonicon" /></button>
+        <button id="dataObjectCancel"><span data-lang="cancel"></span> <img src="/images/delete.svg"
+                class="buttonicon" /></button>
     </div>
     <span id="editbannerlabel" data-lang="inEditMode"></span>
 </div>
@@ -20,6 +22,36 @@
             <td class="tablecell" data-lang="description"></td>
             <td class="tablecell">
                 <textarea id="attributedescriptioninput"></textarea>
+            </td>
+        </tr>
+        <tr id="attributelogo" style="display: none;">
+            <td class="tablecell" data-lang="uploadlogo"></td>
+            <td class="tablecell">
+                <table>
+                    <tr>
+                        <td style="width: 10px;"><input type="radio" id="attributelogoselectnone" name="logo" value="0"
+                                checked="checked">
+                        </td>
+                        <td data-lang="none"></td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td><input type="radio" id="attributelogoselectnew" name="logo" value="1"></td>
+                        <td>
+                            <input type="file" id="attributelogofile" name="image"
+                                accept=".jpg, .jpeg, .png, .gif, .bmp, .svg" />
+                            <input type="text" id="attributelogonewref" style="display: none;" />
+                        </td>
+                        <td><span id="attributelogouploadlabel"></span></td>
+                    </tr>
+                    <tr>
+                        <td><input type="radio" id="attributelogoselectexisting" name="logo" value="2"></td>
+                        <td data-lang="useexisting"></td>
+                        <td></td>
+                    </tr>
+                </table>
+
+                <input type="text" id="attributelogoref" style="display: none;" />
             </td>
         </tr>
         <tr id="attributepublisher" style="display: none;">
@@ -46,7 +78,7 @@
                 </select>
             </td>
         </tr>
-        <tr id="attributevimmmanualid">
+        <tr id="attributevimmmanualid" style="display: none;">
             <td class="tablecell" data-lang="vimmmid"></td>
             <td class="tablecell">
                 <input id="attributevimmmanualidinput" type="text" class="inputwide">
@@ -79,5 +111,5 @@
 
 <h3 data-lang="suggestedsignatures"></h3>
 <div id="dataObjectSuggestedSignatures">
-    
+
 </div>

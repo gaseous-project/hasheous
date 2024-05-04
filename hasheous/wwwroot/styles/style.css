@@ -59,7 +59,12 @@ a:hover {
     text-decoration: underline;
 }
 
-input[type='text'], input[type='number'], input[type="email"], input[type="password"], input[type="datetime-local"], textarea {
+input[type='text'],
+input[type='number'],
+input[type="email"],
+input[type="password"],
+input[type="datetime-local"],
+textarea {
     background-color: var(--field-background-color);
     color: var(--field-text-color);
     padding: 4px;
@@ -75,15 +80,26 @@ input[type='text'], input[type='number'], input[type="email"], input[type="passw
     height: 21px;
 }
 
-input[type='text']:hover, input[type='number']:hover, input[type="email"]:hover, input[type="password"]:hover, input[type="datetime-local"]:hover, textarea:hover {
+input[type='text']:hover,
+input[type='number']:hover,
+input[type="email"]:hover,
+input[type="password"]:hover,
+input[type="datetime-local"]:hover,
+textarea:hover {
     border-color: var(--field-border-color-highlight);
 }
 
-input[type='text']:focus, input[type='number']:focus, input[type="email"]:focus, input[type="password"]:focus, input[type="datetime-local"]:focus, textarea:focus {
+input[type='text']:focus,
+input[type='number']:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="datetime-local"]:focus,
+textarea:focus {
     outline: none;
 }
 
-input[type='button'], button {
+input[type='button'],
+button {
     background-color: var(--button-color);
     color: var(--button-text-color);
     border-width: 1px;
@@ -99,12 +115,14 @@ input[type='button'], button {
     height: 30px;
 }
 
-input[type='button']:hover, button:hover {
+input[type='button']:hover,
+button:hover {
     background-color: var(--button-color-hover);
     cursor: pointer;
 }
 
-input[type='button']:disabled, button:disabled {
+input[type='button']:disabled,
+button:disabled {
     background-color: var(--button-color-disabled);
     color: var(--button-text-color-disabled);
     cursor: not-allowed;
@@ -173,7 +191,8 @@ input[type='button']:disabled, button:disabled {
     z-index: 50;
 }
 
-#banner_header_label, .header_label {
+#banner_header_label,
+.header_label {
     font-family: Commodore64;
     display: inline-block;
     font-size: 16pt;
@@ -258,7 +277,8 @@ input[type='button']:disabled, button:disabled {
 }
 
 /* Links inside the dropdown */
-.dropdown-content a, .dropdown-content span {
+.dropdown-content a,
+.dropdown-content span {
     color: black;
     padding: 12px 16px;
     text-decoration: none;
@@ -268,12 +288,16 @@ input[type='button']:disabled, button:disabled {
 .dropdown-content span {
     cursor: auto;
 }
-  
+
 /* Change color of dropdown links on hover */
-.dropdown-content a:hover {background-color: var(--element-highlight);}
-  
+.dropdown-content a:hover {
+    background-color: var(--element-highlight);
+}
+
 /* Show the dropdown menu (use JS to add this class to the .dropdown-content container when the user clicks on the dropdown button) */
-.show {display:block;}
+.show {
+    display: block;
+}
 
 #pagecontainer {
     display: flex;
@@ -299,7 +323,11 @@ input[type='button']:disabled, button:disabled {
     text-align: left;
 }
 
-#login_email, #login_password, #register_email, #register_password, #register_confirmpassword {
+#login_email,
+#login_password,
+#register_email,
+#register_password,
+#register_confirmpassword {
     width: 250px;
 }
 
@@ -327,9 +355,7 @@ td {
     padding: 5px;
 }
 
-.tableheadcell {
-    
-}
+.tableheadcell {}
 
 .tablecell {
     border-top-style: solid;
@@ -349,8 +375,13 @@ td {
     float: right;
 }
 
+.page_content_box {
+    margin-right: 270px;
+}
+
 .page_detail_box {
     float: right;
+    display: inline;
     border-radius: var(--element-border-radius);
     border-style: solid;
     border-width: 1px;
@@ -513,4 +544,12 @@ td {
 
 .errorlabel-error {
     color: var(--invalid-color);
+}
+
+#dataObjectLogoBox {
+    padding: 20px;
+}
+
+#dataObjectLogoImage {
+    max-width: 100%;
 }

@@ -107,5 +107,11 @@
     "submissionapikeyheading": "Submission API Key",
     "submissionapikeydetails": "Use the below key in your ROM manager tool to submit updates to Hasheous.",
     "submissionapikeyresetbutton": "Reset Key",
-    "submissionapikeywarning": "Note: if you reset your API key, remember to update the key in your ROM manager tool."
+    "submissionapikeywarning": "Note: if you reset your API key, remember to update the key in your ROM manager tool.",
+    "uploadlogo": "Upload new logo",
+    "uploadinglogo": "Uploading...",
+    "uploadlogocomplete": "Upload complete",
+    "clearlogo": "Remove",
+    "none": "None",
+    "useexisting": "Use existing"
 }

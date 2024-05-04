@@ -58,6 +58,9 @@ namespace hasheous_server.Models
                                 return null;
                         }
 
+                    case AttributeType.ImageId:
+                        return "/api/v1/images/" + Value.ToString();
+
                     default:
                         return null;
                 }

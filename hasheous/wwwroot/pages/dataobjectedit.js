@@ -16,7 +16,7 @@ if (userProfile != null) {
 if (mustRedirect == true) { location.window.replace("/"); }
 
 // save button
-document.getElementById('dataObjectSave').addEventListener("click", function(e) {
+document.getElementById('dataObjectSave').addEventListener("click", function (e) {
     // start collecting data
 
     // signatures
@@ -48,6 +48,37 @@ document.getElementById('dataObjectSave').addEventListener("click", function(e) 
     attributes.push(
         newAttributeObject('ShortString', 'VIMMManualId', 'None', document.getElementById('attributevimmmanualidinput').value)
     );
+    let logoOpt = document.querySelector('input[name=logo]:checked');
+    switch (logoOpt.value) {
+        case "0":
+            // no logo
+            attributes.push(
+                newAttributeObject('ImageId', 'Logo', 'None', '')
+            );
+            break;
+
+        case "1":
+            // uploaded logo
+            let uploadedLogo = document.getElementById('attributelogonewref');
+            if (uploadedLogo.value.length > 0) {
+                attributes.push(
+                    newAttributeObject('ImageId', 'Logo', 'None', uploadedLogo.value)
+                );
+            } else {
+                // user didn't actually specify a new logo - set to existing
+                attributes.push(
+                    newAttributeObject('ImageId', 'Logo', 'None', document.getElementById('attributelogoref').value)
+                );
+            }
+            break;
+
+        case "2":
+            // existing logo
+            attributes.push(
+                newAttributeObject('ImageId', 'Logo', 'None', document.getElementById('attributelogoref').value)
+            );
+            break;
+    }
 
     // compile final model
     let model = {
@@ -62,10 +93,10 @@ document.getElementById('dataObjectSave').addEventListener("click", function(e) 
     ajaxCall(
         '/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int') + '/FullObject',
         'PUT',
-        function(success) {
+        function (success) {
             window.location.replace("/index.html?page=dataobjectdetail&type=" + pageType + "&id=" + getQueryString('id', 'int'));
         },
-        function(error) {
+        function (error) {
 
         },
         JSON.stringify(model)
@@ -73,10 +104,36 @@ document.getElementById('dataObjectSave').addEventListener("click", function(e) 
 });
 
 // cancel button
-document.getElementById('dataObjectCancel').addEventListener("click", function(e) {
+document.getElementById('dataObjectCancel').addEventListener("click", function (e) {
     window.location.replace("/index.html?page=dataobjectdetail&type=" + pageType + "&id=" + getQueryString('id', 'int'));
 });
 
+// logo upload button
+document.getElementById('attributelogofile').addEventListener("change", function (e) {
+    let ofile = document.getElementById('attributelogofile').files[0];
+    let formdata = new FormData();
+    formdata.append("file", ofile);
+
+    let uploadLabel = document.getElementById('attributelogouploadlabel');
+    uploadLabel.innerHTML = lang.getLang('uploadinglogo');
+
+    $.ajax({
+        url: '/api/v1/Images/',
+        type: 'POST',
+        data: formdata,
+        processData: false,
+        contentType: false,
+        success: function (data) {
+            uploadLabel.innerHTML = lang.getLang('uploadlogocomplete');
+            document.getElementById('attributelogonewref').value = data;
+            document.getElementById('attributelogoselectnew').checked = 'checked';
+            console.log(data);
+        },
+        error: function (error) {
+            console.warn("Error: " + error);
+        }
+    });
+});
 
 ajaxCall(
     '/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int'),
@@ -96,21 +153,22 @@ function renderContent() {
     // show required fields for this page type
     switch (pageType) {
         case "company":
-            // no special fields beyond description required
+            document.getElementById('attributelogo').style.display = '';
             break;
 
         case "platform":
-            // only show the manufacturer attribute
             document.getElementById('attributemanufacturer').style.display = '';
+            document.getElementById('attributelogo').style.display = '';
             break;
 
         case "game":
             document.getElementById('attributepublisher').style.display = '';
             document.getElementById('attributeplatform').style.display = '';
+            document.getElementById('attributelogo').style.display = '';
             break;
 
     }
-    
+
     // attributes
     for (let i = 0; i < dataObject.attributes.length; i++) {
         switch (dataObject.attributes[i].attributeType) {
@@ -126,6 +184,15 @@ function renderContent() {
                 switch (dataObject.attributes[i].attributeName) {
                     case "VIMMManualId":
                         document.getElementById('attributevimmmanualidinput').value = dataObject.attributes[i].value;
+                        break;
+                }
+                break;
+
+            case "ImageId":
+                switch (dataObject.attributes[i].attributeName) {
+                    case "Logo":
+                        document.getElementById('attributelogoref').value = dataObject.attributes[i].value;
+                        document.getElementById('attributelogoselectexisting').checked = 'checked';
                         break;
                 }
                 break;
@@ -154,7 +221,7 @@ function renderContent() {
                         selectElement.appendChild(selectOption);
                     }
                 }
-                
+
                 break;
 
             default:
@@ -201,7 +268,7 @@ function renderContent() {
             sigSearchId = "Id";
             sigSearchName = "Publisher";
             break;
-        
+
         case "platform":
             sigSearchType = "Platform";
             sigSearchId = "Id";
@@ -230,7 +297,7 @@ function renderContent() {
                 );
             },
             headers: {
-                "Content-Type" : "application/json",
+                "Content-Type": "application/json",
             },
             params: {
                 contentType: "application/json"
@@ -240,7 +307,7 @@ function renderContent() {
 
                 for (var i = 0; i < data.length; i++) {
                     let sigName;
-                    
+
                     switch (pageType) {
                         case "game":
                             let year = "";
@@ -400,11 +467,11 @@ function GetSuggestedSignatures() {
         ajaxCall(
             url,
             'POST',
-            function(success) {
+            function (success) {
                 if (success.length > 0) {
                     let signatureElement = document.getElementById('dataObjectSuggestedSignatures');
                     signatureElement.innerHTML = '';
-                    
+
                     let selectedSignatures = [];
                     let selectedSignaturesObj = $('#signaturesselect').select2('data');
                     for (let i = 0; i < selectedSignaturesObj.length; i++) {
@@ -434,12 +501,12 @@ function GetSuggestedSignatures() {
                                     sigItem.setAttribute('data-id', success[i].Id);
                                     sigItem.innerHTML = success[i].Publisher;
                                     break;
-                
+
                                 case "platform":
                                     sigItem.setAttribute('data-id', success[i].Id);
                                     sigItem.innerHTML = success[i].Platform;
                                     break;
-                
+
                                 case "game":
                                     // check the selected platform, and filter accordingly
                                     useSig = false;
@@ -476,24 +543,24 @@ function GetSuggestedSignatures() {
 
                                         sigItem.innerHTML = success[i].name + year + system;
                                     }
-                                    
+
                                     break;
-                
+
                             }
-                
+
                             if (useSig == true) {
-                                sigItem.addEventListener('click', function(e) {
+                                sigItem.addEventListener('click', function (e) {
                                     let signatureId = this.getAttribute('data-id');
                                     let signatureLabel = this.innerText;
 
                                     if ($('#signaturesselect').find("option[value='" + signatureId + "']").length) {
                                         $('#signaturesselect').val(signatureId).trigger('change');
-                                    } else { 
+                                    } else {
                                         // Create a DOM Option and pre-select by default
                                         var newOption = new Option(signatureLabel, signatureId, true, true);
                                         // Append it to the select
                                         $('#signaturesselect').append(newOption).trigger('change');
-                                    } 
+                                    }
 
                                     GetSuggestedSignatures();
                                 });
@@ -504,7 +571,7 @@ function GetSuggestedSignatures() {
                     }
                 }
             },
-            function(error) {
+            function (error) {
                 console.log(error);
             },
             JSON.stringify(searchModel)

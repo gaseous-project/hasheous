@@ -71,7 +71,8 @@ namespace Classes
             get
             {
                 string logPath = Path.Combine(ConfigurationPath, "Logs");
-                if (!Directory.Exists(logPath)) {
+                if (!Directory.Exists(logPath))
+                {
                     Directory.CreateDirectory(logPath);
                 }
                 return logPath;
@@ -83,7 +84,7 @@ namespace Classes
             get
             {
                 string logFileExtension = "txt";
-                
+
                 string logPathName = Path.Combine(LogPath, "Server Log " + DateTime.Now.ToUniversalTime().ToString("yyyyMMdd") + "." + logFileExtension);
                 return logPathName;
             }
@@ -117,11 +118,13 @@ namespace Classes
                     if (_tempConfig != null)
                     {
                         _config = _tempConfig;
-                    } else
+                    }
+                    else
                     {
                         throw new Exception("There was an error reading the config file: Json returned null");
                     }
-                } else
+                }
+                else
                 {
                     // no config file!
                     // use defaults and save
@@ -262,7 +265,8 @@ namespace Classes
 
             public class Database
             {
-                private static string _DefaultHostName {
+                private static string _DefaultHostName
+                {
                     get
                     {
                         if (!String.IsNullOrEmpty(Environment.GetEnvironmentVariable("dbhost")))
@@ -445,7 +449,7 @@ namespace Classes
 
                 public Communications.MetadataSources Source = _Source;
             }
-            
+
             public class IGDB
             {
                 private static string _DefaultIGDBClientId

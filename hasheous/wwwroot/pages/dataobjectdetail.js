@@ -16,11 +16,11 @@ if (userProfile != null) {
     document.getElementById('dataObjectAdminControls').style.display = 'none';
 }
 
-document.getElementById('dataObjectEdit').addEventListener("click", function(e) {
+document.getElementById('dataObjectEdit').addEventListener("click", function (e) {
     window.location.replace("/index.html?page=dataobjectedit&type=" + pageType + "&id=" + getQueryString('id', 'int'));
 });
 
-document.getElementById('dataObjectDelete').addEventListener("click", function(e) {
+document.getElementById('dataObjectDelete').addEventListener("click", function (e) {
     ajaxCall(
         '/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int'),
         'DELETE',
@@ -72,13 +72,20 @@ function renderContent() {
                     }
                 )
                 break;
-            
+
+            case "Logo":
+                let logoImageBox = document.getElementById('dataObjectLogo');
+                logoImageBox.style.display = '';
+                let logoImage = document.getElementById('dataObjectLogoImage');
+                logoImage.setAttribute('src', '/api/v1/images/' + dataObject.attributes[i].value);
+                break;
+
             default:
                 switch (dataObject.attributes[i].attributeType) {
                     case "ObjectRelationship":
                         if (dataObject.attributes[i].value) {
                             attributeValues.push(
-                                { 
+                                {
                                     "attribute": dataObject.attributes[i].attributeName,
                                     "value": "<a href=\"/index.html?page=dataobjectdetail&type=" + dataObject.attributes[i].attributeRelationType + "&id=" + dataObject.attributes[i].value.id + "\">" + dataObject.attributes[i].value.name + "</a>"
                                 }
@@ -96,7 +103,7 @@ function renderContent() {
                                 romHeader.innerHTML = lang.getLang('associatedroms');
                                 romBox.appendChild(romHeader);
 
-                                romBox.appendChild(new generateTable(dataObject.attributes[i].value, [ 'name', 'size:bytes', 'md5', 'sha1', 'signatureSource']));
+                                romBox.appendChild(new generateTable(dataObject.attributes[i].value, ['name', 'size:bytes', 'md5', 'sha1', 'signatureSource']));
 
                                 break;
                         }
@@ -111,7 +118,7 @@ function renderContent() {
                         )
                     default:
                         attributeValues.push(
-                            { 
+                            {
                                 "attribute": dataObject.attributes[i].attributeName,
                                 "value": dataObject.attributes[i].value
                             }
@@ -127,7 +134,7 @@ function renderContent() {
         document.getElementById('dataObjectAttributesSection').style.display = '';
 
         let attributeElement = document.getElementById('dataObjectAttributes');
-        attributeElement.appendChild(new generateTable(attributeValues, [ 'attribute:lang', 'value' ]));
+        attributeElement.appendChild(new generateTable(attributeValues, ['attribute:lang', 'value']));
     }
 
     if (dataObject.signatureDataObjects.length > 0) {
@@ -159,7 +166,7 @@ function renderContent() {
 
     let newMetadataMapTable = new generateTable(
         dataObject.metadata,
-        [ 'source:lang', 'matchMethod:lang', 'link:link' ],
+        ['source:lang', 'matchMethod:lang', 'link:link'],
         'id',
         false
     );
