@@ -7,7 +7,7 @@ class language {
     constructor() {
         let loadComplete = false;
         this.Init(
-            function() {
+            function () {
                 loadComplete = true;
             }
         )
@@ -23,10 +23,10 @@ class language {
         let language = this.locale.split("-")[0];
         let localisation = this.locale.split("-")[1];
         try {
-            this.languageDefault = JSON.parse(await (await fetch('/localisation/' + language + '.json')).text());
+            this.languageDefault = await this.getJSON('/localisation/' + language + '.json');
         } catch (e) {
             // something went wrong - default to en
-            this.languageDefault = JSON.parse(await (await fetch('/localisation/en.json')).text());
+            this.languageDefault = await this.getJSON('/localisation/en.json');
             console.warn("No suitable language file for " + language + ". Falling back to en");
             language = "en";
         }
@@ -35,13 +35,19 @@ class language {
         try {
             if (localisation) {
                 // load overlay language
-                this.languageOverlay = JSON.parse(await (await fetch('/localisation/' + language + '-' + localisation + '.json')).text());
+                this.languageOverlay = await this.getJSON('/localisation/' + language + '-' + localisation + '.json');
                 console.log('Loaded language localisation file: ' + language + '-' + localisation + '.json');
             }
-        } catch(e) {
+        } catch (e) {
             console.warn(e);
             this.languageOverlay = undefined;
         }
+    }
+
+    async getJSON(url) {
+        return fetch(url)
+            .then((response) => response.json())
+            .then((responseJson) => { return responseJson });
     }
 
     getLang(token, substituteArray) {
@@ -50,8 +56,8 @@ class language {
             case "dataobjects":
             case "dataobjectnew":
                 let pageType = getQueryString('type', 'string');
-                
-                let langMapping = 
+
+                let langMapping =
                 {
                     "company":
                     {
@@ -69,14 +75,14 @@ class language {
                         "dataobject_new": "newgame"
                     }
                 };
-                
+
                 let newToken = langMapping[pageType][token];
                 if (newToken) {
                     token = newToken;
                 }
-                
+
                 break;
-            
+
             default:
                 break;
         }
@@ -86,7 +92,7 @@ class language {
                 return this.#replaceTokens(this.languageOverlay[token.toLowerCase()], substituteArray);
             }
         }
-        
+
         if (this.languageDefault) {
             if (token.toLowerCase() in this.languageDefault) {
                 return this.#replaceTokens(this.languageDefault[token.toLowerCase()], substituteArray);
