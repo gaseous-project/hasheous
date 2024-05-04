@@ -1,7 +1,7 @@
 // set up banner UI elements
 let searchBox = document.getElementById('banner_search_field');
 searchBox.placeholder = lang.getLang("searchfieldlabel");
-searchBox.addEventListener("keypress", function(e) {
+searchBox.addEventListener("keypress", function (e) {
     let key = e.code;
     if (key == 'Enter') {
         e.preventDefault();
@@ -15,7 +15,7 @@ function showMenu() {
 }
 
 // Close the dropdown menu if the user clicks outside of it
-window.onclick = function(event) {
+window.onclick = function (event) {
     if (!event.target.matches('.dropbtn')) {
         let dropdowns = document.getElementsByClassName("dropdown-content");
         for (let i = 0; i < dropdowns.length; i++) {
@@ -70,7 +70,7 @@ let targetPage = getQueryString('page', 'string');
 if (!targetPage) { targetPage = "home"; }
 switch (targetPage) {
     default:
-        $('#content').load('/pages/' + targetPage + '.html', function(responseTxt, statusTxt, xhr){
+        $('#content').load('/pages/' + targetPage + '.html', function (responseTxt, statusTxt, xhr) {
             if (statusTxt == "success") {
                 let pageScriptDiv = document.getElementById('postLoadPageScripts');
                 pageScriptDiv.innerHTML = '';

@@ -6,20 +6,27 @@ class language {
 
     constructor() {
         let loadComplete = false;
-        this.Init(
-            function () {
-                loadComplete = true;
-            }
-        )
+        // this.Init(
+        //     function () {
+        //         loadComplete = true;
+        //         console.log("Poo");
+        //         callback();
+        //     }
+        // )
+        // console.log("fuck");
+
+        Promise.resolve(this.Init()).then(console.log('Language files loaded'));
     }
 
-    async Init(callback) {
+    async Init() {
         // load base language
         if (getCookie("userLocale")) {
             this.locale = getCookie("userLocale");
         } else {
             this.locale = window.navigator.userLanguage || window.navigator.language;
         }
+        console.log("Browser locale: " + this.locale);
+
         let language = this.locale.split("-")[0];
         let localisation = this.locale.split("-")[1];
         try {
