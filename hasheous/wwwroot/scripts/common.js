@@ -1,6 +1,3 @@
-// load language files
-const lang = new language();
-
 function ajaxCall(endpoint, method, successFunction, errorFunction, body) {
     $.ajax({
 

@@ -5,20 +5,18 @@ class language {
     languageOverlay = undefined;
 
     constructor() {
-        let loadComplete = false;
-        // this.Init(
-        //     function () {
-        //         loadComplete = true;
-        //         console.log("Poo");
-        //         callback();
-        //     }
-        // )
-        // console.log("fuck");
 
-        Promise.resolve(this.Init()).then(console.log('Language files loaded'));
     }
 
-    async Init() {
+    async Init(callback) {
+        await this.InitAsync();
+        console.log('Language files loaded');
+        if (callback) {
+            callback();
+        }
+    }
+
+    async InitAsync() {
         // load base language
         if (getCookie("userLocale")) {
             this.locale = getCookie("userLocale");
@@ -30,10 +28,10 @@ class language {
         let language = this.locale.split("-")[0];
         let localisation = this.locale.split("-")[1];
         try {
-            this.languageDefault = await this.getJSON('/localisation/' + language + '.json');
+            this.languageDefault = await $.getJSON('/localisation/' + language + '.json');
         } catch (e) {
             // something went wrong - default to en
-            this.languageDefault = await this.getJSON('/localisation/en.json');
+            this.languageDefault = await $.getJSON('/localisation/en.json');
             console.warn("No suitable language file for " + language + ". Falling back to en");
             language = "en";
         }
@@ -42,20 +40,22 @@ class language {
         try {
             if (localisation) {
                 // load overlay language
-                this.languageOverlay = await this.getJSON('/localisation/' + language + '-' + localisation + '.json');
+                this.languageOverlay = await $.getJSON('/localisation/' + language + '-' + localisation + '.json');
                 console.log('Loaded language localisation file: ' + language + '-' + localisation + '.json');
             }
         } catch (e) {
             console.warn(e);
             this.languageOverlay = undefined;
         }
+
+        this.applyLanguage();
     }
 
-    async getJSON(url) {
-        return fetch(url)
-            .then((response) => response.json())
-            .then((responseJson) => { return responseJson });
-    }
+    // async getJSON(url) {
+    //     return fetch(url)
+    //         .then((response) => response.json())
+    //         .then((responseJson) => { return responseJson });
+    // }
 
     getLang(token, substituteArray) {
         let page = getQueryString('page', 'string');
@@ -124,5 +124,27 @@ class language {
         } else {
             return text;
         }
+    }
+
+    setPageElementInnerHTMLLanguage(elementList) {
+        for (let i = 0; i < elementList.length; i++) {
+            if (elementList[i].getAttribute('data-lang')) {
+                elementList[i].innerHTML = lang.getLang(elementList[i].getAttribute('data-lang'));
+            }
+        }
+    }
+
+    applyLanguage() {
+        this.setPageElementInnerHTMLLanguage(document.getElementsByTagName('h1'));
+        this.setPageElementInnerHTMLLanguage(document.getElementsByTagName('h2'));
+        this.setPageElementInnerHTMLLanguage(document.getElementsByTagName('h3'));
+        this.setPageElementInnerHTMLLanguage(document.getElementsByTagName('span'));
+        this.setPageElementInnerHTMLLanguage(document.getElementsByTagName('p'));
+        this.setPageElementInnerHTMLLanguage(document.getElementsByTagName('div'));
+        this.setPageElementInnerHTMLLanguage(document.getElementsByTagName('th'));
+        this.setPageElementInnerHTMLLanguage(document.getElementsByTagName('td'));
+        this.setPageElementInnerHTMLLanguage(document.getElementsByTagName('label'));
+        this.setPageElementInnerHTMLLanguage(document.getElementsByTagName('a'));
+        this.setPageElementInnerHTMLLanguage(document.getElementsByTagName('button'));
     }
 }

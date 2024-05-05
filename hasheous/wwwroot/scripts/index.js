@@ -1,13 +1,47 @@
-// set up banner UI elements
-let searchBox = document.getElementById('banner_search_field');
-searchBox.placeholder = lang.getLang("searchfieldlabel");
-searchBox.addEventListener("keypress", function (e) {
-    let key = e.code;
-    if (key == 'Enter') {
-        e.preventDefault();
-        window.location.href = '/index.html?page=search&query=' + encodeURIComponent(searchBox.value);
+// load language files
+const lang = new language();
+lang.Init(
+    function () {
+        setUpUI();
+
+        // load the page into the main container and set the page title
+        let targetPage = getQueryString('page', 'string');
+        if (!targetPage) { targetPage = "home"; }
+        switch (targetPage) {
+            default:
+                $('#content').load('/pages/' + targetPage + '.html', function (responseTxt, statusTxt, xhr) {
+                    if (statusTxt == "success") {
+                        let pageScriptDiv = document.getElementById('postLoadPageScripts');
+                        pageScriptDiv.innerHTML = '';
+                        let pageScriptElement = document.createElement('script');
+                        pageScriptElement.setAttribute('src', '/pages/' + targetPage + '.js');
+                        pageScriptDiv.appendChild(pageScriptElement);
+
+                        lang.applyLanguage();
+                    }
+                    if (statusTxt == "error") {
+                        console.error("Error loading page: " + xhr.status + ": " + xhr.statusText);
+                    }
+                    setPageTitle(targetPage);
+                });
+                break;
+        }
     }
-});
+);
+
+
+// set up banner UI elements
+function setUpUI() {
+    let searchBox = document.getElementById('banner_search_field');
+    searchBox.placeholder = lang.getLang("searchfieldlabel");
+    searchBox.addEventListener("keypress", function (e) {
+        let key = e.code;
+        if (key == 'Enter') {
+            e.preventDefault();
+            window.location.href = '/index.html?page=search&query=' + encodeURIComponent(searchBox.value);
+        }
+    });
+}
 
 // user menu drop down menu
 function showMenu() {
@@ -55,47 +89,6 @@ function userLogoff() {
             location.replace("/index.html");
         }
     );
-}
-
-function setPageElementInnerHTMLLanguage(elementList) {
-    for (let i = 0; i < elementList.length; i++) {
-        if (elementList[i].getAttribute('data-lang')) {
-            elementList[i].innerHTML = lang.getLang(elementList[i].getAttribute('data-lang'));
-        }
-    }
-}
-
-// load the page into the main container and set the page title
-let targetPage = getQueryString('page', 'string');
-if (!targetPage) { targetPage = "home"; }
-switch (targetPage) {
-    default:
-        $('#content').load('/pages/' + targetPage + '.html', function (responseTxt, statusTxt, xhr) {
-            if (statusTxt == "success") {
-                let pageScriptDiv = document.getElementById('postLoadPageScripts');
-                pageScriptDiv.innerHTML = '';
-                let pageScriptElement = document.createElement('script');
-                pageScriptElement.setAttribute('src', '/pages/' + targetPage + '.js');
-                pageScriptDiv.appendChild(pageScriptElement);
-
-                setPageElementInnerHTMLLanguage(document.getElementsByTagName('h1'));
-                setPageElementInnerHTMLLanguage(document.getElementsByTagName('h2'));
-                setPageElementInnerHTMLLanguage(document.getElementsByTagName('h3'));
-                setPageElementInnerHTMLLanguage(document.getElementsByTagName('span'));
-                setPageElementInnerHTMLLanguage(document.getElementsByTagName('p'));
-                setPageElementInnerHTMLLanguage(document.getElementsByTagName('div'));
-                setPageElementInnerHTMLLanguage(document.getElementsByTagName('th'));
-                setPageElementInnerHTMLLanguage(document.getElementsByTagName('td'));
-                setPageElementInnerHTMLLanguage(document.getElementsByTagName('label'));
-                setPageElementInnerHTMLLanguage(document.getElementsByTagName('a'));
-                setPageElementInnerHTMLLanguage(document.getElementsByTagName('button'));
-            }
-            if (statusTxt == "error") {
-                console.error("Error loading page: " + xhr.status + ": " + xhr.statusText);
-            }
-            setPageTitle(targetPage);
-        });
-        break;
 }
 
 function setPageTitle(targetPage, overrideLanguageLookup) {
