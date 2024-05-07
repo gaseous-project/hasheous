@@ -28,12 +28,10 @@ namespace hasheous_server.Controllers.v1_0
         [Route("Lookup")]
         public async Task<IActionResult> Lookup(HashLookupModel model)
         {
-            HashLookup hashLookup = new HashLookup(model);
-
             try
             {
                 // send legacy lookups to new lookup code as well - we'll do this until we're sure no one is using this old endpoint anymore
-                HashLookup2 hashLookup2 = new HashLookup2(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), model);
+                HashLookup hashLookup = new HashLookup(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), model);
 
                 if (hashLookup == null)
                 {
@@ -41,10 +39,14 @@ namespace hasheous_server.Controllers.v1_0
                 }
                 else
                 {
-                    return Ok(hashLookup);
+                    Dictionary<string, object> returnObject = new Dictionary<string, object>{
+                        { "signature", hashLookup.Signature },
+                        { "metadataIds", new List<string>()}
+                    };
+                    return Ok(returnObject);
                 }
             }
-            catch (HashLookup2.HashNotFoundException hnfEx)
+            catch (HashLookup.HashNotFoundException hnfEx)
             {
                 return NotFound("The provided hash was not found in the signature database.");
             }

@@ -18,7 +18,7 @@ namespace hasheous_server.Classes
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
 
-            HashLookup2 hashLookup = new HashLookup2(db, new Models.HashLookupModel
+            HashLookup hashLookup = new HashLookup(db, new Models.HashLookupModel
             {
                 MD5 = model.MD5,
                 SHA1 = model.SHA1

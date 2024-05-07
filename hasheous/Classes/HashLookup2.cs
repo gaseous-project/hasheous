@@ -11,7 +11,7 @@ using static Classes.Common;
 
 namespace Classes
 {
-	public class HashLookup2
+	public class HashLookup
     {
         public class HashNotFoundException : Exception
         {
@@ -30,12 +30,12 @@ namespace Classes
             }
         }
 
-        public HashLookup2()
+        public HashLookup()
         {
 
         }
 
-        public HashLookup2(Database db, hasheous_server.Models.HashLookupModel model)
+        public HashLookup(Database db, hasheous_server.Models.HashLookupModel model)
         {
             SignatureManagement signature = new SignatureManagement();
             // get the raw signature

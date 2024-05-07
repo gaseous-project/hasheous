@@ -45,7 +45,7 @@ namespace hasheous_server.Controllers.v1_0
             {
                 return Ok(submissions.AddVote(_userManager.GetUserId(HttpContext.User), model));
             }
-            catch (HashLookup2.HashNotFoundException hnfEx)
+            catch (HashLookup.HashNotFoundException hnfEx)
             {
                 return NotFound("The provided hash was not found in the signature database.");
             }

@@ -27,7 +27,7 @@ namespace hasheous_server.Controllers.v1_0
         {
             try
             {
-                HashLookup2 hashLookup = new HashLookup2(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), model);
+                HashLookup hashLookup = new HashLookup(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), model);
 
                 if (hashLookup == null)
                 {
@@ -38,7 +38,7 @@ namespace hasheous_server.Controllers.v1_0
                     return Ok(hashLookup);
                 }
             }
-            catch (HashLookup2.HashNotFoundException hnfEx)
+            catch (HashLookup.HashNotFoundException hnfEx)
             {
                 return NotFound("The provided hash was not found in the signature database.");
             }
