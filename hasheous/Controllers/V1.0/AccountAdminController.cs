@@ -15,7 +15,7 @@ namespace hasheous_server.Controllers.v1_0
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]")]
     [ApiVersion("1.0")]
-    // [ApiExplorerSettings(IgnoreApi = true)]
+    [ApiExplorerSettings(IgnoreApi = true)]
     [Authorize]
     public class AccountAdminController : Controller
     {
@@ -51,7 +51,7 @@ namespace hasheous_server.Controllers.v1_0
                 user.LockoutEnabled = rawUser.LockoutEnabled;
                 user.LockoutEnd = rawUser.LockoutEnd;
                 user.SecurityProfile = rawUser.SecurityProfile;
-                
+
                 // get roles
                 ApplicationUser? aUser = await _userManager.FindByIdAsync(rawUser.Id);
                 if (aUser != null)
@@ -76,8 +76,8 @@ namespace hasheous_server.Controllers.v1_0
             if (ModelState.IsValid)
             {
                 ApplicationUser user = new ApplicationUser
-                { 
-                    UserName = model.UserName, 
+                {
+                    UserName = model.UserName,
                     NormalizedUserName = model.UserName.ToUpper(),
                     Email = model.Email,
                     NormalizedEmail = model.Email.ToUpper()
@@ -96,7 +96,7 @@ namespace hasheous_server.Controllers.v1_0
                 {
                     return Ok(result);
                 }
-            }   
+            }
             else
             {
                 return NotFound();
@@ -109,7 +109,7 @@ namespace hasheous_server.Controllers.v1_0
         public async Task<IActionResult> GetUser(string UserId)
         {
             ApplicationUser? rawUser = await _userManager.FindByIdAsync(UserId);
-            
+
             if (rawUser != null)
             {
                 UserViewModel user = new UserViewModel();
@@ -118,7 +118,7 @@ namespace hasheous_server.Controllers.v1_0
                 user.LockoutEnabled = rawUser.LockoutEnabled;
                 user.LockoutEnd = rawUser.LockoutEnd;
                 user.SecurityProfile = rawUser.SecurityProfile;
-                
+
                 // get roles
                 IList<string> aUserRoles = await _userManager.GetRolesAsync(rawUser);
                 user.Roles = aUserRoles.ToList();
@@ -159,16 +159,16 @@ namespace hasheous_server.Controllers.v1_0
         public async Task<IActionResult> SetUserRoles(string UserId, string RoleName)
         {
             ApplicationUser? user = await _userManager.FindByIdAsync(UserId);
-            
+
             if (user != null)
             {
                 // get roles
                 List<string> userRoles = (await _userManager.GetRolesAsync(user)).ToList();
-                
+
                 // delete all roles
                 foreach (string role in userRoles)
                 {
-                    if ((new string[] { "Admin", "Member" }).Contains(role) )
+                    if ((new string[] { "Admin", "Member" }).Contains(role))
                     {
                         await _userManager.RemoveFromRoleAsync(user, role);
                     }
@@ -193,7 +193,7 @@ namespace hasheous_server.Controllers.v1_0
                         await _userManager.AddToRoleAsync(user, RoleName);
                         break;
                 }
-                
+
                 return Ok();
             }
             else
@@ -210,12 +210,12 @@ namespace hasheous_server.Controllers.v1_0
             if (ModelState.IsValid)
             {
                 ApplicationUser? user = await _userManager.FindByIdAsync(UserId);
-                
+
                 if (user != null)
                 {
                     user.SecurityProfile = securityProfile;
                     await _userManager.UpdateAsync(user);
-                    
+
                     return Ok();
                 }
                 else

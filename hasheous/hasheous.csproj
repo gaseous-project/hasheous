@@ -33,7 +33,6 @@
     <None Remove="Support\" />
     <None Remove="Support\Country.txt" />
     <None Remove="Support\Language.txt" />
-    <None Remove="Support\PlatformMap.json" />
     <None Remove="Schema\" />
     <None Remove="Schema\hasheous-1000.sql" />
     <None Remove="Schema\hasheous-1001.sql" />
@@ -45,7 +44,6 @@
   <ItemGroup>
     <EmbeddedResource Include="Support\Country.txt" />
     <EmbeddedResource Include="Support\Language.txt" />
-    <EmbeddedResource Include="Support\PlatformMap.json" />
     <EmbeddedResource Include="Schema\hasheous-1000.sql" />
     <EmbeddedResource Include="Schema\hasheous-1001.sql" />
     <EmbeddedResource Include="Schema\hasheous-1002.sql" />

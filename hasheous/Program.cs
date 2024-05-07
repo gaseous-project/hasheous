@@ -45,9 +45,6 @@ Config.InitSettings();
 // write updated settings back to the config file
 Config.UpdateConfig();
 
-// update platform map
-JsonPlatformMap.ImportPlatformMap();
-
 // set up server
 var builder = WebApplication.CreateBuilder(args);
 
@@ -203,7 +200,7 @@ builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
             options.SignIn.RequireConfirmedPhoneNumber = false;
             options.SignIn.RequireConfirmedEmail = false;
             options.SignIn.RequireConfirmedAccount = false;
-    })
+        })
     .AddUserStore<UserStore>()
     .AddRoleStore<RoleStore>()
     .AddDefaultTokenProviders()
@@ -257,7 +254,7 @@ using (var scope = app.Services.CreateScope())
 {
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleStore>();
     var roles = new[] { "Admin", "Moderator", "Member" };
- 
+
     foreach (var role in roles)
     {
         if (await roleManager.FindByNameAsync(role, CancellationToken.None) == null)
@@ -309,11 +306,11 @@ app.Use(async (context, next) =>
     string correlationId = Guid.NewGuid().ToString();
     CallContext.SetData("CorrelationId", correlationId);
     CallContext.SetData("CallingProcess", context.Request.Method + ": " + context.Request.Path);
-    
+
     string userIdentity;
     try
     {
-        userIdentity = context.User.Claims.Where(x=>x.Type==System.Security.Claims.ClaimTypes.NameIdentifier).FirstOrDefault().Value;
+        userIdentity = context.User.Claims.Where(x => x.Type == System.Security.Claims.ClaimTypes.NameIdentifier).FirstOrDefault().Value;
     }
     catch
     {
@@ -328,22 +325,22 @@ app.Use(async (context, next) =>
 // add background tasks
 ProcessQueue.QueueItems.Add(
     new ProcessQueue.QueueItem(
-        ProcessQueue.QueueItemType.SignatureIngestor, 
+        ProcessQueue.QueueItemType.SignatureIngestor,
         60,
         new List<ProcessQueue.QueueItemType>
         {
-            
+
         }
         )
     );
 
 ProcessQueue.QueueItems.Add(
     new ProcessQueue.QueueItem(
-        ProcessQueue.QueueItemType.TallyVotes, 
+        ProcessQueue.QueueItemType.TallyVotes,
         1440,
         new List<ProcessQueue.QueueItemType>
         {
-            
+
         }
         )
     );

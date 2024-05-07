@@ -7,6 +7,7 @@ namespace hasheous_server.Controllers.v1_0
 {
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]/")]
+    [ApiExplorerSettings(IgnoreApi = true)]
     [ApiVersion("1.0")]
     public class ImagesController : ControllerBase
     {
