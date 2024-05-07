@@ -203,7 +203,7 @@ class generateTable {
                         dataRow.appendChild(cell);
                     }
 
-                    if (Object.keys(this.resultSet[0])[x] == indexColumn) {
+                    if (cellName === indexColumn) {
                         dataRow.setAttribute('data-' + cellName, cellContent.innerHTML);
                         rowId = cellContent.innerHTML;
                     }

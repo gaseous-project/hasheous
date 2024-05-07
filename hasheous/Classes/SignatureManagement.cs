@@ -24,7 +24,7 @@ namespace Classes
         }
 
         public List<Signatures_Games_2> GetRawSignatures(HashLookupModel model)
-		{
+        {
             Dictionary<string, object> dbDict = new Dictionary<string, object>();
             List<string> whereClauses = new List<string>();
             if (model.MD5 != null)
@@ -51,7 +51,7 @@ namespace Classes
                 foreach (DataRow sigDbRow in sigDb.Rows)
                 {
                     Signatures_Games_2.GameItem game = BuildGameItem(sigDbRow);
-                    
+
                     Signatures_Games_2.RomItem rom = BuildRomItem(sigDbRow);
 
                     Signatures_Games_2 gameItem = new Signatures_Games_2
@@ -86,7 +86,8 @@ namespace Classes
                         // search name too short - throw an error
                         throw new SignatureBadSearchCriteriaException("Name search field must be 3 characters or longer");
                     }
-                } else if (model.Ids != null)
+                }
+                else if (model.Ids != null)
                 {
                     if (model.Ids.Length == 0)
                     {
@@ -122,7 +123,7 @@ namespace Classes
             }
 
             string orderBy = "";
-            switch(model.SearchType)
+            switch (model.SearchType)
             {
                 case SignatureSearchModel.SignatureSearchTypes.Publisher:
                     sql = "SELECT * FROM Signatures_Publishers";
@@ -147,7 +148,7 @@ namespace Classes
                     whereNameField = "Name";
                     orderBy = "Name";
                     break;
-                
+
                 default:
                     throw new SignatureBadSearchCriteriaException("Invalid search type provided");
             }
@@ -186,7 +187,7 @@ namespace Classes
             sql += " LIMIT 1000;";
 
             // execute search
-            switch(model.SearchType)
+            switch (model.SearchType)
             {
                 case SignatureSearchModel.SignatureSearchTypes.Game:
                     List<Signatures_Games_2.GameItem> games = new List<Signatures_Games_2.GameItem>();
@@ -259,7 +260,7 @@ namespace Classes
                 case LookupTypes.Country:
                     tableName = "Countries";
                     break;
-                
+
                 case LookupTypes.Language:
                     tableName = "Languages";
                     break;
@@ -280,6 +281,27 @@ namespace Classes
             }
 
             return returnDict;
+        }
+
+        public hasheous_server.Models.Signatures_Games_2.RomItem GetRomItemByHash(hasheous_server.Models.HashLookupModel model)
+        {
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql = "SELECT `Id` AS romid, `Name` AS romname, Signatures_Roms.* FROM Signatures_Roms WHERE MD5 = @md5 OR SHA1 = @sha1;";
+
+            return BuildRomItem(db.ExecuteCMD(sql, new Dictionary<string, object>{
+                { "md5", model.MD5 },
+                { "sha1", model.SHA1 }
+            }).Rows[0]);
+        }
+
+        public hasheous_server.Models.Signatures_Games_2.RomItem GetRomItemById(long id)
+        {
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql = "SELECT `Id` AS romid, `Name` AS romname, Signatures_Roms.* FROM Signatures_Roms WHERE Id = @id;";
+
+            return BuildRomItem(db.ExecuteCMD(sql, new Dictionary<string, object>{
+                { "id", id }
+            }).Rows[0]);
         }
     }
 }

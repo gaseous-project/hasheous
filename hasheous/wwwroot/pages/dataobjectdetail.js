@@ -80,6 +80,20 @@ function renderContent() {
                 logoImage.setAttribute('src', '/api/v1/images/' + dataObject.attributes[i].value);
                 break;
 
+            case "LogoAttribution":
+                let logoImageAttributionBox = document.getElementById('dataObjectLogoAttribution');
+                logoImageAttributionBox.style.display = '';
+                let logoImageAttributionLabel = document.getElementById('dataObjectLogoImageAttribution');
+                logoImageAttributionLabel.innerHTML = lang.getLang('logoattribution', [lang.getLang(dataObject.attributes[i].value)]);
+                let logoImageAttributionLogo = document.getElementById('dataObjectLogoImageAttributionLogo');
+                switch (dataObject.attributes[i].value) {
+                    case "IGDB":
+                        logoImageAttributionLogo.setAttribute('src', '/images/IGDB_logo.svg');
+                        logoImageAttributionLogo.style.display = '';
+                        break;
+                }
+                break;
+
             default:
                 switch (dataObject.attributes[i].attributeType) {
                     case "ObjectRelationship":
@@ -103,7 +117,17 @@ function renderContent() {
                                 romHeader.innerHTML = lang.getLang('associatedroms');
                                 romBox.appendChild(romHeader);
 
-                                romBox.appendChild(new generateTable(dataObject.attributes[i].value, ['name', 'size:bytes', 'md5', 'sha1', 'signatureSource']));
+                                romBox.appendChild(
+                                    new generateTable(
+                                        dataObject.attributes[i].value,
+                                        ['id', 'name', 'size:bytes', 'md5', 'sha1', 'signatureSource'],
+                                        'id',
+                                        true,
+                                        function (id) {
+                                            window.location = '/index.html?page=romdetail&id=' + id;
+                                        }
+                                    )
+                                );
 
                                 break;
                         }

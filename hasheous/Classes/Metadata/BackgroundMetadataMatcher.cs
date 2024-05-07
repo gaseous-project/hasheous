@@ -8,6 +8,7 @@ using IGDB;
 using IGDB.Models;
 using hasheous_server.Classes.Metadata.IGDB;
 using hasheous_server.Models;
+using hasheous_server.Classes;
 
 namespace BackgroundMetadataMatcher
 {
@@ -54,191 +55,85 @@ namespace BackgroundMetadataMatcher
             Voted = 5
         }
 
-        public async void StartMatcher()
+        public void GetGameArtwork(long DataObjectId)
         {
-            Random rand = new Random();
+            DataObjects dataObjects = new DataObjects();
+            DataObjectItem dataObjectItem = dataObjects.GetDataObject(DataObjects.DataObjectType.Game, DataObjectId);
 
-            // start matching signature platforms to IGDB metadata
-            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql = "SELECT * FROM Signatures_Platforms ORDER BY `Platform`";
-            Dictionary<string, object> dbDict = new Dictionary<string, object>();
-
-            DataTable sigDb = db.ExecuteCMD(sql);
-            
-            foreach (DataRow row in sigDb.Rows)
+            if (dataObjectItem != null)
             {
-                // check if there is an existing match
-                sql = "SELECT * FROM Match_SignaturePlatforms WHERE SignaturePlatformId=@signatureplatformid";
-                dbDict.Clear();
-                dbDict.Add("signatureplatformid", (int)row["Id"]);
-                DataTable sigPlatformDb = db.ExecuteCMD(sql, dbDict);
-
-                if (sigPlatformDb.Rows.Count == 0)
+                // check for cover
+                bool logoPresent = false;
+                foreach (AttributeItem attribute in dataObjectItem.Attributes)
                 {
-                    // no match recorded - insert one (if we can)
-                    Console.WriteLine("Searching for platform match for Signature platform: " + (string)row["Platform"]);
-                    PerformPlatformSearch(
-                        rand,
-                        db,
-                        row,
-                        "INSERT INTO Match_SignaturePlatforms (SignaturePlatformId, IGDBPlatformId, MatchMethod, LastSearched, NextSearch) VALUES (@signatureplatformid, @igdbplatformid, @matchmethod, @lastsearched, @nextsearch);",
-                        dbDict);
-                }
-                else
-                {
-                    // we have a match - do we need to update it?
-                    switch ((MatchMethod)sigPlatformDb.Rows[0]["MatchMethod"])
+                    if (
+                        attribute.attributeType == AttributeItem.AttributeType.ImageId &&
+                        attribute.attributeName == AttributeItem.AttributeName.Logo
+                    )
                     {
-                        case MatchMethod.Automatic:
-                        case MatchMethod.AutomaticTooManyMatches:
-                        case MatchMethod.Manual:
-                            // no update required - changes should be up to the user
-                            break;
-
-                        case MatchMethod.NoMatch:
-                            // no match - has it been more than 7 days but less than 14 days since the last search?
-                            Console.WriteLine("Searching for platform match for Signature platform: " + (string)row["Platform"]);
-                            if ((DateTime)sigPlatformDb.Rows[0]["NextSearch"] < DateTime.UtcNow)
-                            {
-                                PerformPlatformSearch(
-                                    rand,
-                                    db,
-                                    row,
-                                    "UPDATE Match_SignaturePlatforms SET IGDBPlatformId=@igdbplatformid, MatchMethod=@matchmethod, LastSearched=@lastsearched, NextSearch=@nextsearch WHERE SignaturePlatformId=@signatureplatformid;",
-                                    dbDict
-                                );
-                            }
-                            else
-                            {
-                                Console.WriteLine("Postponing update until " + (DateTime)sigPlatformDb.Rows[0]["NextSearch"]);
-                            }
-                            break;
-
+                        logoPresent = true;
+                        break;
                     }
                 }
-            }
-        }
 
-        private async void PerformPlatformSearch(Random rand, Database db, DataRow row, string sql, Dictionary<string, object> dbDict)
-        {
-            long platformMapId = -1;
-            int hoursToAdd = rand.Next(168, 336);
-
-            foreach (PlatformMapItem platformMapItem in JsonPlatformMap.PlatformMap)
-            {
-                if (
-                    platformMapItem.IGDBName == ((string)row["Platform"]).ToLower() ||
-                    platformMapItem.AlternateNames.Contains(((string)row["Platform"]).ToLower(), StringComparer.OrdinalIgnoreCase)
-                )
+                // only add a logo if it isn't already present
+                if (logoPresent == false)
                 {
-                    platformMapId = platformMapItem.IGDBId;
-                    break;
-                }
-            }
-
-            if (platformMapId == -1)
-            {
-                // no platform map match, perform search
-                string searchPlatform = ((string)row["Platform"]).ToLower();
-                Task<Platform[]> platforms = SearchForPlatform(searchPlatform);
-
-                if (platforms != null)
-                {
-                    if (platforms.Result != null)
+                    // check for metadata source
+                    foreach (DataObjectItem.MetadataItem metadata in dataObjectItem.Metadata)
                     {
-                        if (platforms.Result.Length == 0)
+                        if (
+                            metadata.MatchMethod == MatchMethod.Automatic ||
+                            metadata.MatchMethod == MatchMethod.Manual ||
+                            metadata.MatchMethod == MatchMethod.ManualByAdmin ||
+                            metadata.MatchMethod == MatchMethod.Voted
+                        )
                         {
-                            // no match
-                            dbDict.Add("igdbplatformid", 0);
-                            dbDict.Add("matchmethod", MatchMethod.NoMatch);
-                            dbDict.Add("lastsearched", DateTime.UtcNow);
-                            dbDict.Add("nextsearch", DateTime.UtcNow.AddHours(hoursToAdd));
-                        }
-                        else if (platforms.Result.Length == 1)
-                        {
-                            // exact match
-                            dbDict.Add("igdbplatformid", platforms.Result[0].Id);
-                            dbDict.Add("matchmethod", MatchMethod.Automatic);
-                            dbDict.Add("lastsearched", DateTime.UtcNow);
-                            dbDict.Add("nextsearch", DateTime.UtcNow.AddHours(hoursToAdd));
+                            string? imageRef = null;
+                            Communications.MetadataSources? coverProvider = null;
 
-                            // get platform metadata
-                            hasheous_server.Classes.Metadata.IGDB.Platforms.GetPlatform((long)platforms.Result[0].Id);
-                        }
-                        else
-                        {
-                            // multiple matches
-                            
-                            bool matchFound = false;
-                            foreach (Platform platform in platforms.Result)
+                            if (metadata.Id.Length > 0)
                             {
-                                if (matchFound == false)
+                                switch (metadata.Source)
                                 {
-                                    if (platform.Name.ToLower() == ((string)row["Platform"]).ToLower())
-                                    {
-                                        // exact match
-                                        dbDict.Add("igdbplatformid", platforms.Result[0].Id);
-                                        dbDict.Add("matchmethod", MatchMethod.Automatic);
-                                        dbDict.Add("lastsearched", DateTime.UtcNow);
-                                        dbDict.Add("nextsearch", DateTime.UtcNow.AddHours(hoursToAdd));
-                                        matchFound = true;
-                                    }
+                                    case Communications.MetadataSources.IGDB:
+                                        // get game metadata
+                                        Game game = hasheous_server.Classes.Metadata.IGDB.Games.GetGame(metadata.Id, false, false, false);
+                                        if (game.Cover != null)
+                                        {
+                                            if (game.Cover.Id != null)
+                                            {
+                                                Cover cover = Covers.GetCover((long)game.Cover.Id, Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB_Game(game));
+                                                if (cover != null)
+                                                {
+                                                    string CoverPath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB_Game(game), "Cover.png");
+                                                    if (File.Exists(CoverPath))
+                                                    {
+                                                        Images images = new Images();
+                                                        coverProvider = Communications.MetadataSources.IGDB;
+                                                        imageRef = images.AddImage("Cover.png", File.ReadAllBytes(CoverPath)) + ":" + coverProvider.ToString();
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        break;
                                 }
-                                hasheous_server.Classes.Metadata.IGDB.Platforms.GetPlatform((long)platform.Id);
-                            }
 
-                            if (matchFound == false)
-                            {
-                                dbDict.Add("igdbplatformid", 0);
-                                dbDict.Add("matchmethod", MatchMethod.AutomaticTooManyMatches);
-                                dbDict.Add("lastsearched", DateTime.UtcNow);
-                                dbDict.Add("nextsearch", DateTime.UtcNow.AddHours(hoursToAdd));
+                                if (imageRef != null)
+                                {
+                                    dataObjects.AddAttribute(DataObjectId, new AttributeItem
+                                    {
+                                        attributeName = AttributeItem.AttributeName.Logo,
+                                        attributeType = AttributeItem.AttributeType.ImageId,
+                                        attributeRelationType = DataObjects.DataObjectType.None,
+                                        Value = imageRef
+                                    });
+                                }
                             }
                         }
                     }
-                    else
-                    {
-                        // no match
-                        dbDict.Add("igdbplatformid", 0);
-                        dbDict.Add("matchmethod", MatchMethod.NoMatch);
-                        dbDict.Add("lastsearched", DateTime.UtcNow);
-                        dbDict.Add("nextsearch", DateTime.UtcNow.AddHours(hoursToAdd));
-                    }
                 }
             }
-            else
-            {
-                // platform map defined
-                dbDict.Add("igdbplatformid", platformMapId);
-                dbDict.Add("matchmethod", MatchMethod.Automatic);
-                dbDict.Add("lastsearched", DateTime.UtcNow);
-                dbDict.Add("nextsearch", DateTime.UtcNow.AddHours(hoursToAdd));
-
-                // get platform metadata
-                hasheous_server.Classes.Metadata.IGDB.Platforms.GetPlatform(platformMapId);
-            }
-            db.ExecuteCMD(sql, dbDict);
-        }
-
-        private async Task<Platform[]> SearchForPlatform(string PlatformName)
-        {
-            Communications comms = new Communications(Communications.MetadataSources.IGDB);
-            string searchBody = "search \"" + PlatformName + "\";";
-            var results = await comms.APIComm<Platform>(IGDBClient.Endpoints.Platforms, "fields *;", searchBody);
-
-            if (results == null || results.Length == 0)
-            {
-                searchBody = "where name ~ *\"" + PlatformName + "\"*;";
-                results = await comms.APIComm<Platform>(IGDBClient.Endpoints.Platforms, "fields *;", searchBody);
-
-                if (results == null || results.Length == 0)
-                {
-                    searchBody = "where name ~ \"" + PlatformName + "\";";
-                    results = await comms.APIComm<Platform>(IGDBClient.Endpoints.Platforms, "fields *;", searchBody);
-                }
-            }
-
-            return results;
         }
     }
 }

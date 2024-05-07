@@ -1,4 +1,5 @@
 using Authentication;
+using Classes;
 using hasheous_server.Classes;
 using hasheous_server.Models;
 using Microsoft.AspNetCore.Identity;
@@ -40,7 +41,18 @@ namespace hasheous_server.Controllers.v1_0
         public async Task<IActionResult> FixMatch(SubmissionsMatchFixModel model)
         {
             Submissions submissions = new Submissions();
-            return Ok(submissions.AddVote(_userManager.GetUserId(HttpContext.User), model));
+            try
+            {
+                return Ok(submissions.AddVote(_userManager.GetUserId(HttpContext.User), model));
+            }
+            catch (HashLookup2.HashNotFoundException hnfEx)
+            {
+                return NotFound("The provided hash was not found in the signature database.");
+            }
+            catch
+            {
+                return NotFound();
+            }
         }
     }
 }

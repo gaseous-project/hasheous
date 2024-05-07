@@ -35,7 +35,7 @@ namespace Classes
 
         }
 
-        public HashLookup2(Database db, HashLookupModel model)
+        public HashLookup2(Database db, hasheous_server.Models.HashLookupModel model)
         {
             SignatureManagement signature = new SignatureManagement();
             // get the raw signature

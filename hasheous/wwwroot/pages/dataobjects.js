@@ -6,11 +6,13 @@ function setupPage() {
             // show admin tools
             let newObjectBtn = document.getElementById('dataObjectNew');
             newObjectBtn.style.display = '';
-            newObjectBtn.addEventListener("click", function(e) {
+            newObjectBtn.addEventListener("click", function (e) {
                 window.location = '/index.html?page=dataobjectnew&type=' + pageType;
             });
         }
     }
+
+    setPageTitle(lang.langMapping[pageType]['dataobject_objects']);
 }
 
 function createDataObjectsTable(pageNumber, pageSize) {
@@ -24,7 +26,7 @@ function createDataObjectsTable(pageNumber, pageSize) {
     ajaxCall(
         '/api/v1/DataObjects/' + pageType + '?pageSize=' + pageSize + '&pageNumber=' + pageNumber + '&getchildrelations=true',
         'GET',
-        function(success) {
+        function (success) {
             switch (pageType) {
                 case "game":
                     columns = [
@@ -61,7 +63,7 @@ function createDataObjectsTable(pageNumber, pageSize) {
                     break;
 
                 default:
-                    case "company":
+                case "company":
                     columns = [
                         'id',
                         'name',
@@ -78,13 +80,13 @@ function createDataObjectsTable(pageNumber, pageSize) {
                 columns,
                 'id',
                 true,
-                function(id) {
+                function (id) {
                     window.location = '/index.html?page=dataobjectdetail&type=' + pageType + '&id=' + id;
                 },
                 success.count,
                 success.pageNumber,
                 success.totalPages,
-                function(p) {
+                function (p) {
                     createDataObjectsTable(p, pageSize);
                 }
             );

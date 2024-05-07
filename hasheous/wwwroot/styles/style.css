@@ -553,3 +553,8 @@ td {
 #dataObjectLogoImage {
     max-width: 100%;
 }
+
+#dataObjectLogoImageAttributionLogo {
+    float: right;
+    max-width: 40px;
+}

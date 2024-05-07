@@ -4,6 +4,25 @@ class language {
     languageDefault = undefined;
     languageOverlay = undefined;
 
+    langMapping =
+        {
+            "company":
+            {
+                "dataobject_objects": "companies",
+                "dataobject_new": "newcompany"
+            },
+            "platform":
+            {
+                "dataobject_objects": "platforms",
+                "dataobject_new": "newplatform"
+            },
+            "game":
+            {
+                "dataobject_objects": "games",
+                "dataobject_new": "newgame"
+            }
+        };
+
     constructor() {
 
     }
@@ -64,26 +83,7 @@ class language {
             case "dataobjectnew":
                 let pageType = getQueryString('type', 'string');
 
-                let langMapping =
-                {
-                    "company":
-                    {
-                        "dataobject_objects": "companies",
-                        "dataobject_new": "newcompany"
-                    },
-                    "platform":
-                    {
-                        "dataobject_objects": "platforms",
-                        "dataobject_new": "newplatform"
-                    },
-                    "game":
-                    {
-                        "dataobject_objects": "games",
-                        "dataobject_new": "newgame"
-                    }
-                };
-
-                let newToken = langMapping[pageType][token];
+                let newToken = this.langMapping[pageType][token];
                 if (newToken) {
                     token = newToken;
                 }

@@ -102,7 +102,7 @@ namespace hasheous_server.Classes
         public void TallyVotes()
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            
+
             // loop all game dataobjects, then fetch all votes for each game
             DataObjects dataObjects = new DataObjects();
             DataObjectsList dataObjectsList = dataObjects.GetDataObjects(DataObjects.DataObjectType.Game, 0, 0, null, false);
@@ -143,7 +143,7 @@ namespace hasheous_server.Classes
             // 1. do not update metadata if the value is already correct
             // 2. do not update metadata set manually, or manually by admin
             // 3. do not update metadata set automatically unless we have a winningvotecount of at least 3 (meaning at least three people agree it's correct)
-            
+
             // Rule 3. do not update metadata set automatically unless we have a winningvotecount of at least 3 (meaning at least three people agree it's correct)
             if (WinningVoteCount >= 3)
             {

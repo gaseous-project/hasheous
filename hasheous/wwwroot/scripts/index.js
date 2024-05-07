@@ -92,6 +92,7 @@ function userLogoff() {
 }
 
 function setPageTitle(targetPage, overrideLanguageLookup) {
+    console.log(targetPage + ' override: ' + overrideLanguageLookup);
     if (overrideLanguageLookup === true) {
         document.title = lang.getLang("Hasheous") + " - " + targetPage;
     } else {

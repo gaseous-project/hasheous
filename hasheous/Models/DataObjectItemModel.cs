@@ -15,6 +15,7 @@ namespace hasheous_server.Models
             ShortString = 1,
             DateTime = 2,
             ImageId = 3,
+            ImageAttribution = 4,
             ObjectRelationship = 10,
             EmbeddedList = 11
         }
@@ -30,7 +31,8 @@ namespace hasheous_server.Models
             Country = 6,
             Language = 7,
             ROMs = 8,
-            VIMMManualId = 9
+            VIMMManualId = 9,
+            LogoAttribution = 10
         }
 
         public long? Id { get; set; }

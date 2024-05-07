@@ -6,6 +6,7 @@ using hasheous_server.Classes.Metadata.IGDB;
 using hasheous_server.Models;
 using IGDB;
 using IGDB.Models;
+using Microsoft.AspNetCore.Razor.Language.Intermediate;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NuGet.Common;
 using static hasheous_server.Classes.Metadata.IGDB.Communications;
@@ -83,7 +84,8 @@ namespace hasheous_server.Classes
             }
 
             float pageCount = (float)data.Rows.Count / (float)pageSize;
-            DataObjectsList objectsList = new DataObjectsList{
+            DataObjectsList objectsList = new DataObjectsList
+            {
                 Objects = DataObjects,
                 Count = data.Rows.Count,
                 PageNumber = pageNumber,
@@ -148,7 +150,8 @@ namespace hasheous_server.Classes
             // get metadata matches
             List<DataObjectItem.MetadataItem> metadataItems = GetMetadataMap(ObjectType, id);
 
-            DataObjectItem item = new DataObjectItem{
+            DataObjectItem item = new DataObjectItem
+            {
                 Id = id,
                 Name = (string)row["Name"],
                 CreatedDate = (DateTime)row["CreatedDate"],
@@ -172,6 +175,29 @@ namespace hasheous_server.Classes
             foreach (DataRow dataRow in data.Rows)
             {
                 AttributeItem attributeItem = BuildAttributeItem(dataRow, GetChildRelations);
+
+                // further processing
+                switch (attributeItem.attributeType)
+                {
+                    case AttributeItem.AttributeType.ImageId:
+                        if (attributeItem.Value.ToString().Contains(":"))
+                        {
+                            string[] attributeValues = attributeItem.Value.ToString().Split(':');
+                            attributeItem.Value = attributeValues[0];
+
+                            // create attribution attribute
+                            AttributeItem imageAttribution = new AttributeItem()
+                            {
+                                attributeType = AttributeItem.AttributeType.ImageAttribution,
+                                attributeName = AttributeItem.AttributeName.LogoAttribution,
+                                Value = attributeValues[1],
+                                attributeRelationType = attributeItem.attributeRelationType = DataObjectType.None
+                            };
+                            attributes.Add(imageAttribution);
+                        }
+                        break;
+                }
+
                 attributes.Add(attributeItem);
             }
 
@@ -182,7 +208,7 @@ namespace hasheous_server.Classes
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "";
-            Dictionary<string, object> dbDict = new Dictionary<string, object>{};
+            Dictionary<string, object> dbDict = new Dictionary<string, object> { };
 
             switch (ObjectType)
             {
@@ -213,7 +239,7 @@ namespace hasheous_server.Classes
                         ORDER BY Signatures_Games.`Name`;";
                     break;
             }
-            
+
             List<Dictionary<string, object>> signatureItems = db.ExecuteCMDDict(sql, new Dictionary<string, object>{
                 { "id", DataObjectId },
                 { "typeid", ObjectType }
@@ -232,7 +258,8 @@ namespace hasheous_server.Classes
             List<DataObjectItem.MetadataItem> metadataItems = new List<DataObjectItem.MetadataItem>();
             foreach (DataRow dataRow in data.Rows)
             {
-                DataObjectItem.MetadataItem metadataItem = new DataObjectItem.MetadataItem(ObjectType){
+                DataObjectItem.MetadataItem metadataItem = new DataObjectItem.MetadataItem(ObjectType)
+                {
                     Id = (string)dataRow["MetadataId"],
                     MatchMethod = (BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod)dataRow["MatchMethod"],
                     Source = (Metadata.IGDB.Communications.MetadataSources)dataRow["SourceId"],
@@ -289,7 +316,8 @@ namespace hasheous_server.Classes
             // compile countries
             if (countries.Count > 0)
             {
-                AttributeItem countryAttributes = new AttributeItem{
+                AttributeItem countryAttributes = new AttributeItem
+                {
                     attributeName = AttributeItem.AttributeName.Country,
                     attributeType = AttributeItem.AttributeType.ShortString,
                     attributeRelationType = DataObjectType.None
@@ -308,7 +336,8 @@ namespace hasheous_server.Classes
             // compile languages
             if (languages.Count > 0)
             {
-                AttributeItem languageAttributes = new AttributeItem{
+                AttributeItem languageAttributes = new AttributeItem
+                {
                     attributeName = AttributeItem.AttributeName.Language,
                     attributeType = AttributeItem.AttributeType.ShortString,
                     attributeRelationType = DataObjectType.None
@@ -332,7 +361,7 @@ namespace hasheous_server.Classes
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
 
             SignatureManagement signature = new SignatureManagement();
-            
+
             List<Signatures_Games_2.RomItem> roms = new List<Signatures_Games_2.RomItem>();
 
             foreach (Dictionary<string, object> GameSignature in GameSignatures)
@@ -366,7 +395,8 @@ namespace hasheous_server.Classes
                 }
             }
 
-            AttributeItem attribute = new AttributeItem{
+            AttributeItem attribute = new AttributeItem
+            {
                 attributeName = AttributeItem.AttributeName.ROMs,
                 attributeType = AttributeItem.AttributeType.EmbeddedList,
                 attributeRelationType = DataObjectType.ROM,
@@ -508,7 +538,9 @@ namespace hasheous_server.Classes
                                     { "value", newAttribute.Value }
                                 });
                             }
-                        } else {
+                        }
+                        else
+                        {
                             if (newAttribute.Value == "")
                             {
                                 // blank value - delete it
@@ -546,8 +578,8 @@ namespace hasheous_server.Classes
                                 { "match", BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin },
                                 { "metaid", newMetadataItem.Id },
                                 { "source", existingMetadataItem.Source },
-                                { "winningvotecount", null },
-                                { "totalvotecount", null }
+                                { "winningvotecount", 0 },
+                                { "totalvotecount", 0 }
                             });
                         }
                     }
@@ -603,7 +635,8 @@ namespace hasheous_server.Classes
 
         private async Task<MatchItem?> _DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch)
         {
-            MatchItem? DataObjectSearchResults = new MatchItem{
+            MatchItem? DataObjectSearchResults = new MatchItem
+            {
                 MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
                 MetadataId = ""
             };
@@ -651,7 +684,7 @@ namespace hasheous_server.Classes
                                 switch (objectType)
                                 {
                                     case DataObjectType.Company:
-                                        DataObjectSearchResults = await GetDataObject<IGDB.Models.Company>(MetadataSources.IGDB, IGDBClient.Endpoints.Companies, "fields *;", "where name ~ *\"" + item.Name + "\"");        
+                                        DataObjectSearchResults = await GetDataObject<IGDB.Models.Company>(MetadataSources.IGDB, IGDBClient.Endpoints.Companies, "fields *;", "where name ~ *\"" + item.Name + "\"");
                                         break;
 
                                     case DataObjectType.Platform:
@@ -670,7 +703,7 @@ namespace hasheous_server.Classes
                                                     foreach (DataObjectItem.MetadataItem provider in platformDO.Metadata)
                                                     {
                                                         if (provider.Source == MetadataSources.IGDB && (
-                                                            provider.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic || 
+                                                            provider.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic ||
                                                             provider.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Manual ||
                                                             provider.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin
                                                             )
@@ -683,7 +716,7 @@ namespace hasheous_server.Classes
                                                 }
                                             }
                                         }
-                                        
+
                                         if (PlatformId != null)
                                         {
                                             List<string> SearchCandidates = GetSearchCandidates(item.Name);
@@ -697,7 +730,8 @@ namespace hasheous_server.Classes
                                                     if (games.Length == 1)
                                                     {
                                                         // exact match!
-                                                        DataObjectSearchResults = new MatchItem{
+                                                        DataObjectSearchResults = new MatchItem
+                                                        {
                                                             MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic,
                                                             MetadataId = games[0].Slug
                                                         };
@@ -707,10 +741,13 @@ namespace hasheous_server.Classes
                                                     else if (games.Length > 1)
                                                     {
                                                         // too many matches - high likelihood of sequels and other variants
-                                                        foreach (Game game in games) {
-                                                            if (game.Name == SearchCandidate) {
+                                                        foreach (Game game in games)
+                                                        {
+                                                            if (game.Name == SearchCandidate)
+                                                            {
                                                                 // found game title matches the search candidate
-                                                                DataObjectSearchResults = new MatchItem{
+                                                                DataObjectSearchResults = new MatchItem
+                                                                {
                                                                     MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic,
                                                                     MetadataId = game.Slug
                                                                 };
@@ -728,7 +765,8 @@ namespace hasheous_server.Classes
                                         }
                                         else
                                         {
-                                            DataObjectSearchResults = new MatchItem{
+                                            DataObjectSearchResults = new MatchItem
+                                            {
                                                 MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
                                                 MetadataId = ""
                                             };
@@ -756,6 +794,14 @@ namespace hasheous_server.Classes
                 }
             }
 
+            // get metadata cover if new object is a game
+            if (objectType == DataObjectType.Game)
+            {
+                BackgroundMetadataMatcher.BackgroundMetadataMatcher metadataMatcher = new BackgroundMetadataMatcher.BackgroundMetadataMatcher();
+                metadataMatcher.GetGameArtwork((long)id);
+            }
+
+            // update date
             UpdateDataObjectDate((long)id);
 
             return DataObjectSearchResults;
@@ -769,7 +815,8 @@ namespace hasheous_server.Classes
 
             // assumption: no games have () in their titles so we'll remove them
             int idx = GameName.IndexOf('(');
-            if (idx >= 0) {
+            if (idx >= 0)
+            {
                 GameName = GameName.Substring(0, idx);
             }
 
@@ -817,7 +864,7 @@ namespace hasheous_server.Classes
                             break;
 
                     }
-                    
+
                     return matchItem;
                 }
                 else
@@ -888,7 +935,8 @@ namespace hasheous_server.Classes
 
         private AttributeItem BuildAttributeItem(DataRow row, bool GetChildRelations = false)
         {
-            AttributeItem attributeItem = new AttributeItem(){
+            AttributeItem attributeItem = new AttributeItem()
+            {
                 Id = (long)row["AttributeId"],
                 attributeType = (AttributeItem.AttributeType)row["AttributeType"],
                 attributeName = (AttributeItem.AttributeName)row["AttributeName"],
@@ -898,12 +946,13 @@ namespace hasheous_server.Classes
             {
                 case AttributeItem.AttributeType.ObjectRelationship:
                     if (GetChildRelations == true)
-                    {   
+                    {
                         attributeItem.Value = GetDataObject(attributeItem.attributeRelationType, (long)row["AttributeRelation"]);
                     }
                     else
                     {
-                        RelationItem relationItem = new RelationItem(){
+                        RelationItem relationItem = new RelationItem()
+                        {
                             relationType = attributeItem.attributeRelationType,
                             relationId = (long)row["AttributeRelation"]
                         };
@@ -993,7 +1042,7 @@ namespace hasheous_server.Classes
                             )
                         {
                             DataObjectItem platformObject = (DataObjectItem)attribute.Value;
-                            
+
                             List<Dictionary<string, object>> platformSignatures = GetSignatures(DataObjectType.Platform, platformObject.Id);
                             foreach (Dictionary<string, object> platformSignature in platformSignatures)
                             {
@@ -1001,7 +1050,7 @@ namespace hasheous_server.Classes
                             }
                         }
                     }
-                    
+
                     // construct where clause
                     if (platformIds.Count > 0)
                     {

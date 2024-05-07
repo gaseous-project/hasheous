@@ -28,6 +28,34 @@ namespace hasheous_server.Controllers.v1_0
 
             return Ok(objects);
         }
+
+        [MapToApiVersion("1.0")]
+        [HttpPost]
+        [AllowAnonymous]
+        [Route("Rom/ByHash")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetRomItemByHash(HashLookupModel model)
+        {
+            SignatureManagement signature = new SignatureManagement();
+
+            object objects = signature.GetRomItemByHash(model);
+
+            return Ok(objects);
+        }
+
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [AllowAnonymous]
+        [Route("Rom/ById/{id}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetRomItemById(long id)
+        {
+            SignatureManagement signature = new SignatureManagement();
+
+            object objects = signature.GetRomItemById(id);
+
+            return Ok(objects);
+        }
     }
 }
 
