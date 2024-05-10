@@ -10,7 +10,7 @@ namespace hasheous_server.Controllers.v1_0
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]/")]
     [ApiVersion("1.0")]
-    [ApiExplorerSettings(IgnoreApi = true)]
+    [ApiExplorerSettings(IgnoreApi = false)]
     [Authorize]
     public class DataObjectsController : ControllerBase
     {
@@ -309,6 +309,36 @@ namespace hasheous_server.Controllers.v1_0
             else
             {
                 return Ok(DataObjects.SignatureSearch(Id, ObjectType, SearchString));
+            }
+        }
+
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [Authorize(Roles = "Admin")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [Route("{ObjectType}/{Id}/MergeObject/")]
+        public async Task<IActionResult> MergeObjects(Classes.DataObjects.DataObjectType ObjectType, long Id, long TargetId, bool Commit = false)
+        {
+            hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
+
+            Models.DataObjectItem? DataObject = DataObjects.GetDataObject(ObjectType, Id);
+
+            if (DataObject == null)
+            {
+                return NotFound();
+            }
+            else
+            {
+                Models.DataObjectItem? TargetDataObject = DataObjects.GetDataObject(ObjectType, TargetId);
+
+                if (TargetDataObject == null)
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    return Ok(DataObjects.MergeObjects(DataObject, TargetDataObject, Commit));
+                }
             }
         }
     }

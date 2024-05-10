@@ -80,6 +80,8 @@
     "ineditmode": "Editing object",
     "edit": "Edit",
     "delete": "Delete",
+    "mergeinto": "Merge Into",
+    "mergeintoobject": "Merge Into Object",
     "publisher": "Publisher",
     "platform": "Platform",
     "manufacturer": "Manufacturer",

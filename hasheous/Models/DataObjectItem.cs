@@ -15,6 +15,7 @@ namespace hasheous_server.Models
     public class DataObjectItem : DataObjectItemModel
     {
         public long Id { get; set; }
+        public DataObjects.DataObjectType ObjectType { get; set; }
         public List<Dictionary<string, object>>? SignatureDataObjects { get; set; }
         public List<MetadataItem>? Metadata { get; set; }
         public List<AttributeItem>? Attributes { get; set; }
@@ -46,13 +47,13 @@ namespace hasheous_server.Models
                                 {
                                     case DataObjects.DataObjectType.Company:
                                         return "https://www.igdb.com/companies/" + Id;
-                                    
+
                                     case DataObjects.DataObjectType.Platform:
                                         return "https://www.igdb.com/platforms/" + Id;
 
                                     case DataObjects.DataObjectType.Game:
                                         return "https://www.igdb.com/games/" + Id;
-                                    
+
                                     default:
                                         return "";
                                 }

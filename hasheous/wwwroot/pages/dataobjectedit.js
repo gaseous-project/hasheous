@@ -284,6 +284,7 @@ function renderContent() {
     }
     $(signatureElement).select2({
         minimumInputLength: 3,
+        closeOnSelect: false,
         ajax: {
             url: '/api/v1/Signatures/Search',
             type: "POST",

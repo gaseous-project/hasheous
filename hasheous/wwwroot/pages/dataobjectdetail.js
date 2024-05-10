@@ -33,6 +33,20 @@ document.getElementById('dataObjectDelete').addEventListener("click", function (
     );
 });
 
+document.getElementById('dataObjectMerge').addEventListener("click", function (e) {
+    let mergeIntoId = $('#dataObjectMergeSelect').val();
+    ajaxCall(
+        '/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int') + '/MergeObject?TargetId=' + mergeIntoId + '&commit=true',
+        'GET',
+        function (success) {
+            location.replace('index.html?page=dataobjectdetail&type=' + pageType + '&id=' + mergeIntoId);
+        },
+        function (error) {
+            console.warn(error);
+        }
+    );
+});
+
 ajaxCall(
     '/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int'),
     'GET',
@@ -48,6 +62,42 @@ function renderContent() {
     document.getElementById('dataObject_object_name').innerHTML = dataObject.name;
     document.getElementById('page_date_box_createdDate').innerHTML = moment(dataObject.createdDate + 'Z').format('lll');
     document.getElementById('page_date_box_updatedDate').innerHTML = moment(dataObject.updatedDate + 'Z').format('lll');
+
+    let mergeIntoSelector = document.getElementById('dataObjectMergeSelect');
+    $(mergeIntoSelector).select2({
+        minimumInputLength: 3,
+        placeholder: lang.getLang('mergeintoobject'),
+        allowClear: true,
+        ajax: {
+            url: '/api/v1/DataObjects/' + pageType,
+            type: 'GET',
+            dataType: 'json',
+            data: function (params) {
+                var query = {
+                    search: params.term
+                }
+
+                return query;
+            },
+            processResults: function (data) {
+                var arr = [];
+
+                for (var i = 0; i < data.objects.length; i++) {
+                    if (data.objects[i].id != getQueryString('id', 'int')) {
+                        arr.push({
+                            id: data.objects[i].id,
+                            text: data.objects[i].name + ' (' + data.objects[i].id + ')',
+                            fullObject: data.objects[i]
+                        });
+                    }
+                }
+
+                return {
+                    results: arr
+                };
+            }
+        }
+    });
 
     let descriptionElement = document.getElementById('dataObjectDescription');
     let attributeValues = [];

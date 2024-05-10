@@ -483,6 +483,11 @@ td {
     width: 90%;
 }
 
+.mergeintoselect {
+    width: 100%;
+    margin-bottom: 5px;
+}
+
 .tablefooter {
     position: relative;
     display: flexbox;

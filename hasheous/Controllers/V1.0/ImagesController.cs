@@ -1,6 +1,7 @@
 using Classes;
 using hasheous_server.Classes;
 using hasheous_server.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace hasheous_server.Controllers.v1_0
@@ -9,6 +10,7 @@ namespace hasheous_server.Controllers.v1_0
     [Route("api/v{version:apiVersion}/[controller]/")]
     [ApiExplorerSettings(IgnoreApi = true)]
     [ApiVersion("1.0")]
+    [Authorize]
     public class ImagesController : ControllerBase
     {
         [MapToApiVersion("1.0")]
@@ -16,6 +18,9 @@ namespace hasheous_server.Controllers.v1_0
         [ProducesResponseType(typeof(FileStreamResult), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [Route("{Id}")]
+        [ResponseCache(CacheProfileName = "MaxDays")]
+        [ApiExplorerSettings(IgnoreApi = false)]
+        [AllowAnonymous]
         public async Task<IActionResult> GetImage(string Id)
         {
             Images images = new Images();
@@ -39,6 +44,7 @@ namespace hasheous_server.Controllers.v1_0
         [RequestSizeLimit(long.MaxValue)]
         [Consumes("multipart/form-data")]
         [DisableRequestSizeLimit, RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue, ValueLengthLimit = int.MaxValue)]
+        [Authorize(Roles = "Admin, Moderator")]
         public async Task<IActionResult> UploadImage(IFormFile file)
         {
             Guid sessionid = Guid.NewGuid();

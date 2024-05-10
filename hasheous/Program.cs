@@ -94,6 +94,12 @@ builder.Services.AddControllers(options =>
             Duration = 604800,
             Location = ResponseCacheLocation.Any
         });
+    options.CacheProfiles.Add("MaxDays",
+    new CacheProfile()
+    {
+        Duration = int.MaxValue,
+        Location = ResponseCacheLocation.Any
+    });
 });
 
 // email configuration

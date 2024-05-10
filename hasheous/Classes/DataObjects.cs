@@ -7,6 +7,7 @@ using hasheous_server.Models;
 using IGDB;
 using IGDB.Models;
 using Microsoft.AspNetCore.Razor.Language.Intermediate;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NuGet.Common;
 using static hasheous_server.Classes.Metadata.IGDB.Communications;
@@ -153,6 +154,7 @@ namespace hasheous_server.Classes
             DataObjectItem item = new DataObjectItem
             {
                 Id = id,
+                ObjectType = ObjectType,
                 Name = (string)row["Name"],
                 CreatedDate = (DateTime)row["CreatedDate"],
                 UpdatedDate = (DateTime)row["UpdatedDate"],
@@ -491,72 +493,88 @@ namespace hasheous_server.Classes
             // update attributes
             foreach (AttributeItem newAttribute in model.Attributes)
             {
-                bool attributeFound = false;
-                foreach (AttributeItem existingAttribute in EditedObject.Attributes)
+                switch (newAttribute.attributeType)
                 {
-                    if (
-                        (newAttribute.attributeType == existingAttribute.attributeType) &&
-                        (newAttribute.attributeName == existingAttribute.attributeName)
-                    )
-                    {
-                        attributeFound = true;
+                    case AttributeItem.AttributeType.EmbeddedList:
+                        break;
 
-                        string compareValue = "";
-                        string sqlField;
-                        switch (existingAttribute.attributeType)
+                    default:
+                        bool attributeFound = false;
+                        foreach (AttributeItem existingAttribute in EditedObject.Attributes)
                         {
-                            case AttributeItem.AttributeType.ObjectRelationship:
-                                sqlField = "AttributeRelation";
-                                DataObjectItem tempCompare = (DataObjectItem)existingAttribute.Value;
-                                if (tempCompare != null)
+                            if (
+                                (newAttribute.attributeType == existingAttribute.attributeType) &&
+                                (newAttribute.attributeName == existingAttribute.attributeName)
+                            )
+                            {
+                                attributeFound = true;
+
+                                string sqlField;
+                                bool isMatch = false;
+                                switch (existingAttribute.attributeType)
                                 {
-                                    compareValue = tempCompare.Id.ToString();
+                                    case AttributeItem.AttributeType.ObjectRelationship:
+                                        sqlField = "AttributeRelation";
+                                        DataObjectItem tempCompare = (DataObjectItem)existingAttribute.Value;
+                                        DataObjectItem newCompare = (DataObjectItem)newAttribute.Value;
+                                        if (tempCompare != null)
+                                        {
+                                            if (tempCompare.Name == newCompare.Name)
+                                            {
+                                                isMatch = true;
+                                            }
+                                        }
+                                        break;
+
+                                    default:
+                                        sqlField = "AttributeValue";
+                                        if ((string)newAttribute.Value == (string)existingAttribute.Value)
+                                        {
+                                            isMatch = true;
+                                        }
+                                        break;
+
                                 }
-                                break;
 
-                            default:
-                                sqlField = "AttributeValue";
-                                compareValue = (string)existingAttribute.Value;
-                                break;
-
-                        }
-
-                        if (compareValue != (string)newAttribute.Value)
-                        {
-                            if (newAttribute.Value == "")
-                            {
-                                // blank value - delete it
-                                DeleteAttribute(id, (long)existingAttribute.Id);
-                            }
-                            else
-                            {
-                                // update existing value
-                                sql = "UPDATE DataObject_Attributes SET " + sqlField + "=@value WHERE DataObjectId=@id AND AttributeId=@attrid;";
-                                db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                                //if (compareValue != (string)newAttribute.Value)
+                                if (isMatch == false)
+                                {
+                                    if (newAttribute.Value == "")
+                                    {
+                                        // blank value - delete it
+                                        DeleteAttribute(id, (long)existingAttribute.Id);
+                                    }
+                                    else
+                                    {
+                                        // update existing value
+                                        sql = "UPDATE DataObject_Attributes SET " + sqlField + "=@value WHERE DataObjectId=@id AND AttributeId=@attrid;";
+                                        db.ExecuteNonQuery(sql, new Dictionary<string, object>{
                                     { "id", id },
                                     { "attrid", existingAttribute.Id },
                                     { "value", newAttribute.Value }
                                 });
+                                    }
+                                }
+                                else
+                                {
+                                    if (newAttribute.Value == "")
+                                    {
+                                        // blank value - delete it
+                                        DeleteAttribute(id, (long)existingAttribute.Id);
+                                    }
+                                }
                             }
                         }
-                        else
-                        {
-                            if (newAttribute.Value == "")
-                            {
-                                // blank value - delete it
-                                DeleteAttribute(id, (long)existingAttribute.Id);
-                            }
-                        }
-                    }
-                }
 
-                if (attributeFound == false)
-                {
-                    if (newAttribute.Value != "")
-                    {
-                        // create a new attribute
-                        AddAttribute(id, newAttribute);
-                    }
+                        if (attributeFound == false)
+                        {
+                            if (newAttribute.Value != "")
+                            {
+                                // create a new attribute
+                                AddAttribute(id, newAttribute);
+                            }
+                        }
+                        break;
                 }
             }
 
@@ -1095,6 +1113,115 @@ namespace hasheous_server.Classes
             List<Dictionary<string, object>> results = db.ExecuteCMDDict(sql, dbDict);
 
             return results;
+        }
+
+        public DataObjectItem MergeObjects(DataObjectItem sourceObject, DataObjectItem targetObject, bool commit = false)
+        {
+            // first, ensure both objects are the same type
+            if (sourceObject.ObjectType != targetObject.ObjectType)
+            {
+                throw new Exception("Cannot merge objects of different types");
+            }
+
+            // copy root attributes
+            // copy the name if the target is empty - note this should not ever be required
+            if (targetObject.Name == "")
+            {
+                targetObject.Name = sourceObject.Name;
+            }
+
+            // copy attributes
+            foreach (AttributeItem srcAttribute in sourceObject.Attributes)
+            {
+                switch (srcAttribute.attributeType)
+                {
+                    case AttributeItem.AttributeType.ObjectRelationship:
+                    case AttributeItem.AttributeType.EmbeddedList:
+                        break;
+
+                    default:
+                        bool targetAttributeFound = false;
+                        foreach (AttributeItem targetAttribute in targetObject.Attributes)
+                        {
+                            if (targetAttribute.attributeName == srcAttribute.attributeName)
+                            {
+                                targetAttributeFound = true;
+                                if (targetAttribute.Value == null || targetAttribute.Value == "")
+                                {
+                                    targetAttribute.Value = srcAttribute.Value;
+                                }
+                            }
+                        }
+
+                        if (targetAttributeFound == false)
+                        {
+                            switch (srcAttribute.attributeName)
+                            {
+                                case AttributeItem.AttributeName.Country:
+                                case AttributeItem.AttributeName.Language:
+                                case AttributeItem.AttributeName.ROMs:
+                                    break;
+
+                                default:
+                                    targetObject.Attributes.Add(srcAttribute);
+                                    break;
+                            }
+                        }
+                        break;
+                }
+            }
+
+            // copy metadata
+            foreach (DataObjectItem.MetadataItem srcMetadata in sourceObject.Metadata)
+            {
+                bool targetMetadataFound = false;
+                foreach (DataObjectItem.MetadataItem targetMetadata in targetObject.Metadata)
+                {
+                    if (targetMetadata.Source == srcMetadata.Source)
+                    {
+                        targetMetadataFound = true;
+                        if (targetMetadata.Id == null || targetMetadata.Id == "")
+                        {
+                            targetMetadata.Id = srcMetadata.Id;
+                            targetMetadata.MatchMethod = srcMetadata.MatchMethod;
+                        }
+                    }
+                }
+
+                if (targetMetadataFound == false)
+                {
+                    targetObject.Metadata.Add(srcMetadata);
+                }
+            }
+
+            // copy signatures
+            foreach (Dictionary<string, object> srcSignature in sourceObject.SignatureDataObjects)
+            {
+                bool targetSignatureFound = false;
+                foreach (Dictionary<string, object> targetSignature in targetObject.SignatureDataObjects)
+                {
+                    if (targetSignature["SignatureId"] == srcSignature["SignatureId"])
+                    {
+                        targetSignatureFound = true;
+                    }
+                }
+
+                if (targetSignatureFound == false)
+                {
+                    targetObject.SignatureDataObjects.Add(srcSignature);
+                }
+            }
+
+            // apply changes if commit = true
+            if (commit == true)
+            {
+                EditDataObject(targetObject.ObjectType, targetObject.Id, targetObject);
+                DataObjectMetadataSearch(targetObject.ObjectType, targetObject.Id, false);
+                UpdateDataObjectDate(targetObject.Id);
+                DeleteDataObject(sourceObject.ObjectType, sourceObject.Id);
+            }
+
+            return targetObject;
         }
     }
 }
