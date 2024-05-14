@@ -553,10 +553,15 @@ td {
 
 #dataObjectLogoBox {
     padding: 20px;
+    text-align: center;
 }
 
 #dataObjectLogoImage {
     max-width: 100%;
+}
+
+#dataObjectLogoAttribution {
+    text-align: left;
 }
 
 #dataObjectLogoImageAttributionLogo {

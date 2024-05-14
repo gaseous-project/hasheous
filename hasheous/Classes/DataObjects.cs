@@ -516,12 +516,22 @@ namespace hasheous_server.Classes
                                     case AttributeItem.AttributeType.ObjectRelationship:
                                         sqlField = "AttributeRelation";
                                         DataObjectItem tempCompare = (DataObjectItem)existingAttribute.Value;
-                                        DataObjectItem newCompare = (DataObjectItem)newAttribute.Value;
                                         if (tempCompare != null)
                                         {
-                                            if (tempCompare.Name == newCompare.Name)
+                                            if (long.TryParse(newAttribute.Value.ToString(), out long newCompareLong))
                                             {
-                                                isMatch = true;
+                                                if (tempCompare.Id == newCompareLong)
+                                                {
+                                                    isMatch = true;
+                                                }
+                                            }
+                                            else
+                                            {
+                                                DataObjectItem newCompare = (DataObjectItem)newAttribute.Value;
+                                                if (tempCompare.Name == newCompare.Name)
+                                                {
+                                                    isMatch = true;
+                                                }
                                             }
                                         }
                                         break;
