@@ -55,6 +55,39 @@ namespace BackgroundMetadataMatcher
             Voted = 5
         }
 
+        public void GetGamesWithoutArtwork()
+        {
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql = @"
+                SELECT
+                    *
+                FROM
+                    `DataObject`
+                LEFT JOIN
+                    `DataObject_MetadataMap` ON `DataObject_MetadataMap`.`DataObjectId` = `DataObject`.`Id`
+                LEFT JOIN
+                    (
+                        SELECT
+                            *
+                        FROM
+                            `DataObject_Attributes`
+                        WHERE
+                            `DataObject_Attributes`.`AttributeName` = 3
+                    ) `Attr` ON `Attr`.`DataObjectId` = `DataObject`.`Id`
+                WHERE
+                    `DataObject`.`ObjectType` = 2 AND
+                    (`DataObject_MetadataMap`.`MetadataId` IS NOT NULL AND `DataObject_MetadataMap`.`MetadataId` <> "") AND
+                    (`Attr`.`AttributeValue` IS NULL OR `Attr`.`AttributeValue` = "");
+            ";
+
+            DataTable data = db.ExecuteCMD(sql, new Dictionary<string, object>());
+            foreach (DataRow row in data.Rows)
+            {
+                Logging.Log(Logging.LogType.Information, "Background Metadata Matcher", "Getting artwork for game " + (string)row["Name"]);
+                GetGameArtwork((long)row["Id"]);
+            }
+        }
+
         public void GetGameArtwork(long DataObjectId)
         {
             DataObjects dataObjects = new DataObjects();

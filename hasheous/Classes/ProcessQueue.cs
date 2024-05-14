@@ -5,8 +5,8 @@ using static Classes.Common;
 
 namespace Classes
 {
-	public static class ProcessQueue
-	{
+    public static class ProcessQueue
+    {
         public static List<QueueItem> QueueItems = new List<QueueItem>();
 
         public class QueueItem
@@ -66,7 +66,8 @@ namespace Classes
             private double _LastRunDuration = 0;
             public DateTime LastFinishTime => _LastFinishTime;
             public double LastRunDuration => _LastRunDuration;
-            public DateTime NextRunTime {
+            public DateTime NextRunTime
+            {
                 get
                 {
                     return LastRunTime.AddMinutes(Interval);
@@ -111,7 +112,7 @@ namespace Classes
                             {
                                 case QueueItemType.SignatureIngestor:
                                     XML.XMLIngestor tIngest = new XML.XMLIngestor();
-                                    
+
                                     foreach (int i in Enum.GetValues(typeof(gaseous_signature_parser.parser.SignatureParser)))
                                     {
                                         gaseous_signature_parser.parser.SignatureParser parserType = (gaseous_signature_parser.parser.SignatureParser)i;
@@ -120,7 +121,7 @@ namespace Classes
                                             parserType != gaseous_signature_parser.parser.SignatureParser.Unknown
                                         )
                                         {
-                                            
+
                                             string SignaturePath = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesDirectory, parserType.ToString());
                                             string SignatureProcessedPath = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesProcessedDirectory, parserType.ToString());
 
@@ -137,17 +138,17 @@ namespace Classes
                                             tIngest.Import(SignaturePath, SignatureProcessedPath, parserType);
                                         }
                                     }
-                                    
-                                    break;
 
-                                // case QueueItemType.SignatureMetadataMatcher:
-                                //     BackgroundMetadataMatcher.BackgroundMetadataMatcher backgroundMetadataMatcher = new BackgroundMetadataMatcher.BackgroundMetadataMatcher();
-                                //     backgroundMetadataMatcher.StartMatcher();
-                                //     break;
+                                    break;
 
                                 case QueueItemType.TallyVotes:
                                     Submissions submissions = new Submissions();
                                     submissions.TallyVotes();
+                                    break;
+
+                                case QueueItemType.GetMissingArtwork:
+                                    BackgroundMetadataMatcher.BackgroundMetadataMatcher tMatcher = new BackgroundMetadataMatcher.BackgroundMetadataMatcher();
+                                    tMatcher.GetGamesWithoutArtwork();
                                     break;
 
                             }
@@ -200,7 +201,12 @@ namespace Classes
             /// <summary>
             /// Tallys all votes in the database
             /// </summary>
-            TallyVotes
+            TallyVotes,
+
+            /// <summary>
+            /// Fetches missing artwork for game data objects
+            /// </summary>
+            GetMissingArtwork
         }
 
         public enum QueueItemState

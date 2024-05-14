@@ -351,6 +351,17 @@ ProcessQueue.QueueItems.Add(
         )
     );
 
+ProcessQueue.QueueItems.Add(
+    new ProcessQueue.QueueItem(
+        ProcessQueue.QueueItemType.GetMissingArtwork,
+        1440,
+        new List<ProcessQueue.QueueItemType>
+        {
+
+        }
+        )
+    );
+
 Logging.WriteToDiskOnly = false;
 
 // start the app
