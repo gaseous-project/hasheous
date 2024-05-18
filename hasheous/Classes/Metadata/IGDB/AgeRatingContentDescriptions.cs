@@ -98,7 +98,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
         private static async Task<AgeRatingContentDescription> GetObjectFromServer(string WhereClause)
         {
             // get AgeRatingContentDescriptionContentDescriptions metadata
-            Communications comms = new Communications();
+            Communications comms = new Communications(Communications.MetadataSources.IGDB);
             var results = await comms.APIComm<AgeRatingContentDescription>(IGDBClient.Endpoints.AgeRatingContentDescriptions, fieldList, WhereClause);
             var result = results.First();
 

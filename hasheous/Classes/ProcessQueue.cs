@@ -1,11 +1,12 @@
 ﻿using System;
 using Classes;
+using hasheous_server.Classes;
 using static Classes.Common;
 
 namespace Classes
 {
-	public static class ProcessQueue
-	{
+    public static class ProcessQueue
+    {
         public static List<QueueItem> QueueItems = new List<QueueItem>();
 
         public class QueueItem
@@ -65,7 +66,8 @@ namespace Classes
             private double _LastRunDuration = 0;
             public DateTime LastFinishTime => _LastFinishTime;
             public double LastRunDuration => _LastRunDuration;
-            public DateTime NextRunTime {
+            public DateTime NextRunTime
+            {
                 get
                 {
                     return LastRunTime.AddMinutes(Interval);
@@ -110,7 +112,7 @@ namespace Classes
                             {
                                 case QueueItemType.SignatureIngestor:
                                     XML.XMLIngestor tIngest = new XML.XMLIngestor();
-                                    
+
                                     foreach (int i in Enum.GetValues(typeof(gaseous_signature_parser.parser.SignatureParser)))
                                     {
                                         gaseous_signature_parser.parser.SignatureParser parserType = (gaseous_signature_parser.parser.SignatureParser)i;
@@ -119,22 +121,34 @@ namespace Classes
                                             parserType != gaseous_signature_parser.parser.SignatureParser.Unknown
                                         )
                                         {
+
                                             string SignaturePath = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesDirectory, parserType.ToString());
+                                            string SignatureProcessedPath = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesProcessedDirectory, parserType.ToString());
 
                                             if (!Directory.Exists(SignaturePath))
                                             {
                                                 Directory.CreateDirectory(SignaturePath);
                                             }
 
-                                            tIngest.Import(SignaturePath, parserType);
+                                            if (!Directory.Exists(SignatureProcessedPath))
+                                            {
+                                                Directory.CreateDirectory(SignatureProcessedPath);
+                                            }
+
+                                            tIngest.Import(SignaturePath, SignatureProcessedPath, parserType);
                                         }
                                     }
-                                    
+
                                     break;
 
-                                case QueueItemType.SignatureMetadataMatcher:
-                                    BackgroundMetadataMatcher.BackgroundMetadataMatcher backgroundMetadataMatcher = new BackgroundMetadataMatcher.BackgroundMetadataMatcher();
-                                    backgroundMetadataMatcher.StartMatcher();
+                                case QueueItemType.TallyVotes:
+                                    Submissions submissions = new Submissions();
+                                    submissions.TallyVotes();
+                                    break;
+
+                                case QueueItemType.GetMissingArtwork:
+                                    BackgroundMetadataMatcher.BackgroundMetadataMatcher tMatcher = new BackgroundMetadataMatcher.BackgroundMetadataMatcher();
+                                    tMatcher.GetGamesWithoutArtwork();
                                     break;
 
                             }
@@ -185,9 +199,14 @@ namespace Classes
             SignatureIngestor,
 
             /// <summary>
-            /// Matches metadata provided by signatures to supported metadata providers
+            /// Tallys all votes in the database
             /// </summary>
-            SignatureMetadataMatcher
+            TallyVotes,
+
+            /// <summary>
+            /// Fetches missing artwork for game data objects
+            /// </summary>
+            GetMissingArtwork
         }
 
         public enum QueueItemState

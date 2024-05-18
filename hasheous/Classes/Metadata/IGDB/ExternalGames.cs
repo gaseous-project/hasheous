@@ -102,7 +102,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
         private static async Task<ExternalGame?> GetObjectFromServer(string WhereClause)
         {
             // get ExternalGames metadata
-            Communications comms = new Communications();
+            Communications comms = new Communications(Communications.MetadataSources.IGDB);
             var results = await comms.APIComm<ExternalGame>(IGDBClient.Endpoints.ExternalGames, fieldList, WhereClause);
             if (results.Length > 0)
             {

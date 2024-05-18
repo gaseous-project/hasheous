@@ -4,15 +4,16 @@ using Classes;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Versioning;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.OpenApi.Models;
 using Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using System.Threading.RateLimiting;
-using hasheous_server.Classes.Metadata.IGDB;
 using static Classes.Common;
+using System.Net.Mail;
+using System.Net;
+using static Authentication.ApiKey;
 
 Logging.WriteToDiskOnly = true;
 Logging.Log(Logging.LogType.Information, "Startup", "Starting Hasheous Server " + Assembly.GetExecutingAssembly().GetName().Version);
@@ -44,12 +45,6 @@ Config.InitSettings();
 // write updated settings back to the config file
 Config.UpdateConfig();
 
-// set api metadata source from config
-Communications.MetadataSource = Config.MetadataConfiguration.Source;
-
-// update platform map
-JsonPlatformMap.ImportPlatformMap();
-
 // set up server
 var builder = WebApplication.CreateBuilder(args);
 
@@ -64,6 +59,20 @@ builder.Services.AddControllers().AddJsonOptions(x =>
 
     // set max depth
     x.JsonSerializerOptions.MaxDepth = 64;
+});
+builder.Services.AddMvc().AddNewtonsoftJson(x =>
+{
+    // serialize enums as string in api responses
+    x.SerializerSettings.Converters.Add(new Newtonsoft.Json.Converters.StringEnumConverter());
+
+    // suppress nulls
+    x.SerializerSettings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
+
+    // set max depth
+    x.SerializerSettings.MaxDepth = 64;
+
+    // indent all responses
+    x.SerializerSettings.Formatting = Newtonsoft.Json.Formatting.Indented;
 });
 builder.Services.AddResponseCaching();
 builder.Services.AddControllers(options =>
@@ -85,7 +94,23 @@ builder.Services.AddControllers(options =>
             Duration = 604800,
             Location = ResponseCacheLocation.Any
         });
+    options.CacheProfiles.Add("MaxDays",
+    new CacheProfile()
+    {
+        Duration = int.MaxValue,
+        Location = ResponseCacheLocation.Any
+    });
 });
+
+// email configuration
+var smtpClient = new SmtpClient(Config.EmailSMTPConfiguration.Host)
+{
+    Port = Config.EmailSMTPConfiguration.Port,
+    Credentials = new NetworkCredential(Config.EmailSMTPConfiguration.UserName, Config.EmailSMTPConfiguration.Password),
+    EnableSsl = Config.EmailSMTPConfiguration.EnableSSL,
+};
+builder.Services.AddSingleton(smtpClient);
+builder.Services.AddTransient<IEmailSender, SmtpEmailSender>();
 
 // rate limiting
 builder.Services.AddRateLimiter(options =>
@@ -173,7 +198,7 @@ builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
         {
             options.Password.RequireDigit = true;
             options.Password.RequireLowercase = true;
-            options.Password.RequireNonAlphanumeric = false;
+            options.Password.RequireNonAlphanumeric = true;
             options.Password.RequireUppercase = true;
             options.Password.RequiredLength = 10;
             options.User.AllowedUserNameCharacters = null;
@@ -205,8 +230,13 @@ builder.Services.AddTransient<IRoleStore<ApplicationRole>, RoleStore>();
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("Admin", policy => policy.RequireRole("Admin"));
+    options.AddPolicy("Moderator", policy => policy.RequireRole("Moderator"));
     options.AddPolicy("Member", policy => policy.RequireRole("Member"));
 });
+
+// setup api key
+builder.Services.AddSingleton<ApiKeyAuthorizationFilter>();
+builder.Services.AddSingleton<IApiKeyValidator, ApiKeyValidator>();
 
 var app = builder.Build();
 
@@ -229,8 +259,8 @@ app.UseResponseCaching();
 using (var scope = app.Services.CreateScope())
 {
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleStore>();
-    var roles = new[] { "Admin", "Member" };
- 
+    var roles = new[] { "Admin", "Moderator", "Member" };
+
     foreach (var role in roles)
     {
         if (await roleManager.FindByNameAsync(role, CancellationToken.None) == null)
@@ -242,26 +272,27 @@ using (var scope = app.Services.CreateScope())
         }
     }
 
-    // set up administrator account
-    var userManager = scope.ServiceProvider.GetRequiredService<UserStore>();
-    if (await userManager.FindByNameAsync("admin@localhost", CancellationToken.None) == null)
-    {
-        ApplicationUser adminUser = new ApplicationUser{
-            Id = Guid.NewGuid().ToString(),
-            Email = "admin@localhost",
-            NormalizedEmail = "ADMIN@LOCALHOST",
-            EmailConfirmed = true,
-            UserName = "administrator",
-            NormalizedUserName = "ADMINISTRATOR"
-        };
+    // // set up administrator account
+    // var userManager = scope.ServiceProvider.GetRequiredService<UserStore>();
+    // if (await userManager.FindByNameAsync("admin@localhost", CancellationToken.None) == null)
+    // {
+    //     ApplicationUser adminUser = new ApplicationUser{
+    //         Id = Guid.NewGuid().ToString(),
+    //         Email = "admin@localhost",
+    //         NormalizedEmail = "ADMIN@LOCALHOST",
+    //         EmailConfirmed = true,
+    //         UserName = "administrator",
+    //         NormalizedUserName = "ADMINISTRATOR"
+    //     };
 
-        //set user password
-        PasswordHasher<ApplicationUser> ph = new PasswordHasher<ApplicationUser>();
-        adminUser.PasswordHash = ph.HashPassword(adminUser, "letmein");
+    //     //set user password
+    //     PasswordHasher<ApplicationUser> ph = new PasswordHasher<ApplicationUser>();
+    //     adminUser.PasswordHash = ph.HashPassword(adminUser, "letmein");
 
-        await userManager.CreateAsync(adminUser, CancellationToken.None);
-        await userManager.AddToRoleAsync(adminUser, "Admin", CancellationToken.None);
-    }
+    //     await userManager.CreateAsync(adminUser, CancellationToken.None);
+    //     await userManager.AddToRoleAsync(adminUser, "Admin", CancellationToken.None);
+    //     await userManager.AddToRoleAsync(adminUser, "Moderator", CancellationToken.None);
+    // }
 }
 
 app.UseAuthorization();
@@ -281,11 +312,11 @@ app.Use(async (context, next) =>
     string correlationId = Guid.NewGuid().ToString();
     CallContext.SetData("CorrelationId", correlationId);
     CallContext.SetData("CallingProcess", context.Request.Method + ": " + context.Request.Path);
-    
+
     string userIdentity;
     try
     {
-        userIdentity = context.User.Claims.Where(x=>x.Type==System.Security.Claims.ClaimTypes.NameIdentifier).FirstOrDefault().Value;
+        userIdentity = context.User.Claims.Where(x => x.Type == System.Security.Claims.ClaimTypes.NameIdentifier).FirstOrDefault().Value;
     }
     catch
     {
@@ -300,21 +331,33 @@ app.Use(async (context, next) =>
 // add background tasks
 ProcessQueue.QueueItems.Add(
     new ProcessQueue.QueueItem(
-        ProcessQueue.QueueItemType.SignatureIngestor, 
+        ProcessQueue.QueueItemType.SignatureIngestor,
         60,
         new List<ProcessQueue.QueueItemType>
         {
-            ProcessQueue.QueueItemType.SignatureMetadataMatcher
+
         }
         )
     );
+
 ProcessQueue.QueueItems.Add(
     new ProcessQueue.QueueItem(
-        ProcessQueue.QueueItemType.SignatureMetadataMatcher, 
-        60,
+        ProcessQueue.QueueItemType.TallyVotes,
+        1440,
         new List<ProcessQueue.QueueItemType>
         {
-            ProcessQueue.QueueItemType.SignatureIngestor
+
+        }
+        )
+    );
+
+ProcessQueue.QueueItems.Add(
+    new ProcessQueue.QueueItem(
+        ProcessQueue.QueueItemType.GetMissingArtwork,
+        1440,
+        new List<ProcessQueue.QueueItemType>
+        {
+
         }
         )
     );

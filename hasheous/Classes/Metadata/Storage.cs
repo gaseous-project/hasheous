@@ -88,85 +88,88 @@ namespace Classes.Metadata
 		public static void NewCacheValue(TablePrefix prefix, object ObjectToCache, bool UpdateRecord = false)
 		{
 			// get the object type name
-			string ObjectTypeName = ObjectToCache.GetType().Name;
+            if (ObjectToCache != null)
+            {
+                string ObjectTypeName = ObjectToCache.GetType().Name;
 
-			// build dictionary
-			string objectJson = Newtonsoft.Json.JsonConvert.SerializeObject(ObjectToCache);
-			Dictionary<string, object?> objectDict = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object?>>(objectJson);
-            objectDict.Add("dateAdded", DateTime.UtcNow);
-            objectDict.Add("lastUpdated", DateTime.UtcNow);
+                // build dictionary
+                string objectJson = Newtonsoft.Json.JsonConvert.SerializeObject(ObjectToCache);
+                Dictionary<string, object?> objectDict = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object?>>(objectJson);
+                objectDict.Add("dateAdded", DateTime.UtcNow);
+                objectDict.Add("lastUpdated", DateTime.UtcNow);
 
-			// generate sql
-			string fieldList = "";
-			string valueList = "";
-			string updateFieldValueList = "";
-			foreach (KeyValuePair<string, object?> key in objectDict)
-			{
-				if (fieldList.Length > 0)
-				{
-					fieldList = fieldList + ", ";
-					valueList = valueList + ", ";
-				}
-				fieldList = fieldList + key.Key;
-				valueList = valueList + "@" + key.Key;
-				if ((key.Key != "id") && (key.Key != "dateAdded"))
+                // generate sql
+                string fieldList = "";
+                string valueList = "";
+                string updateFieldValueList = "";
+                foreach (KeyValuePair<string, object?> key in objectDict)
                 {
-                    if (updateFieldValueList.Length > 0)
+                    if (fieldList.Length > 0)
                     {
-                        updateFieldValueList = updateFieldValueList + ", ";
+                        fieldList = fieldList + ", ";
+                        valueList = valueList + ", ";
                     }
-                    updateFieldValueList += key.Key + " = @" + key.Key;
-				}
+                    fieldList = fieldList + key.Key;
+                    valueList = valueList + "@" + key.Key;
+                    if ((key.Key != "id") && (key.Key != "dateAdded"))
+                    {
+                        if (updateFieldValueList.Length > 0)
+                        {
+                            updateFieldValueList = updateFieldValueList + ", ";
+                        }
+                        updateFieldValueList += key.Key + " = @" + key.Key;
+                    }
 
-				// check property type
-				Type objectType = ObjectToCache.GetType();
-				if (objectType != null)
-				{
-					PropertyInfo objectProperty = objectType.GetProperty(key.Key);
-					if (objectProperty != null)
-					{
-						string compareName = objectProperty.PropertyType.Name.ToLower().Split("`")[0];
-						var objectValue = objectProperty.GetValue(ObjectToCache);
-						if (objectValue != null)
-						{
-							string newObjectValue;
-							Dictionary<string, object> newDict;
-                            switch (compareName)
-							{
-								case "identityorvalue":
-                                    newObjectValue = Newtonsoft.Json.JsonConvert.SerializeObject(objectValue);
-									newDict = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(newObjectValue);
-                                    objectDict[key.Key] = newDict["Id"];
-                                    break;
-                                case "identitiesorvalues":
-                                    newObjectValue = Newtonsoft.Json.JsonConvert.SerializeObject(objectValue);
-                                    newDict = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(newObjectValue);
-									newObjectValue = Newtonsoft.Json.JsonConvert.SerializeObject(newDict["Ids"]);
-                                    objectDict[key.Key] = newObjectValue;
-                                    break;
-								case "int32[]":
-                                    newObjectValue = Newtonsoft.Json.JsonConvert.SerializeObject(objectValue);
-                                    objectDict[key.Key] = newObjectValue;
-                                    break;
+                    // check property type
+                    Type objectType = ObjectToCache.GetType();
+                    if (objectType != null)
+                    {
+                        PropertyInfo objectProperty = objectType.GetProperty(key.Key);
+                        if (objectProperty != null)
+                        {
+                            string compareName = objectProperty.PropertyType.Name.ToLower().Split("`")[0];
+                            var objectValue = objectProperty.GetValue(ObjectToCache);
+                            if (objectValue != null)
+                            {
+                                string newObjectValue;
+                                Dictionary<string, object> newDict;
+                                switch (compareName)
+                                {
+                                    case "identityorvalue":
+                                        newObjectValue = Newtonsoft.Json.JsonConvert.SerializeObject(objectValue);
+                                        newDict = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(newObjectValue);
+                                        objectDict[key.Key] = newDict["Id"];
+                                        break;
+                                    case "identitiesorvalues":
+                                        newObjectValue = Newtonsoft.Json.JsonConvert.SerializeObject(objectValue);
+                                        newDict = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(newObjectValue);
+                                        newObjectValue = Newtonsoft.Json.JsonConvert.SerializeObject(newDict["Ids"]);
+                                        objectDict[key.Key] = newObjectValue;
+                                        break;
+                                    case "int32[]":
+                                        newObjectValue = Newtonsoft.Json.JsonConvert.SerializeObject(objectValue);
+                                        objectDict[key.Key] = newObjectValue;
+                                        break;
+                                }
                             }
-						}
-					}
-				}
-			}
+                        }
+                    }
+                }
 
-			string sql = "";
-			if (UpdateRecord == false)
-			{
-				sql = "INSERT INTO " + GetTableName(prefix, ObjectTypeName) + " (" + fieldList + ") VALUES (" + valueList + ")";
+                string sql = "";
+                if (UpdateRecord == false)
+                {
+                    sql = "INSERT INTO " + GetTableName(prefix, ObjectTypeName) + " (" + fieldList + ") VALUES (" + valueList + ")";
+                }
+                else
+                {
+                    sql = "UPDATE " + GetTableName(prefix, ObjectTypeName) + " SET " + updateFieldValueList + " WHERE Id = @Id";
+                }
+
+                // execute sql
+                Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+                db.ExecuteCMD(sql, objectDict);
             }
-			else
-			{
-				sql = "UPDATE " + GetTableName(prefix, ObjectTypeName) + " SET " + updateFieldValueList + " WHERE Id = @Id";
-			}
-
-            // execute sql
-            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-			db.ExecuteCMD(sql, objectDict);
         }
 
 		public static T GetCacheValue<T>(T EndpointType, TablePrefix prefix, string SearchField, object SearchValue)

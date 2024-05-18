@@ -71,13 +71,16 @@ namespace hasheous_server.Classes.Metadata.IGDB
 
             // set up where clause
             string WhereClause = "";
+            string searchField = "";
             switch (searchUsing)
             {
                 case SearchUsing.id:
                     WhereClause = "where id = " + searchValue;
+                    searchField = "id";
                     break;
                 case SearchUsing.slug:
-                    WhereClause = "where slug = " + searchValue;
+                    WhereClause = "where slug = \"" + searchValue + "\"";
+                    searchField = "slug";
                     break;
                 default:
                     throw new Exception("Invalid search type");
@@ -95,17 +98,20 @@ namespace hasheous_server.Classes.Metadata.IGDB
                     try
                     {
                         returnValue = await GetObjectFromServer(WhereClause);
-                        Storage.NewCacheValue(Storage.TablePrefix.IGDB, returnValue, true);
-                        UpdateSubClasses(returnValue);
+                        if (returnValue != null)
+                        {
+                            Storage.NewCacheValue(Storage.TablePrefix.IGDB, returnValue, true);
+                            UpdateSubClasses(returnValue);
+                        }
                         return returnValue;
                     }
                     catch (Exception ex)
                     {
                         Console.Error.WriteLine("Metadata: " + returnValue.GetType().Name + ": An error occurred while connecting to IGDB. WhereClause: " + WhereClause + ex.ToString());
-                        return Storage.GetCacheValue<Platform>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
+                        return Storage.GetCacheValue<Platform>(returnValue, Storage.TablePrefix.IGDB, searchField, searchValue);
                     }
                 case Storage.CacheStatus.Current:
-                    return Storage.GetCacheValue<Platform>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
+                    return Storage.GetCacheValue<Platform>(returnValue, Storage.TablePrefix.IGDB, searchField, searchValue);
                 default:
                     throw new Exception("How did you get here?");
             }
@@ -136,11 +142,17 @@ namespace hasheous_server.Classes.Metadata.IGDB
         private static async Task<Platform> GetObjectFromServer(string WhereClause)
         {
             // get platform metadata
-            Communications comms = new Communications();
+            Communications comms = new Communications(Communications.MetadataSources.IGDB);
             var results = await comms.APIComm<Platform>(IGDBClient.Endpoints.Platforms, fieldList, WhereClause);
-            var result = results.First();
-
-            return result;
+            if (results != null)
+            {
+                var result = results.First();
+                return result;
+            }
+            else
+            {
+                return null;
+            }
         }
     }
 }

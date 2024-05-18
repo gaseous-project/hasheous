@@ -1,0 +1,115 @@
+<div id="editbanner">
+    <div id="editbannerbuttons">
+        <button id="dataObjectSave"><span data-lang="save"></span> <img src="/images/save.svg"
+                class="buttonicon" /></button>
+        <button id="dataObjectCancel"><span data-lang="cancel"></span> <img src="/images/delete.svg"
+                class="buttonicon" /></button>
+    </div>
+    <span id="editbannerlabel" data-lang="inEditMode"></span>
+</div>
+
+<h2 data-lang="name"></h2>
+<input type="text" id="dataObject_object_name" onkeyup="GetSuggestedSignatures();"></h1>
+
+<h2 data-lang="attributes"></h2>
+<div id="dataObjectAttributes" class="table_container">
+    <table>
+        <tr>
+            <th class="tableheadcell" data-lang="attribute"></th>
+            <th class="tableheadcell" data-lang="value"></th>
+        </tr>
+        <tr id="attributedescription">
+            <td class="tablecell" data-lang="description"></td>
+            <td class="tablecell">
+                <textarea id="attributedescriptioninput"></textarea>
+            </td>
+        </tr>
+        <tr id="attributelogo" style="display: none;">
+            <td class="tablecell" data-lang="uploadlogo"></td>
+            <td class="tablecell">
+                <table>
+                    <tr>
+                        <td style="width: 10px;"><input type="radio" id="attributelogoselectnone" name="logo" value="0"
+                                checked="checked">
+                        </td>
+                        <td data-lang="none"></td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td><input type="radio" id="attributelogoselectnew" name="logo" value="1"></td>
+                        <td>
+                            <input type="file" id="attributelogofile" name="image"
+                                accept=".jpg, .jpeg, .png, .gif, .bmp, .svg" />
+                            <input type="text" id="attributelogonewref" style="display: none;" />
+                        </td>
+                        <td><span id="attributelogouploadlabel"></span></td>
+                    </tr>
+                    <tr>
+                        <td><input type="radio" id="attributelogoselectexisting" name="logo" value="2"></td>
+                        <td data-lang="useexisting"></td>
+                        <td></td>
+                    </tr>
+                </table>
+
+                <input type="text" id="attributelogoref" style="display: none;" />
+            </td>
+        </tr>
+        <tr id="attributepublisher" style="display: none;">
+            <td class="tablecell" data-lang="publisher"></td>
+            <td class="tablecell">
+                <select id="attributepublisherselect" class="attributeeditselect">
+                    <option value=""> </option>
+                </select>
+            </td>
+        </tr>
+        <tr id="attributemanufacturer" style="display: none;">
+            <td class="tablecell" data-lang="manufacturer"></td>
+            <td class="tablecell">
+                <select id="attributemanufacturerselect" class="attributeeditselect">
+                    <option value=""> </option>
+                </select>
+            </td>
+        </tr>
+        <tr id="attributeplatform" style="display: none;">
+            <td class="tablecell" data-lang="platform"></td>
+            <td class="tablecell">
+                <select id="attributeplatformselect" class="attributeeditselect">
+                    <option value=""> </option>
+                </select>
+            </td>
+        </tr>
+        <tr id="attributevimmmanualid" style="display: none;">
+            <td class="tablecell" data-lang="vimmmid"></td>
+            <td class="tablecell">
+                <input id="attributevimmmanualidinput" type="text" class="inputwide">
+            </td>
+        </tr>
+
+    </table>
+</div>
+
+<h2 data-lang="metadatamap"></h2>
+<div id="dataObjectMetadataMap" class="table_container">
+    <table>
+        <tr>
+            <th class="tableheadcell" data-lang="source"></th>
+            <th class="tableheadcell" data-lang="mapping"></th>
+        </tr>
+        <tr>
+            <td class="tablecell" data-lang="igdb"></td>
+            <td class="tablecell"><input id="metadatamapigdb" type="text" class="attributeeditselect"></td>
+        </tr>
+    </table>
+</div>
+
+<h2 data-lang="signatures"></h2>
+<div id="dataObjectSignatures">
+    <select id="signaturesselect" multiple="multiple" class="attributeeditselect">
+
+    </select>
+</div>
+
+<h3 data-lang="suggestedsignatures"></h3>
+<div id="dataObjectSuggestedSignatures">
+
+</div>

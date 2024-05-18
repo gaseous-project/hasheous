@@ -13,8 +13,9 @@ namespace hasheous_server.Controllers.v1_0
     /// </summary>
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]")]
+    [ApiExplorerSettings(IgnoreApi = true)]
     [ApiVersion("1.0")]
-    //[Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin")]
     public class LogsController : Controller
     {
         /// <summary>

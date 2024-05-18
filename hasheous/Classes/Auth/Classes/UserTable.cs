@@ -89,15 +89,15 @@ namespace Authentication
                 user.SecurityStamp = (string?)(string.IsNullOrEmpty((string?)row["SecurityStamp"]) ? null : row["SecurityStamp"]);
                 user.ConcurrencyStamp = (string?)(string.IsNullOrEmpty((string?)row["ConcurrencyStamp"]) ? null : row["ConcurrencyStamp"]);
                 user.Email = (string?)(string.IsNullOrEmpty((string?)row["Email"]) ? null : row["Email"]);
-                user.EmailConfirmed = row["EmailConfirmed"] == "1" ? true:false;
+                user.EmailConfirmed = bool.Parse(row["EmailConfirmed"].ToString());
                 user.PhoneNumber = (string?)(string.IsNullOrEmpty((string?)row["PhoneNumber"]) ? null : row["PhoneNumber"]);
-                user.PhoneNumberConfirmed = row["PhoneNumberConfirmed"] == "1" ? true : false;
+                user.PhoneNumberConfirmed = bool.Parse(row["PhoneNumberConfirmed"].ToString());
                 user.NormalizedEmail = (string?)(string.IsNullOrEmpty((string?)row["NormalizedEmail"]) ? null : row["NormalizedEmail"]);
                 user.NormalizedUserName = (string?)(string.IsNullOrEmpty((string?)row["NormalizedUserName"]) ? null : row["NormalizedUserName"]);
-                user.LockoutEnabled = row["LockoutEnabled"] == "1" ? true : false;
+                user.LockoutEnabled = bool.Parse(row["LockoutEnabled"].ToString());
                 user.LockoutEnd = string.IsNullOrEmpty((string?)row["LockoutEnd"]) ? DateTime.Now : DateTime.Parse((string?)row["LockoutEnd"]);
                 user.AccessFailedCount = string.IsNullOrEmpty((string?)row["AccessFailedCount"]) ? 0 : int.Parse((string?)row["AccessFailedCount"]);
-                user.TwoFactorEnabled = row["TwoFactorEnabled"] == "1" ? true:false;
+                user.TwoFactorEnabled = bool.Parse(row["TwoFactorEnabled"].ToString());
                 user.SecurityProfile = GetSecurityProfile(user);
             }
 
@@ -125,15 +125,15 @@ namespace Authentication
                 user.SecurityStamp = (string?)(string.IsNullOrEmpty((string?)row["SecurityStamp"]) ? null : row["SecurityStamp"]);
                 user.ConcurrencyStamp = (string?)(string.IsNullOrEmpty((string?)row["ConcurrencyStamp"]) ? null : row["ConcurrencyStamp"]);
                 user.Email = (string?)(string.IsNullOrEmpty((string?)row["Email"]) ? null : row["Email"]);
-                user.EmailConfirmed = row["EmailConfirmed"] == "1" ? true:false;
+                user.EmailConfirmed = bool.Parse(row["EmailConfirmed"].ToString());
                 user.PhoneNumber = (string?)(string.IsNullOrEmpty((string?)row["PhoneNumber"]) ? null : row["PhoneNumber"]);
-                user.PhoneNumberConfirmed = row["PhoneNumberConfirmed"] == "1" ? true : false;
+                user.PhoneNumberConfirmed = bool.Parse(row["PhoneNumberConfirmed"].ToString());
                 user.NormalizedEmail = (string?)(string.IsNullOrEmpty((string?)row["NormalizedEmail"]) ? null : row["NormalizedEmail"]);
                 user.NormalizedUserName = (string?)(string.IsNullOrEmpty((string?)row["NormalizedUserName"]) ? null : row["NormalizedUserName"]);
-                user.LockoutEnabled = row["LockoutEnabled"] == "1" ? true : false;
+                user.LockoutEnabled = bool.Parse(row["LockoutEnabled"].ToString());
                 user.LockoutEnd = string.IsNullOrEmpty((string?)row["LockoutEnd"]) ? DateTime.Now : DateTime.Parse((string?)row["LockoutEnd"]);
                 user.AccessFailedCount = string.IsNullOrEmpty((string?)row["AccessFailedCount"]) ? 0 : int.Parse((string?)row["AccessFailedCount"]);
-                user.TwoFactorEnabled = row["TwoFactorEnabled"] == "1" ? true:false;
+                user.TwoFactorEnabled = bool.Parse(row["TwoFactorEnabled"].ToString());
                 user.SecurityProfile = GetSecurityProfile(user);
                 users.Add(user);
             }
@@ -156,15 +156,15 @@ namespace Authentication
                 user.SecurityStamp = (string?)(string.IsNullOrEmpty((string?)row["SecurityStamp"]) ? null : row["SecurityStamp"]);
                 user.ConcurrencyStamp = (string?)(string.IsNullOrEmpty((string?)row["ConcurrencyStamp"]) ? null : row["ConcurrencyStamp"]);
                 user.Email = (string?)(string.IsNullOrEmpty((string?)row["Email"]) ? null : row["Email"]);
-                user.EmailConfirmed = row["EmailConfirmed"] == "1" ? true:false;
+                user.EmailConfirmed = bool.Parse(row["EmailConfirmed"].ToString());
                 user.PhoneNumber = (string?)(string.IsNullOrEmpty((string?)row["PhoneNumber"]) ? null : row["PhoneNumber"]);
-                user.PhoneNumberConfirmed = row["PhoneNumberConfirmed"] == "1" ? true : false;
+                user.PhoneNumberConfirmed = bool.Parse(row["PhoneNumberConfirmed"].ToString());
                 user.NormalizedEmail = (string?)(string.IsNullOrEmpty((string?)row["NormalizedEmail"]) ? null : row["NormalizedEmail"]);
                 user.NormalizedUserName = (string?)(string.IsNullOrEmpty((string?)row["NormalizedUserName"]) ? null : row["NormalizedUserName"]);
-                user.LockoutEnabled = row["LockoutEnabled"] == "1" ? true : false;
+                user.LockoutEnabled = bool.Parse(row["LockoutEnabled"].ToString());
                 user.LockoutEnd = string.IsNullOrEmpty((string?)row["LockoutEnd"]) ? DateTime.Now : DateTime.Parse((string?)row["LockoutEnd"]);
                 user.AccessFailedCount = string.IsNullOrEmpty((string?)row["AccessFailedCount"]) ? 0 : int.Parse((string?)row["AccessFailedCount"]);
-                user.TwoFactorEnabled = row["TwoFactorEnabled"] == "1" ? true:false;
+                user.TwoFactorEnabled = bool.Parse(row["TwoFactorEnabled"].ToString());
                 user.SecurityProfile = GetSecurityProfile(user);
                 users.Add(user);
             }

@@ -71,7 +71,8 @@ namespace Classes
             get
             {
                 string logPath = Path.Combine(ConfigurationPath, "Logs");
-                if (!Directory.Exists(logPath)) {
+                if (!Directory.Exists(logPath))
+                {
                     Directory.CreateDirectory(logPath);
                 }
                 return logPath;
@@ -83,7 +84,7 @@ namespace Classes
             get
             {
                 string logFileExtension = "txt";
-                
+
                 string logPathName = Path.Combine(LogPath, "Server Log " + DateTime.Now.ToUniversalTime().ToString("yyyyMMdd") + "." + logFileExtension);
                 return logPathName;
             }
@@ -94,6 +95,14 @@ namespace Classes
             get
             {
                 return _config.LoggingConfiguration;
+            }
+        }
+
+        public static ConfigFile.EmailSMTP EmailSMTPConfiguration
+        {
+            get
+            {
+                return _config.EmailSMTPConfiguration;
             }
         }
 
@@ -109,11 +118,13 @@ namespace Classes
                     if (_tempConfig != null)
                     {
                         _config = _tempConfig;
-                    } else
+                    }
+                    else
                     {
                         throw new Exception("There was an error reading the config file: Json returned null");
                     }
-                } else
+                }
+                else
                 {
                     // no config file!
                     // use defaults and save
@@ -250,9 +261,12 @@ namespace Classes
 
             public Logging LoggingConfiguration = new Logging();
 
+            public EmailSMTP EmailSMTPConfiguration = new EmailSMTP();
+
             public class Database
             {
-                private static string _DefaultHostName {
+                private static string _DefaultHostName
+                {
                     get
                     {
                         if (!String.IsNullOrEmpty(Environment.GetEnvironmentVariable("dbhost")))
@@ -369,6 +383,14 @@ namespace Classes
                     }
                 }
 
+                public string LibrarySignaturesProcessedDirectory
+                {
+                    get
+                    {
+                        return Path.Combine(LibraryRootDirectory, "Signatures - Processed");
+                    }
+                }
+
                 public string LibraryTempDirectory
                 {
                     get
@@ -427,7 +449,7 @@ namespace Classes
 
                 public Communications.MetadataSources Source = _Source;
             }
-            
+
             public class IGDB
             {
                 private static string _DefaultIGDBClientId
@@ -472,6 +494,16 @@ namespace Classes
                 public int LogRetention = 7;
 
                 public bool AlwaysLogToDisk = false;
+            }
+
+            public class EmailSMTP
+            {
+                public string Host = "";
+                public int Port = 587;
+                public bool EnableSSL = true;
+                public string UserName = "";
+                public string Password = "";
+                public string SendAs = "";
             }
         }
     }

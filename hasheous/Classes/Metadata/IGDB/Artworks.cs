@@ -108,7 +108,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
         private static async Task<Artwork> GetObjectFromServer(string WhereClause, string LogoPath)
         {
             // get Artwork metadata
-            Communications comms = new Communications();
+            Communications comms = new Communications(Communications.MetadataSources.IGDB);
             var results = await comms.APIComm<Artwork>(IGDBClient.Endpoints.Artworks, fieldList, WhereClause);
             var result = results.First();
 

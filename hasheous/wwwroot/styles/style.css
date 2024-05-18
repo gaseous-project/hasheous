@@ -1,0 +1,570 @@
+:root {
+    --page-background: #ffffff;
+    --link-color: rgb(0, 0, 120);
+    --link-color-highlight: rgb(0, 0, 230);
+    --element-background-color: rgba(240, 240, 240);
+    --element-background-color-translucent: rgba(240, 240, 240, 0.5);
+    --element-border-color: rgb(190, 190, 190);
+    --element-border-radius: 5px;
+    --element-highlight: #ddd;
+    --element-alert-background-color: rgb(252, 255, 235);
+    --element-alert-border-color: rgb(132, 92, 0);
+    --element-alert-text-color: rgb(0, 0, 0);
+    --field-background-color: rgb(255, 255, 255);
+    --field-text-color: rgb(0, 0, 0);
+    --field-border-color: rgb(190, 190, 190);
+    --field-border-color-highlight: rgb(190, 190, 255);
+    --button-color: #555;
+    --button-text-color: #ffffff;
+    --button-color-hover: #888;
+    --button-color-disabled: #555;
+    --button-text-color-disabled: #888;
+    --redbutton-color: darkred;
+    --redbutton-text-color: #ffffff;
+    --redbutton-color-hover: red;
+    --max-page-width: 1122px;
+    --banner-height: 40px;
+    --valid-color: #00b50c;
+    --invalid-color: #b21a1a;
+}
+
+@font-face {
+    font-family: Commodore64;
+    src: url('/fonts/Commodore Pixelized v1.2.ttf');
+}
+
+body {
+    font-family: "PT Sans", Arial, Helvetica, sans-serif;
+    font-kerning: normal;
+    font-style: normal;
+    font-weight: 100;
+    font-size: 13px;
+    background-color: var(--page-background);
+}
+
+h1 {
+    margin-top: unset;
+    position: relative;
+    display: block;
+    width: 100%;
+}
+
+a {
+    color: var(--link-color);
+    text-decoration: none;
+}
+
+a:hover {
+    color: var(--link-color-highlight);
+    text-decoration: underline;
+}
+
+input[type='text'],
+input[type='number'],
+input[type="email"],
+input[type="password"],
+input[type="datetime-local"],
+textarea {
+    background-color: var(--field-background-color);
+    color: var(--field-text-color);
+    padding: 4px;
+    font-family: "PT Sans", Arial, Helvetica, sans-serif;
+    font-kerning: normal;
+    font-style: normal;
+    font-weight: 100;
+    font-size: 13px;
+    border-radius: 5px;
+    border-width: 1px;
+    border-style: solid;
+    border-color: var(--field-border-color);
+    height: 21px;
+}
+
+input[type='text']:hover,
+input[type='number']:hover,
+input[type="email"]:hover,
+input[type="password"]:hover,
+input[type="datetime-local"]:hover,
+textarea:hover {
+    border-color: var(--field-border-color-highlight);
+}
+
+input[type='text']:focus,
+input[type='number']:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="datetime-local"]:focus,
+textarea:focus {
+    outline: none;
+}
+
+input[type='button'],
+button {
+    background-color: var(--button-color);
+    color: var(--button-text-color);
+    border-width: 1px;
+    border-color: var(--button-color);
+    border-style: solid;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    padding-left: 15px;
+    padding-right: 15px;
+    margin-right: 3px;
+    margin-bottom: 3px;
+    font-size: 13px;
+    height: 30px;
+}
+
+input[type='button']:hover,
+button:hover {
+    background-color: var(--button-color-hover);
+    cursor: pointer;
+}
+
+input[type='button']:disabled,
+button:disabled {
+    background-color: var(--button-color-disabled);
+    color: var(--button-text-color-disabled);
+    cursor: not-allowed;
+}
+
+.inputwide {
+    width: 95%;
+}
+
+.bigbutton {
+    background-color: var(--button-color);
+    color: var(--button-text-color);
+    border-width: 1px;
+    border-color: var(--button-color);
+    border-style: solid;
+    margin-top: 10px;
+    width: 100%;
+    height: 42px;
+    font-size: 16px;
+    border-radius: 10px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+}
+
+.redbutton {
+    background-color: var(--redbutton-color);
+    border-color: var(--redbutton-color);
+    color: var(--redbutton-text-color);
+}
+
+.redbutton:hover {
+    background-color: var(--redbutton-color-hover);
+}
+
+.redbutton:disabled {
+    background-color: var(--button-color-disabled);
+}
+
+#banner_header {
+    background-color: var(--element-background-color-translucent);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    position: fixed;
+    top: 0px;
+    left: 0px;
+    height: var(--banner-height);
+    right: 0px;
+    align-items: center;
+    z-index: 49;
+    border-bottom-color: var(--element-border-color);
+    border-bottom-width: 1px;
+    border-bottom-style: solid;
+}
+
+#banner_icon {
+    position: fixed;
+    top: 0px;
+    left: 0px;
+    width: 40px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    padding: 0px;
+    margin: 0px;
+    display: flex;
+    z-index: 50;
+}
+
+#banner_header_label,
+.header_label {
+    font-family: Commodore64;
+    display: inline-block;
+    font-size: 16pt;
+    color: rgba(0, 22, 56, 1);
+}
+
+#banner_header_label {
+    padding: 8px;
+    margin-left: 35px;
+    vertical-align: top;
+    cursor: pointer;
+}
+
+#banner_icon_image {
+    width: 40px;
+    height: 40px;
+}
+
+.banner_button_image {
+    height: 20px;
+    width: 20px;
+    margin-right: 5px;
+    /* filter: invert(100%); */
+}
+
+.banner_button {
+    background-color: transparent;
+    float: right;
+    top: 0px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-top: 0px;
+    padding-bottom: 0px;
+    margin: 0px 0px 0px 0px;
+    display: flex;
+    /* color: white; */
+    color: rgba(0, 22, 56, 1);
+    /* border-left-color: rgb(190, 190, 190);
+    border-left-width: 1px;
+    border-left-style: solid; */
+}
+
+.banner_button:hover {
+    cursor: pointer;
+    background-color: var(--element-highlight);
+    /* color: white; */
+}
+
+.banner_button_nohover:hover {
+    background-color: transparent;
+}
+
+#banner_search_field {
+    width: 250px;
+}
+
+/* The container <div> - needed to position the dropdown content */
+.dropdown {
+    position: relative;
+    display: inline-block;
+    float: right;
+}
+
+/* Dropdown Content (Hidden by Default) */
+.dropdown-content {
+    display: none;
+    position: absolute;
+    background-color: var(--element-background-color);
+    border-color: var(--element-border-color);
+    border-width: 1px;
+    border-style: solid;
+    min-width: 160px;
+    /* box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); */
+    z-index: -1;
+    right: 0;
+    top: 40px;
+    filter: drop-shadow(5px 5px 5px rgba(0, 0, 0, 0.3));
+    -webkit-filter: drop-shadow(5px 5px 5px rgba(0, 0, 0, 0.3));
+}
+
+/* Links inside the dropdown */
+.dropdown-content a,
+.dropdown-content span {
+    color: black;
+    padding: 12px 16px;
+    text-decoration: none;
+    display: block;
+}
+
+.dropdown-content span {
+    cursor: auto;
+}
+
+/* Change color of dropdown links on hover */
+.dropdown-content a:hover {
+    background-color: var(--element-highlight);
+}
+
+/* Show the dropdown menu (use JS to add this class to the .dropdown-content container when the user clicks on the dropdown button) */
+.show {
+    display: block;
+}
+
+#pagecontainer {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    padding-top: var(--banner-height);
+}
+
+#content {
+    padding-top: 5px;
+    padding-left: 5px;
+    padding-right: 5px;
+    width: var(--max-page-width);
+    max-width: var(--max-page-width);
+}
+
+.loginwindow {
+    margin: 0 auto;
+    max-width: 350px;
+}
+
+.loginwindow-content {
+    text-align: left;
+}
+
+#login_email,
+#login_password,
+#register_email,
+#register_password,
+#register_confirmpassword {
+    width: 250px;
+}
+
+.table_container {
+    position: relative;
+    display: block;
+    width: 100%;
+    overflow: auto;
+}
+
+table {
+    width: 100%;
+    border-spacing: 0px;
+    border-collapse: collapse;
+}
+
+th {
+    text-align: left;
+    padding: 5px;
+    text-transform: uppercase;
+}
+
+td {
+    text-align: left;
+    padding: 5px;
+}
+
+.tableheadcell {}
+
+.tablecell {
+    border-top-style: solid;
+    border-top-width: 1px;
+    border-top-color: var(--element-border-color);
+    border-bottom-style: solid;
+    border-bottom-width: 1px;
+    border-bottom-color: var(--element-border-color);
+}
+
+.tablerowhighlight:hover {
+    background-color: var(--element-background-color-translucent);
+    cursor: pointer;
+}
+
+.rightfloatheaderbuttondiv {
+    float: right;
+}
+
+.page_content_box {
+    margin-right: 270px;
+}
+
+.page_detail_box {
+    float: right;
+    display: inline;
+    border-radius: var(--element-border-radius);
+    border-style: solid;
+    border-width: 1px;
+    border-color: var(--element-border-color);
+    background-color: var(--element-background-color-translucent);
+    width: 256px;
+}
+
+.dataobject_new_table {
+    width: 100%;
+}
+
+.okcanceldiv {
+    text-align: right;
+}
+
+.linkicon {
+    width: 16px;
+    height: 16px;
+}
+
+.descriptionspan {
+    display: block;
+    margin-bottom: 5px;
+}
+
+.signatureitem {
+    border-radius: var(--element-border-radius);
+    border-style: solid;
+    border-width: 1px;
+    border-color: var(--element-border-color);
+    background-color: var(--element-border-color);
+    padding-top: 2px;
+    padding-bottom: 1px;
+    padding-left: 7px;
+    padding-right: 7px;
+    text-transform: uppercase;
+    color: white;
+    margin-bottom: 5px;
+    margin-right: 5px;
+    display: inline-block;
+}
+
+.signatureitem.selectable:hover {
+    background-color: var(--button-color);
+    cursor: pointer;
+}
+
+#dataObjectAdminControlsRow {
+    text-align: center;
+}
+
+.buttonicon {
+    width: 12px;
+    height: 12px;
+    filter: invert(100%);
+}
+
+.buttonicon13 {
+    width: 13px;
+    height: 13px;
+}
+
+#editbanner {
+    display: table;
+    width: 100%;
+    background-color: var(--element-alert-background-color);
+    border-color: var(--element-alert-border-color);
+    border-radius: var(--element-border-radius);
+    color: var(--element-alert-text-color);
+    border-width: 1px;
+    border-style: solid;
+    padding: 10px 10px 10px 20px;
+    margin-bottom: 10px;
+    clear: both;
+    line-height: 30px;
+}
+
+#editbannerlabel {
+    display: inline-block;
+    vertical-align: middle;
+    line-height: normal;
+}
+
+#editbannerbuttons {
+    float: right;
+}
+
+#dataObject_object_name {
+    width: 100%;
+}
+
+#attributedescriptioninput {
+    width: 90%;
+    height: 50px;
+}
+
+.attributeeditselect {
+    width: 90%;
+}
+
+.mergeintoselect {
+    width: 100%;
+    margin-bottom: 5px;
+}
+
+.tablefooter {
+    position: relative;
+    display: flexbox;
+    height: 30px;
+    padding: 5px;
+    margin-top: 10px;
+}
+
+.tablefootercount {
+    position: absolute;
+    display: inline;
+    left: 5px;
+    top: 5px;
+}
+
+.tablefooterpager {
+    position: absolute;
+    display: inline;
+    right: 5px;
+    top: 5px;
+}
+
+.pageitem {
+    display: inline;
+    padding: 2px 4px 2px 4px;
+    border-color: var(--page-background);
+    border-width: 1px;
+    border-style: solid;
+    border-radius: var(--element-border-radius);
+    margin-right: 2px;
+}
+
+.pageitem:hover {
+    border-color: var(--element-border-color);
+    cursor: pointer;
+}
+
+.pageitem.selected {
+    background-color: var(--element-background-color);
+    border-color: var(--element-background-color);
+}
+
+.pageitem.selected:hover {
+    border-color: var(--element-background-color);
+    cursor: default;
+}
+
+.valid-border-color {
+    -webkit-box-shadow: 0px 0px 5px 1px var(--valid-color);
+    -moz-box-shadow: 0px 0px 5px 1px var(--valid-color);
+    box-shadow: 0px 0px 5px 1px var(--valid-color);
+}
+
+.invalid-border-color {
+    -webkit-box-shadow: 0px 0px 5px 1px var(--invalid-color);
+    -moz-box-shadow: 0px 0px 5px 1px var(--invalid-color);
+    box-shadow: 0px 0px 5px 1px var(--invalid-color);
+}
+
+.errorlabel-error {
+    color: var(--invalid-color);
+}
+
+#dataObjectLogoBox {
+    padding: 20px;
+    text-align: center;
+}
+
+#dataObjectLogoImage {
+    max-width: 100%;
+}
+
+#dataObjectLogoAttribution {
+    text-align: left;
+}
+
+#dataObjectLogoImageAttributionLogo {
+    float: right;
+    max-width: 40px;
+}

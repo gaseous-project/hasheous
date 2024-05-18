@@ -99,7 +99,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
         private static async Task<GameMode> GetObjectFromServer(string WhereClause)
         {
             // get Game_Modes metadata
-            Communications comms = new Communications();
+            Communications comms = new Communications(Communications.MetadataSources.IGDB);
             var results = await comms.APIComm<GameMode>(IGDBClient.Endpoints.GameModes, fieldList, WhereClause);
             var result = results.First();
 

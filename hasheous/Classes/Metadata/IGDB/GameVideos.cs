@@ -99,7 +99,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
         private static async Task<GameVideo> GetObjectFromServer(string WhereClause)
         {
             // get Game_Videos metadata
-            Communications comms = new Communications();
+            Communications comms = new Communications(Communications.MetadataSources.IGDB);
             var results = await comms.APIComm<GameVideo>(IGDBClient.Endpoints.GameVideos, fieldList, WhereClause);
             var result = results.First();
 

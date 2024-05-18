@@ -110,7 +110,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
         private static async Task<Screenshot> GetObjectFromServer(string WhereClause, string LogoPath)
         {
             // get Screenshot metadata
-            Communications comms = new Communications();
+            Communications comms = new Communications(Communications.MetadataSources.IGDB);
             var results = await comms.APIComm<Screenshot>(IGDBClient.Endpoints.Screenshots, fieldList, WhereClause);
             var result = results.First();
 

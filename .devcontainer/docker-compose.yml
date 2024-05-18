@@ -1,0 +1,25 @@
+services:
+  development:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ..:/workspace
+    stdin_open: true
+    environment:
+      - TZ=Australia/Sydney
+      - dbhost=mariadb
+      - dbuser=root
+      - dbpass=hasheous
+      - igdbclientid=${IGDBCLIENTID}
+      - igdbclientsecret=${IGDBCLIENTSECRET}
+  mariadb:
+    hostname: mariadb
+    image: mariadb:latest
+    ports: 
+      - 3307:3306
+    environment:
+      - MARIADB_ROOT_PASSWORD=hasheous
+      - MARIADB_DATABASE=hasheous
+      - MARIADB_USER=root
+      - MARIADB_PASSWORD=hasheous

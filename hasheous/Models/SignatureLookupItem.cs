@@ -11,14 +11,14 @@ namespace hasheous_server.Models
 
         public class SignatureResult
         {
-            public SignatureResult(Signatures_Games RawSignature)
+            public SignatureResult(Signatures_Games_2 RawSignature)
             {
                 this.Game = RawSignature.Game;
                 this.Rom = RawSignature.Rom;
             }
 
-            public Signatures_Games.GameItem Game { get; set; } = new Signatures_Games.GameItem();
-            public Signatures_Games.RomItem Rom { get; set; } = new Signatures_Games.RomItem();
+            public Signatures_Games_2.GameItem Game { get; set; } = new Signatures_Games_2.GameItem();
+            public Signatures_Games_2.RomItem Rom { get; set; } = new Signatures_Games_2.RomItem();
         }
 
         public class MetadataResult
