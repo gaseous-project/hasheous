@@ -239,7 +239,43 @@ class generateTable {
                     footer.appendChild(footerRecordCount);
                 }
 
-                if (pageCount > 1) {
+                if (pageCount > 5) {
+                    // display a popup pager
+                    let footerPager = document.createElement('div');
+                    footerPager.classList.add('tablefooterpager');
+
+                    // insert first page button
+                    footerPager.appendChild(this.#createPageButton("|&lt;", 1, pageNumber, pageCount, pagingCallback));
+
+                    // insert previous page button
+                    footerPager.appendChild(this.#createPageButton("&lt;", pageNumber - 1, pageNumber, pageCount, pagingCallback));
+
+                    // insert pager select
+                    let pagerSelect = document.createElement('select');
+                    for (let i = 1; i < pageCount + 1; i++) {
+                        let pagerOption = document.createElement('option');
+                        pagerOption.value = i;
+                        pagerOption.innerHTML = i;
+                        if (pageNumber == i) {
+                            pagerOption.selected = true;
+                        }
+                        pagerSelect.appendChild(pagerOption);
+                    }
+
+                    pagerSelect.addEventListener("change", function () {
+                        pagingCallback(pagerSelect.value);
+                    })
+
+                    footerPager.appendChild(pagerSelect);
+
+                    // insert next page button
+                    footerPager.appendChild(this.#createPageButton("&gt;", pageNumber + 1, pageNumber, pageCount, pagingCallback));
+
+                    // insert last page button
+                    footerPager.appendChild(this.#createPageButton("&gt;|", pageCount, pageNumber, pageCount, pagingCallback));
+
+                    footer.appendChild(footerPager);
+                } else if (pageCount > 1) {
                     // display a pager
                     let footerPager = document.createElement('div');
                     footerPager.classList.add('tablefooterpager');
