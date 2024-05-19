@@ -1,7 +1,10 @@
 // set up page
 let pageSearchBox = document.getElementById('search_terms');
-pageSearchBox.value = decodeURIComponent(getQueryString('query', 'string'));
-pageSearchBox.addEventListener("keypress", function(e) {
+let pageQuerySearchString = decodeURIComponent(getQueryString('query', 'string'));
+if (pageQuerySearchString != 'null') {
+    pageSearchBox.value = pageQuerySearchString;
+}
+pageSearchBox.addEventListener("keypress", function (e) {
     let key = e.code;
     if (key == 'Enter') {
         e.preventDefault();
@@ -27,7 +30,7 @@ function createDataObjectsTable(targetDiv, pageType, pageNumber, pageSize) {
         ajaxCall(
             '/api/v1/DataObjects/' + pageType + '?search=' + encodeURIComponent(pageSearchBox.value) + '&pageSize=' + pageSize + '&pageNumber=' + pageNumber + '&getchildrelations=true',
             'GET',
-            function(success) {
+            function (success) {
                 let columns;
                 switch (pageType) {
                     case "game":
@@ -53,7 +56,7 @@ function createDataObjectsTable(targetDiv, pageType, pageNumber, pageSize) {
                         break;
 
                     default:
-                        case "company":
+                    case "company":
                         columns = [
                             'id',
                             'name'
@@ -61,18 +64,21 @@ function createDataObjectsTable(targetDiv, pageType, pageNumber, pageSize) {
                         break;
                 }
 
+                let resultsPanel = document.getElementById('searchresultspanel');
+                resultsPanel.style.display = '';
+
                 let newTable = new generateTable(
                     success.objects,
                     columns,
                     'id',
                     true,
-                    function(id) {
+                    function (id) {
                         window.location = '/index.html?page=dataobjectdetail&type=' + pageType + '&id=' + id;
                     },
                     success.count,
                     success.pageNumber,
                     success.totalPages,
-                    function(p) {
+                    function (p) {
                         createDataObjectsTable(targetDiv, pageType, p, pageSize);
                     }
                 );
@@ -116,11 +122,15 @@ function createDataObjectsTableFromMD5Search(hashType) {
     ajaxCall(
         '/api/v1/Lookup/ByHash/?getchildrelations=true',
         'POST',
-        function(success) {
+        function (success) {
             let resultDiv = document.getElementById('gamesearchresults');
-            
+
             if (success) {
                 let arr = [success];
+
+                let resultsPanel = document.getElementById('searchresultspanel');
+                resultsPanel.style.display = '';
+
                 let newTable = new generateTable(
                     arr,
                     [
@@ -133,7 +143,7 @@ function createDataObjectsTableFromMD5Search(hashType) {
                     ],
                     'id',
                     true,
-                    function(id) {
+                    function (id) {
                         window.location = '/index.html?page=dataobjectdetail&type=game&id=' + id;
                     }
                 );
@@ -145,7 +155,7 @@ function createDataObjectsTableFromMD5Search(hashType) {
             ShowError('platformsearchresults');
             ShowError('companysearchresults');
         },
-        function(error) {
+        function (error) {
             console.error(error);
             ShowError('gamesearchresults');
             ShowError('platformsearchresults');
@@ -177,7 +187,7 @@ function ShowError(targetDiv) {
 
     let errorMessage = document.createElement('span');
     errorMessage.innerHTML = lang.getLang('norecords');
-    
+
     errorDiv.appendChild(errorMessage);
 }
 
