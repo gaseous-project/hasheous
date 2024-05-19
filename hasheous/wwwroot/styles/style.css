@@ -218,6 +218,11 @@ button:disabled {
     /* filter: invert(100%); */
 }
 
+.banner_button_image_no_label {
+    height: 20px;
+    width: 20px;
+}
+
 .banner_button {
     background-color: transparent;
     float: right;
@@ -238,6 +243,60 @@ button:disabled {
     border-left-style: solid; */
 }
 
+.footer_social_table {
+    align-items: center;
+    justify-content: center;
+    display: flex;
+}
+
+.footer_button_image {
+    height: 20px;
+    width: 20px;
+    margin-right: 5px;
+    float: left;
+    margin-top: -3px;
+}
+
+.footer_button {
+    background-color: transparent;
+    top: 0px;
+    height: 20px;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-top: 0px;
+    padding-bottom: 0px;
+    margin: 0px 0px 0px 0px;
+    display: inline-block;
+    color: rgba(0, 22, 56, 1);
+    clear: left;
+}
+
+.footer_button:hover {
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.footer_links {
+    text-align: center;
+}
+
+.footer_link {
+    display: inline;
+    margin-left: 10px;
+    margin-right: 10px;
+    margin-top: 5px;
+    margin-bottom: 5px;
+    white-space: nowrap;
+}
+
+.footer_link:hover {
+    cursor: pointer;
+    text-decoration: underline;
+}
+
 .banner_button:hover {
     cursor: pointer;
     background-color: var(--element-highlight);
@@ -250,6 +309,22 @@ button:disabled {
 
 #banner_search_field {
     width: 250px;
+}
+
+#banner_search_small {
+    display: none;
+}
+
+#pagefooter {
+    margin-top: 50px;
+    border-top-style: solid;
+    border-top-width: 1px;
+    border-top-color: var(--element-border-color);
+    padding-top: 15px;
+    padding-left: 15px;
+    padding-right: 15px;
+    width: var(--max-page-width);
+    max-width: var(--max-page-width);
 }
 
 /* The container <div> - needed to position the dropdown content */
@@ -299,7 +374,7 @@ button:disabled {
     display: block;
 }
 
-#pagecontainer {
+.pagecontainer {
     display: flex;
     justify-content: center;
     width: 100%;
@@ -557,7 +632,7 @@ td {
 }
 
 #dataObjectLogoImage {
-    max-width: 100%;
+    max-width: 214px;
 }
 
 #dataObjectLogoAttribution {
