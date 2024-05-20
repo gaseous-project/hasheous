@@ -41,7 +41,8 @@
 				"ms-dotnettools.vscodeintellicode-csharp",
 				"Zignd.html-css-class-completion",
 				"ms-azuretools.vscode-docker",
-				"Gruntfuggly.todo-tree"
+				"Gruntfuggly.todo-tree",
+				"eamodio.gitlens"
 			]
 		}
 	}
