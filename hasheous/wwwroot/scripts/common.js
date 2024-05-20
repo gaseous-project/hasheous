@@ -186,6 +186,14 @@ class generateTable {
                             cellContent = cellValue;
                             break;
 
+                        case "image":
+                            if (cellValue.length > 0) {
+                                cellContent.innerHTML = "<div class=\"dataObjectLogoTable\"><img src=\"/api/v1/images/" + cellValue + "\" class=\"dataObjectLogoTableImg\" /></div>";
+                            } else {
+                                cellContent.innerHTML = "<div class=\"dataObjectLogoTable\"></div>";
+                            }
+                            break;
+
                         default:
                             // default to plain text
                             cellContent.innerHTML = cellValue;

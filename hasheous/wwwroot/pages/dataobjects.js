@@ -31,6 +31,10 @@ function createDataObjectsTable(pageNumber, pageSize) {
                 case "game":
                     columns = [
                         'id',
+                        {
+                            column: 'attributes[attributeName=Logo].value:image',
+                            name: 'logo'
+                        },
                         'name',
                         {
                             column: 'attributes[attributeName=Platform].value.name',
@@ -50,6 +54,10 @@ function createDataObjectsTable(pageNumber, pageSize) {
                 case "platform":
                     columns = [
                         'id',
+                        {
+                            column: 'attributes[attributeName=Logo].value:image',
+                            name: 'logo'
+                        },
                         'name',
                         {
                             column: 'attributes[attributeName=Manufacturer].value.name',
@@ -66,6 +74,10 @@ function createDataObjectsTable(pageNumber, pageSize) {
                 case "company":
                     columns = [
                         'id',
+                        {
+                            column: 'attributes[attributeName=Logo].value:image',
+                            name: 'logo'
+                        },
                         'name',
                         {
                             column: 'metadata[source=IGDB].id',
