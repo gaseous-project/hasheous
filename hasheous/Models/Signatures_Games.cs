@@ -4,19 +4,12 @@ using gaseous_signature_parser.models.RomSignatureObject;
 
 namespace hasheous_server.Models
 {
-	public class Signatures_Games : HasheousClient.Models.LookupResponseModel
-	{
-		public Signatures_Games()
-		{
-		}
-    }
+    public class Signatures_Games_2
+    {
+        public GameItem? Game { get; set; }
+        public RomItem? Rom { get; set; }
 
-	public class Signatures_Games_2
-	{
-		public GameItem? Game { get; set; }
-		public RomItem? Rom { get; set; }
-
-		public int Score
+        public int Score
         {
             get
             {
@@ -36,20 +29,20 @@ namespace hasheous_server.Models
             }
         }
 
-		public class GameItem : gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game
-		{
-			public GameItem()
-			{
-			}
+        public class GameItem : gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game
+        {
+            public GameItem()
+            {
+            }
 
-			public long SystemId { get; set; }
+            public long SystemId { get; set; }
 
             public long PublisherId { get; set; }
 
             public Dictionary<string, string> Countries = new Dictionary<string, string>();
             public Dictionary<string, string> Languages = new Dictionary<string, string>();
 
-			public int Score
+            public int Score
             {
                 get
                 {
@@ -101,15 +94,15 @@ namespace hasheous_server.Models
                     return _score;
                 }
             }
-		}
+        }
 
-		public class RomItem : gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom
-		{
-			public RomItem()
-			{
-			}
+        public class RomItem : gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom
+        {
+            public RomItem()
+            {
+            }
 
-			public int Score
+            public int Score
             {
                 get
                 {
@@ -162,7 +155,7 @@ namespace hasheous_server.Models
                     return _score;
                 }
             }
-		}
-	}
+        }
+    }
 }
 
