@@ -34,7 +34,7 @@ document.getElementById('dataObjectDelete').addEventListener("click", function (
 });
 
 document.getElementById('dataObjectMerge').addEventListener("click", function (e) {
-    let mergeIntoId = $('#dataObjectMergeSelect').val();
+    let mergeIntoId = Number($('#dataObjectMergeSelect').val());
     ajaxCall(
         '/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int') + '/MergeObject?TargetId=' + mergeIntoId + '&commit=true',
         'GET',

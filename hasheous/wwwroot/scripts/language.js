@@ -128,8 +128,10 @@ class language {
 
     setPageElementInnerHTMLLanguage(elementList) {
         for (let i = 0; i < elementList.length; i++) {
-            if (elementList[i].getAttribute('data-lang')) {
-                elementList[i].innerHTML = lang.getLang(elementList[i].getAttribute('data-lang'));
+            let dataLang = $(elementList[i]).attr('data-lang');
+            if (dataLang) {
+                let dataLangStr = dataLang.replace(/\W/g, '');
+                elementList[i].innerHTML = this.getLang(dataLangStr);
             }
         }
     }
