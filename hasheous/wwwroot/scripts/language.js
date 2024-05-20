@@ -130,7 +130,8 @@ class language {
         for (let i = 0; i < elementList.length; i++) {
             let dataLang = $(elementList[i]).attr('data-lang');
             if (dataLang) {
-                elementList[i].innerHTML = this.getLang(dataLang);
+                let dataLangStr = dataLang.replace(/<\/[^>]+(>|$)/g, "");
+                elementList[i].innerHTML = this.getLang(dataLangStr);
             }
         }
     }
