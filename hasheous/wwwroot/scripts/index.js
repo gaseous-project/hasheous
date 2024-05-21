@@ -75,6 +75,7 @@ if (userProfile == null) {
     if (userProfile.Roles.includes('Admin') || userProfile.Roles.includes('Moderator')) {
         document.getElementById('banner_company').style.display = '';
         document.getElementById('banner_game').style.display = '';
+        document.getElementById('dropdown_settings').style.display = '';
     }
 }
 

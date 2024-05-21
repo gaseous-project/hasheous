@@ -220,8 +220,9 @@ class generateTable {
                 if (rowId != null) {
                     if (rowClickCallback) {
                         dataRow.classList.add('tablerowhighlight');
+                        let clickbackResultSet = this.resultSet;
                         dataRow.addEventListener("click", function () {
-                            rowClickCallback(rowId);
+                            rowClickCallback(rowId, clickbackResultSet);
                         }, true);
                     }
                 }

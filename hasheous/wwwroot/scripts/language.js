@@ -148,5 +148,6 @@ class language {
         this.setPageElementInnerHTMLLanguage(document.getElementsByTagName('label'));
         this.setPageElementInnerHTMLLanguage(document.getElementsByTagName('a'));
         this.setPageElementInnerHTMLLanguage(document.getElementsByTagName('button'));
+        this.setPageElementInnerHTMLLanguage(document.getElementsByTagName('option'));
     }
 }

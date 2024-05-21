@@ -7,7 +7,7 @@ let selectedPlatform = undefined;
 let mustRedirect = true;
 if (userProfile != null) {
     if (userProfile.Roles != null) {
-        if (userProfile.Roles.includes('Admin')) {
+        if (userProfile.Roles.includes('Admin') || userProfile.Roles.includes('Moderator')) {
             mustRedirect = false;
         }
     }

@@ -4,6 +4,7 @@
     "login": "Login",
     "registeraccount": "Register Account",
     "email": "Email:",
+    "emailaddress": "Email Address",
     "password": "Password:",
     "confirmpassword": "Confirm Password:",
     "rememberme": "Remember me",
@@ -47,6 +48,8 @@
     "createddate": "Created Date",
     "updateddate": "Updated Date",
     "profile": "Account",
+    "account": "Account",
+    "settings": "Settings",
     "signout": "Sign Out",
     "signin": "Sign In",
     "homepage": "Home page:",
@@ -140,5 +143,8 @@
     "termsofservice": "Terms of Service",
     "termsofservicetext": "<p>Hasheous is a free service provided to the community with the aim of fairly satisfying the needs of the community.</p><p>As such, Hasheous has a rate limiter, and caching in place in order to limit the impact to the service (and therefore the cost of hosting) due to heavy users.</p><p>The Hasheous team reserves the right to suspend or block users who:<ul><li>exceed or circumvent these limits and place undue strain on the service</li><li>engage in offensive or abusive activity while using the service</li></ul></p>",
     "privacypolicy": "Privacy Policy",
-    "privacypolicytext": "<h2>What data does Hasheous collect?</h2>\n<p>Hasheous collects data about the users of its services. The following data is collected:</p>\n<ul>\n<li>Email address</li>\n<li>Password</li>\n<li>Language</li>\n<li>Game Match Submissions</li>\n</ul>\n<h2>How does Hasheous use your data?</h2>\n<p>Hasheous uses your data in the following ways:</p>\n<ul>\n<li>For authentication</li>\n<li>For sending you notifications</li>\n<li>For displaying the Hasheous UI</li>\n<li>For storing your game match submissions. Submissions are stored using an internal user identifier to prevent duplicate submissions.</li>\n</ul>\n<h2>How does Hasheous share your data?</h2>\n<p>Hasheous does not share your data with any third parties, unless legally obliged.</p>\n<h2>How does Hasheous protect your data?</h2>\n<p>Hasheous uses industry standard security measures to keep your data secure.</p>\n<ul>\n<li>Mandatory HTTPS</li>\n<li>Passwords are salted and hashed when stored</li>\n</ul>\n<h2>What rights does Hasheous have?</h2>\n<p>Hasheous retains only the right to use your Game Match Submissions.</p>\n<p>You can delete your account at anytime, however your Game Match Submissions remain in the Hasheous database. The\naccount and all user identifiers will be deleted immediately, which will remove the link to your Game Match\nSubmissions.</p>\n<p>You can contact Hasheous if you have any questions about this.</p>\n<h2>How can I contact Hasheous?</h2>\n<p>You can contact Hasheous via our GitHub repository: <a href=\"https:\/\/github.com\/hasheous\/hasheous\">https:\/\/github.com\/hasheous\/hasheous</a> or, via Discord <a href=\"https:\/\/discord.gg\/Nhu7wpT3k4\">https:\/\/discord.gg\/Nhu7wpT3k4</a></p>\n<h2>Changes to this Privacy Policy</h2>\n<p>Hasheous will update this Privacy Policy from time to time. The updated version will be posted on this page.</p>"
+    "privacypolicytext": "<h2>What data does Hasheous collect?</h2>\n<p>Hasheous collects data about the users of its services. The following data is collected:</p>\n<ul>\n<li>Email address</li>\n<li>Password</li>\n<li>Language</li>\n<li>Game Match Submissions</li>\n</ul>\n<h2>How does Hasheous use your data?</h2>\n<p>Hasheous uses your data in the following ways:</p>\n<ul>\n<li>For authentication</li>\n<li>For sending you notifications</li>\n<li>For displaying the Hasheous UI</li>\n<li>For storing your game match submissions. Submissions are stored using an internal user identifier to prevent duplicate submissions.</li>\n</ul>\n<h2>How does Hasheous share your data?</h2>\n<p>Hasheous does not share your data with any third parties, unless legally obliged.</p>\n<h2>How does Hasheous protect your data?</h2>\n<p>Hasheous uses industry standard security measures to keep your data secure.</p>\n<ul>\n<li>Mandatory HTTPS</li>\n<li>Passwords are salted and hashed when stored</li>\n</ul>\n<h2>What rights does Hasheous have?</h2>\n<p>Hasheous retains only the right to use your Game Match Submissions.</p>\n<p>You can delete your account at anytime, however your Game Match Submissions remain in the Hasheous database. The\naccount and all user identifiers will be deleted immediately, which will remove the link to your Game Match\nSubmissions.</p>\n<p>You can contact Hasheous if you have any questions about this.</p>\n<h2>How can I contact Hasheous?</h2>\n<p>You can contact Hasheous via our GitHub repository: <a href=\"https:\/\/github.com\/hasheous\/hasheous\">https:\/\/github.com\/hasheous\/hasheous</a> or, via Discord <a href=\"https:\/\/discord.gg\/Nhu7wpT3k4\">https:\/\/discord.gg\/Nhu7wpT3k4</a></p>\n<h2>Changes to this Privacy Policy</h2>\n<p>Hasheous will update this Privacy Policy from time to time. The updated version will be posted on this page.</p>",
+    "roles": "Roles",
+    "admin": "Administrator",
+    "moderator": "Moderator"
 }

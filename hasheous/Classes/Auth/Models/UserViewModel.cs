@@ -8,7 +8,8 @@ namespace Authentication
         public DateTimeOffset? LockoutEnd { get; set; }
         public List<string> Roles { get; set; }
         public SecurityProfileViewModel SecurityProfile { get; set; }
-        public string HighestRole {
+        public string HighestRole
+        {
             get
             {
                 string _highestRole = "";
@@ -20,22 +21,22 @@ namespace Authentication
                             // there is no higher
                             _highestRole = role;
                             break;
-                        case "Gamer":
+                        case "Moderator":
                             // only one high is Admin, so check for that
                             if (_highestRole != "Admin")
                             {
                                 _highestRole = role;
                             }
                             break;
-                        case "Player":
+                        case "Member":
                             // make sure _highestRole isn't already set to Gamer or Admin
-                            if (_highestRole != "Admin" && _highestRole != "Gamer")
+                            if (_highestRole != "Admin" && _highestRole != "Moderator")
                             {
                                 _highestRole = role;
                             }
                             break;
                         default:
-                            _highestRole = "Player";
+                            _highestRole = "Member";
                             break;
                     }
                 }
