@@ -4,6 +4,17 @@ document.getElementById('dataObject_cancel').addEventListener("click", function(
 });
 setPageTitle("newcompany");
 
+let mustRedirect = true;
+if (userProfile != null) {
+    if (userProfile.Roles != null) {
+        if (userProfile.Roles.includes('Admin') || userProfile.Roles.includes('Moderator')) {
+            mustRedirect = false;
+        }
+    }
+}
+
+if (mustRedirect == true) { location.window.replace("/"); }
+
 function saveDataObject() {
     let model = {
         "name": document.getElementById('dataObject_object_name').value

@@ -1,5 +1,16 @@
 const login = new loginTools();
 
+// setup roles
+let roleBadgeDiv = document.getElementById('account_roles');
+for (let i = 0; i < userProfile.Roles.length; i++) {
+    let roleName = userProfile.Roles[i].toLowerCase();
+    console.log(roleName);
+    let roleBadge = document.createElement('div');
+    roleBadge.innerHTML = lang.getLang(roleName);
+    roleBadge.classList.add('badge');
+    roleBadgeDiv.appendChild(roleBadge);
+}
+
 // setup submission api key
 let submissionApiKeyField = document.getElementById('submissionapikey');
 function GetApiKey() {
@@ -52,7 +63,7 @@ function handleErrors() {
                 passwordError.classList.add('errorlabel-error');
                 errorlabel.appendChild(passwordError);
                 break;
-            
+
             default:
                 // no error
                 break;
@@ -107,10 +118,10 @@ resetPasswordButton.addEventListener("click", function (e) {
     ajaxCall(
         '/api/v1/Account/ChangePassword',
         'POST',
-        function(result) {
+        function (result) {
             resetPasswordCallback(result, '/?page=changepasswordconfirmed');
         },
-        function(error) {
+        function (error) {
             resetPasswordCallback(error, '/?page=changepasswordconfirmed');
         },
         JSON.stringify(ajaxData)
@@ -135,7 +146,7 @@ function resetPasswordCallback(result, redirectPath) {
                     }
                 }
             }
-        
+
             break;
 
     }
