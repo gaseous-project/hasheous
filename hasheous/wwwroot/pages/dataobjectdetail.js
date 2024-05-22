@@ -4,7 +4,7 @@ let editMode = false;
 
 if (userProfile != null) {
     if (userProfile.Roles != null) {
-        if (userProfile.Roles.includes('Admin')) {
+        if (userProfile.Roles.includes('Moderator') || userProfile.Roles.includes('Admin')) {
             document.getElementById('dataObjectAdminControls').style.display = '';
         } else {
             document.getElementById('dataObjectAdminControls').style.display = 'none';

@@ -10,6 +10,7 @@
     "rememberme": "Remember me",
     "incorrectpassword": "Incorrect email address or password",
     "forgottenpassword": "Forgotten password",
+    "forgotpassword": "Forgot Password",
     "forgottenpasswordheading": "Reset your password",
     "forgottenpasswordlabel": "Enter your email address below, and a link will be sent to reset your password:",
     "forgottenpasswordsendlink": "Send Link",

@@ -7,7 +7,8 @@ namespace Authentication
         public string EmailAddress { get; set; }
         public List<String> Roles { get; set; }
         public SecurityProfileViewModel SecurityProfile { get; set; }
-        public string HighestRole {
+        public string HighestRole
+        {
             get
             {
                 string _highestRole = "";
@@ -19,22 +20,22 @@ namespace Authentication
                             // there is no higher
                             _highestRole = role;
                             break;
-                        case "Gamer":
+                        case "Moderator":
                             // only one high is Admin, so check for that
                             if (_highestRole != "Admin")
                             {
                                 _highestRole = role;
                             }
                             break;
-                        case "Player":
-                            // make sure _highestRole isn't already set to Gamer or Admin
-                            if (_highestRole != "Admin" && _highestRole != "Gamer")
+                        case "Member":
+                            // make sure _highestRole isn't already set to Moderator or Admin
+                            if (_highestRole != "Admin" && _highestRole != "Moderator")
                             {
                                 _highestRole = role;
                             }
                             break;
                         default:
-                            _highestRole = "Player";
+                            _highestRole = "Member";
                             break;
                     }
                 }

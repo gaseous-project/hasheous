@@ -29,7 +29,7 @@ namespace Authentication
                             }
                             break;
                         case "Member":
-                            // make sure _highestRole isn't already set to Gamer or Admin
+                            // make sure _highestRole isn't already set to Moderator or Admin
                             if (_highestRole != "Admin" && _highestRole != "Moderator")
                             {
                                 _highestRole = role;
