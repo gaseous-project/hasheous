@@ -29,13 +29,19 @@ namespace Classes
             List<string> whereClauses = new List<string>();
             if (model.MD5 != null)
             {
-                whereClauses.Add("Signatures_Roms.MD5 = @md5");
-                dbDict.Add("md5", model.MD5);
+                if (model.MD5.Length == 32)
+                {
+                    whereClauses.Add("Signatures_Roms.MD5 = @md5");
+                    dbDict.Add("md5", model.MD5);
+                }
             }
-            else if (model.SHA1 != null)
+            if (model.SHA1 != null)
             {
-                whereClauses.Add("Signatures_Roms.SHA1 = @sha1");
-                dbDict.Add("sha1", model.SHA1);
+                if (model.SHA1.Length == 40)
+                {
+                    whereClauses.Add("Signatures_Roms.SHA1 = @sha1");
+                    dbDict.Add("sha1", model.SHA1);
+                }
             }
 
             if (whereClauses.Count > 0)
