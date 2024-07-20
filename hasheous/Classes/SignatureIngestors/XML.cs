@@ -25,7 +25,7 @@ namespace XML
                 SearchPath = Path.Combine(SearchPath, "DAT");
                 ProcessedDirectory = Path.Combine(ProcessedDirectory, "DAT");
             }
-            
+
             // process provided files
             if (!Directory.Exists(SearchPath))
             {
@@ -110,7 +110,7 @@ namespace XML
                         if (Object.SourceMd5 != null)
                         {
                             int sourceId = 0;
-                            
+
                             sql = "SELECT * FROM Signatures_Sources WHERE `SourceMD5`=@sourcemd5";
                             dbDict = new Dictionary<string, object>
                             {
@@ -155,7 +155,7 @@ namespace XML
 
                                     // set up game dictionary
                                     dbDict = new Dictionary<string, object>();
-                                    if (flipNameAndDescription.Contains(Object.SourceType)) 
+                                    if (flipNameAndDescription.Contains(Object.SourceType))
                                     {
                                         dbDict.Add("name", Common.ReturnValueIfNull(gameObject.Description, ""));
                                         dbDict.Add("description", Common.ReturnValueIfNull(gameObject.Name, ""));
@@ -175,7 +175,7 @@ namespace XML
 
                                     List<int> gameCountries = new List<int>();
                                     if (
-                                        gameObject.Country != null && 
+                                        gameObject.Country != null &&
                                         gameObject.Country != "Unknown"
                                         )
                                     {
@@ -356,7 +356,7 @@ namespace XML
                                         if (romObject.Md5 != null || romObject.Sha1 != null)
                                         {
                                             long romId = 0;
-                                            sql = "SELECT * FROM Signatures_Roms WHERE `GameId`=@gameid AND (`MD5`=@md5 OR `SHA1`=@sha1)";
+                                            sql = "SELECT * FROM Signatures_Roms WHERE `GameId`=@gameid AND (`MD5`=@md5 AND `SHA1`=@sha1)";
                                             dbDict = new Dictionary<string, object>();
                                             dbDict.Add("gameid", gameId);
                                             dbDict.Add("name", Common.ReturnValueIfNull(romObject.Name, ""));
