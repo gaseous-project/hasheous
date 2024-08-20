@@ -1,0 +1,47 @@
+name: Trigger auto deployment for hasheous
+
+# When this action will be executed
+on:
+  # Automatically trigger it when detected changes in repo
+  push:
+    branches: 
+      [ main ]
+    paths:
+    - '**'
+    - '.github/workflows/hasheous-AutoDeployTrigger-92cf8b95-e7ca-4ae3-97a9-30a48bd233bd.yml'
+
+  # Allow manual trigger 
+  workflow_dispatch:      
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions: 
+      id-token: write #This is required for requesting the OIDC JWT Token
+      contents: read #Required when GH token is used to authenticate with private repo
+
+    steps:
+      - name: Checkout to the branch
+        uses: actions/checkout@v2
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.HASHEOUS_AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.HASHEOUS_AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.HASHEOUS_AZURE_SUBSCRIPTION_ID }}
+
+      - name: Build and push container image to registry
+        uses: azure/container-apps-deploy-action@v2
+        with:
+          appSourcePath: ${{ github.workspace }} 
+          registryUrl: 
+          registryUsername: ${{ secrets.HASHEOUS_REGISTRY_USERNAME }}
+          registryPassword: ${{ secrets.HASHEOUS_REGISTRY_PASSWORD }}
+          containerAppName: hasheous
+          resourceGroup: hasheous
+          imageToBuild: default/[parameters('containerAppName')]:${{ github.sha }}
+          _buildArgumentsKey_: |
+            _buildArgumentsValues_
+
+
