@@ -48,6 +48,9 @@ document.getElementById('dataObjectSave').addEventListener("click", function (e)
     attributes.push(
         newAttributeObject('ShortString', 'VIMMManualId', 'None', document.getElementById('attributevimmmanualidinput').value)
     );
+    attributes.push(
+        newAttributeObject('ShortString', 'VIMMPlatformName', 'None', document.getElementById('attributevimmplatformnameinput').value)
+    );
     let logoOpt = document.querySelector('input[name=logo]:checked');
     switch (logoOpt.value) {
         case "0":
@@ -159,12 +162,14 @@ function renderContent() {
         case "platform":
             document.getElementById('attributemanufacturer').style.display = '';
             document.getElementById('attributelogo').style.display = '';
+            document.getElementById('attributevimmplatformname').style.display = '';
             break;
 
         case "game":
             document.getElementById('attributepublisher').style.display = '';
             document.getElementById('attributeplatform').style.display = '';
             document.getElementById('attributelogo').style.display = '';
+            document.getElementById('attributevimmmanualid').style.display = '';
             break;
 
     }
@@ -184,6 +189,14 @@ function renderContent() {
                 switch (dataObject.attributes[i].attributeName) {
                     case "VIMMManualId":
                         document.getElementById('attributevimmmanualidinput').value = dataObject.attributes[i].value;
+                        break;
+                }
+                break;
+
+            case "ShortString":
+                switch (dataObject.attributes[i].attributeName) {
+                    case "VIMMPlatformName":
+                        document.getElementById('attributevimmplatformnameinput').value = dataObject.attributes[i].value;
                         break;
                 }
                 break;
