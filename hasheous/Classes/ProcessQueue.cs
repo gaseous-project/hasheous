@@ -1,6 +1,7 @@
 ﻿using System;
 using Classes;
 using hasheous_server.Classes;
+using hasheous_server.Models;
 using static Classes.Common;
 
 namespace Classes
@@ -151,6 +152,73 @@ namespace Classes
                                     tMatcher.GetGamesWithoutArtwork();
                                     break;
 
+                                case QueueItemType.FetchVIMMMetadata:
+                                    // get all platforms
+                                    DataObjectsList Platforms = new DataObjectsList();
+                                    hasheous_server.Classes.DataObjects DataObjects = new hasheous_server.Classes.DataObjects();
+
+                                    // get VIMMSLair manual metadata for each platform
+                                    Platforms = DataObjects.GetDataObjects(DataObjects.DataObjectType.Platform);
+                                    foreach (DataObjectItem Platform in Platforms.Objects)
+                                    {
+                                        AttributeItem VIMMPlatformName = Platform.Attributes.Find(x => x.attributeName == AttributeItem.AttributeName.VIMMPlatformName);
+                                        if (VIMMPlatformName != null)
+                                        {
+                                            VIMMSLair.ManualDownloader tDownloader = new VIMMSLair.ManualDownloader(VIMMPlatformName.Value.ToString());
+                                            tDownloader.Download();
+                                        }
+                                    }
+
+                                    // process every game in the database
+                                    DataObjectsList games = DataObjects.GetDataObjects(DataObjects.DataObjectType.Game);
+
+                                    foreach (DataObjectItem game in games.Objects)
+                                    {
+                                        AttributeItem VIMMManualId = game.Attributes.Find(x => x.attributeName == AttributeItem.AttributeName.VIMMManualId);
+                                        if (VIMMManualId == null)
+                                        {
+                                            // game doesn't have an associated VIMM manual metadata record
+                                            // get the platform for this game and obtain the VIMM platform name
+                                            AttributeItem? gamePlatform = game.Attributes.Find(x => x.attributeName == AttributeItem.AttributeName.Platform);
+                                            if (gamePlatform != null)
+                                            {
+                                                RelationItem gamePlatformValue = (RelationItem)gamePlatform.Value;
+                                                DataObjectItem? PlatformObject = Platforms.Objects.Find(x => x.Id == gamePlatformValue.relationId);
+                                                if (PlatformObject != null)
+                                                {
+                                                    AttributeItem VIMMPlatformName = PlatformObject.Attributes.Find(x => x.attributeName == AttributeItem.AttributeName.VIMMPlatformName);
+                                                    if (VIMMPlatformName != null)
+                                                    {
+                                                        // perform the VIMMS manual search against all roms associated with this game until we get a match
+                                                        DataObjectItem game_full = DataObjects.GetDataObject(DataObjects.DataObjectType.Game, game.Id);
+                                                        AttributeItem romsAttribute = game_full.Attributes.FindAll(x => x.attributeName == AttributeItem.AttributeName.ROMs)[0];
+                                                        List<Signatures_Games_2.RomItem> roms = (List<Signatures_Games_2.RomItem>)romsAttribute.Value;
+
+                                                        foreach (Signatures_Games_2.RomItem rom in roms)
+                                                        {
+                                                            string newVIMMManualId = VIMMSLair.ManualSearch.Search(VIMMPlatformName.Value.ToString(), Path.GetFileNameWithoutExtension(rom.Name));
+                                                            if (newVIMMManualId != "")
+                                                            {
+                                                                // update the game with the new VIMM manual id
+                                                                DataObjects.AddAttribute(game.Id, new AttributeItem()
+                                                                {
+                                                                    attributeName = AttributeItem.AttributeName.VIMMManualId,
+                                                                    attributeType = AttributeItem.AttributeType.ShortString,
+                                                                    attributeRelationType = DataObjects.DataObjectType.Game,
+                                                                    Value = newVIMMManualId
+                                                                });
+
+                                                                break;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    break;
+
                             }
                         }
                         catch (Exception ex)
@@ -206,7 +274,12 @@ namespace Classes
             /// <summary>
             /// Fetches missing artwork for game data objects
             /// </summary>
-            GetMissingArtwork
+            GetMissingArtwork,
+
+            /// <summary>
+            /// Fetch VIMM manual metadata
+            /// </summary>
+            FetchVIMMMetadata
         }
 
         public enum QueueItemState
