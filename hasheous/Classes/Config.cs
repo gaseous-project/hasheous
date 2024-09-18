@@ -375,6 +375,14 @@ namespace Classes
                     }
                 }
 
+                public string LibraryMetadataDirectory_VIMMSLair
+                {
+                    get
+                    {
+                        return Path.Combine(LibraryMetadataDirectory, "VIMMSLair");
+                    }
+                }
+
                 public string LibrarySignaturesDirectory
                 {
                     get
@@ -426,6 +434,7 @@ namespace Classes
                     if (!Directory.Exists(LibraryUploadDirectory)) { Directory.CreateDirectory(LibraryUploadDirectory); }
                     if (!Directory.Exists(LibraryMetadataDirectory)) { Directory.CreateDirectory(LibraryMetadataDirectory); }
                     if (!Directory.Exists(LibraryMetadataDirectory_IGDB)) { Directory.CreateDirectory(LibraryMetadataDirectory_IGDB); }
+                    if (!Directory.Exists(LibraryMetadataDirectory_VIMMSLair)) { Directory.CreateDirectory(LibraryMetadataDirectory_VIMMSLair); }
                     if (!Directory.Exists(LibraryTempDirectory)) { Directory.CreateDirectory(LibraryTempDirectory); }
                 }
             }

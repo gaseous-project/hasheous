@@ -361,6 +361,16 @@ ProcessQueue.QueueItems.Add(
         }
         )
     );
+ProcessQueue.QueueItems.Add(
+new ProcessQueue.QueueItem(
+    ProcessQueue.QueueItemType.FetchVIMMMetadata,
+    10080,
+    new List<ProcessQueue.QueueItemType>
+    {
+
+    }
+    )
+);
 
 Logging.WriteToDiskOnly = false;
 

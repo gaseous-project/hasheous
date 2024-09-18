@@ -42,8 +42,9 @@ namespace hasheous_server.Controllers.v1_0
             {
                 return NotFound("The provided hash was not found in the signature database.");
             }
-            catch
+            catch (Exception ex)
             {
+                Console.Error.WriteLine("An error occurred while looking up a hash: " + model.MD5 + " " + model.SHA1 + ": " + ex.Message);
                 return NotFound();
             }
         }
