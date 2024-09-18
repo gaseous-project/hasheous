@@ -32,7 +32,8 @@ namespace hasheous_server.Models
             Language = 7,
             ROMs = 8,
             VIMMManualId = 9,
-            LogoAttribution = 10
+            LogoAttribution = 10,
+            VIMMPlatformName = 11
         }
 
         public long? Id { get; set; }

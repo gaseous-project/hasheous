@@ -11,7 +11,7 @@ using static Classes.Common;
 
 namespace Classes
 {
-	public class HashLookup
+    public class HashLookup
     {
         public class HashNotFoundException : Exception
         {
@@ -75,7 +75,8 @@ namespace Classes
                 if (publisher == null)
                 {
                     // no returned publisher! create one
-                    publisher = dataObjects.NewDataObject(DataObjects.DataObjectType.Company, new DataObjectItemModel{
+                    publisher = dataObjects.NewDataObject(DataObjects.DataObjectType.Company, new DataObjectItemModel
+                    {
                         Name = discoveredSignature.Game.Publisher
                     });
                     // add signature mappinto to publisher
@@ -93,7 +94,8 @@ namespace Classes
                 if (platform == null)
                 {
                     // no returned platform! create one
-                    platform = dataObjects.NewDataObject(DataObjects.DataObjectType.Platform, new DataObjectItemModel{
+                    platform = dataObjects.NewDataObject(DataObjects.DataObjectType.Platform, new DataObjectItemModel
+                    {
                         Name = discoveredSignature.Game.System
                     });
                     // add signature mapping to platform
@@ -119,25 +121,29 @@ namespace Classes
 
                     // assumption: no games have () in their titles so we'll remove them
                     int idx = gameName.IndexOf('(');
-                    if (idx >= 0) {
+                    if (idx >= 0)
+                    {
                         gameName = gameName.Substring(0, idx);
                     }
 
-                    game = dataObjects.NewDataObject(DataObjects.DataObjectType.Game, new DataObjectItemModel{
+                    game = dataObjects.NewDataObject(DataObjects.DataObjectType.Game, new DataObjectItemModel
+                    {
                         Name = gameName
                     });
                     // add signature mapping to game
                     dataObjects.AddSignature(game.Id, DataObjects.DataObjectType.Game, long.Parse(discoveredSignature.Game.Id));
-                    
+
                     // add platform reference
-                    dataObjects.AddAttribute(game.Id, new AttributeItem{
+                    dataObjects.AddAttribute(game.Id, new AttributeItem
+                    {
                         attributeName = AttributeItem.AttributeName.Platform,
                         attributeType = AttributeItem.AttributeType.ObjectRelationship,
                         attributeRelationType = DataObjects.DataObjectType.Platform,
                         Value = platform.Id
                     });
                     // add publisher reference
-                    dataObjects.AddAttribute(game.Id, new AttributeItem{
+                    dataObjects.AddAttribute(game.Id, new AttributeItem
+                    {
                         attributeName = AttributeItem.AttributeName.Publisher,
                         attributeType = AttributeItem.AttributeType.ObjectRelationship,
                         attributeRelationType = DataObjects.DataObjectType.Company,
@@ -147,6 +153,43 @@ namespace Classes
                     // force metadata search
                     dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true);
 
+                    // VIMMSLair manual search
+                    foreach (AttributeItem attribute in platform.Attributes)
+                    {
+                        if (attribute.attributeName == AttributeItem.AttributeName.VIMMPlatformName)
+                        {
+                            // ensure the signature is a No-Intros one
+                            Signatures_Games_2? sig = null;
+                            foreach (Signatures_Games_2 s in rawSignatures)
+                            {
+                                if (s.Rom.SignatureSource == RomSignatureObject.Game.Rom.SignatureSourceType.NoIntros)
+                                {
+                                    sig = s;
+                                    break;
+                                }
+                            }
+
+                            if (sig != null)
+                            {
+                                string platformName = (string)attribute.Value;
+
+                                string manualId = VIMMSLair.ManualSearch.Search(platformName, Path.GetFileNameWithoutExtension(discoveredSignature.Rom.Name));
+                                if (manualId != "")
+                                {
+                                    // add manual reference
+                                    dataObjects.AddAttribute(game.Id, new AttributeItem
+                                    {
+                                        attributeName = AttributeItem.AttributeName.VIMMManualId,
+                                        attributeType = AttributeItem.AttributeType.ShortString,
+                                        attributeRelationType = DataObjects.DataObjectType.Game,
+                                        Value = manualId
+                                    });
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
                     // re-get the game
                     game = dataObjects.GetDataObject(DataObjects.DataObjectType.Game, game.Id);
                 }
@@ -154,11 +197,13 @@ namespace Classes
                 // build return item
                 this.Id = game.Id;
                 this.Name = game.Name;
-                this.Platform = new MiniDataObjectItem{
+                this.Platform = new MiniDataObjectItem
+                {
                     Name = platform.Name,
                     metadata = platform.Metadata
                 };
-                this.Publisher = new MiniDataObjectItem{
+                this.Publisher = new MiniDataObjectItem
+                {
                     Name = publisher.Name,
                     metadata = publisher.Metadata
                 };
@@ -178,7 +223,8 @@ namespace Classes
                             break;
 
                         default:
-                            AttributeItemCompiled attributeItemCompiled = new AttributeItemCompiled{
+                            AttributeItemCompiled attributeItemCompiled = new AttributeItemCompiled
+                            {
                                 Id = attribute.Id,
                                 attributeName = attribute.attributeName,
                                 attributeRelationType = attribute.attributeRelationType,
