@@ -1,3 +1,6 @@
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.Net;
 using Classes;
 using Classes.Metadata;
 using hasheous_server.Classes.Metadata;
@@ -8,11 +11,21 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace hasheous_server.Controllers.v1_0
 {
+    /// <summary>
+    /// Endpoints used for proxying metadata from IGDB
+    /// </summary>
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]/")]
     [ApiVersion("1.0")]
     public class MetadataProxyController : ControllerBase
     {
+        /// <summary>
+        /// Get metadata from IGDB
+        /// </summary>
+        /// <param name="Id">The Id of the IGDB object to fetch</param>
+        /// <returns>
+        /// The metadata object from IGDB
+        /// </returns>
         [MapToApiVersion("1.0")]
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
@@ -241,6 +254,15 @@ namespace hasheous_server.Controllers.v1_0
             return NotFound();
         }
 
+        /// <summary>
+        /// Search for metadata from IGDB
+        /// </summary>
+        /// <param name="SearchString">
+        /// The string to search for
+        /// </param>
+        /// <returns>
+        /// The platform metadata object from IGDB
+        /// </returns>
         [MapToApiVersion("1.0")]
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
@@ -272,6 +294,18 @@ namespace hasheous_server.Controllers.v1_0
             }
         }
 
+        /// <summary>
+        /// Search for metadata from IGDB
+        /// </summary>
+        /// <param name="PlatformId">
+        /// The Id of the platform to search games for
+        /// </param>
+        /// <param name="SearchString">
+        /// The string to search for
+        /// </param>
+        /// <returns>
+        /// The game metadata object from IGDB
+        /// </returns>
         [MapToApiVersion("1.0")]
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
@@ -330,6 +364,91 @@ namespace hasheous_server.Controllers.v1_0
                 }
 
                 return Ok(gamesToReturn);
+            }
+        }
+
+        private static HttpClient client = new HttpClient();
+
+        /// <summary>
+        /// Get image from IGDB
+        /// </summary>
+        /// <param name="ImageId">
+        /// The Id of the image to fetch
+        /// </param>
+        /// <returns>
+        /// The image from IGDB
+        /// </returns>
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [Route("IGDB/Image/{ImageId}.jpg")]
+        [ResponseCache(CacheProfileName = "7Days")]
+        public async Task<IActionResult> GetImage(string ImageId)
+        {
+            string imageDirectory = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB, "Images");
+            string imagePath = Path.Combine(imageDirectory, ImageId + ".jpg");
+
+            // create directory if it doesn't exist
+            if (!System.IO.Directory.Exists(imageDirectory))
+            {
+                System.IO.Directory.CreateDirectory(imageDirectory);
+            }
+
+            // check if image exists
+            if (System.IO.File.Exists(imagePath))
+            {
+                return PhysicalFile(imagePath, "image/jpeg");
+            }
+            else
+            {
+                // get image from IGDB
+                string url = String.Format("https://images.igdb.com/igdb/image/upload/t_{0}/{1}.jpg", "original", ImageId);
+
+                // download image from url
+                try
+                {
+                    using (HttpResponseMessage response = client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).Result)
+                    {
+                        response.EnsureSuccessStatusCode();
+
+                        using (Stream contentStream = await response.Content.ReadAsStreamAsync(), fileStream = new FileStream(imagePath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true))
+                        {
+                            var totalRead = 0L;
+                            var totalReads = 0L;
+                            var buffer = new byte[8192];
+                            var isMoreToRead = true;
+
+                            do
+                            {
+                                var read = await contentStream.ReadAsync(buffer, 0, buffer.Length);
+                                if (read == 0)
+                                {
+                                    isMoreToRead = false;
+                                }
+                                else
+                                {
+                                    await fileStream.WriteAsync(buffer, 0, read);
+
+                                    totalRead += read;
+                                    totalReads += 1;
+
+                                    if (totalReads % 2000 == 0)
+                                    {
+                                        Console.WriteLine(string.Format("total bytes downloaded so far: {0:n0}", totalRead));
+                                    }
+                                }
+                            }
+                            while (isMoreToRead);
+                        }
+                    }
+
+                    return PhysicalFile(imagePath, "image/jpeg");
+                }
+                catch (Exception ex)
+                {
+                    return NotFound();
+                }
             }
         }
     }

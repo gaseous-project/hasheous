@@ -19,7 +19,6 @@ namespace hasheous_server.Controllers.v1_0
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [Route("{Id}")]
         [ResponseCache(CacheProfileName = "MaxDays")]
-        [ApiExplorerSettings(IgnoreApi = false)]
         [AllowAnonymous]
         public async Task<IActionResult> GetImage(string Id)
         {
