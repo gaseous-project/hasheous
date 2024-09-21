@@ -1,0 +1,77 @@
+name: Data Accuracy Report
+description: Report data accuracy issues
+title: "[Data]: "
+labels: [data]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thankyou for helping to improve the quality of our data. Please provide the following information to help us investigate the issue.
+  - type: input
+    id: contact
+    attributes:
+      label: Your contact information
+      description: "Please provide your email address or other contact information (optional)"
+      placeholder: ""
+    validations:
+      required: false
+  - type: dropdown
+    id: objecttype
+    attributes:
+      label: Object type
+      description: "What type of object is the data about?"
+      options:
+        - Company
+        - Platform
+        - Game
+    validations:
+      required: true
+  - type: input
+    id: objectid
+    attributes:
+      label: Object ID
+      description: "The unique identifier of the object in question. The id can be found in the URL of the object's page."
+      placeholder: ""
+    validations:
+      required: true
+  - type: input
+    id: field
+    attributes:
+      label: Field
+      description: "The name of the field that contains the incorrect data."
+      placeholder: ""
+    validations:
+      required: true
+  - type: input
+    id: incorrectvalue
+    attributes:
+      label: Incorrect value
+      description: "The incorrect value that is currently in the field."
+      placeholder: ""
+    validations:
+      required: true
+  - type: input
+    id: correctvalue
+    attributes:
+      label: Correct value
+      description: "The correct value that should be in the field."
+      placeholder: ""
+    validations:
+      required: true
+  - type: input
+    id: description
+    attributes:
+      label: Description
+      description: "Please provide a detailed description of the issue."
+      placeholder: ""
+    validations:
+      required: true
+  - type: input
+    id: sources
+    attributes:
+      label: Supporting sources
+      description: "Please provide any supporting sources or evidence that can help us verify the correct value."
+      placeholder: ""
+    validations:
+      required: true
+  
