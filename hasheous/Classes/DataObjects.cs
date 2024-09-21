@@ -120,6 +120,76 @@ namespace hasheous_server.Classes
             }
         }
 
+        public Models.DataObjectItem? SearchDataObject(DataObjectType objectType, string? objectName, List<DataObjectSearchCriteriaItem> searchCriteria)
+        {
+            if (searchCriteria.Count == 0)
+            {
+                throw new DataObjectsBadSearchCriteriaException("No search criteria provided");
+            }
+
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql = "SELECT * FROM DataObject";
+            Dictionary<string, object> dbDict = new Dictionary<string, object> { };
+
+            string nameClause = "";
+            if (objectName != null && objectName != "")
+            {
+                if (objectName.Contains("%"))
+                {
+                    nameClause = "`Name` LIKE @name";
+                    dbDict.Add("name", objectName);
+                }
+                else
+                {
+                    nameClause = "`Name` = @name";
+                    dbDict.Add("name", objectName);
+                }
+            }
+
+            int loopCount = 0;
+            foreach (DataObjectSearchCriteriaItem searchCriteriaItem in searchCriteria)
+            {
+                string valueField = "AttributeValue";
+                switch (searchCriteriaItem.Field)
+                {
+                    case AttributeItem.AttributeName.Platform:
+                    case AttributeItem.AttributeName.Publisher:
+                        valueField = "AttributeRelation";
+                        break;
+                }
+
+                sql += " JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId AND DataObject_Attributes.AttributeName = @field" + loopCount + " AND DataObject_Attributes." + valueField + " = @value" + loopCount;
+                dbDict.Add("field" + loopCount, (int)searchCriteriaItem.Field);
+                dbDict.Add("value" + loopCount, searchCriteriaItem.Value);
+
+                loopCount++;
+            }
+
+            if (nameClause != "")
+            {
+                sql += " WHERE " + nameClause;
+            }
+
+            DataTable data = db.ExecuteCMD(sql, dbDict);
+
+            if (data.Rows.Count > 0)
+            {
+                DataObjectItem item = BuildDataObject(objectType, (long)data.Rows[0]["Id"], data.Rows[0], true);
+
+                return item;
+            }
+            else
+            {
+                return null;
+            }
+        }
+
+        public class DataObjectSearchCriteriaItem
+        {
+            public AttributeItem.AttributeName Field { get; set; }
+            public string Value { get; set; }
+        }
+
         private void UpdateDataObjectDate(long DataObjectId)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);

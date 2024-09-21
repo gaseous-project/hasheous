@@ -219,6 +219,10 @@ namespace Classes
 
                                     break;
 
+                                case QueueItemType.AutoMapper:
+                                    AutoMapper.RomAutoMapper();
+                                    break;
+
                             }
                         }
                         catch (Exception ex)
@@ -279,7 +283,12 @@ namespace Classes
             /// <summary>
             /// Fetch VIMM manual metadata
             /// </summary>
-            FetchVIMMMetadata
+            FetchVIMMMetadata,
+
+            /// <summary>
+            /// Loops all ROMs in the database and attempts to match them to a data object - or creates a new datao object if no match is found
+            /// </summary>
+            AutoMapper
         }
 
         public enum QueueItemState
