@@ -9,12 +9,24 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace hasheous_server.Controllers.v1_0
 {
+    /// <summary>
+    /// Signatures Controller
+    /// </summary>
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]/")]
     [ApiVersion("1.0")]
     [Authorize]
     public class SignaturesController : ControllerBase
     {
+        /// <summary>
+        /// Get Signatures
+        /// </summary>
+        /// <param name="model">
+        /// The model to search for
+        /// </param>
+        /// <returns>
+        /// The list of signatures
+        /// </returns>
         [MapToApiVersion("1.0")]
         [HttpPost]
         [AllowAnonymous]
@@ -29,6 +41,15 @@ namespace hasheous_server.Controllers.v1_0
             return Ok(objects);
         }
 
+        /// <summary>
+        /// Get Rom Item By Hash
+        /// </summary>
+        /// <param name="model">
+        /// The model to search for
+        /// </param>
+        /// <returns>
+        /// The list of signatures
+        /// </returns>
         [MapToApiVersion("1.0")]
         [HttpPost]
         [AllowAnonymous]
@@ -43,6 +64,15 @@ namespace hasheous_server.Controllers.v1_0
             return Ok(objects);
         }
 
+        /// <summary>
+        /// Get Rom Item By Id
+        /// </summary>
+        /// <param name="id">
+        /// The id to search for
+        /// </param>
+        /// <returns>
+        /// The list of signatures
+        /// </returns>
         [MapToApiVersion("1.0")]
         [HttpGet]
         [AllowAnonymous]

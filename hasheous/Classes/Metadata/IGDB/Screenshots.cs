@@ -6,7 +6,7 @@ using IGDB.Models;
 
 namespace hasheous_server.Classes.Metadata.IGDB
 {
-	public class Screenshots
+    public class Screenshots
     {
         const string fieldList = "fields alpha_channel,animated,checksum,game,height,image_id,url,width;";
 
@@ -70,7 +70,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
                     returnValue = await GetObjectFromServer(WhereClause, LogoPath);
                     Storage.NewCacheValue(Storage.TablePrefix.IGDB, returnValue);
                     forceImageDownload = true;
-                    break;  
+                    break;
                 case Storage.CacheStatus.Expired:
                     try
                     {
@@ -91,12 +91,12 @@ namespace hasheous_server.Classes.Metadata.IGDB
                     throw new Exception("How did you get here?");
             }
 
-            if ((!File.Exists(Path.Combine(LogoPath, "Screenshot.jpg"))) || forceImageDownload == true)
-            {
-                //GetImageFromServer(returnValue.Url, LogoPath, LogoSize.t_thumb, returnValue.ImageId);
-                //GetImageFromServer(returnValue.Url, LogoPath, LogoSize.t_logo_med, returnValue.ImageId);
-                GetImageFromServer(returnValue.Url, LogoPath, LogoSize.t_original, returnValue.ImageId);
-            }
+            // if ((!File.Exists(Path.Combine(LogoPath, "Screenshot.jpg"))) || forceImageDownload == true)
+            // {
+            //     //GetImageFromServer(returnValue.Url, LogoPath, LogoSize.t_thumb, returnValue.ImageId);
+            //     //GetImageFromServer(returnValue.Url, LogoPath, LogoSize.t_logo_med, returnValue.ImageId);
+            //     GetImageFromServer(returnValue.Url, LogoPath, LogoSize.t_original, returnValue.ImageId);
+            // }
 
             return returnValue;
         }
@@ -116,49 +116,49 @@ namespace hasheous_server.Classes.Metadata.IGDB
 
             //GetImageFromServer(result.Url, LogoPath, LogoSize.t_thumb, result.ImageId);
             //GetImageFromServer(result.Url, LogoPath, LogoSize.t_logo_med, result.ImageId);
-            GetImageFromServer(result.Url, LogoPath, LogoSize.t_original, result.ImageId);
+            //GetImageFromServer(result.Url, LogoPath, LogoSize.t_original, result.ImageId);
 
             return result;
         }
 
-        private static void GetImageFromServer(string Url, string LogoPath, LogoSize logoSize, string ImageId)
-        {
-            using (var client = new HttpClient())
-            {
-                string fileName = "Artwork.jpg";
-                string extension = "jpg";
-                switch (logoSize)
-                {
-                    case LogoSize.t_thumb:
-                        fileName = "_Thumb";
-                        extension = "jpg";
-                        break;
-                    case LogoSize.t_logo_med:
-                        fileName = "_Medium";
-                        extension = "png";
-                        break;
-                    case LogoSize.t_original:
-                        fileName = "";
-                        extension = "png";
-                        break;
-                    default:
-                        fileName = "Artwork";
-                        extension = "jpg";
-                        break;
-                }
-                fileName = ImageId + fileName;
-                string imageUrl = Url.Replace(LogoSize.t_thumb.ToString(), logoSize.ToString()).Replace("jpg", extension);
+        // private static void GetImageFromServer(string Url, string LogoPath, LogoSize logoSize, string ImageId)
+        // {
+        //     using (var client = new HttpClient())
+        //     {
+        //         string fileName = "Artwork.jpg";
+        //         string extension = "jpg";
+        //         switch (logoSize)
+        //         {
+        //             case LogoSize.t_thumb:
+        //                 fileName = "_Thumb";
+        //                 extension = "jpg";
+        //                 break;
+        //             case LogoSize.t_logo_med:
+        //                 fileName = "_Medium";
+        //                 extension = "png";
+        //                 break;
+        //             case LogoSize.t_original:
+        //                 fileName = "";
+        //                 extension = "png";
+        //                 break;
+        //             default:
+        //                 fileName = "Artwork";
+        //                 extension = "jpg";
+        //                 break;
+        //         }
+        //         fileName = ImageId + fileName;
+        //         string imageUrl = Url.Replace(LogoSize.t_thumb.ToString(), logoSize.ToString()).Replace("jpg", extension);
 
-                using (var s = client.GetStreamAsync("https:" + imageUrl))
-                {
-                    if (!Directory.Exists(LogoPath)) { Directory.CreateDirectory(LogoPath); }
-                    using (var fs = new FileStream(Path.Combine(LogoPath, fileName + "." + extension), FileMode.OpenOrCreate))
-                    {
-                        s.Result.CopyTo(fs);
-                    }
-                }
-            }
-        }
+        //         using (var s = client.GetStreamAsync("https:" + imageUrl))
+        //         {
+        //             if (!Directory.Exists(LogoPath)) { Directory.CreateDirectory(LogoPath); }
+        //             using (var fs = new FileStream(Path.Combine(LogoPath, fileName + "." + extension), FileMode.OpenOrCreate))
+        //             {
+        //                 s.Result.CopyTo(fs);
+        //             }
+        //         }
+        //     }
+        // }
 
         private enum LogoSize
         {
@@ -166,6 +166,6 @@ namespace hasheous_server.Classes.Metadata.IGDB
             t_logo_med,
             t_original
         }
-	}
+    }
 }
 

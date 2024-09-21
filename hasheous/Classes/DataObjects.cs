@@ -2,6 +2,7 @@ using System.Data;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using Classes;
+using hasheous_server.Classes.Metadata;
 using hasheous_server.Classes.Metadata.IGDB;
 using hasheous_server.Models;
 using IGDB;
@@ -10,7 +11,7 @@ using Microsoft.AspNetCore.Razor.Language.Intermediate;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NuGet.Common;
-using static hasheous_server.Classes.Metadata.IGDB.Communications;
+using static hasheous_server.Classes.Metadata.Communications;
 
 namespace hasheous_server.Classes
 {
@@ -334,7 +335,7 @@ namespace hasheous_server.Classes
                 {
                     Id = (string)dataRow["MetadataId"],
                     MatchMethod = (BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod)dataRow["MatchMethod"],
-                    Source = (Metadata.IGDB.Communications.MetadataSources)dataRow["SourceId"],
+                    Source = (Metadata.Communications.MetadataSources)dataRow["SourceId"],
                     LastSearch = (DateTime)dataRow["LastSearched"],
                     NextSearch = (DateTime)dataRow["NextSearch"],
                     WinningVoteCount = (int)Common.ReturnValueIfNull(dataRow["WinningVoteCount"], 0),
@@ -492,15 +493,15 @@ namespace hasheous_server.Classes
             DataTable data = db.ExecuteCMD(sql, dbDict);
 
             // set up metadata searching
-            foreach (Enum source in Enum.GetValues(typeof(Metadata.IGDB.Communications.MetadataSources)))
+            foreach (Enum source in Enum.GetValues(typeof(Metadata.Communications.MetadataSources)))
             {
-                if ((Metadata.IGDB.Communications.MetadataSources)source != Metadata.IGDB.Communications.MetadataSources.None)
+                if ((Metadata.Communications.MetadataSources)source != Metadata.Communications.MetadataSources.None)
                 {
                     sql = "INSERT INTO DataObject_MetadataMap (DataObjectId, MetadataId, SourceId, MatchMethod, LastSearched, NextSearch) VALUES (@id, @metaid, @srcid, @method, @lastsearched, @nextsearch);";
                     dbDict = new Dictionary<string, object>{
                         { "id", (long)(ulong)data.Rows[0][0] },
                         { "metaid", "" },
-                        { "srcid", (Metadata.IGDB.Communications.MetadataSources)source },
+                        { "srcid", (Metadata.Communications.MetadataSources)source },
                         { "method", BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch },
                         { "lastsearched", DateTime.UtcNow.AddMonths(-3) },
                         { "nextsearch", DateTime.UtcNow.AddMonths(-1) }
@@ -778,7 +779,7 @@ namespace hasheous_server.Classes
                         // searching is allowed
                         switch (metadata.Source)
                         {
-                            case Metadata.IGDB.Communications.MetadataSources.IGDB:
+                            case Metadata.Communications.MetadataSources.IGDB:
                                 switch (objectType)
                                 {
                                     case DataObjectType.Company:

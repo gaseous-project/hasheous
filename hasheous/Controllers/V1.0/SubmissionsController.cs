@@ -34,6 +34,15 @@ namespace hasheous_server.Controllers.v1_0
             _logger = loggerFactory.CreateLogger<SubmissionsController>();
         }
 
+        /// <summary>
+        /// Add a vote to a match
+        /// </summary>
+        /// <param name="model">
+        /// The model to add a vote to
+        /// </param>
+        /// <returns>
+        /// The result of the vote
+        /// </returns>
         [MapToApiVersion("1.0")]
         [HttpPost]
         [Route("FixMatch")]

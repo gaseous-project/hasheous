@@ -2,7 +2,7 @@
 using System.Data;
 using Newtonsoft.Json;
 using IGDB.Models;
-using hasheous_server.Classes.Metadata.IGDB;
+using hasheous_server.Classes.Metadata;
 
 namespace Classes
 {

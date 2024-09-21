@@ -6,6 +6,7 @@ using System.Data;
 using Classes;
 using IGDB;
 using IGDB.Models;
+using hasheous_server.Classes.Metadata;
 using hasheous_server.Classes.Metadata.IGDB;
 using hasheous_server.Models;
 using hasheous_server.Classes;

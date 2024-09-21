@@ -1,6 +1,6 @@
 using System.Data;
 using Classes;
-using hasheous_server.Classes.Metadata.IGDB;
+using hasheous_server.Classes.Metadata;
 using hasheous_server.Models;
 using static hasheous_server.Models.DataObjectItem;
 

@@ -1,5 +1,5 @@
 using System.Security.Cryptography.X509Certificates;
-using hasheous_server.Classes.Metadata.IGDB;
+using hasheous_server.Classes.Metadata;
 using NuGet.Protocol.Core.Types;
 
 namespace hasheous_server.Models

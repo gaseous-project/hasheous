@@ -7,12 +7,21 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace hasheous_server.Controllers.v1_0
 {
+    /// <summary>
+    /// Sources Controller
+    /// </summary>
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]/")]
     [ApiVersion("1.0")]
     [Authorize]
     public class SourcesController : ControllerBase
     {
+        /// <summary>
+        /// Get Source List
+        /// </summary>
+        /// <returns>
+        /// The list of signature sources
+        /// </returns>
         [MapToApiVersion("1.0")]
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
@@ -23,6 +32,12 @@ namespace hasheous_server.Controllers.v1_0
             return Ok(Enum.GetValues(typeof(RomSignatureObject.Game.Rom.SignatureSourceType)).Cast<RomSignatureObject.Game.Rom.SignatureSourceType>().ToList());
         }
 
+        /// <summary>
+        /// Get Source Statistics
+        /// </summary>
+        /// <returns>
+        /// The list of signature sources
+        /// </returns>
         [MapToApiVersion("1.0")]
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
@@ -34,6 +49,15 @@ namespace hasheous_server.Controllers.v1_0
             return Ok(sources.GetSourceStatistics());
         }
 
+        /// <summary>
+        /// Get Source Details
+        /// </summary>
+        /// <param name="sourceType">
+        /// The source type to get details for
+        /// </param>
+        /// <returns>
+        /// The list of signature sources
+        /// </returns>
         [MapToApiVersion("1.0")]
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]

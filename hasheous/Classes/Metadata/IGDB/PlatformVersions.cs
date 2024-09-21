@@ -6,16 +6,16 @@ using IGDB.Models;
 
 namespace hasheous_server.Classes.Metadata.IGDB
 {
-	public class PlatformVersions
-	{
+    public class PlatformVersions
+    {
         const string fieldList = "fields checksum,companies,connectivity,cpu,graphics,main_manufacturer,media,memory,name,online,os,output,platform_logo,platform_version_release_dates,resolutions,slug,sound,storage,summary,url;";
 
         public PlatformVersions()
-		{
-		}
+        {
+        }
 
 
-        public static PlatformVersion? GetPlatformVersion(long Id, Platform ParentPlatform)
+        public static PlatformVersion? GetPlatformVersion(long Id)//, Platform ParentPlatform)
         {
             if (Id == 0)
             {
@@ -23,18 +23,18 @@ namespace hasheous_server.Classes.Metadata.IGDB
             }
             else
             {
-                Task<PlatformVersion> RetVal = _GetPlatformVersion(SearchUsing.id, Id, ParentPlatform);
+                Task<PlatformVersion> RetVal = _GetPlatformVersion(SearchUsing.id, Id);//, ParentPlatform);
                 return RetVal.Result;
             }
         }
 
-        public static PlatformVersion GetPlatformVersion(string Slug, Platform ParentPlatform)
+        public static PlatformVersion GetPlatformVersion(string Slug)//, Platform ParentPlatform)
         {
-            Task<PlatformVersion> RetVal = _GetPlatformVersion(SearchUsing.slug, Slug, ParentPlatform);
+            Task<PlatformVersion> RetVal = _GetPlatformVersion(SearchUsing.slug, Slug);//, ParentPlatform);
             return RetVal.Result;
         }
 
-        private static async Task<PlatformVersion> _GetPlatformVersion(SearchUsing searchUsing, object searchValue, Platform ParentPlatform)
+        private static async Task<PlatformVersion> _GetPlatformVersion(SearchUsing searchUsing, object searchValue)//, Platform ParentPlatform)
         {
             // check database first
             Storage.CacheStatus? cacheStatus = new Storage.CacheStatus();
@@ -69,7 +69,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
                     if (returnValue != null)
                     {
                         Storage.NewCacheValue(Storage.TablePrefix.IGDB, returnValue);
-                        UpdateSubClasses(ParentPlatform, returnValue);
+                        // UpdateSubClasses(ParentPlatform, returnValue);
                     }
                     return returnValue;
                 case Storage.CacheStatus.Expired:
@@ -77,7 +77,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
                     {
                         returnValue = await GetObjectFromServer(WhereClause);
                         Storage.NewCacheValue(Storage.TablePrefix.IGDB, returnValue, true);
-                        UpdateSubClasses(ParentPlatform, returnValue);
+                        // UpdateSubClasses(ParentPlatform, returnValue);
                     }
                     catch (Exception ex)
                     {
@@ -92,13 +92,13 @@ namespace hasheous_server.Classes.Metadata.IGDB
             }
         }
 
-        private static void UpdateSubClasses(Platform ParentPlatform, PlatformVersion platformVersion)
-        {
-            if (platformVersion.PlatformLogo != null)
-            {
-                PlatformLogo platformLogo = PlatformLogos.GetPlatformLogo(platformVersion.PlatformLogo.Id, Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB_Platform(ParentPlatform), "Versions", platformVersion.Slug));
-            }
-        }
+        // private static void UpdateSubClasses(Platform ParentPlatform, PlatformVersion platformVersion)
+        // {
+        //     if (platformVersion.PlatformLogo != null)
+        //     {
+        //         PlatformLogo platformLogo = PlatformLogos.GetPlatformLogo(platformVersion.PlatformLogo.Id, Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB_Platform(ParentPlatform), "Versions", platformVersion.Slug));
+        //     }
+        // }
 
         private enum SearchUsing
         {
