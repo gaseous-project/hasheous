@@ -386,6 +386,12 @@ namespace hasheous_server.Controllers.v1_0
         [ResponseCache(CacheProfileName = "7Days")]
         public async Task<IActionResult> GetImage(string ImageId)
         {
+            // Validate ImageId to prevent path traversal
+            if (ImageId.Contains("..") || ImageId.Contains("/") || ImageId.Contains("\\"))
+            {
+                return BadRequest("Invalid image ID");
+            }
+
             string imageDirectory = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB, "Images");
             string imagePath = Path.Combine(imageDirectory, ImageId + ".jpg");
 
