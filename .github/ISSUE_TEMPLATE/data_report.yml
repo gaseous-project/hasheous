@@ -12,7 +12,7 @@ body:
     attributes:
       label: Your contact information
       description: "Please provide your email address or other contact information (optional)"
-      placeholder: ""
+      placeholder: "Email address"
     validations:
       required: false
   - type: dropdown
@@ -31,7 +31,7 @@ body:
     attributes:
       label: Object ID
       description: "The unique identifier of the object in question. The id can be found in the URL of the object's page."
-      placeholder: ""
+      placeholder: "ID number"
     validations:
       required: true
   - type: input
@@ -39,7 +39,7 @@ body:
     attributes:
       label: Field
       description: "The name of the field that contains the incorrect data."
-      placeholder: ""
+      placeholder: "Field name"
     validations:
       required: true
   - type: input
@@ -47,7 +47,7 @@ body:
     attributes:
       label: Incorrect value
       description: "The incorrect value that is currently in the field."
-      placeholder: ""
+      placeholder: "Bad value"
     validations:
       required: true
   - type: input
@@ -55,7 +55,7 @@ body:
     attributes:
       label: Correct value
       description: "The correct value that should be in the field."
-      placeholder: ""
+      placeholder: "Correct value"
     validations:
       required: true
   - type: input
@@ -63,7 +63,7 @@ body:
     attributes:
       label: Description
       description: "Please provide a detailed description of the issue."
-      placeholder: ""
+      placeholder: "Description"
     validations:
       required: true
   - type: input
@@ -71,7 +71,7 @@ body:
     attributes:
       label: Supporting sources
       description: "Please provide any supporting sources or evidence that can help us verify the correct value."
-      placeholder: ""
+      placeholder: "Sources"
     validations:
       required: true
   
