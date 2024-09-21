@@ -7,17 +7,17 @@ using IGDB.Models;
 namespace hasheous_server.Classes.Metadata.IGDB
 {
     public class Platforms
-	{
+    {
         const string fieldList = "fields abbreviation,alternative_name,category,checksum,created_at,generation,name,platform_family,platform_logo,slug,summary,updated_at,url,versions,websites;";
 
         public Platforms()
-		{
+        {
 
-		}
+        }
 
 
         public static Platform? GetPlatform(long Id, bool forceRefresh = false)
-		{
+        {
             if (Id == 0)
             {
                 Platform returnValue = new Platform();
@@ -45,14 +45,14 @@ namespace hasheous_server.Classes.Metadata.IGDB
             }
         }
 
-		public static Platform GetPlatform(string Slug, bool forceRefresh = false)
-		{
-			Task<Platform> RetVal = _GetPlatform(SearchUsing.slug, Slug, forceRefresh);
-			return RetVal.Result;
-		}
+        public static Platform GetPlatform(string Slug, bool forceRefresh = false)
+        {
+            Task<Platform> RetVal = _GetPlatform(SearchUsing.slug, Slug, forceRefresh);
+            return RetVal.Result;
+        }
 
-		private static async Task<Platform> _GetPlatform(SearchUsing searchUsing, object searchValue, bool forceRefresh)
-		{
+        private static async Task<Platform> _GetPlatform(SearchUsing searchUsing, object searchValue, bool forceRefresh)
+        {
             // check database first
             Storage.CacheStatus? cacheStatus = new Storage.CacheStatus();
             if (searchUsing == SearchUsing.id)
@@ -119,18 +119,18 @@ namespace hasheous_server.Classes.Metadata.IGDB
 
         private static void UpdateSubClasses(Platform platform)
         {
-            if (platform.Versions != null)
-            {
-                foreach (long PlatformVersionId in platform.Versions.Ids)
-                {
-                    PlatformVersion platformVersion = PlatformVersions.GetPlatformVersion(PlatformVersionId, platform);
-                }
-            }
+            // if (platform.Versions != null)
+            // {
+            //     foreach (long PlatformVersionId in platform.Versions.Ids)
+            //     {
+            //         PlatformVersion platformVersion = PlatformVersions.GetPlatformVersion(PlatformVersionId, platform);
+            //     }
+            // }
 
-            if (platform.PlatformLogo != null)
-            {
-                PlatformLogo platformLogo = PlatformLogos.GetPlatformLogo(platform.PlatformLogo.Id, Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB_Platform(platform));
-            }
+            // if (platform.PlatformLogo != null)
+            // {
+            //     PlatformLogo platformLogo = PlatformLogos.GetPlatformLogo(platform.PlatformLogo.Id, Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB_Platform(platform));
+            // }
         }
 
         private enum SearchUsing

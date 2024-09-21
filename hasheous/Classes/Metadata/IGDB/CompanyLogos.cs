@@ -97,8 +97,8 @@ namespace hasheous_server.Classes.Metadata.IGDB
             {
                 if ((!File.Exists(Path.Combine(LogoPath, "Logo.jpg"))) || forceImageDownload == true)
                 {
-                    GetImageFromServer(returnValue.Url, LogoPath, LogoSize.t_thumb);
-                    GetImageFromServer(returnValue.Url, LogoPath, LogoSize.t_logo_med);
+                    // GetImageFromServer(returnValue.Url, LogoPath, LogoSize.t_thumb);
+                    // GetImageFromServer(returnValue.Url, LogoPath, LogoSize.t_logo_med);
                 }
             }
 
@@ -120,8 +120,8 @@ namespace hasheous_server.Classes.Metadata.IGDB
             {
                 var result = results.First();
 
-                GetImageFromServer(result.Url, LogoPath, LogoSize.t_thumb);
-                GetImageFromServer(result.Url, LogoPath, LogoSize.t_logo_med);
+                // GetImageFromServer(result.Url, LogoPath, LogoSize.t_thumb);
+                // GetImageFromServer(result.Url, LogoPath, LogoSize.t_logo_med);
 
                 return result;
             }
@@ -131,39 +131,39 @@ namespace hasheous_server.Classes.Metadata.IGDB
             }
         }
 
-        private static void GetImageFromServer(string Url, string LogoPath, LogoSize logoSize)
-        {
-            using (var client = new HttpClient())
-            {
-                string fileName = "Logo.jpg";
-                string extension = "jpg";
-                switch (logoSize)
-                {
-                    case LogoSize.t_thumb:
-                        fileName = "Logo_Thumb";
-                        extension = "jpg";
-                        break;
-                    case LogoSize.t_logo_med:
-                        fileName = "Logo_Medium";
-                        extension = "png";
-                        break;
-                    default:
-                        fileName = "Logo";
-                        extension = "jpg";
-                        break;
-                }
-                string imageUrl = Url.Replace(LogoSize.t_thumb.ToString(), logoSize.ToString()).Replace("jpg", extension);
+        // private static void GetImageFromServer(string Url, string LogoPath, LogoSize logoSize)
+        // {
+        //     using (var client = new HttpClient())
+        //     {
+        //         string fileName = "Logo.jpg";
+        //         string extension = "jpg";
+        //         switch (logoSize)
+        //         {
+        //             case LogoSize.t_thumb:
+        //                 fileName = "Logo_Thumb";
+        //                 extension = "jpg";
+        //                 break;
+        //             case LogoSize.t_logo_med:
+        //                 fileName = "Logo_Medium";
+        //                 extension = "png";
+        //                 break;
+        //             default:
+        //                 fileName = "Logo";
+        //                 extension = "jpg";
+        //                 break;
+        //         }
+        //         string imageUrl = Url.Replace(LogoSize.t_thumb.ToString(), logoSize.ToString()).Replace("jpg", extension);
 
-                using (var s = client.GetStreamAsync("https:" + imageUrl))
-                {
-                    if (!Directory.Exists(LogoPath)) { Directory.CreateDirectory(LogoPath); }
-                    using (var fs = new FileStream(Path.Combine(LogoPath, fileName + "." + extension), FileMode.OpenOrCreate))
-                    {
-                        s.Result.CopyTo(fs);
-                    }
-                }
-            }
-        }
+        //         using (var s = client.GetStreamAsync("https:" + imageUrl))
+        //         {
+        //             if (!Directory.Exists(LogoPath)) { Directory.CreateDirectory(LogoPath); }
+        //             using (var fs = new FileStream(Path.Combine(LogoPath, fileName + "." + extension), FileMode.OpenOrCreate))
+        //             {
+        //                 s.Result.CopyTo(fs);
+        //             }
+        //         }
+        //     }
+        // }
 
         private enum LogoSize
         {

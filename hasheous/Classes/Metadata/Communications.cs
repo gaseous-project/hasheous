@@ -1,4 +1,5 @@
 using System;
+using System.Data;
 using System.Net;
 using Classes;
 using Classes.Metadata;
@@ -6,7 +7,7 @@ using IGDB;
 using IGDB.Models;
 using RestEase;
 
-namespace hasheous_server.Classes.Metadata.IGDB
+namespace hasheous_server.Classes.Metadata
 {
     /// <summary>
     /// Handles all metadata API communications
@@ -199,7 +200,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
             }
 
             try
-            {   
+            {
                 if (InRateLimitAvoidanceMode == true)
                 {
                     // sleep for a moment to help avoid hitting the rate limiter
@@ -212,7 +213,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
 
                 // increment rate limiter avoidance call count
                 RateLimitAvoidanceCallCount += 1;
-                
+
                 return results;
             }
             catch (ApiException apiEx)
@@ -228,7 +229,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
                         else
                         {
                             Logging.Log(Logging.LogType.Information, "API Connection", "IGDB API rate limit hit while accessing endpoint " + Endpoint, apiEx);
-                            
+
                             RetryAttempts += 1;
 
                             return await IGDBAPI<T>(Endpoint, Fields, Query);
@@ -238,11 +239,61 @@ namespace hasheous_server.Classes.Metadata.IGDB
                         throw;
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Logging.Log(Logging.LogType.Warning, "API Connection", "Exception when accessing endpoint " + Endpoint, ex);
                 throw;
             }
+        }
+
+        public static T? GetSearchCache<T>(string SearchFields, string SearchString)
+        {
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql = "SELECT * FROM SearchCache WHERE SearchFields = @searchfields AND SearchString = @searchstring;";
+            Dictionary<string, object> dbDict = new Dictionary<string, object>
+            {
+                { "searchfields", SearchFields },
+                { "searchstring", SearchString }
+            };
+            DataTable data = db.ExecuteCMD(sql, dbDict);
+            if (data.Rows.Count > 0)
+            {
+                // cache hit
+                string rawString = data.Rows[0]["Content"].ToString();
+                T ReturnValue = Newtonsoft.Json.JsonConvert.DeserializeObject<T>(rawString);
+                if (ReturnValue != null)
+                {
+                    Logging.Log(Logging.LogType.Information, "Search Cache", "Found search result in cache. Search string: " + SearchString);
+                    return ReturnValue;
+                }
+                else
+                {
+                    Logging.Log(Logging.LogType.Information, "Search Cache", "Search result not found in cache.");
+                    return default;
+                }
+            }
+            else
+            {
+                // cache miss
+                Logging.Log(Logging.LogType.Information, "Search Cache", "Search result not found in cache.");
+                return default;
+            }
+        }
+
+        public static void SetSearchCache<T>(string SearchFields, string SearchString, T SearchResult)
+        {
+            Logging.Log(Logging.LogType.Information, "Search Cache", "Storing search results in cache. Search string: " + SearchString);
+
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql = "INSERT INTO SearchCache (SearchFields, SearchString, Content, LastSearch) VALUES (@searchfields, @searchstring, @content, @lastsearch);";
+            Dictionary<string, object> dbDict = new Dictionary<string, object>
+            {
+                { "searchfields", SearchFields },
+                { "searchstring", SearchString },
+                { "content", Newtonsoft.Json.JsonConvert.SerializeObject(SearchResult) },
+                { "lastsearch", DateTime.UtcNow }
+            };
+            db.ExecuteNonQuery(sql, dbDict);
         }
     }
 }

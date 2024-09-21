@@ -1,5 +1,5 @@
 using hasheous_server.Classes;
-using hasheous_server.Classes.Metadata.IGDB;
+using hasheous_server.Classes.Metadata;
 
 namespace hasheous_server.Models
 {
