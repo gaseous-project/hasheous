@@ -112,7 +112,7 @@ namespace Classes
                 DataObjectItem? game = GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Game, long.Parse(discoveredSignature.Game.Id));
                 if (game == null)
                 {
-                    // no returned game! create one
+                    // no returned game! trim up the name and check if one exists with the same name and platform
 
                     // remove version numbers from name
                     string gameName = discoveredSignature.Game.Name;
@@ -126,32 +126,44 @@ namespace Classes
                         gameName = gameName.Substring(0, idx);
                     }
 
-                    game = dataObjects.NewDataObject(DataObjects.DataObjectType.Game, new DataObjectItemModel
+                    // check if the game exists - create a new one if it doesn't
+                    game = dataObjects.SearchDataObject(DataObjects.DataObjectType.Game, gameName, new List<DataObjects.DataObjectSearchCriteriaItem>
                     {
-                        Name = gameName
+                        new DataObjects.DataObjectSearchCriteriaItem
+                        {
+                            Field = AttributeItem.AttributeName.Platform,
+                            Value = platform.Id.ToString()
+                        }
                     });
+                    if (game == null)
+                    {
+                        game = dataObjects.NewDataObject(DataObjects.DataObjectType.Game, new DataObjectItemModel
+                        {
+                            Name = gameName
+                        });
+
+                        // add platform reference
+                        dataObjects.AddAttribute(game.Id, new AttributeItem
+                        {
+                            attributeName = AttributeItem.AttributeName.Platform,
+                            attributeType = AttributeItem.AttributeType.ObjectRelationship,
+                            attributeRelationType = DataObjects.DataObjectType.Platform,
+                            Value = platform.Id
+                        });
+                        // add publisher reference
+                        dataObjects.AddAttribute(game.Id, new AttributeItem
+                        {
+                            attributeName = AttributeItem.AttributeName.Publisher,
+                            attributeType = AttributeItem.AttributeType.ObjectRelationship,
+                            attributeRelationType = DataObjects.DataObjectType.Company,
+                            Value = publisher.Id
+                        });
+                        // force metadata search
+                        dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true);
+                    }
+
                     // add signature mapping to game
                     dataObjects.AddSignature(game.Id, DataObjects.DataObjectType.Game, long.Parse(discoveredSignature.Game.Id));
-
-                    // add platform reference
-                    dataObjects.AddAttribute(game.Id, new AttributeItem
-                    {
-                        attributeName = AttributeItem.AttributeName.Platform,
-                        attributeType = AttributeItem.AttributeType.ObjectRelationship,
-                        attributeRelationType = DataObjects.DataObjectType.Platform,
-                        Value = platform.Id
-                    });
-                    // add publisher reference
-                    dataObjects.AddAttribute(game.Id, new AttributeItem
-                    {
-                        attributeName = AttributeItem.AttributeName.Publisher,
-                        attributeType = AttributeItem.AttributeType.ObjectRelationship,
-                        attributeRelationType = DataObjects.DataObjectType.Company,
-                        Value = publisher.Id
-                    });
-
-                    // force metadata search
-                    dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true);
 
                     // VIMMSLair manual search
                     foreach (AttributeItem attribute in platform.Attributes)
