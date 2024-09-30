@@ -82,35 +82,35 @@ builder.Services.AddControllers(options =>
         {
             Duration = 1,
             Location = ResponseCacheLocation.Any,
-            VaryByQueryKeys = ["*"]
+            VaryByQueryKeys = new[] { "*" }
         });
     options.CacheProfiles.Add("Default30",
         new CacheProfile()
         {
             Duration = 30,
             Location = ResponseCacheLocation.Any,
-            VaryByQueryKeys = ["*"]
+            VaryByQueryKeys = new[] { "*" }
         });
     options.CacheProfiles.Add("5Minute",
         new CacheProfile()
         {
             Duration = 300,
             Location = ResponseCacheLocation.Any,
-            VaryByQueryKeys = ["*"]
+            VaryByQueryKeys = new[] { "*" }
         });
     options.CacheProfiles.Add("7Days",
         new CacheProfile()
         {
             Duration = 604800,
             Location = ResponseCacheLocation.Any,
-            VaryByQueryKeys = ["*"]
+            VaryByQueryKeys = new[] { "*" }
         });
     options.CacheProfiles.Add("MaxDays",
     new CacheProfile()
     {
         Duration = int.MaxValue,
         Location = ResponseCacheLocation.Any,
-        VaryByQueryKeys = ["*"]
+        VaryByQueryKeys = new[] { "*" }
     });
 });
 
