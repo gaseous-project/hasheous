@@ -5,6 +5,7 @@ using Classes;
 using Classes.Metadata;
 using hasheous_server.Classes.Metadata;
 using hasheous_server.Classes.Metadata.IGDB;
+using HasheousClient;
 using IGDB;
 using IGDB.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -23,13 +24,25 @@ namespace hasheous_server.Controllers.v1_0
         /// Get metadata from IGDB
         /// </summary>
         /// <param name="Id">The Id of the IGDB object to fetch</param>
+        /// <param name="slug">The slug of the IGDB object to fetch (not all endpoints support slug searching)</param>
         /// <returns>
         /// The metadata object from IGDB
         /// </returns>
+        /// <remarks>
+        /// 
+        /// </remarks>
+        ///    
+        /// <response code="200">Returns the metadata object from IGDB</response>
+        /// <response code="404">If the metadata object is not found</response>
+        /// <response code="400">If the Id or slug is invalid</response>
+        /// <response code="500">If an error occurs</response>
+        /// 
         [MapToApiVersion("1.0")]
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [Route("IGDB/AgeRating")]
         [Route("IGDB/AgeRatingContentDescription")]
         [Route("IGDB/AlternativeName")]
@@ -54,8 +67,25 @@ namespace hasheous_server.Controllers.v1_0
         [Route("IGDB/Screenshot")]
         [Route("IGDB/Theme")]
         [ResponseCache(CacheProfileName = "7Days")]
-        public async Task<IActionResult> GetMetadata(long Id)
+        public async Task<IActionResult> GetMetadata(long Id = 0, string slug = "")
         {
+            // reject invalid id or slug
+            if (Id == 0 && slug == "")
+            {
+                return BadRequest();
+            }
+
+            // define variable for slug response
+            bool isSlugSearch = false;
+            if (Id == 0 && slug != "")
+            {
+                isSlugSearch = true;
+            }
+            bool supportsSlugSearch = false;
+
+            // define return value
+            object? returnValue = null;
+
             // get last value of Request.Path.Value
             string[] path = Request.Path.Value.Split("/");
             string lastValue = path[path.Length - 1];
@@ -64,186 +94,349 @@ namespace hasheous_server.Controllers.v1_0
             switch (lastValue)
             {
                 case "AgeRating":
+                    supportsSlugSearch = false;
+                    if (isSlugSearch)
+                    {
+                        break;
+                    }
+
                     AgeRating? ageRating = AgeRatings.GetAgeRatings(Id);
                     if (ageRating != null)
                     {
-                        return Ok(ageRating);
+                        returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.AgeRating>(ageRating, new HasheousClient.Models.Metadata.IGDB.AgeRating());
                     }
                     break;
 
                 case "AgeRatingContentDescription":
+                    supportsSlugSearch = false;
+                    if (isSlugSearch)
+                    {
+                        break;
+                    }
+
                     AgeRatingContentDescription? ageRatingContentDescription = AgeRatingContentDescriptions.GetAgeRatingContentDescriptions(Id);
                     if (ageRatingContentDescription != null)
                     {
-                        return Ok(ageRatingContentDescription);
+                        returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.AgeRatingContentDescription>(ageRatingContentDescription, new HasheousClient.Models.Metadata.IGDB.AgeRatingContentDescription());
                     }
                     break;
 
                 case "AlternativeName":
+                    supportsSlugSearch = false;
+                    if (isSlugSearch)
+                    {
+                        break;
+                    }
+
                     AlternativeName? alternativeName = AlternativeNames.GetAlternativeNames(Id);
                     if (alternativeName != null)
                     {
-                        return Ok(alternativeName);
+                        returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.AlternativeName>(alternativeName, new HasheousClient.Models.Metadata.IGDB.AlternativeName());
                     }
                     break;
 
                 case "Artwork":
+                    supportsSlugSearch = false;
+                    if (isSlugSearch)
+                    {
+                        break;
+                    }
+
                     Artwork? artwork = Artworks.GetArtwork(Id, Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB);
                     if (artwork != null)
                     {
-                        return Ok(artwork);
+                        returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.Artwork>(artwork, new HasheousClient.Models.Metadata.IGDB.Artwork());
                     }
                     break;
 
                 case "Collection":
-                    Collection? collection = Collections.GetCollections(Id);
+                    supportsSlugSearch = true;
+                    Collection? collection = null;
+
+                    if (isSlugSearch == true)
+                    {
+                        collection = Collections.GetCollections(slug);
+                    }
+                    else
+                    {
+                        collection = Collections.GetCollections(Id);
+                    }
+
                     if (collection != null)
                     {
-                        return Ok(collection);
+                        returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.Collection>(collection, new HasheousClient.Models.Metadata.IGDB.Collection());
                     }
                     break;
 
                 case "Company":
-                    Company? company = Companies.GetCompanies(Id);
+                    supportsSlugSearch = true;
+                    Company? company = null;
+
+                    if (isSlugSearch == true)
+                    {
+                        company = Companies.GetCompanies(slug);
+                    }
+                    else
+                    {
+                        company = Companies.GetCompanies(Id);
+                    }
+
                     if (company != null)
                     {
-                        return Ok(company);
+                        returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.Company>(company, new HasheousClient.Models.Metadata.IGDB.Company());
                     }
                     break;
 
                 case "CompanyLogo":
+                    supportsSlugSearch = false;
+                    if (isSlugSearch)
+                    {
+                        break;
+                    }
+
                     CompanyLogo? companyLogo = CompanyLogos.GetCompanyLogo(Id, Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB);
                     if (companyLogo != null)
                     {
-                        return Ok(companyLogo);
+                        returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.CompanyLogo>(companyLogo, new HasheousClient.Models.Metadata.IGDB.CompanyLogo());
                     }
                     break;
 
                 case "Cover":
+                    supportsSlugSearch = false;
+                    if (isSlugSearch)
+                    {
+                        break;
+                    }
+
                     Cover? cover = Covers.GetCover(Id, Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB);
                     if (cover != null)
                     {
-                        return Ok(cover);
+                        returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.Cover>(cover, new HasheousClient.Models.Metadata.IGDB.Cover());
                     }
                     break;
 
                 case "ExternalGame":
+                    supportsSlugSearch = false;
+                    if (isSlugSearch)
+                    {
+                        break;
+                    }
+
                     ExternalGame? externalGame = ExternalGames.GetExternalGames(Id);
                     if (externalGame != null)
                     {
-                        return Ok(externalGame);
+                        returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.ExternalGame>(externalGame, new HasheousClient.Models.Metadata.IGDB.ExternalGame());
                     }
                     break;
 
                 case "Franchise":
-                    Franchise? franchise = Franchises.GetFranchises(Id);
+                    supportsSlugSearch = true;
+                    Franchise? franchise = null;
+
+                    if (isSlugSearch == true)
+                    {
+                        franchise = Franchises.GetFranchises(slug);
+                    }
+                    else
+                    {
+                        franchise = Franchises.GetFranchises(Id);
+                    }
+
                     if (franchise != null)
                     {
-                        return Ok(franchise);
+                        returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.Franchise>(franchise, new HasheousClient.Models.Metadata.IGDB.Franchise());
                     }
                     break;
 
                 case "GameMode":
+                    supportsSlugSearch = false;
+                    if (isSlugSearch)
+                    {
+                        break;
+                    }
+
                     GameMode? gameMode = GameModes.GetGame_Modes(Id);
                     if (gameMode != null)
                     {
-                        return Ok(gameMode);
+                        returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.GameMode>(gameMode, new HasheousClient.Models.Metadata.IGDB.GameMode());
                     }
                     break;
 
                 case "Game":
-                    Game? game = Games.GetGame(Id, false, false, false);
+                    supportsSlugSearch = true;
+                    Game? game = null;
+
+                    if (isSlugSearch == true)
+                    {
+                        game = Games.GetGame(slug, false, false, false);
+                    }
+                    else
+                    {
+                        game = Games.GetGame(Id, false, false, false);
+                    }
+
                     if (game != null)
                     {
-                        return Ok(game);
+                        returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.Game>(game, new HasheousClient.Models.Metadata.IGDB.Game());
                     }
                     break;
 
                 case "GameVideo":
+                    supportsSlugSearch = false;
+                    if (isSlugSearch)
+                    {
+                        break;
+                    }
+
                     GameVideo? gameVideo = GamesVideos.GetGame_Videos(Id);
                     if (gameVideo != null)
                     {
-                        return Ok(gameVideo);
+                        returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.GameVideo>(gameVideo, new HasheousClient.Models.Metadata.IGDB.GameVideo());
                     }
                     break;
 
                 case "Genre":
+                    supportsSlugSearch = false;
+                    if (isSlugSearch)
+                    {
+                        break;
+                    }
+
                     Genre? genre = Genres.GetGenres(Id);
                     if (genre != null)
                     {
-                        return Ok(genre);
+                        returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.Genre>(genre, new HasheousClient.Models.Metadata.IGDB.Genre());
                     }
                     break;
 
                 case "InvolvedCompany":
+                    supportsSlugSearch = false;
+                    if (isSlugSearch)
+                    {
+                        break;
+                    }
+
                     InvolvedCompany? involvedCompany = InvolvedCompanies.GetInvolvedCompanies(Id);
                     if (involvedCompany != null)
                     {
-                        return Ok(involvedCompany);
+                        returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.InvolvedCompany>(involvedCompany, new HasheousClient.Models.Metadata.IGDB.InvolvedCompany());
                     }
                     break;
 
                 case "MultiplayerMode":
+                    supportsSlugSearch = false;
+                    if (isSlugSearch)
+                    {
+                        break;
+                    }
+
                     MultiplayerMode? multiplayerMode = MultiplayerModes.GetGame_MultiplayerModes(Id);
                     if (multiplayerMode != null)
                     {
-                        return Ok(multiplayerMode);
+                        returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.MultiplayerMode>(multiplayerMode, new HasheousClient.Models.Metadata.IGDB.MultiplayerMode());
                     }
                     break;
 
                 case "PlatformLogo":
+                    supportsSlugSearch = false;
+                    if (isSlugSearch)
+                    {
+                        break;
+                    }
+
                     PlatformLogo? platformLogo = PlatformLogos.GetPlatformLogo(Id, Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB);
                     if (platformLogo != null)
                     {
-                        return Ok(platformLogo);
+                        returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.PlatformLogo>(platformLogo, new HasheousClient.Models.Metadata.IGDB.PlatformLogo());
                     }
                     break;
 
                 case "Platform":
-                    Platform? platform = Platforms.GetPlatform(Id);
+                    supportsSlugSearch = true;
+                    Platform? platform = null;
+
+                    if (isSlugSearch == true)
+                    {
+                        platform = Platforms.GetPlatform(slug);
+                    }
+                    else
+                    {
+                        platform = Platforms.GetPlatform(Id);
+                    }
+
                     if (platform != null)
                     {
-                        return Ok(platform);
+                        returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.Platform>(platform, new HasheousClient.Models.Metadata.IGDB.Platform());
                     }
                     break;
 
                 case "PlatformVersion":
+                    supportsSlugSearch = false;
+                    if (isSlugSearch)
+                    {
+                        break;
+                    }
+
                     PlatformVersion? platformVersion = PlatformVersions.GetPlatformVersion(Id);
                     if (platformVersion != null)
                     {
-                        return Ok(platformVersion);
+                        returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.PlatformVersion>(platformVersion, new HasheousClient.Models.Metadata.IGDB.PlatformVersion());
                     }
                     break;
 
                 case "PlayerPerspective":
+                    supportsSlugSearch = false;
+                    if (isSlugSearch)
+                    {
+                        break;
+                    }
+
                     PlayerPerspective? playerPerspective = PlayerPerspectives.GetGame_PlayerPerspectives(Id);
                     if (playerPerspective != null)
                     {
-                        return Ok(playerPerspective);
+                        returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.PlayerPerspective>(playerPerspective, new HasheousClient.Models.Metadata.IGDB.PlayerPerspective());
                     }
                     break;
 
                 case "ReleaseDate":
+                    supportsSlugSearch = false;
+                    if (isSlugSearch)
+                    {
+                        break;
+                    }
+
                     ReleaseDate? releaseDate = ReleaseDates.GetReleaseDates(Id);
                     if (releaseDate != null)
                     {
-                        return Ok(releaseDate);
+                        returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.ReleaseDate>(releaseDate, new HasheousClient.Models.Metadata.IGDB.ReleaseDate());
                     }
                     break;
 
                 case "Screenshot":
+                    supportsSlugSearch = false;
+                    if (isSlugSearch)
+                    {
+                        break;
+                    }
+
                     Screenshot? screenshot = Screenshots.GetScreenshot(Id, Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB);
                     if (screenshot != null)
                     {
-                        return Ok(screenshot);
+                        returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.Screenshot>(screenshot, new HasheousClient.Models.Metadata.IGDB.Screenshot());
                     }
                     break;
 
                 case "Theme":
+                    supportsSlugSearch = false;
+                    if (isSlugSearch)
+                    {
+                        break;
+                    }
+
                     Theme? theme = Themes.GetGame_Themes(Id);
                     if (theme != null)
                     {
-                        return Ok(theme);
+                        returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.Theme>(theme, new HasheousClient.Models.Metadata.IGDB.Theme());
                     }
                     break;
 
@@ -251,7 +444,19 @@ namespace hasheous_server.Controllers.v1_0
                     return NotFound();
             }
 
-            return NotFound();
+            if (isSlugSearch == true && supportsSlugSearch == false)
+            {
+                return BadRequest();
+            }
+
+            if (returnValue != null)
+            {
+                return Ok(returnValue);
+            }
+            else
+            {
+                return NotFound();
+            }
         }
 
         /// <summary>
@@ -263,6 +468,13 @@ namespace hasheous_server.Controllers.v1_0
         /// <returns>
         /// The platform metadata object from IGDB
         /// </returns>
+        /// <remarks>
+        /// 
+        /// </remarks>
+        /// 
+        /// <response code="200">Returns the platform metadata object from IGDB</response>
+        /// <response code="404">If the platform metadata object is not found</response>
+        /// <response code="500">If an error occurs</response>
         [MapToApiVersion("1.0")]
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
