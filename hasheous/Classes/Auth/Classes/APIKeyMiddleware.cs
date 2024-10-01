@@ -6,11 +6,13 @@ using Classes;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Security.Cryptography.Xml;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Authentication
 {
     public class ApiKey
     {
+        [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)]
         public class ApiKeyAttribute : ServiceFilterAttribute
         {
             public ApiKeyAttribute()
@@ -21,7 +23,7 @@ namespace Authentication
 
         public class ApiKeyAuthorizationFilter : IAuthorizationFilter
         {
-            private const string ApiKeyHeaderName = "X-API-Key";
+            public const string ApiKeyHeaderName = "X-API-Key";
 
             private readonly IApiKeyValidator _apiKeyValidator;
 
@@ -45,6 +47,16 @@ namespace Authentication
         {
             public bool IsValid(string apiKey, ref AuthorizationFilterContext context)
             {
+                if (apiKey == null)
+                {
+                    return false;
+                }
+
+                if (LookupCache.Get("APIKeyCache", apiKey) == "true")
+                {
+                    return true;
+                }
+
                 Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
                 string sql = "SELECT * FROM UserAPIKeys WHERE `Key` = @apikey";
                 DataTable data = db.ExecuteCMD(sql, new Dictionary<string, object>{
@@ -52,6 +64,8 @@ namespace Authentication
                 });
                 if (data.Rows.Count == 0)
                 {
+                    LookupCache.Add("APIKeyCache", apiKey, "false");
+
                     return false;
                 }
                 else
@@ -69,6 +83,8 @@ namespace Authentication
 
                         context.HttpContext.User = new ClaimsPrincipal(identity);
                     }
+
+                    LookupCache.Add("APIKeyCache", apiKey, "true");
 
                     return true;
                 }
@@ -103,7 +119,7 @@ namespace Authentication
             string newKey = GenerateApiKey();
 
             string? oldKey = GetApiKey(userId);
-            
+
             string sql;
             if (oldKey == null)
             {
@@ -133,7 +149,7 @@ namespace Authentication
             string base64String = Convert.ToBase64String(bytes)
                 .Replace("+", "-")
                 .Replace("/", "_");
-            
+
             return base64String[..keyLength];
         }
     }
