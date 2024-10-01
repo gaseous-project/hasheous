@@ -80,30 +80,37 @@ builder.Services.AddControllers(options =>
     options.CacheProfiles.Add("None",
         new CacheProfile()
         {
-            Duration = 1
+            Duration = 1,
+            Location = ResponseCacheLocation.Any,
+            VaryByQueryKeys = new[] { "*" }
         });
     options.CacheProfiles.Add("Default30",
         new CacheProfile()
         {
-            Duration = 30
+            Duration = 30,
+            Location = ResponseCacheLocation.Any,
+            VaryByQueryKeys = new[] { "*" }
         });
     options.CacheProfiles.Add("5Minute",
         new CacheProfile()
         {
             Duration = 300,
-            Location = ResponseCacheLocation.Any
+            Location = ResponseCacheLocation.Any,
+            VaryByQueryKeys = new[] { "*" }
         });
     options.CacheProfiles.Add("7Days",
         new CacheProfile()
         {
             Duration = 604800,
-            Location = ResponseCacheLocation.Any
+            Location = ResponseCacheLocation.Any,
+            VaryByQueryKeys = new[] { "*" }
         });
     options.CacheProfiles.Add("MaxDays",
     new CacheProfile()
     {
         Duration = int.MaxValue,
-        Location = ResponseCacheLocation.Any
+        Location = ResponseCacheLocation.Any,
+        VaryByQueryKeys = new[] { "*" }
     });
 });
 
@@ -173,6 +180,17 @@ builder.Services.Configure<FormOptions>(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
     {
+        options.AddSecurityDefinition("API Key", new OpenApiSecurityScheme
+        {
+            Name = ApiKey.ApiKeyAuthorizationFilter.ApiKeyHeaderName,
+            In = ParameterLocation.Header,
+            Type = SecuritySchemeType.ApiKey,
+            Description = "API Key Authentication",
+            Scheme = "ApiKeyScheme"
+        });
+
+        options.OperationFilter<AuthorizationOperationFilter>();
+
         options.SwaggerDoc("v1", new OpenApiInfo
         {
             Version = "v1.0",
