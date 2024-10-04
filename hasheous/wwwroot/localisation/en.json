@@ -32,6 +32,8 @@
     "invalidemail": "The email address is invalid",
     "sources": "Data Sources",
     "source": "Source",
+    "apps": "Apps",
+    "newapp": "New App",
     "platforms": "Platforms",
     "newplatform": "New Platform",
     "companies": "Companies",

@@ -16,6 +16,27 @@ namespace hasheous_server.Controllers.v1_0
     {
         [MapToApiVersion("1.0")]
         [HttpGet]
+        [ProducesResponseType(typeof(DataObjectDefinition), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [AllowAnonymous]
+        [Route("{ObjectType}/Definition")]
+        [ApiExplorerSettings(IgnoreApi = false)]
+        public async Task<IActionResult> DataObjectDefinition(Classes.DataObjects.DataObjectType ObjectType)
+        {
+            try
+            {
+                var DataObjectDefinition = hasheous_server.Classes.DataObjects.DataObjectDefinitions[ObjectType];
+
+                return Ok(DataObjectDefinition);
+            }
+            catch (Exception ex)
+            {
+                return NotFound();
+            }
+        }
+
+        [MapToApiVersion("1.0")]
+        [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [AllowAnonymous]
         [Route("{ObjectType}")]

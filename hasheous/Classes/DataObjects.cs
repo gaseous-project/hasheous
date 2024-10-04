@@ -40,8 +40,129 @@ namespace hasheous_server.Classes
             Platform = 1,
             Game = 2,
             ROM = 3,
+            App = 4,
             None = 100
         }
+
+        public static Dictionary<DataObjectType, object> DataObjectDefinitions = new Dictionary<DataObjectType, object>
+        {
+            { DataObjectType.Company, new DataObjectDefinition{
+                HasMetadata = true,
+                HasSignatures = true,
+                AllowMerge = true,
+                Attributes = new List<AttributeItem>{
+                    new AttributeItem{
+                        attributeName = AttributeItem.AttributeName.Description,
+                        attributeType = AttributeItem.AttributeType.LongString,
+                        attributeRelationType = DataObjectType.None
+                    },
+                    new AttributeItem{
+                        attributeName = AttributeItem.AttributeName.Logo,
+                        attributeType = AttributeItem.AttributeType.ImageId,
+                        attributeRelationType = DataObjectType.None
+                    }
+                }
+            } },
+            { DataObjectType.Platform, new DataObjectDefinition{
+                HasMetadata = true,
+                HasSignatures = true,
+                AllowMerge = true,
+                Attributes = new List<AttributeItem>{
+                    new AttributeItem{
+                        attributeName = AttributeItem.AttributeName.Description,
+                        attributeType = AttributeItem.AttributeType.LongString,
+                        attributeRelationType = DataObjectType.None
+                    },
+                    new AttributeItem{
+                        attributeName = AttributeItem.AttributeName.Logo,
+                        attributeType = AttributeItem.AttributeType.ImageId,
+                        attributeRelationType = DataObjectType.None
+                    },
+                    new AttributeItem{
+                        attributeName = AttributeItem.AttributeName.Manufacturer,
+                        attributeType = AttributeItem.AttributeType.ObjectRelationship,
+                        attributeRelationType = DataObjectType.Company
+                    },
+                    new AttributeItem{
+                        attributeName = AttributeItem.AttributeName.VIMMPlatformName,
+                        attributeType = AttributeItem.AttributeType.ShortString,
+                        attributeRelationType = DataObjectType.None
+                    }
+                }
+            } },
+            { DataObjectType.Game, new DataObjectDefinition{
+                HasMetadata = true,
+                HasSignatures = true,
+                AllowMerge = true,
+                Attributes = new List<AttributeItem>{
+                    new AttributeItem{
+                        attributeName = AttributeItem.AttributeName.Description,
+                        attributeType = AttributeItem.AttributeType.LongString,
+                        attributeRelationType = DataObjectType.None
+                    },
+                    new AttributeItem{
+                        attributeName = AttributeItem.AttributeName.Logo,
+                        attributeType = AttributeItem.AttributeType.ImageId,
+                        attributeRelationType = DataObjectType.None
+                    },
+                    new AttributeItem{
+                        attributeName = AttributeItem.AttributeName.Publisher,
+                        attributeType = AttributeItem.AttributeType.ObjectRelationship,
+                        attributeRelationType = DataObjectType.Company
+                    },
+                    new AttributeItem{
+                        attributeName = AttributeItem.AttributeName.Platform,
+                        attributeType = AttributeItem.AttributeType.ObjectRelationship,
+                        attributeRelationType = DataObjectType.Platform
+                    },
+                    new AttributeItem{
+                        attributeName = AttributeItem.AttributeName.VIMMManualId,
+                        attributeType = AttributeItem.AttributeType.ShortString,
+                        attributeRelationType = DataObjectType.None
+                    }
+                }
+            } },
+            {
+                DataObjectType.App, new DataObjectDefinition
+                {
+                    HasMetadata = false,
+                    HasSignatures = false,
+                    AllowMerge = false,
+                    Attributes = new List<AttributeItem>
+                    {
+                        new AttributeItem
+                        {
+                            attributeName = AttributeItem.AttributeName.Description,
+                            attributeType = AttributeItem.AttributeType.LongString,
+                            attributeRelationType = DataObjectType.None
+                        },
+                        new AttributeItem
+                        {
+                            attributeName = AttributeItem.AttributeName.Logo,
+                            attributeType = AttributeItem.AttributeType.ImageId,
+                            attributeRelationType = DataObjectType.None
+                        },
+                        new AttributeItem
+                        {
+                            attributeName = AttributeItem.AttributeName.Publisher,
+                            attributeType = AttributeItem.AttributeType.ShortString,
+                            attributeRelationType = DataObjectType.None
+                        },
+                        new AttributeItem
+                        {
+                            attributeName = AttributeItem.AttributeName.HomePage,
+                            attributeType = AttributeItem.AttributeType.Link,
+                            attributeRelationType = DataObjectType.None
+                        },
+                        new AttributeItem
+                        {
+                            attributeName = AttributeItem.AttributeName.IssueTracker,
+                            attributeType = AttributeItem.AttributeType.Link,
+                            attributeRelationType = DataObjectType.None
+                        }
+                    }
+                } }
+        };
 
         public DataObjectsList GetDataObjects(DataObjectType objectType, int pageNumber = 0, int pageSize = 0, string? search = null, bool GetChildRelations = false)
         {
@@ -493,12 +614,17 @@ namespace hasheous_server.Classes
             DataTable data = db.ExecuteCMD(sql, dbDict);
 
             // set up metadata searching
-            foreach (Enum source in Enum.GetValues(typeof(Metadata.Communications.MetadataSources)))
+            switch (objectType)
             {
-                if ((Metadata.Communications.MetadataSources)source != Metadata.Communications.MetadataSources.None)
-                {
-                    sql = "INSERT INTO DataObject_MetadataMap (DataObjectId, MetadataId, SourceId, MatchMethod, LastSearched, NextSearch) VALUES (@id, @metaid, @srcid, @method, @lastsearched, @nextsearch);";
-                    dbDict = new Dictionary<string, object>{
+                case DataObjectType.Company:
+                case DataObjectType.Platform:
+                case DataObjectType.Game:
+                    foreach (Enum source in Enum.GetValues(typeof(Metadata.Communications.MetadataSources)))
+                    {
+                        if ((Metadata.Communications.MetadataSources)source != Metadata.Communications.MetadataSources.None)
+                        {
+                            sql = "INSERT INTO DataObject_MetadataMap (DataObjectId, MetadataId, SourceId, MatchMethod, LastSearched, NextSearch) VALUES (@id, @metaid, @srcid, @method, @lastsearched, @nextsearch);";
+                            dbDict = new Dictionary<string, object>{
                         { "id", (long)(ulong)data.Rows[0][0] },
                         { "metaid", "" },
                         { "srcid", (Metadata.Communications.MetadataSources)source },
@@ -506,11 +632,16 @@ namespace hasheous_server.Classes
                         { "lastsearched", DateTime.UtcNow.AddMonths(-3) },
                         { "nextsearch", DateTime.UtcNow.AddMonths(-1) }
                     };
-                    db.ExecuteNonQuery(sql, dbDict);
-                }
-            }
+                            db.ExecuteNonQuery(sql, dbDict);
+                        }
+                    }
 
-            DataObjectMetadataSearch(objectType, (long)(ulong)data.Rows[0][0]);
+                    DataObjectMetadataSearch(objectType, (long)(ulong)data.Rows[0][0]);
+                    break;
+
+                default:
+                    break;
+            }
 
             return GetDataObject(objectType, (long)(ulong)data.Rows[0][0]);
         }
@@ -660,19 +791,24 @@ namespace hasheous_server.Classes
             }
 
             // update metadata map
-            foreach (DataObjectItem.MetadataItem newMetadataItem in model.Metadata)
+            switch (objectType)
             {
-                bool metadataFound = false;
-                foreach (DataObjectItem.MetadataItem existingMetadataItem in EditedObject.Metadata)
-                {
-                    if (newMetadataItem.Source == existingMetadataItem.Source)
+                case DataObjectType.Company:
+                case DataObjectType.Platform:
+                case DataObjectType.Game:
+                    foreach (DataObjectItem.MetadataItem newMetadataItem in model.Metadata)
                     {
-                        metadataFound = true;
-                        if (newMetadataItem.Id != existingMetadataItem.Id)
+                        bool metadataFound = false;
+                        foreach (DataObjectItem.MetadataItem existingMetadataItem in EditedObject.Metadata)
                         {
-                            // change to manually set
-                            sql = "UPDATE DataObject_MetadataMap SET MatchMethod=@match, MetadataId=@metaid, WinningVoteCount=@winningvotecount, TotalVoteCount=@totalvotecount WHERE DataObjectId=@id AND SourceId=@source;";
-                            db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                            if (newMetadataItem.Source == existingMetadataItem.Source)
+                            {
+                                metadataFound = true;
+                                if (newMetadataItem.Id != existingMetadataItem.Id)
+                                {
+                                    // change to manually set
+                                    sql = "UPDATE DataObject_MetadataMap SET MatchMethod=@match, MetadataId=@metaid, WinningVoteCount=@winningvotecount, TotalVoteCount=@totalvotecount WHERE DataObjectId=@id AND SourceId=@source;";
+                                    db.ExecuteNonQuery(sql, new Dictionary<string, object>{
                                 { "id", id },
                                 { "match", BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin },
                                 { "metaid", newMetadataItem.Id },
@@ -680,14 +816,14 @@ namespace hasheous_server.Classes
                                 { "winningvotecount", 0 },
                                 { "totalvotecount", 0 }
                             });
+                                }
+                            }
                         }
-                    }
-                }
 
-                if (metadataFound == false)
-                {
-                    sql = "INSERT INTO DataObject_MetadataMap (DataObjectId, MetadataId, SourceId, MatchMethod, LastSearched, NextSearch) VALUES (@id, @metaid, @source, @match, @last, @next);";
-                    db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                        if (metadataFound == false)
+                        {
+                            sql = "INSERT INTO DataObject_MetadataMap (DataObjectId, MetadataId, SourceId, MatchMethod, LastSearched, NextSearch) VALUES (@id, @metaid, @source, @match, @last, @next);";
+                            db.ExecuteNonQuery(sql, new Dictionary<string, object>{
                         { "id", id },
                         { "match", BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin },
                         { "metaid", newMetadataItem.Id },
@@ -695,7 +831,12 @@ namespace hasheous_server.Classes
                         { "last", DateTime.UtcNow },
                         { "next", DateTime.UtcNow.AddMonths(1) }
                     });
-                }
+                        }
+                    }
+                    break;
+
+                default:
+                    break;
             }
 
             // signatures
@@ -727,9 +868,18 @@ namespace hasheous_server.Classes
         /// <param name="id"></param>
         public MatchItem? DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch = false)
         {
-            var retVal = _DataObjectMetadataSearch(objectType, id, ForceSearch);
-            retVal.Wait(new TimeSpan(0, 0, 15));
-            return retVal.Result;
+            switch (objectType)
+            {
+                case DataObjectType.Company:
+                case DataObjectType.Platform:
+                case DataObjectType.Game:
+                    var retVal = _DataObjectMetadataSearch(objectType, id, ForceSearch);
+                    retVal.Wait(new TimeSpan(0, 0, 15));
+                    return retVal.Result;
+
+                default:
+                    return null;
+            }
         }
 
         private async Task<MatchItem?> _DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch)

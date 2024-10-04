@@ -6,6 +6,11 @@ if (userProfile != null) {
     if (userProfile.Roles != null) {
         if (userProfile.Roles.includes('Moderator') || userProfile.Roles.includes('Admin')) {
             document.getElementById('dataObjectAdminControls').style.display = '';
+            if (dataObjectDefinition.allowMerge == true) {
+                document.getElementById('dataObjectMergeButtons').style.display = '';
+            } else {
+                document.getElementById('dataObjectMergeButtons').style.display = 'none';
+            }
         } else {
             document.getElementById('dataObjectAdminControls').style.display = 'none';
         }
@@ -190,6 +195,17 @@ function renderContent() {
                                 "value": moment(dataObject.attributes[i].value + 'Z').format('lll')
                             }
                         )
+                        break;
+
+                    case "Link":
+                        attributeValues.push(
+                            {
+                                "attribute": dataObject.attributes[i].attributeName,
+                                "value": "<a href=\"" + dataObject.attributes[i].value + "\" target=\"_blank\" rel=\"noopener noreferrer\">" + dataObject.attributes[i].value + "<img src=\"/images/link.svg\" class=\"linkicon\"></a>"
+                            }
+                        )
+                        break;
+
                     default:
                         attributeValues.push(
                             {
@@ -238,11 +254,14 @@ function renderContent() {
         }
     }
 
-    let newMetadataMapTable = new generateTable(
-        dataObject.metadata,
-        ['source:lang', 'matchMethod:lang', 'link:link'],
-        'id',
-        false
-    );
-    document.getElementById('dataObjectMetadataMap').appendChild(newMetadataMapTable);
+    if (dataObject.metadata.length > 0) {
+        document.getElementById('dataObjectMetadataSection').style.display = '';
+        let newMetadataMapTable = new generateTable(
+            dataObject.metadata,
+            ['source:lang', 'matchMethod:lang', 'link:link'],
+            'id',
+            false
+        );
+        document.getElementById('dataObjectMetadataMap').appendChild(newMetadataMapTable);
+    }
 }

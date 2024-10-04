@@ -16,6 +16,7 @@ namespace hasheous_server.Models
             DateTime = 2,
             ImageId = 3,
             ImageAttribution = 4,
+            Link = 5,
             ObjectRelationship = 10,
             EmbeddedList = 11
         }
@@ -33,7 +34,9 @@ namespace hasheous_server.Models
             ROMs = 8,
             VIMMManualId = 9,
             LogoAttribution = 10,
-            VIMMPlatformName = 11
+            VIMMPlatformName = 11,
+            HomePage = 12,
+            IssueTracker = 13
         }
 
         public long? Id { get; set; }

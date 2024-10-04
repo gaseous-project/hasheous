@@ -13,6 +13,7 @@
     <script src="/scripts/login.js"></script>
     <script src="/scripts/language.js"></script>
     <script src="/scripts/common.js"></script>
+    <script src="/scripts/dataobjects.js"></script>
     <script src="/api/v1/Account/Profile/Basic/profile.js"></script>
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -35,7 +36,8 @@
                 <div id="myDropdown" class="dropdown-content">
                     <!-- <div id="banner_user_roles"></div> -->
                     <a href="/index.html?page=account" data-lang="profile">Profile</a>
-                    <a href="/index.html?page=settings" data-lang="settings" id="dropdown_settings" style="display: none;">Settings</a>
+                    <a href="/index.html?page=settings" data-lang="settings" id="dropdown_settings"
+                        style="display: none;">Settings</a>
                     <a href="#" onclick="userLogoff();" data-lang="signout">Sign Out</a>
                 </div>
             </div>
@@ -43,6 +45,11 @@
             <div id="banner_login" onclick="window.location.href = '/index.html?page=login';" class="banner_button"
                 style="display: none;">
                 <span id="banner_login_label" data-lang="login">Login</span>
+            </div>
+
+            <div id="banner_app" onclick="window.location.href = '/index.html?page=dataobjects&type=app';"
+                class="banner_button">
+                <span id="banner_app_label" data-lang="apps">Apps</span>
             </div>
 
             <div id="banner_game" onclick="window.location.href = '/index.html?page=dataobjects&type=game';"

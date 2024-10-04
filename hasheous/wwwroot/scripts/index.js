@@ -1,12 +1,45 @@
+// globals
+var dataObjectDefinition = null;
+
 // load language files
 const lang = new language();
 lang.Init(
-    function () {
+    async function () {
         setUpUI();
 
         // load the page into the main container and set the page title
         let targetPage = getQueryString('page', 'string');
         if (!targetPage) { targetPage = "home"; }
+
+        // load object definitions if on the right pages
+        switch (targetPage) {
+            case "dataobjectdetail":
+            case "dataobjectedit":
+                switch (getQueryString('type', 'string')) {
+                    case "company":
+                    case "platform":
+                    case "game":
+                    case "app":
+                        try {
+                            const response = await fetch('/api/v1/DataObjects/' + getQueryString('type', 'string') + '/Definition');
+                            if (response.ok) {
+                                dataObjectDefinition = await response.json();
+                            } else {
+                                console.error('Failed to fetch data object definition:', response.statusText);
+                            }
+                        } catch (error) {
+                            console.error('Error fetching data object definition:', error);
+                        }
+                        console.log(dataObjectDefinition);
+                        break;
+                    default:
+                        break;
+                }
+                break;
+            default:
+                break;
+        }
+
         switch (targetPage) {
             default:
                 $('#content').load('/pages/' + targetPage + '.html', function (responseTxt, statusTxt, xhr) {

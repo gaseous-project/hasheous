@@ -4,6 +4,8 @@ let editMode = false;
 
 let selectedPlatform = undefined;
 
+let suggestSignatures = false;
+
 let mustRedirect = true;
 if (userProfile != null) {
     if (userProfile.Roles != null) {
@@ -31,56 +33,15 @@ document.getElementById('dataObjectSave').addEventListener("click", function (e)
     let metadata = [];
     metadata.push(newMetadataObject('IGDB', document.getElementById('metadatamapigdb')));
 
-    // attributes
+    // get attributes
     let attributes = [];
-    attributes.push(
-        newAttributeObject('LongString', 'Description', 'None', document.getElementById('attributedescriptioninput').value)
-    );
-    attributes.push(
-        newAttributeObject('ObjectRelationship', 'Manufacturer', 'Company', document.getElementById('attributemanufacturerselect').value)
-    );
-    attributes.push(
-        newAttributeObject('ObjectRelationship', 'Publisher', 'Company', document.getElementById('attributepublisherselect').value)
-    );
-    attributes.push(
-        newAttributeObject('ObjectRelationship', 'Platform', 'Platform', document.getElementById('attributeplatformselect').value)
-    );
-    attributes.push(
-        newAttributeObject('ShortString', 'VIMMManualId', 'None', document.getElementById('attributevimmmanualidinput').value)
-    );
-    attributes.push(
-        newAttributeObject('ShortString', 'VIMMPlatformName', 'None', document.getElementById('attributevimmplatformnameinput').value)
-    );
-    let logoOpt = document.querySelector('input[name=logo]:checked');
-    switch (logoOpt.value) {
-        case "0":
-            // no logo
-            attributes.push(
-                newAttributeObject('ImageId', 'Logo', 'None', '')
-            );
-            break;
+    for (let i = 0; i < renderedAttributes.length; i++) {
+        let attribute = renderedAttributes[i];
+        let attributeValue = attribute.getValue();
 
-        case "1":
-            // uploaded logo
-            let uploadedLogo = document.getElementById('attributelogonewref');
-            if (uploadedLogo.value.length > 0) {
-                attributes.push(
-                    newAttributeObject('ImageId', 'Logo', 'None', uploadedLogo.value)
-                );
-            } else {
-                // user didn't actually specify a new logo - set to existing
-                attributes.push(
-                    newAttributeObject('ImageId', 'Logo', 'None', document.getElementById('attributelogoref').value)
-                );
-            }
-            break;
-
-        case "2":
-            // existing logo
-            attributes.push(
-                newAttributeObject('ImageId', 'Logo', 'None', document.getElementById('attributelogoref').value)
-            );
-            break;
+        attributes.push(
+            newAttributeObject(attribute.attribute.attributeType, attribute.attribute.attributeName, attribute.attribute.attributeRelationType, attributeValue)
+        );
     }
 
     // compile final model
@@ -111,33 +72,6 @@ document.getElementById('dataObjectCancel').addEventListener("click", function (
     window.location.replace("/index.html?page=dataobjectdetail&type=" + pageType + "&id=" + getQueryString('id', 'int'));
 });
 
-// logo upload button
-document.getElementById('attributelogofile').addEventListener("change", function (e) {
-    let ofile = document.getElementById('attributelogofile').files[0];
-    let formdata = new FormData();
-    formdata.append("file", ofile);
-
-    let uploadLabel = document.getElementById('attributelogouploadlabel');
-    uploadLabel.innerHTML = lang.getLang('uploadinglogo');
-
-    $.ajax({
-        url: '/api/v1/Images/',
-        type: 'POST',
-        data: formdata,
-        processData: false,
-        contentType: false,
-        success: function (data) {
-            uploadLabel.innerHTML = lang.getLang('uploadlogocomplete');
-            document.getElementById('attributelogonewref').value = data;
-            document.getElementById('attributelogoselectnew').checked = 'checked';
-            console.log(data);
-        },
-        error: function (error) {
-            console.warn("Error: " + error);
-        }
-    });
-});
-
 ajaxCall(
     '/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int'),
     'GET',
@@ -145,33 +79,69 @@ ajaxCall(
         console.log(success);
         dataObject = success;
         renderContent();
+        loadData();
     }
 );
 
+let renderedAttributes = [];
 function renderContent() {
     setPageTitle(dataObject.name, true);
-    document.getElementById('dataObject_object_name').value = dataObject.name;
-    GetSuggestedSignatures();
+    let objectName = document.getElementById('dataObject_object_name');
+    objectName.value = dataObject.name;
 
-    // show required fields for this page type
-    switch (pageType) {
-        case "company":
-            document.getElementById('attributelogo').style.display = '';
-            break;
+    // render attributes fields
+    let dataObjectAttributesInput = document.getElementById('dataObjectAttributesInput');
+    for (let i = 0; i < dataObjectDefinition.attributes.length; i++) {
+        let attribute = dataObjectDefinition.attributes[i];
 
-        case "platform":
-            document.getElementById('attributemanufacturer').style.display = '';
-            document.getElementById('attributelogo').style.display = '';
-            document.getElementById('attributevimmplatformname').style.display = '';
-            break;
+        let tableRow = document.createElement('tr');
+        tableRow.id = 'attribute' + attribute.attributeName.toLowerCase();
 
-        case "game":
-            document.getElementById('attributepublisher').style.display = '';
-            document.getElementById('attributeplatform').style.display = '';
-            document.getElementById('attributelogo').style.display = '';
-            document.getElementById('attributevimmmanualid').style.display = '';
-            break;
+        let tableCell = document.createElement('td');
+        tableCell.classList.add("tablecell");
+        tableCell.setAttribute('data-lang', attribute.attributeName);
+        tableCell.innerHTML = lang.getLang(attribute.attributeName);
+        tableRow.appendChild(tableCell);
 
+        let typeCell = document.createElement('td');
+        typeCell.classList.add("tablecell");
+        typeCell.setAttribute('data-lang', attribute.attributeType);
+        typeCell.innerHTML = lang.getLang(attribute.attributeType);
+        tableRow.appendChild(typeCell);
+
+        let inputCell = document.createElement('td');
+        inputCell.classList.add("tablecell");
+
+        // insert input fields
+        let dataObjectAttribute = new dataObjectAttributes(attribute);
+        renderedAttributes.push(dataObjectAttribute);
+        inputCell.appendChild(dataObjectAttribute.inputElement);
+
+        tableRow.appendChild(inputCell);
+
+        dataObjectAttributesInput.appendChild(tableRow);
+    }
+
+    if (dataObjectDefinition.hasSignatures == true) {
+        document.getElementById('dataObjectSignatureSection').style.display = '';
+        objectName.addEventListener('keyup', function (e) {
+            console.log('keyup');
+            GetSuggestedSignatures();
+        });
+    } else {
+        document.getElementById('dataObjectSignatureSection').style.display = 'none';
+    }
+
+    if (dataObjectDefinition.hasMetadata == true) {
+        document.getElementById('dataObjectMetadataSection').style.display = '';
+    } else {
+        document.getElementById('dataObjectMetadataSection').style.display = 'none';
+    }
+}
+
+function loadData() {
+    if (dataObjectDefinition.hasSignatures == true) {
+        GetSuggestedSignatures();
     }
 
     // attributes
@@ -180,7 +150,7 @@ function renderContent() {
             case "LongString":
                 switch (dataObject.attributes[i].attributeName) {
                     case "Description":
-                        document.getElementById('attributedescriptioninput').innerHTML = dataObject.attributes[i].value;
+                        document.getElementById('attribute' + dataObject.attributes[i].attributeName.toLowerCase() + 'input').innerHTML = dataObject.attributes[i].value;
                         break;
                 }
                 break;
@@ -188,15 +158,11 @@ function renderContent() {
             case "ShortString":
                 switch (dataObject.attributes[i].attributeName) {
                     case "VIMMManualId":
-                        document.getElementById('attributevimmmanualidinput').value = dataObject.attributes[i].value;
+                        document.getElementById('attribute' + dataObject.attributes[i].attributeName.toLowerCase() + 'input').value = dataObject.attributes[i].value;
                         break;
-                }
-                break;
 
-            case "ShortString":
-                switch (dataObject.attributes[i].attributeName) {
                     case "VIMMPlatformName":
-                        document.getElementById('attributevimmplatformnameinput').value = dataObject.attributes[i].value;
+                        document.getElementById('attribute' + dataObject.attributes[i].attributeName.toLowerCase() + 'input').value = dataObject.attributes[i].value;
                         break;
                 }
                 break;
@@ -204,8 +170,8 @@ function renderContent() {
             case "ImageId":
                 switch (dataObject.attributes[i].attributeName) {
                     case "Logo":
-                        document.getElementById('attributelogoref').value = dataObject.attributes[i].value;
-                        document.getElementById('attributelogoselectexisting').checked = 'checked';
+                        document.getElementById('attribute' + dataObject.attributes[i].attributeName.toLowerCase() + 'ref').value = dataObject.attributes[i].value;
+                        document.getElementById('attribute' + dataObject.attributes[i].attributeName.toLowerCase() + 'selectexisting').checked = 'checked';
                         break;
                 }
                 break;
@@ -215,14 +181,20 @@ function renderContent() {
                 if (dataObject.attributes[i].value) {
                     switch (dataObject.attributes[i].attributeName) {
                         case "Manufacturer":
-                            selectElement = document.getElementById('attributemanufacturerselect');
+                            selectElement = document.getElementById('attribute' + dataObject.attributes[i].attributeName.toLowerCase() + 'select');
                             break;
                         case "Publisher":
-                            selectElement = document.getElementById('attributepublisherselect');
+                            selectElement = document.getElementById('attribute' + dataObject.attributes[i].attributeName.toLowerCase() + 'select');
                             break;
                         case "Platform":
                             selectedPlatform = dataObject.attributes[i].value;
-                            selectElement = document.getElementById('attributeplatformselect')
+                            selectElement = document.getElementById('attribute' + dataObject.attributes[i].attributeName.toLowerCase() + 'select')
+
+                            $(selectElement).on('select2:select', function (e) {
+                                let data = e.params.data;
+                                selectedPlatform = data.fullObject;
+                                GetSuggestedSignatures();
+                            });
                             break;
                     }
 
@@ -242,10 +214,10 @@ function renderContent() {
         }
     }
 
-    // set up attributes menus
-    SetupObjectMenus('attributemanufacturerselect', "Company");
-    SetupObjectMenus('attributepublisherselect', "Company");
-    SetupObjectMenus('attributeplatformselect', "Platform");
+    // // set up attributes menus
+    // SetupObjectMenus('attributemanufacturerselect', "Company");
+    // SetupObjectMenus('attributepublisherselect', "Company");
+    // SetupObjectMenus('attributeplatformselect', "Platform");
 
     // signatures
     let signatureElement = document.getElementById('signaturesselect');
@@ -402,56 +374,6 @@ function newAttributeObject(type, name, relationType, value) {
     }
 
     return attribute;
-}
-
-function SetupObjectMenus(dropdownName, endpoint) {
-    $("#" + dropdownName).select2({
-        ajax: {
-            allowClear: true,
-            placeholder: {
-                "id": "",
-                "text": "None"
-            },
-            url: '/api/v1/DataObjects/' + endpoint,
-            data: function (params) {
-                var query = {
-                    search: params.term
-                }
-
-                return query;
-            },
-            processResults: function (data) {
-                var arr = [];
-
-                arr.push({
-                    id: "",
-                    text: "None"
-                });
-
-                for (var i = 0; i < data.objects.length; i++) {
-                    arr.push({
-                        id: data.objects[i].id,
-                        text: data.objects[i].name,
-                        fullObject: data.objects[i]
-                    });
-                }
-
-                return {
-                    results: arr
-                };
-            }
-        }
-    });
-
-    switch (endpoint) {
-        case "Platform":
-            $("#" + dropdownName).on('select2:select', function (e) {
-                var data = e.params.data;
-                selectedPlatform = data.fullObject;
-                GetSuggestedSignatures();
-            });
-            break;
-    }
 }
 
 function GetSuggestedSignatures() {
