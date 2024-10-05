@@ -676,3 +676,8 @@ td {
     color: var(--badge-text-color);
     display: inline;
 }
+
+.screenshotimage {
+    max-width: 24%;
+    margin-left: 5px;
+}

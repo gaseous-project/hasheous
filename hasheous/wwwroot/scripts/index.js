@@ -30,8 +30,8 @@ lang.Init(
                         } catch (error) {
                             console.error('Error fetching data object definition:', error);
                         }
-                        console.log(dataObjectDefinition);
                         break;
+
                     default:
                         break;
                 }

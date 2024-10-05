@@ -135,6 +135,23 @@ function renderContent() {
                 logoImage.setAttribute('src', '/api/v1/images/' + dataObject.attributes[i].value);
                 break;
 
+            case "Screenshot1":
+            case "Screenshot2":
+            case "Screenshot3":
+            case "Screenshot4":
+                if (dataObject.attributes[i].value) {
+                    let screenshotSection = document.getElementById('dataObjectScreenshotsSection');
+                    screenshotSection.style.display = '';
+
+                    let screenshotBox = document.getElementById('dataObjectScreenshots');
+
+                    let screenshotImage = document.createElement('img');
+                    screenshotImage.setAttribute('src', '/api/v1/images/' + dataObject.attributes[i].value);
+                    screenshotImage.classList.add('screenshotimage');
+                    screenshotBox.appendChild(screenshotImage);
+                }
+                break;
+
             case "LogoAttribution":
                 let logoImageAttributionBox = document.getElementById('dataObjectLogoAttribution');
                 logoImageAttributionBox.style.display = '';

@@ -159,6 +159,30 @@ namespace hasheous_server.Classes
                             attributeName = AttributeItem.AttributeName.IssueTracker,
                             attributeType = AttributeItem.AttributeType.Link,
                             attributeRelationType = DataObjectType.None
+                        },
+                        new AttributeItem
+                        {
+                            attributeName = AttributeItem.AttributeName.Screenshot1,
+                            attributeType = AttributeItem.AttributeType.ImageId,
+                            attributeRelationType = DataObjectType.None
+                        },
+                        new AttributeItem
+                        {
+                            attributeName = AttributeItem.AttributeName.Screenshot2,
+                            attributeType = AttributeItem.AttributeType.ImageId,
+                            attributeRelationType = DataObjectType.None
+                        },
+                        new AttributeItem
+                        {
+                            attributeName = AttributeItem.AttributeName.Screenshot3,
+                            attributeType = AttributeItem.AttributeType.ImageId,
+                            attributeRelationType = DataObjectType.None
+                        },
+                        new AttributeItem
+                        {
+                            attributeName = AttributeItem.AttributeName.Screenshot4,
+                            attributeType = AttributeItem.AttributeType.ImageId,
+                            attributeRelationType = DataObjectType.None
                         }
                     }
                 } }
@@ -368,31 +392,38 @@ namespace hasheous_server.Classes
             List<AttributeItem> attributes = new List<AttributeItem>();
             foreach (DataRow dataRow in data.Rows)
             {
-                AttributeItem attributeItem = BuildAttributeItem(dataRow, GetChildRelations);
-
-                // further processing
-                switch (attributeItem.attributeType)
+                try
                 {
-                    case AttributeItem.AttributeType.ImageId:
-                        if (attributeItem.Value.ToString().Contains(":"))
-                        {
-                            string[] attributeValues = attributeItem.Value.ToString().Split(':');
-                            attributeItem.Value = attributeValues[0];
+                    AttributeItem attributeItem = BuildAttributeItem(dataRow, GetChildRelations);
 
-                            // create attribution attribute
-                            AttributeItem imageAttribution = new AttributeItem()
+                    // further processing
+                    switch (attributeItem.attributeType)
+                    {
+                        case AttributeItem.AttributeType.ImageId:
+                            if (attributeItem.Value.ToString().Contains(":"))
                             {
-                                attributeType = AttributeItem.AttributeType.ImageAttribution,
-                                attributeName = AttributeItem.AttributeName.LogoAttribution,
-                                Value = attributeValues[1],
-                                attributeRelationType = attributeItem.attributeRelationType = DataObjectType.None
-                            };
-                            attributes.Add(imageAttribution);
-                        }
-                        break;
-                }
+                                string[] attributeValues = attributeItem.Value.ToString().Split(':');
+                                attributeItem.Value = attributeValues[0];
 
-                attributes.Add(attributeItem);
+                                // create attribution attribute
+                                AttributeItem imageAttribution = new AttributeItem()
+                                {
+                                    attributeType = AttributeItem.AttributeType.ImageAttribution,
+                                    attributeName = AttributeItem.AttributeName.LogoAttribution,
+                                    Value = attributeValues[1],
+                                    attributeRelationType = attributeItem.attributeRelationType = DataObjectType.None
+                                };
+                                attributes.Add(imageAttribution);
+                            }
+                            break;
+                    }
+
+                    attributes.Add(attributeItem);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Error processing attribute: " + ex.Message);
+                }
             }
 
             return attributes;

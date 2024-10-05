@@ -39,9 +39,11 @@ document.getElementById('dataObjectSave').addEventListener("click", function (e)
         let attribute = renderedAttributes[i];
         let attributeValue = attribute.getValue();
 
-        attributes.push(
-            newAttributeObject(attribute.attribute.attributeType, attribute.attribute.attributeName, attribute.attribute.attributeRelationType, attributeValue)
-        );
+        if (attributeValue != undefined && attributeValue != "" && attributeValue != null) {
+            attributes.push(
+                newAttributeObject(attribute.attribute.attributeType, attribute.attribute.attributeName, attribute.attribute.attributeRelationType, attributeValue)
+            );
+        }
     }
 
     // compile final model
@@ -156,12 +158,13 @@ function loadData() {
                 break;
 
             case "ShortString":
+            case "Link":
                 switch (dataObject.attributes[i].attributeName) {
                     case "VIMMManualId":
-                        document.getElementById('attribute' + dataObject.attributes[i].attributeName.toLowerCase() + 'input').value = dataObject.attributes[i].value;
-                        break;
-
                     case "VIMMPlatformName":
+                    case "HomePage":
+                    case "IssueTracker":
+                    case "Publisher":
                         document.getElementById('attribute' + dataObject.attributes[i].attributeName.toLowerCase() + 'input').value = dataObject.attributes[i].value;
                         break;
                 }
@@ -170,6 +173,10 @@ function loadData() {
             case "ImageId":
                 switch (dataObject.attributes[i].attributeName) {
                     case "Logo":
+                    case "Screenshot1":
+                    case "Screenshot2":
+                    case "Screenshot3":
+                    case "Screenshot4":
                         document.getElementById('attribute' + dataObject.attributes[i].attributeName.toLowerCase() + 'ref').value = dataObject.attributes[i].value;
                         document.getElementById('attribute' + dataObject.attributes[i].attributeName.toLowerCase() + 'selectexisting').checked = 'checked';
                         break;
