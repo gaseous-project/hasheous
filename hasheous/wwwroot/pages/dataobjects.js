@@ -94,7 +94,7 @@ function createDataObjectsTable(pageNumber, pageSize) {
                         },
                         'name',
                         {
-                            column: 'attributes[attributeName=Publisher].value.name',
+                            column: 'attributes[attributeName=Publisher].value',
                             name: 'publisher'
                         },
                         {

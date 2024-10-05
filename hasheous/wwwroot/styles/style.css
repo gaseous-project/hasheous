@@ -679,5 +679,6 @@ td {
 
 .screenshotimage {
     max-width: 24%;
+    max-height: 118px;
     margin-left: 5px;
 }

@@ -145,10 +145,17 @@ function renderContent() {
 
                     let screenshotBox = document.getElementById('dataObjectScreenshots');
 
+                    let screenshotLink = document.createElement('a');
+                    screenshotLink.setAttribute('href', '/api/v1/images/' + dataObject.attributes[i].value + '.png');
+                    screenshotLink.setAttribute('target', '_blank');
+                    screenshotLink.setAttribute('rel', 'noopener noreferrer');
+
                     let screenshotImage = document.createElement('img');
-                    screenshotImage.setAttribute('src', '/api/v1/images/' + dataObject.attributes[i].value);
+                    screenshotImage.setAttribute('src', '/api/v1/images/' + dataObject.attributes[i].value + '.png');
                     screenshotImage.classList.add('screenshotimage');
-                    screenshotBox.appendChild(screenshotImage);
+
+                    screenshotLink.appendChild(screenshotImage);
+                    screenshotBox.appendChild(screenshotLink);
                 }
                 break;
 
