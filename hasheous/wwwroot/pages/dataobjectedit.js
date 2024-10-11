@@ -43,15 +43,33 @@ document.getElementById('dataObjectSave').addEventListener("click", function (e)
             attributes.push(
                 newAttributeObject(attribute.attribute.attributeType, attribute.attribute.attributeName, attribute.attribute.attributeRelationType, attributeValue)
             );
+        } else {
+            attributes.push(
+                newAttributeObject(attribute.attribute.attributeType, attribute.attribute.attributeName, attribute.attribute.attributeRelationType, "")
+            );
+        }
+    }
+
+    // get user access control list
+    let userPermissions = {};
+    if (pageType == "app") {
+        let accessControlSelect = document.getElementById('dataObjectAccessControlSelect');
+        let selectedUsers = $(accessControlSelect).select2('data');
+        for (let i = 0; i < selectedUsers.length; i++) {
+            userPermissions[selectedUsers[i].text] = ["Read", "Update"];
         }
     }
 
     // compile final model
     let model = {
+        id: getQueryString('id', 'int'),
+        dataObjectType: pageType,
         name: document.getElementById('dataObject_object_name').value,
         attributes: attributes,
         metadata: metadata,
-        signatureDataObjects: signatures
+        signatureDataObjects: signatures,
+        permissions: [],
+        userPermissions: userPermissions
     };
 
     console.log(model);
@@ -139,11 +157,35 @@ function renderContent() {
     } else {
         document.getElementById('dataObjectMetadataSection').style.display = 'none';
     }
+
+    if (pageType == "app") {
+        document.getElementById('dataObjectAccessControl').style.display = '';
+    }
 }
 
 function loadData() {
     if (dataObjectDefinition.hasSignatures == true) {
         GetSuggestedSignatures();
+    }
+
+    // access control
+    if (pageType == "app") {
+        let accessControlSelect = document.getElementById('dataObjectAccessControlSelect');
+        if (dataObject.userPermissions != null) {
+            for (key in dataObject.userPermissions) {
+                let userOption = document.createElement('option');
+                userOption.value = key;
+                userOption.innerHTML = key;
+                userOption.selected = 'selected';
+                accessControlSelect.appendChild(userOption);
+            }
+        }
+
+        $(accessControlSelect).select2({
+            closeOnSelect: true,
+            tags: true,
+            tokenSeparators: [',', ' ']
+        });
     }
 
     // attributes

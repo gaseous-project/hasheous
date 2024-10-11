@@ -88,5 +88,7 @@ namespace hasheous_server.Models
         }
         public DateTime CreatedDate { get; set; }
         public DateTime UpdatedDate { get; set; }
+        public List<DataObjectPermission.PermissionType>? Permissions { get; set; }
+        public Dictionary<string, List<DataObjectPermission.PermissionType>>? UserPermissions { get; set; }
     }
 }

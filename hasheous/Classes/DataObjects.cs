@@ -435,6 +435,8 @@ namespace hasheous_server.Classes
             string sql = "";
             Dictionary<string, object> dbDict = new Dictionary<string, object> { };
 
+            bool abort = false;
+
             switch (ObjectType)
             {
                 case DataObjectType.Company:
@@ -463,6 +465,15 @@ namespace hasheous_server.Classes
                         WHERE DataObject_SignatureMap.`DataObjectId` = @id AND DataObject_SignatureMap.`DataObjectTypeId` = @typeid
                         ORDER BY Signatures_Games.`Name`;";
                     break;
+
+                default:
+                    abort = true;
+                    break;
+            }
+
+            if (abort == true)
+            {
+                return new List<Dictionary<string, object>>();
             }
 
             List<Dictionary<string, object>> signatureItems = db.ExecuteCMDDict(sql, new Dictionary<string, object>{
@@ -880,6 +891,59 @@ namespace hasheous_server.Classes
                 AddSignature(id, objectType, long.Parse(signature["SignatureId"].ToString()));
             }
 
+            // access control
+            if (objectType == DataObjectType.App)
+            {
+                // update access control
+                sql = "DELETE FROM DataObject_ACL WHERE DataObject_ID=@id";
+                db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                    { "id", id }
+                });
+
+                foreach (KeyValuePair<string, List<DataObjectPermission.PermissionType>> acl in model.UserPermissions)
+                {
+                    // get user id from email
+                    sql = "SELECT Id FROM Users WHERE Email=@email;";
+                    dbDict = new Dictionary<string, object>{
+                        { "email", acl.Key }
+                    };
+                    DataTable user = db.ExecuteCMD(sql, dbDict);
+                    if (user.Rows.Count > 0)
+                    {
+                        sql = "INSERT INTO DataObject_ACL (`DataObject_ID`, `UserId`, `Read`, `Write`, `Delete`) VALUES (@id, @userid, @read, @write, @delete);";
+                        dbDict = new Dictionary<string, object>{
+                            { "id", id },
+                            { "userid", user.Rows[0]["Id"] }
+                        };
+                        if (acl.Value.Contains(DataObjectPermission.PermissionType.Read))
+                        {
+                            dbDict.Add("read", true);
+                        }
+                        else
+                        {
+                            dbDict.Add("read", false);
+                        }
+                        if (acl.Value.Contains(DataObjectPermission.PermissionType.Update))
+                        {
+                            dbDict.Add("write", true);
+                        }
+                        else
+                        {
+                            dbDict.Add("write", false);
+                        }
+                        if (acl.Value.Contains(DataObjectPermission.PermissionType.Delete))
+                        {
+                            dbDict.Add("delete", true);
+                        }
+                        else
+                        {
+                            dbDict.Add("delete", false);
+                        }
+                        db.ExecuteNonQuery(sql, dbDict);
+                    }
+                }
+            }
+
             return GetDataObject(objectType, id);
         }
 
@@ -1240,7 +1304,14 @@ namespace hasheous_server.Classes
                     }
                     break;
                 default:
-                    attributeItem.Value = (string)row["AttributeValue"];
+                    if (row["AttributeValue"] != DBNull.Value)
+                    {
+                        attributeItem.Value = (string)row["AttributeValue"];
+                    }
+                    else
+                    {
+                        attributeItem.Value = "";
+                    }
                     break;
             }
 

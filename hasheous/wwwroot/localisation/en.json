@@ -157,5 +157,7 @@
     "screenshot2": "Screenshot 2",
     "screenshot3": "Screenshot 3",
     "screenshot4": "Screenshot 4",
-    "issuetracker": "Issue Tracker"
+    "issuetracker": "Issue Tracker",
+    "accesscontrol": "Access Control",
+    "clientapikeys": "Client API Keys"
 }

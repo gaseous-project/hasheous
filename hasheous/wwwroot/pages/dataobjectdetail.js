@@ -58,6 +58,32 @@ ajaxCall(
     function (success) {
         console.log(success);
         dataObject = success;
+
+        // hide buttons if user is not an admin
+        if (userProfile != null) {
+            if (userProfile.Roles != null) {
+                if (!userProfile.Roles.includes('Admin')) {
+                    // check if dataObject.permissions has a value
+                    if (dataObject.permissions != null) {
+                        if (dataObject.permissions.includes('Update')) {
+                            document.getElementById('dataObjectEdit').style.display = '';
+                        } else {
+                            document.getElementById('dataObjectEdit').style.display = 'none';
+                        }
+                        if (dataObject.permissions.includes('Delete')) {
+                            document.getElementById('dataObjectDelete').style.display = '';
+                        } else {
+                            document.getElementById('dataObjectDelete').style.display = 'none';
+                        }
+                    } else {
+                        document.getElementById('dataObjectAdminControls').style.display = 'none';
+                    }
+                }
+            } else {
+                document.getElementById('dataObjectAdminControls').style.display = 'none';
+            }
+        }
+
         renderContent();
     }
 );
@@ -287,5 +313,31 @@ function renderContent() {
             false
         );
         document.getElementById('dataObjectMetadataMap').appendChild(newMetadataMapTable);
+    }
+
+    if (pageType == "app") {
+        // app specific handling
+
+        // app permissions handling
+        if (dataObject.userPermissions != null) {
+            document.getElementById('dataObjectAccessControlSection').style.display = '';
+
+            // loop through permissions and add to table
+            // the value is a dictionary with the key being the users email address and the value being a list of permissions
+            let userListTarget = document.getElementById('dataObjectAccessControl');
+            for (let key in dataObject.userPermissions) {
+                if (dataObject.userPermissions[key].includes('Update')) {
+                    let userName = document.createElement('span');
+                    userName.classList.add('signatureitem');
+                    userName.innerHTML = key;
+                    userListTarget.appendChild(userName);
+                }
+            }
+        }
+
+        // client api key handling
+        if (dataObject.permissions.includes('Update')) {
+            document.getElementById('dataObjectClientAPIKeysSection').style.display = '';
+        }
     }
 }
