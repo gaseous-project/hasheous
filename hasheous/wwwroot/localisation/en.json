@@ -159,5 +159,12 @@
     "screenshot4": "Screenshot 4",
     "issuetracker": "Issue Tracker",
     "accesscontrol": "Access Control",
-    "clientapikeys": "Client API Keys"
+    "createclientapikeys": "Create Client API Key",
+    "clientapikeys": "Client API Keys",
+    "clientapikeysresponse": "Your Client API Key",
+    "clientapikeyresponse": "<p>Your client API key is:</p><input type=\"text\" readonly=\"readonly\" class=\"inputwide apikey\" value=\"{0}\" /><p>Please store this key securely, as it will not be shown again.</p>",
+    "clientapirevokeprompt": "Are you sure you want to revoke this key? Please enter \"REVOKE\" to confirm. Note that it may take up to 5 minutes for the key to be revoked.",
+    "never": "Never",
+    "expires": "Expires",
+    "create": "Create"
 }

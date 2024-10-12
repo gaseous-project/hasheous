@@ -97,8 +97,59 @@
     </div>
 
     <div id="dataObjectClientAPIKeysSection" style="display: none;">
+        <h2 data-lang="createclientapikeys"></h2>
+        <div id="dataObjectClientAPIKeyButtons">
+            <table>
+                <tr>
+                    <td>
+                        <span data-lang="name"></span>
+                    </td>
+                    <td colspan="2">
+                        <input type="text" id="dataObjectClientAPIKeyName" maxlength="200" class="inputwide" />
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <span data-lang="expires"></span>
+                    </td>
+                    <td style="width: 10px;">
+                        <input type="radio" id="dataObjectClientAPIKeyExpiresNever" name="dataObjectClientAPIKeyExpires"
+                            value="never" checked />
+                    </td>
+                    <td>
+                        <label for="dataObjectClientAPIKeyExpiresNever" data-lang="never"></label>
+                    </td>
+                </tr>
+                <tr>
+                    <td></td>
+                    <td>
+                        <input type="radio" id="dataObjectClientAPIKeyExpiresCustom"
+                            name="dataObjectClientAPIKeyExpires" value="custom" />
+                    </td>
+                    <td>
+                        <label for="dataObjectClientAPIKeyExpiresCustom">
+                            <input type="datetime-local" id="dataObjectClientAPIKeyExpires" />
+                        </label>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="3">
+                        <button id="dataObjectClientAPIKeyCreate"><span data-lang="create"></span> <img
+                                src="/images/save.svg" class="buttonicon" /></button>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <div id="dataObjectClientAPIKeysResponseSection" style="display: none;">
+            <h3 data-lang="clientapikeysresponse"></h3>
+            <span id="dataObjectClientAPIKeysResponse">
+
+            </span>
+        </div>
+
         <h2 data-lang="clientapikeys"></h2>
         <div id="dataObjectClientAPIKeys">
-            
+
         </div>
     </div>

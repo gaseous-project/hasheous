@@ -41,7 +41,6 @@ namespace hasheous_server.Controllers.v1_0
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [AllowAnonymous]
         [Route("{ObjectType}/Definition")]
-        [ApiExplorerSettings(IgnoreApi = false)]
         public async Task<IActionResult> DataObjectDefinition(Classes.DataObjects.DataObjectType ObjectType)
         {
             try
@@ -503,6 +502,80 @@ namespace hasheous_server.Controllers.v1_0
                 {
                     return Ok(DataObjects.MergeObjects(DataObject, TargetDataObject, Commit));
                 }
+            }
+        }
+
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [Authorize]
+        [ProducesResponseType(typeof(List<ClientApiKeyItem>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [Route("app/{Id}/ClientApiKeys")]
+        public async Task<IActionResult> GetClientApiKeys(long Id)
+        {
+            var user = await _userManager.GetUserAsync(User);
+
+            DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
+
+            if (dataObjectPermission.CheckAsync(user, DataObjects.DataObjectType.App, DataObjectPermission.PermissionType.Update, Id).Result)
+            {
+                Authentication.ClientApiKey clientApiKey = new Authentication.ClientApiKey();
+
+                return Ok(clientApiKey.GetApiKeys(Id));
+            }
+            else
+            {
+                return NotFound();
+            }
+        }
+
+        [MapToApiVersion("1.0")]
+        [HttpPost]
+        [Authorize]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [Route("app/{Id}/ClientApiKeys")]
+        public async Task<IActionResult> NewClientApiKey(long Id, string Name, DateTime? Expires)
+        {
+            var user = await _userManager.GetUserAsync(User);
+
+            DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
+
+            if (dataObjectPermission.CheckAsync(user, DataObjects.DataObjectType.App, DataObjectPermission.PermissionType.Update, Id).Result)
+            {
+                Authentication.ClientApiKey clientApiKey = new Authentication.ClientApiKey();
+
+                return Ok(clientApiKey.CreateApiKey(Id, Name, Expires));
+            }
+            else
+            {
+                return NotFound();
+            }
+        }
+
+        [MapToApiVersion("1.0")]
+        [HttpDelete]
+        [Authorize]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [Route("app/{Id}/ClientApiKeys/{ClientId}")]
+        public async Task<IActionResult> DeleteClientApiKey(long Id, long ClientId)
+        {
+            var user = await _userManager.GetUserAsync(User);
+
+            DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
+
+            if (dataObjectPermission.CheckAsync(user, DataObjects.DataObjectType.App, DataObjectPermission.PermissionType.Update, Id).Result)
+            {
+                Authentication.ClientApiKey clientApiKey = new Authentication.ClientApiKey();
+
+                clientApiKey.RevokeApiKey(Id, ClientId);
+
+                return Ok();
+            }
+            else
+            {
+                return NotFound();
             }
         }
     }

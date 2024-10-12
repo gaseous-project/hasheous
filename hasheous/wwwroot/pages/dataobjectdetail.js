@@ -338,6 +338,87 @@ function renderContent() {
         // client api key handling
         if (dataObject.permissions.includes('Update')) {
             document.getElementById('dataObjectClientAPIKeysSection').style.display = '';
+
+            // set up the create client api key button
+            let createClientAPIKeyBtn = document.getElementById('dataObjectClientAPIKeyCreate');
+            createClientAPIKeyBtn.addEventListener("click", function (e) {
+                // create client api key model
+                let clientAPIKeyUrl = '/api/v1/DataObjects/app/' + getQueryString('id', 'int') + '/ClientAPIKeys' + '?name=' + encodeURIComponent(document.getElementById('dataObjectClientAPIKeyName').value);
+
+                if (
+                    document.getElementById('dataObjectClientAPIKeyExpiresCustom').checked == true &&
+                    document.getElementById('dataObjectClientAPIKeyExpires').value != ''
+                ) {
+                    clientAPIKeyUrl += '&expires=' + document.getElementById('dataObjectClientAPIKeyExpires').value;
+                }
+
+                fetch(clientAPIKeyUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }).then(async function (response) {
+                    if (response.ok) {
+                        let value = await response.json();
+                        console.log(response.json());
+                        document.getElementById('dataObjectClientAPIKeysResponseSection').style.display = '';
+
+                        document.getElementById('dataObjectClientAPIKeysResponse').innerHTML = lang.getLang('clientapikeyresponse', [value.key]);
+
+                        GetApiKeys();
+                    } else {
+                        throw new Error('Failed to create client API key');
+                    }
+                });
+            });
+
+            GetApiKeys();
         }
     }
+}
+
+function GetApiKeys() {
+    // get client api keys
+    ajaxCall(
+        '/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int') + '/ClientAPIKeys',
+        'GET',
+        function (success) {
+            console.log(success);
+            let clientAPIKeysTable = new generateTable(
+                success,
+                ['clientId', 'name', 'created:date', 'expires:date', 'expired', 'revoked'],
+                'clientId',
+                true,
+                function (key, rows) {
+                    for (let i = 0; i < rows.length; i++) {
+                        if (rows[i].clientId == key) {
+                            let row = rows[i];
+                            if (row.revoked == false) {
+                                let revokePrompt = prompt(lang.getLang('clientapirevokeprompt'));
+                                if (revokePrompt == 'REVOKE') {
+                                    ajaxCall(
+                                        '/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int') + '/ClientAPIKeys/' + key,
+                                        'DELETE',
+                                        function (success) {
+                                            GetApiKeys();
+                                        },
+                                        function (error) {
+                                            GetApiKeys();
+                                        }
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            );
+
+            let clientAPIKeysTableElement = document.getElementById('dataObjectClientAPIKeys');
+            clientAPIKeysTableElement.innerHTML = '';
+            clientAPIKeysTableElement.appendChild(clientAPIKeysTable);
+        },
+        function (error) {
+            console.warn(error);
+        }
+    );
 }

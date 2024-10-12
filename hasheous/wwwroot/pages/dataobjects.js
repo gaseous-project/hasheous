@@ -98,8 +98,8 @@ function createDataObjectsTable(pageNumber, pageSize) {
                             name: 'publisher'
                         },
                         {
-                            column: 'attributes[attributeName=HomePage].value',
-                            name: 'homepage'
+                            column: 'attributes[attributeName=HomePage].value:link',
+                            name: 'link'
                         }
                     ];
                     break;

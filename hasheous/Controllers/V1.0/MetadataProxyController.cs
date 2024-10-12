@@ -9,7 +9,7 @@ using HasheousClient;
 using IGDB;
 using IGDB.Models;
 using Microsoft.AspNetCore.Mvc;
-using static Authentication.ApiKey;
+using static Authentication.ClientApiKey;
 
 namespace hasheous_server.Controllers.v1_0
 {
@@ -19,7 +19,7 @@ namespace hasheous_server.Controllers.v1_0
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]/")]
     [ApiVersion("1.0")]
-    [ApiKey()]
+    [ClientApiKey()]
     public class MetadataProxyController : ControllerBase
     {
         /// <summary>
