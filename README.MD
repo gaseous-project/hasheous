@@ -18,9 +18,8 @@ Hasheous is hosted at https://hasheous.org/
 Join our Discord server: https://discord.gg/Nhu7wpT3k4
 
 ## Requirements
-* MariaDB 11.1.2 or MySQL Server 8+
-  * These are the database versions Hasheous has been tested and developed against. Your mileage may vary with earlier versions.
-  * Currently MariaDB is the preferred database server.
+* MariaDB 11.1.2 or greater
+  * This is the database version Hasheous has been tested and developed against. Your mileage may vary with earlier versions.
 * Internet Game Database API Key. See: https://api-docs.igdb.com/#account-creation
 
 ## Third Party Projects
