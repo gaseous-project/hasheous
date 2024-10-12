@@ -14,6 +14,7 @@ using static Classes.Common;
 using System.Net.Mail;
 using System.Net;
 using static Authentication.ApiKey;
+using static Authentication.ClientApiKey;
 
 Logging.WriteToDiskOnly = true;
 Logging.Log(Logging.LogType.Information, "Startup", "Starting Hasheous Server " + Assembly.GetExecutingAssembly().GetName().Version);
@@ -189,6 +190,15 @@ builder.Services.AddSwaggerGen(options =>
             Scheme = "ApiKeyScheme"
         });
 
+        options.AddSecurityDefinition("Client API Key", new OpenApiSecurityScheme
+        {
+            Name = ClientApiKey.ClientApiKeyAuthorizationFilter.ClientApiKeyHeaderName,
+            In = ParameterLocation.Header,
+            Type = SecuritySchemeType.ApiKey,
+            Description = "Client API Key",
+            Scheme = "ClientApiKeyScheme"
+        });
+
         options.OperationFilter<AuthorizationOperationFilter>();
 
         options.SwaggerDoc("v1", new OpenApiInfo
@@ -260,6 +270,8 @@ builder.Services.AddAuthorization(options =>
 // setup api key
 builder.Services.AddSingleton<ApiKeyAuthorizationFilter>();
 builder.Services.AddSingleton<IApiKeyValidator, ApiKeyValidator>();
+builder.Services.AddSingleton<ClientApiKeyAuthorizationFilter>();
+builder.Services.AddSingleton<IClientApiKeyValidator, ClientApiKeyValidator>();
 
 var app = builder.Build();
 

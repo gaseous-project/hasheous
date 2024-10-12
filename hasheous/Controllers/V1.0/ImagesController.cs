@@ -3,6 +3,7 @@ using hasheous_server.Classes;
 using hasheous_server.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Net.Http.Headers;
 
 namespace hasheous_server.Controllers.v1_0
 {
@@ -15,9 +16,10 @@ namespace hasheous_server.Controllers.v1_0
     {
         [MapToApiVersion("1.0")]
         [HttpGet]
-        [ProducesResponseType(typeof(FileStreamResult), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [Route("{Id}")]
+        [Route("{Id}.png")]
         [ResponseCache(CacheProfileName = "MaxDays")]
         [AllowAnonymous]
         public async Task<IActionResult> GetImage(string Id)
@@ -32,7 +34,14 @@ namespace hasheous_server.Controllers.v1_0
             }
             else
             {
-                return File(image.content, image.mimeType, image.Id + image.extension);
+                System.Net.Mime.ContentDisposition cd = new System.Net.Mime.ContentDisposition
+                {
+                    FileName = image.Id + image.extension,
+                    Inline = true
+                };
+                Response.Headers.Add("Content-Disposition", cd.ToString());
+
+                return File(image.content, image.mimeType);
             }
         }
 

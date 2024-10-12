@@ -70,7 +70,6 @@ function createDataObjectsTable(pageNumber, pageSize) {
                     ];
                     break;
 
-                default:
                 case "company":
                     columns = [
                         'id',
@@ -85,6 +84,33 @@ function createDataObjectsTable(pageNumber, pageSize) {
                         }
                     ];
                     break;
+
+                case "app":
+                    columns = [
+                        'id',
+                        {
+                            column: 'attributes[attributeName=Logo].value:image',
+                            name: 'logo'
+                        },
+                        'name',
+                        {
+                            column: 'attributes[attributeName=Publisher].value',
+                            name: 'publisher'
+                        },
+                        {
+                            column: 'attributes[attributeName=HomePage].value:link',
+                            name: 'link'
+                        }
+                    ];
+                    break;
+
+                default:
+                    columns = [
+                        'id',
+                        'name'
+                    ];
+                    break;
+
             }
 
             let newTable = new generateTable(

@@ -20,7 +20,12 @@ class language {
             {
                 "dataobject_objects": "games",
                 "dataobject_new": "newgame"
-            }
+            },
+            "app":
+            {
+                "dataobject_objects": "apps",
+                "dataobject_new": "newapp"
+            },
         };
 
     constructor() {

@@ -43,6 +43,7 @@
     <None Remove="Schema\hasheous-1006.sql" />
     <None Remove="Schema\hasheous-1007.sql" />
     <None Remove="Schema\hasheous-1008.sql" />
+    <None Remove="Schema\hasheous-1009.sql" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Support\Country.txt" />
@@ -56,5 +57,6 @@
     <EmbeddedResource Include="Schema\hasheous-1006.sql" />
     <EmbeddedResource Include="Schema\hasheous-1007.sql" />
     <EmbeddedResource Include="Schema\hasheous-1008.sql" />
+    <EmbeddedResource Include="Schema\hasheous-1009.sql" />
   </ItemGroup>
 </Project>

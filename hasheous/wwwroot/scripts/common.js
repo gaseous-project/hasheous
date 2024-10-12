@@ -163,7 +163,11 @@ class generateTable {
                     let cellContent = document.createElement('span');
                     switch (cellType) {
                         case "date":
-                            cellContent.innerHTML = moment(cellValue + "Z").format('llll');
+                            if (cellValue.length > 0) {
+                                cellContent.innerHTML = moment(cellValue + "Z").format('llll');
+                            } else {
+                                cellContent.innerHTML = "";
+                            }
                             break;
 
                         case "lang":
@@ -172,7 +176,19 @@ class generateTable {
 
                         case "link":
                             if (cellValue.length > 0) {
-                                cellContent.innerHTML = "<a href=\"" + cellValue + "\" target=\"_blank\" rel=\"noopener noreferrer\">" + cellValue + "<img src=\"/images/link.svg\" class=\"linkicon\" /></a>";
+                                // cellContent.innerHTML = "<a href=\"" + cellValue + "\" target=\"_blank\" rel=\"noopener noreferrer\">" + cellValue + "<img src=\"/images/link.svg\" class=\"linkicon\" /></a>";
+
+                                let newLink = document.createElement('a');
+                                newLink.href = cellValue;
+                                newLink.target = "_blank";
+                                newLink.rel = "noopener noreferrer";
+                                newLink.innerHTML = cellValue + "<img src=\"/images/link.svg\" class=\"linkicon\" />";
+                                newLink.addEventListener("click", function (ev) {
+                                    window.open(cellValue, '_blank', 'noopener,noreferrer');
+                                    ev.stopPropagation();
+                                    ev.preventDefault();
+                                }, true);
+                                cellContent.appendChild(newLink);
                             } else {
                                 cellContent.innerHTML = "";
                             }
@@ -223,7 +239,7 @@ class generateTable {
                         let clickbackResultSet = this.resultSet;
                         dataRow.addEventListener("click", function () {
                             rowClickCallback(rowId, clickbackResultSet);
-                        }, true);
+                        }, false);
                     }
                 }
 

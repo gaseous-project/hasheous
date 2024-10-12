@@ -6,6 +6,11 @@ if (userProfile != null) {
     if (userProfile.Roles != null) {
         if (userProfile.Roles.includes('Moderator') || userProfile.Roles.includes('Admin')) {
             document.getElementById('dataObjectAdminControls').style.display = '';
+            if (dataObjectDefinition.allowMerge == true) {
+                document.getElementById('dataObjectMergeButtons').style.display = '';
+            } else {
+                document.getElementById('dataObjectMergeButtons').style.display = 'none';
+            }
         } else {
             document.getElementById('dataObjectAdminControls').style.display = 'none';
         }
@@ -53,6 +58,32 @@ ajaxCall(
     function (success) {
         console.log(success);
         dataObject = success;
+
+        // hide buttons if user is not an admin
+        if (userProfile != null) {
+            if (userProfile.Roles != null) {
+                if (!userProfile.Roles.includes('Admin')) {
+                    // check if dataObject.permissions has a value
+                    if (dataObject.permissions != null) {
+                        if (dataObject.permissions.includes('Update')) {
+                            document.getElementById('dataObjectEdit').style.display = '';
+                        } else {
+                            document.getElementById('dataObjectEdit').style.display = 'none';
+                        }
+                        if (dataObject.permissions.includes('Delete')) {
+                            document.getElementById('dataObjectDelete').style.display = '';
+                        } else {
+                            document.getElementById('dataObjectDelete').style.display = 'none';
+                        }
+                    } else {
+                        document.getElementById('dataObjectAdminControls').style.display = 'none';
+                    }
+                }
+            } else {
+                document.getElementById('dataObjectAdminControls').style.display = 'none';
+            }
+        }
+
         renderContent();
     }
 );
@@ -130,6 +161,30 @@ function renderContent() {
                 logoImage.setAttribute('src', '/api/v1/images/' + dataObject.attributes[i].value);
                 break;
 
+            case "Screenshot1":
+            case "Screenshot2":
+            case "Screenshot3":
+            case "Screenshot4":
+                if (dataObject.attributes[i].value) {
+                    let screenshotSection = document.getElementById('dataObjectScreenshotsSection');
+                    screenshotSection.style.display = '';
+
+                    let screenshotBox = document.getElementById('dataObjectScreenshots');
+
+                    let screenshotLink = document.createElement('a');
+                    screenshotLink.setAttribute('href', '/api/v1/images/' + dataObject.attributes[i].value + '.png');
+                    screenshotLink.setAttribute('target', '_blank');
+                    screenshotLink.setAttribute('rel', 'noopener noreferrer');
+
+                    let screenshotImage = document.createElement('img');
+                    screenshotImage.setAttribute('src', '/api/v1/images/' + dataObject.attributes[i].value + '.png');
+                    screenshotImage.classList.add('screenshotimage');
+
+                    screenshotLink.appendChild(screenshotImage);
+                    screenshotBox.appendChild(screenshotLink);
+                }
+                break;
+
             case "LogoAttribution":
                 let logoImageAttributionBox = document.getElementById('dataObjectLogoAttribution');
                 logoImageAttributionBox.style.display = '';
@@ -190,6 +245,17 @@ function renderContent() {
                                 "value": moment(dataObject.attributes[i].value + 'Z').format('lll')
                             }
                         )
+                        break;
+
+                    case "Link":
+                        attributeValues.push(
+                            {
+                                "attribute": dataObject.attributes[i].attributeName,
+                                "value": "<a href=\"" + dataObject.attributes[i].value + "\" target=\"_blank\" rel=\"noopener noreferrer\">" + dataObject.attributes[i].value + "<img src=\"/images/link.svg\" class=\"linkicon\"></a>"
+                            }
+                        )
+                        break;
+
                     default:
                         attributeValues.push(
                             {
@@ -238,11 +304,121 @@ function renderContent() {
         }
     }
 
-    let newMetadataMapTable = new generateTable(
-        dataObject.metadata,
-        ['source:lang', 'matchMethod:lang', 'link:link'],
-        'id',
-        false
+    if (dataObject.metadata.length > 0) {
+        document.getElementById('dataObjectMetadataSection').style.display = '';
+        let newMetadataMapTable = new generateTable(
+            dataObject.metadata,
+            ['source:lang', 'matchMethod:lang', 'link:link'],
+            'id',
+            false
+        );
+        document.getElementById('dataObjectMetadataMap').appendChild(newMetadataMapTable);
+    }
+
+    if (pageType == "app") {
+        // app specific handling
+
+        // app permissions handling
+        if (dataObject.userPermissions != null) {
+            document.getElementById('dataObjectAccessControlSection').style.display = '';
+
+            // loop through permissions and add to table
+            // the value is a dictionary with the key being the users email address and the value being a list of permissions
+            let userListTarget = document.getElementById('dataObjectAccessControl');
+            for (let key in dataObject.userPermissions) {
+                if (dataObject.userPermissions[key].includes('Update')) {
+                    let userName = document.createElement('span');
+                    userName.classList.add('signatureitem');
+                    userName.innerHTML = key;
+                    userListTarget.appendChild(userName);
+                }
+            }
+        }
+
+        // client api key handling
+        if (dataObject.permissions.includes('Update')) {
+            document.getElementById('dataObjectClientAPIKeysSection').style.display = '';
+
+            // set up the create client api key button
+            let createClientAPIKeyBtn = document.getElementById('dataObjectClientAPIKeyCreate');
+            createClientAPIKeyBtn.addEventListener("click", function (e) {
+                // create client api key model
+                let clientAPIKeyUrl = '/api/v1/DataObjects/app/' + getQueryString('id', 'int') + '/ClientAPIKeys' + '?name=' + encodeURIComponent(document.getElementById('dataObjectClientAPIKeyName').value);
+
+                if (
+                    document.getElementById('dataObjectClientAPIKeyExpiresCustom').checked == true &&
+                    document.getElementById('dataObjectClientAPIKeyExpires').value != ''
+                ) {
+                    clientAPIKeyUrl += '&expires=' + document.getElementById('dataObjectClientAPIKeyExpires').value;
+                }
+
+                fetch(clientAPIKeyUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }).then(async function (response) {
+                    if (response.ok) {
+                        let value = await response.json();
+                        console.log(response.json());
+                        document.getElementById('dataObjectClientAPIKeysResponseSection').style.display = '';
+
+                        document.getElementById('dataObjectClientAPIKeysResponse').innerHTML = lang.getLang('clientapikeyresponse', [value.key]);
+
+                        GetApiKeys();
+                    } else {
+                        throw new Error('Failed to create client API key');
+                    }
+                });
+            });
+
+            GetApiKeys();
+        }
+    }
+}
+
+function GetApiKeys() {
+    // get client api keys
+    ajaxCall(
+        '/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int') + '/ClientAPIKeys',
+        'GET',
+        function (success) {
+            console.log(success);
+            let clientAPIKeysTable = new generateTable(
+                success,
+                ['clientId', 'name', 'created:date', 'expires:date', 'expired', 'revoked'],
+                'clientId',
+                true,
+                function (key, rows) {
+                    for (let i = 0; i < rows.length; i++) {
+                        if (rows[i].clientId == key) {
+                            let row = rows[i];
+                            if (row.revoked == false) {
+                                let revokePrompt = prompt(lang.getLang('clientapirevokeprompt'));
+                                if (revokePrompt == 'REVOKE') {
+                                    ajaxCall(
+                                        '/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int') + '/ClientAPIKeys/' + key,
+                                        'DELETE',
+                                        function (success) {
+                                            GetApiKeys();
+                                        },
+                                        function (error) {
+                                            GetApiKeys();
+                                        }
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            );
+
+            let clientAPIKeysTableElement = document.getElementById('dataObjectClientAPIKeys');
+            clientAPIKeysTableElement.innerHTML = '';
+            clientAPIKeysTableElement.appendChild(clientAPIKeysTable);
+        },
+        function (error) {
+            console.warn(error);
+        }
     );
-    document.getElementById('dataObjectMetadataMap').appendChild(newMetadataMapTable);
 }

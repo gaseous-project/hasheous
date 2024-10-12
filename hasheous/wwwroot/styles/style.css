@@ -311,6 +311,7 @@ button:disabled {
 
 #banner_search_field {
     width: 250px;
+    opacity: 75%;
 }
 
 #banner_search_small {
@@ -675,4 +676,14 @@ td {
     background-color: var(--badge-background-color);
     color: var(--badge-text-color);
     display: inline;
+}
+
+.screenshotimage {
+    max-width: 24%;
+    max-height: 118px;
+    margin-left: 5px;
+}
+
+.apikey {
+    font-family: 'Courier New', Courier, monospace !important;
 }
