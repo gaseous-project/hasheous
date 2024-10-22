@@ -1167,7 +1167,7 @@ namespace hasheous_server.Controllers.v1_0
             string searchFields = "fields abbreviation,alternative_name,category,checksum,created_at,generation,name,platform_family,platform_logo,slug,summary,updated_at,url,versions,websites; ";
             searchBody += "where name ~ *\"" + SearchString + "\"*;";
 
-            List<Platform>? searchCache = Communications.GetSearchCache<List<Platform>>(searchFields, searchBody);
+            List<HasheousClient.Models.Metadata.IGDB.Platform>? searchCache = Communications.GetSearchCache<List<HasheousClient.Models.Metadata.IGDB.Platform>>(searchFields, searchBody);
 
             if (searchCache == null)
             {
@@ -1176,14 +1176,20 @@ namespace hasheous_server.Controllers.v1_0
                 Communications comms = new Communications(Communications.MetadataSources.IGDB);
                 var results = await comms.APIComm<Platform>(IGDBClient.Endpoints.Platforms, searchFields, searchBody);
 
-                Communications.SetSearchCache<List<Platform>>(searchFields, searchBody, results.ToList());
+                List<HasheousClient.Models.Metadata.IGDB.Platform> platforms = new List<HasheousClient.Models.Metadata.IGDB.Platform>();
+                foreach (Platform platform in results.ToList())
+                {
+                    HasheousClient.Models.Metadata.IGDB.Platform tempPlatform = new HasheousClient.Models.Metadata.IGDB.Platform();
+                    tempPlatform = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.Platform>(platform, tempPlatform);
+                    platforms.Add(tempPlatform);
+                }
 
-                return Ok(results.ToList());
+                Communications.SetSearchCache<List<HasheousClient.Models.Metadata.IGDB.Platform>>(searchFields, searchBody, platforms);
+
+                searchCache = platforms;
             }
-            else
-            {
-                return Ok(searchCache);
-            }
+
+            return Ok(searchCache);
         }
 
         /// <summary>
@@ -1212,7 +1218,7 @@ namespace hasheous_server.Controllers.v1_0
             searchBody += "where platforms = (" + PlatformId + ");";
             searchBody += "limit 100;";
 
-            List<Game>? searchCache = Communications.GetSearchCache<List<Game>>(searchFields, searchBody);
+            List<HasheousClient.Models.Metadata.IGDB.Game>? searchCache = Communications.GetSearchCache<List<HasheousClient.Models.Metadata.IGDB.Game>>(searchFields, searchBody);
 
             if (searchCache == null)
             {
@@ -1221,42 +1227,20 @@ namespace hasheous_server.Controllers.v1_0
                 Communications comms = new Communications(Communications.MetadataSources.IGDB);
                 var results = await comms.APIComm<Game>(IGDBClient.Endpoints.Games, searchFields, searchBody);
 
-                List<Game> games = new List<Game>();
+                List<HasheousClient.Models.Metadata.IGDB.Game> games = new List<HasheousClient.Models.Metadata.IGDB.Game>();
                 foreach (Game game in results.ToList())
                 {
-                    Storage.CacheStatus cacheStatus = Storage.GetCacheStatus(Storage.TablePrefix.IGDB, "Game", (long)game.Id);
-                    switch (cacheStatus)
-                    {
-                        case Storage.CacheStatus.NotPresent:
-                            Storage.NewCacheValue(Storage.TablePrefix.IGDB, game, false);
-                            break;
-
-                        case Storage.CacheStatus.Expired:
-                            Storage.NewCacheValue(Storage.TablePrefix.IGDB, game, true);
-                            break;
-
-                    }
-
-                    games.Add(game);
+                    HasheousClient.Models.Metadata.IGDB.Game tempGame = new HasheousClient.Models.Metadata.IGDB.Game();
+                    tempGame = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.Game>(game, tempGame);
+                    games.Add(tempGame);
                 }
 
-                Communications.SetSearchCache<List<Game>>(searchFields, searchBody, games);
+                Communications.SetSearchCache<List<HasheousClient.Models.Metadata.IGDB.Game>>(searchFields, searchBody, games);
 
-                return Ok(games);
+                searchCache = games;
             }
-            else
-            {
-                // get full version of results from database
-                // this is a hacky workaround due to the readonly nature of IGDB.Model.Game IdentityOrValue fields
-                List<Game> gamesToReturn = new List<Game>();
-                foreach (Game game in searchCache)
-                {
-                    Game tempGame = Games.GetGame((long)game.Id, false, false, false);
-                    gamesToReturn.Add(tempGame);
-                }
 
-                return Ok(gamesToReturn);
-            }
+            return Ok(searchCache);
         }
 
         private static HttpClient client = new HttpClient();
