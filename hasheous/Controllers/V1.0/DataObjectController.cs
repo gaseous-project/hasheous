@@ -477,7 +477,7 @@ namespace hasheous_server.Controllers.v1_0
         public async Task<IActionResult> MergeObjects(Classes.DataObjects.DataObjectType ObjectType, long Id, long TargetId, bool Commit = false)
         {
             // merging isn't valid for apps
-            if (ObjectType != Classes.DataObjects.DataObjectType.App)
+            if (ObjectType == Classes.DataObjects.DataObjectType.App)
             {
                 return NotFound();
             }

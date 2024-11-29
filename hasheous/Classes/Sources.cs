@@ -14,13 +14,14 @@ namespace hasheous_server.Classes
                 case RomSignatureObject.Game.Rom.SignatureSourceType.TOSEC:
                 case RomSignatureObject.Game.Rom.SignatureSourceType.MAMEArcade:
                 case RomSignatureObject.Game.Rom.SignatureSourceType.MAMEMess:
+                case RomSignatureObject.Game.Rom.SignatureSourceType.Redump:
                     SourceTypeLabel = sourceType.ToString();
                     break;
 
                 case RomSignatureObject.Game.Rom.SignatureSourceType.NoIntros:
                     SourceTypeLabel = "No-Intro";
                     break;
-                
+
                 default:
                     throw new Exception("Invalid source type");
             }
@@ -61,7 +62,8 @@ namespace hasheous_server.Classes
 
         public hasheous_server.Models.SourceItem BuildSourceItem(DataRow row)
         {
-            hasheous_server.Models.SourceItem sourceItem = new hasheous_server.Models.SourceItem{
+            hasheous_server.Models.SourceItem sourceItem = new hasheous_server.Models.SourceItem
+            {
                 Id = (int)row["Id"],
                 Name = (string)row["Name"],
                 Description = (string)row["Description"],
