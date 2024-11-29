@@ -365,15 +365,10 @@ app.Use(async (context, next) =>
 });
 
 // add background tasks
+ProcessQueue.QueueItem signatureIngestor = new ProcessQueue.QueueItem(ProcessQueue.QueueItemType.SignatureIngestor, 60, new List<ProcessQueue.QueueItemType>());
+signatureIngestor.ForceExecute();
 ProcessQueue.QueueItems.Add(
-    new ProcessQueue.QueueItem(
-        ProcessQueue.QueueItemType.SignatureIngestor,
-        60,
-        new List<ProcessQueue.QueueItemType>
-        {
-
-        }
-        )
+    signatureIngestor
     );
 
 ProcessQueue.QueueItems.Add(

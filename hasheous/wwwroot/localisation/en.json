@@ -62,6 +62,8 @@
     "tosecdesc": "The Old School Emulation Center (TOSEC) is a retrocomputing initiative dedicated to the cataloging and preservation of software, firmware and resources for arcade machines, microcomputers, minicomputers and video game consoles. The main goal of the project is to catalog and audit various kinds of software and firmware images for these systems.",
     "nointro": "No-Intro",
     "nointrodesc": "No-Intro catalogs the best available copies of ROMs and digital games, providing DAT files for ROM managers and an online database.",
+    "redump": "Redump",
+    "redumpdesc": "Redump is a database of disc images, including CD-ROMs, DVDs, and other optical media. The database is intended to be a comprehensive archive of all known disc images.",
     "progetto": "Progetto Snaps",
     "progettodesc": "Provides DATs for MAME and MESS.",
     "save": "OK",
