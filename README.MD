@@ -5,7 +5,7 @@ This project aims to match the content of DAT's like those provided by TOSEC and
 Hasheous is hosted at https://hasheous.org/
 
 ## Features
-* Supports TOSEC, MAME, MESS, and No-Intro
+* Supports TOSEC, MAME, MESS, Redump, and No-Intro
 * Matches to the following metadata sources:
   * IGDB
   * VIMMS Lair Manual Project (provides scans of game manuals)
@@ -79,6 +79,7 @@ Dockerfile and docker-compose-build.yml files have been provided to make deploym
 Currently supported DAT's:
 * TOSEC: https://www.tosecdev.org/downloads/category/56-2023-01-23
 * MAME Arcade and MAME Mess: https://www.progettosnaps.net/dats/MAME
+* Redump: http://redump.org
 * No-Intro: https://no-intro.org
 
 If there are other DAT's you'd like to see support for, please raise an issue with a link to the DAT's.
@@ -98,6 +99,10 @@ If there are other DAT's you'd like to see support for, please raise an issue wi
 1. Download the DAT files from the source website. For example; from https://www.progettosnaps.net/dats/MAME
 2. Extract the archive
 3. Copy the file name `MAME 0.257 (mess).dat` files to `~/.hasheous-server/Data/Signatures/MAME MESS/`
+
+### Redump
+1. Download the DAT files from the source website. For example; from http://redump.org/downloads/
+2. Copy the DAT files to `~/.hasheous-server/Data/Signatures/Redump/`
 
 ### No-Intro
 1. Download the DAT files from the source website. For example; from https://datomatic.no-intro.org/index.php?page=download&op=daily&s=64
