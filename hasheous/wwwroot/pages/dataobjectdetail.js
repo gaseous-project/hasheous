@@ -206,7 +206,7 @@ function renderContent() {
                             attributeValues.push(
                                 {
                                     "attribute": dataObject.attributes[i].attributeName,
-                                    "value": "<a href=\"/index.html?page=dataobjectdetail&type=" + dataObject.attributes[i].attributeRelationType + "&id=" + dataObject.attributes[i].value.id + "\">" + dataObject.attributes[i].value.name + "</a>"
+                                    "value": "<a href=\"/index.html?page=dataobjectdetail&type=" + dataObject.attributes[i].attributeRelationType.toLowerCase() + "&id=" + dataObject.attributes[i].value.id + "\">" + dataObject.attributes[i].value.name + "</a>"
                                 }
                             );
                         }
