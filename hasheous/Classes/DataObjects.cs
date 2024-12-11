@@ -12,6 +12,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NuGet.Common;
 using static hasheous_server.Classes.Metadata.Communications;
+using static hasheous_server.Models.DataObjectItem;
 
 namespace hasheous_server.Classes
 {
@@ -492,6 +493,7 @@ namespace hasheous_server.Classes
                 { "id", DataObjectId }
             });
             List<DataObjectItem.MetadataItem> metadataItems = new List<DataObjectItem.MetadataItem>();
+
             foreach (DataRow dataRow in data.Rows)
             {
                 DataObjectItem.MetadataItem metadataItem = new DataObjectItem.MetadataItem(ObjectType)
@@ -506,6 +508,50 @@ namespace hasheous_server.Classes
                 };
 
                 metadataItems.Add(metadataItem);
+            }
+
+            // loop through each enum in Metadata.Communications.MetadataSources and create a metadata item
+            // check if the enum is in metadataItems, if not, add it
+            foreach (Metadata.Communications.MetadataSources source in Enum.GetValues(typeof(Metadata.Communications.MetadataSources)))
+            {
+                if (source != MetadataSources.None)
+                {
+                    bool found = false;
+                    foreach (DataObjectItem.MetadataItem metadataItem in metadataItems)
+                    {
+                        if (metadataItem.Source == source)
+                        {
+                            found = true;
+                        }
+                    }
+
+                    if (found == false)
+                    {
+                        DataObjectItem.MetadataItem metadataItem = new DataObjectItem.MetadataItem(ObjectType)
+                        {
+                            Id = "",
+                            MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
+                            Source = source,
+                            LastSearch = DateTime.UtcNow.AddMonths(-3),
+                            NextSearch = DateTime.UtcNow.AddMonths(-1),
+                            WinningVoteCount = 0,
+                            TotalVoteCount = 0
+                        };
+
+                        // insert a record for this metadata source
+                        sql = "INSERT INTO DataObject_MetadataMap (DataObjectId, MetadataId, SourceId, MatchMethod, LastSearched, NextSearch) VALUES (@id, @metaid, @srcid, @method, @lastsearched, @nextsearch);";
+                        db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                            { "id", DataObjectId },
+                            { "metaid", "" },
+                            { "srcid", (int)source },
+                            { "method", BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch },
+                            { "lastsearched", DateTime.UtcNow.AddMonths(-3) },
+                            { "nextsearch", DateTime.UtcNow.AddMonths(-1) }
+                        });
+
+                        metadataItems.Add(metadataItem);
+                    }
+                }
             }
 
             return metadataItems;
@@ -1003,6 +1049,8 @@ namespace hasheous_server.Classes
             // search for metadata
             foreach (DataObjectItem item in DataObjectsToProcess)
             {
+                Logging.Log(Logging.LogType.Information, "Metadata Match", "Searching for metadata for " + item.Name + " (" + item.ObjectType + ")");
+
                 foreach (DataObjectItem.MetadataItem metadata in item.Metadata)
                 {
                     dbDict = new Dictionary<string, object>{
@@ -1130,23 +1178,87 @@ namespace hasheous_server.Classes
                                 dbDict["metadataid"] = DataObjectSearchResults.MetadataId;
 
                                 break;
+
+                            case Metadata.Communications.MetadataSources.TheGamesDb:
+                                TheGamesDB.TheGamesDBDatabase tgdbMetadata = TheGamesDB.MetadataQuery.metadata;
+                                switch (objectType)
+                                {
+                                    case DataObjectType.Platform:
+                                        foreach (KeyValuePair<string, TheGamesDB.TheGamesDBDatabase.IncludeItem.PlatformItem.DataItem> metadataPlatform in tgdbMetadata.include.platform.data)
+                                        {
+                                            if (
+                                                (metadataPlatform.Value.name == item.Name) ||
+                                                (metadataPlatform.Value.alias == item.Name))
+                                            {
+                                                // we have a match, add the tgdb platform id to the data object
+                                                dbDict["metadataid"] = metadataPlatform.Key;
+                                                dbDict["method"] = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic;
+                                                break;
+                                            }
+                                        }
+                                        break;
+
+                                    case DataObjectType.Game:
+                                        // get the game platform if set
+                                        long tgdbPlaformId = 0;
+                                        AttributeItem tgdbPlatformAttribute = item.Attributes.Find(x => x.attributeName == AttributeItem.AttributeName.Platform && x.attributeType == AttributeItem.AttributeType.ObjectRelationship);
+
+                                        if (tgdbPlatformAttribute != null)
+                                        {
+                                            // get the associated platform dataobject
+                                            DataObjectItem tgdbPlatformDO = (DataObjectItem)tgdbPlatformAttribute.Value;
+
+                                            // check if tgdbPlatformDO has a configured metadata value for TheGamesDB
+                                            DataObjectItem.MetadataItem tgdbPlatformMetadata = tgdbPlatformDO.Metadata.Find(x => x.Source == MetadataSources.TheGamesDb);
+                                            if (tgdbPlatformMetadata != null && tgdbPlatformMetadata.Id != "")
+                                            {
+                                                // get the platform id
+                                                tgdbPlaformId = long.Parse(tgdbPlatformMetadata.Id);
+
+                                                // search for games
+                                                foreach (TheGamesDB.TheGamesDBDatabase.DataItem.GameItem metadataGame in tgdbMetadata.data.games)
+                                                {
+                                                    if (metadataGame.platform == tgdbPlaformId)
+                                                    {
+                                                        if (
+                                                            metadataGame.game_title == item.Name ||
+                                                            (
+                                                                metadataGame.alternates != null &&
+                                                                metadataGame.alternates.Contains(item.Name)
+                                                            )
+                                                        )
+                                                        {
+                                                            // we have a match, add the tgdb game id to the data object
+                                                            dbDict["metadataid"] = metadataGame.id;
+                                                            dbDict["method"] = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic;
+                                                            break;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        break;
+                                }
+                                break;
                         }
 
+                        Logging.Log(Logging.LogType.Information, "Metadata Match", "Matched " + item.ObjectType + " " + item.Name + " to " + metadata.Source + " metadata: " + DataObjectSearchResults.MetadataId);
                         sql = "UPDATE DataObject_MetadataMap SET MetadataId=@metadataid, MatchMethod=@method, LastSearched=@lastsearched, NextSearch=@nextsearch WHERE DataObjectId=@id AND SourceId=@srcid;";
                         db.ExecuteNonQuery(sql, dbDict);
                     }
                 }
-            }
 
-            // get metadata cover if new object is a game
-            if (objectType == DataObjectType.Game)
-            {
-                BackgroundMetadataMatcher.BackgroundMetadataMatcher metadataMatcher = new BackgroundMetadataMatcher.BackgroundMetadataMatcher();
-                metadataMatcher.GetGameArtwork((long)id);
-            }
+                // get metadata cover if new object is a game
+                if (objectType == DataObjectType.Game)
+                {
+                    BackgroundMetadataMatcher.BackgroundMetadataMatcher metadataMatcher = new BackgroundMetadataMatcher.BackgroundMetadataMatcher();
+                    metadataMatcher.GetGameArtwork((long)item.Id);
+                }
 
-            // update date
-            UpdateDataObjectDate((long)id);
+                // update date
+                UpdateDataObjectDate((long)item.Id);
+            }
 
             return DataObjectSearchResults;
         }

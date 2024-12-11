@@ -32,6 +32,7 @@ document.getElementById('dataObjectSave').addEventListener("click", function (e)
     // metadata
     let metadata = [];
     metadata.push(newMetadataObject('IGDB', document.getElementById('metadatamapigdb')));
+    metadata.push(newMetadataObject('thegamesdb', document.getElementById('metadatamapthegamesdb')));
 
     // get attributes
     let attributes = [];
@@ -390,12 +391,28 @@ function loadData() {
     // metadata
     if (dataObject.metadata.length > 0) {
         for (let i = 0; i < dataObject.metadata.length; i++) {
-            switch (dataObject.metadata[i].source) {
-                case "IGDB":
-                    let igdbLink = document.getElementById('metadatamapigdb');
-                    igdbLink.value = dataObject.metadata[i].id;
-                    break;
-            }
+            // append a row for each metadata item
+            let metadataRow = document.createElement('tr');
+
+            let metadataCell = document.createElement('td');
+            metadataCell.innerHTML = lang.getLang(dataObject.metadata[i].source);
+            metadataCell.setAttribute('data-lang', dataObject.metadata[i].source);
+            metadataCell.classList.add('tablecell');
+            metadataRow.appendChild(metadataCell);
+
+            let metadataInputCell = document.createElement('td');
+            metadataInputCell.classList.add('tablecell');
+
+            let metadataInput = document.createElement('input');
+            metadataInput.type = 'text';
+            metadataInput.classList.add('attributeeditselect');
+            metadataInput.id = 'metadatamap' + dataObject.metadata[i].source.toLowerCase();
+            metadataInput.value = dataObject.metadata[i].id;
+            metadataInputCell.appendChild(metadataInput);
+
+            metadataRow.appendChild(metadataInputCell);
+
+            document.getElementById('dataObjectMetadataMapInput').appendChild(metadataRow);
         }
     }
 }
