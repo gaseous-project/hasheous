@@ -1,0 +1,140 @@
+@media (prefers-color-scheme:dark) {
+    :root {
+        --page-background: rgb(39, 39, 39);
+        --font-color: rgb(255, 255, 255);
+        --header-label-color: rgb(119, 155, 210);
+        --link-color: rgb(171, 171, 220);
+        --link-color-highlight: rgb(143, 143, 220);
+        --element-background-color: rgb(73, 73, 73);
+        --element-background-color-translucent: rgba(73, 73, 73, 0.5);
+        --element-border-color: rgb(100, 100, 100);
+        --element-border-radius: 5px;
+        --element-highlight: rgb(103, 103, 103);
+        --element-alert-background-color: rgb(175, 183, 105);
+        --element-alert-border-color: rgb(132, 92, 0);
+        --element-alert-text-color: rgb(0, 0, 0);
+        --field-background-color: rgb(39, 39, 39);
+        --field-background-selected: rgb(66, 66, 66);
+        --field-background-highlight: rgb(88, 88, 88);
+        --field-text-color: rgb(255, 255, 255);
+        --field-border-color: rgb(190, 190, 190);
+        --field-border-color-highlight: rgb(190, 190, 255);
+        --button-color: rgb(85, 85, 85);
+        --button-text-color: rgb(255, 255, 255);
+        --button-color-hover: rgb(136, 136, 136);
+        --button-color-disabled: rgb(85, 85, 85);
+        --button-text-color-disabled: rgb(136, 136, 136);
+        --redbutton-color: rgb(139, 0, 0);
+        --redbutton-text-color: rgb(255, 255, 255);
+        --redbutton-color-hover: rgb(255, 0, 0);
+        --max-page-width: 1122px;
+        --banner-height: 40px;
+        --banner-button-background-color: transparent;
+        --banner-button-text-color: rgb(255, 255, 255);
+        --footer-button-background-color: transparent;
+        --footer-button-text-color: rgb(255, 255, 255);
+        --valid-color: rgb(0, 181, 12);
+        --invalid-color: rgb(178, 26, 26);
+        --badge-text-color: rgb(255, 255, 255);
+        --badge-background-color: rgb(127, 127, 127);
+    }
+
+    .banner_button_image,
+    .footer_button_image,
+    #dataObjectLogoImageAttributionLogo {
+        filter: invert(1);
+    }
+
+    /* single select */
+    .select2-container--default .select2-selection--single {
+        background-color: var(--field-background-color);
+        border-color: var(--field-border-color);
+        height: 31px;
+    }
+
+    .select2-container--default:hover .select2-selection--single:hover {
+        border-color: var(--field-border-color-hover);
+    }
+
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        color: var(--field-text-color);
+    }
+
+    .select2-container--default.select2-container--disabled .select2-selection--single {
+        background-color: var(--field-background-color);
+        border-color: var(--field-background-color);
+        cursor: not-allowed;
+    }
+
+    .select2-container--default.select2-container--disabled:hover .select2-selection--single:hover {
+        background-color: var(--field-background-color);
+        border-color: var(--field-background-color);
+        cursor: not-allowed;
+    }
+
+    /* multiple select */
+    .select2-container--default .select2-selection--multiple {
+        background-color: var(--field-background-color);
+        border-color: var(--field-border-color);
+    }
+
+    .select2-container--default:hover .select2-selection--multiple:hover {
+        border-color: var(--field-border-color-highlight);
+    }
+
+    /* drop down menu */
+    .select2-dropdown {
+        background-color: var(--field-background-color);
+        border-color: var(--field-border-color);
+    }
+
+    .select2-container--default .select2-results__option--highlighted.select2-results__option--selectable {
+        background-color: var(--field-background-highlight);
+        color: var(--field-text-color);
+    }
+
+    .select2-container--default .select2-results__option--selected {
+        background-color: var(--field-background-color-selected);
+        color: var(--field-text-color);
+    }
+
+    .select2-search__field {
+        background-color: var(--field-background-color);
+        color: var(--field-text-color);
+    }
+
+    /* tag item */
+    .select2-container--default .select2-selection--multiple .select2-selection__choice {
+        background-color: #575757 !important;
+        border: 1px solid var(--field-background-color);
+        border-radius: var(--standard-radius);
+        padding-top: 1px;
+        height: 21px;
+    }
+
+    /* tag item delete button */
+    .select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
+        border-right: none;
+        background-color: var(--element-background-color);
+        color: var(--field-text-color);
+        height: 100%;
+        padding-bottom: 2px;
+        padding-left: 5px;
+    }
+
+    /* tag item label */
+    .select2-container--default .select2-selection--multiple .select2-selection__choice__display {
+        /* background-color: #4e4e4e; */
+        background-color: var(--field-background-color);
+    }
+
+    /* clear selection button */
+    .select2-selection__clear {
+        margin-right: 10px;
+        color: var(--field-text-color);
+    }
+
+    .select2-selection__clear:hover {
+        color: var(--element-background-color);
+    }
+}
