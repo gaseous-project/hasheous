@@ -304,7 +304,14 @@ function renderContent() {
         }
     }
 
-    if (dataObject.metadata.length > 0) {
+    if (
+        dataObject.metadata.length > 0 &&
+        (
+            pageType == "company" ||
+            pageType == "platform" ||
+            pageType == "game"
+        )
+    ) {
         document.getElementById('dataObjectMetadataSection').style.display = '';
         let newMetadataMapTable = new generateTable(
             dataObject.metadata,
