@@ -1211,7 +1211,16 @@ namespace hasheous_server.Classes
                                             if (tgdbPlatformAttribute != null)
                                             {
                                                 // get the associated platform dataobject
-                                                DataObjectItem tgdbPlatformDO = (DataObjectItem)tgdbPlatformAttribute.Value;
+                                                DataObjectItem tgdbPlatformDO;
+                                                try
+                                                {
+                                                    tgdbPlatformDO = (DataObjectItem)tgdbPlatformAttribute.Value;
+                                                }
+                                                catch
+                                                {
+                                                    RelationItem relationItem = (RelationItem)tgdbPlatformAttribute.Value;
+                                                    tgdbPlatformDO = GetDataObject(DataObjectType.Platform, relationItem.relationId);
+                                                }
 
                                                 // check if tgdbPlatformDO has a configured metadata value for TheGamesDB
                                                 DataObjectItem.MetadataItem tgdbPlatformMetadata = tgdbPlatformDO.Metadata.Find(x => x.Source == MetadataSources.TheGamesDb);
