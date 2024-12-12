@@ -1096,7 +1096,17 @@ namespace hasheous_server.Classes
                                                 {
                                                     if (attribute.attributeRelationType == DataObjectType.Platform)
                                                     {
-                                                        DataObjectItem platformDO = (DataObjectItem)attribute.Value;
+                                                        DataObjectItem platformDO;
+                                                        if (attribute.Value.GetType() == typeof(DataObjectItem))
+                                                        {
+                                                            platformDO = (DataObjectItem)attribute.Value;
+                                                        }
+                                                        else
+                                                        {
+                                                            RelationItem relationItem = (RelationItem)attribute.Value;
+                                                            platformDO = GetDataObject(DataObjectType.Platform, relationItem.relationId);
+                                                        }
+
                                                         foreach (DataObjectItem.MetadataItem provider in platformDO.Metadata)
                                                         {
                                                             if (provider.Source == MetadataSources.IGDB && (
@@ -1212,11 +1222,11 @@ namespace hasheous_server.Classes
                                             {
                                                 // get the associated platform dataobject
                                                 DataObjectItem tgdbPlatformDO;
-                                                try
+                                                if (tgdbPlatformAttribute.Value.GetType() == typeof(DataObjectItem))
                                                 {
                                                     tgdbPlatformDO = (DataObjectItem)tgdbPlatformAttribute.Value;
                                                 }
-                                                catch
+                                                else
                                                 {
                                                     RelationItem relationItem = (RelationItem)tgdbPlatformAttribute.Value;
                                                     tgdbPlatformDO = GetDataObject(DataObjectType.Platform, relationItem.relationId);
