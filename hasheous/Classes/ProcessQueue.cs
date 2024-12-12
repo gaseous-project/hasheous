@@ -1,8 +1,12 @@
 ﻿using System;
+using System.Data.Common;
 using Classes;
 using hasheous_server.Classes;
+using hasheous_server.Classes.Metadata;
 using hasheous_server.Models;
+using TheGamesDB;
 using static Classes.Common;
+using static hasheous_server.Models.DataObjectItem;
 
 namespace Classes
 {
@@ -109,6 +113,8 @@ namespace Classes
 
                         try
                         {
+                            hasheous_server.Classes.DataObjects DataObjects = new hasheous_server.Classes.DataObjects();
+
                             switch (_ItemType)
                             {
                                 case QueueItemType.SignatureIngestor:
@@ -139,12 +145,16 @@ namespace Classes
                                             tIngest.Import(SignaturePath, SignatureProcessedPath, parserType);
                                         }
                                     }
-
                                     break;
 
                                 case QueueItemType.TallyVotes:
                                     Submissions submissions = new Submissions();
                                     submissions.TallyVotes();
+                                    break;
+
+                                case QueueItemType.MetadataMatchSearch:
+                                    DataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Platform);
+                                    DataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game);
                                     break;
 
                                 case QueueItemType.GetMissingArtwork:
@@ -155,7 +165,6 @@ namespace Classes
                                 case QueueItemType.FetchVIMMMetadata:
                                     // get all platforms
                                     DataObjectsList Platforms = new DataObjectsList();
-                                    hasheous_server.Classes.DataObjects DataObjects = new hasheous_server.Classes.DataObjects();
 
                                     // get VIMMSLair manual metadata for each platform
                                     Platforms = DataObjects.GetDataObjects(DataObjects.DataObjectType.Platform);
@@ -175,11 +184,19 @@ namespace Classes
                                             }
                                         }
                                     }
+                                    break;
 
+                                case QueueItemType.FetchTheGamesDbMetadata:
+                                    TheGamesDB.DownloadManager tgdbDownloader = new TheGamesDB.DownloadManager();
+                                    tgdbDownloader.Download();
                                     break;
 
                                 case QueueItemType.AutoMapper:
                                     AutoMapper.RomAutoMapper();
+                                    break;
+
+                                case QueueItemType.Maintenance:
+                                    TheGamesDB.MetadataQuery.RunMaintenance();
                                     break;
 
                             }
@@ -235,6 +252,11 @@ namespace Classes
             TallyVotes,
 
             /// <summary>
+            /// Searches for metadata matches for all objects in the database
+            /// </summary>
+            MetadataMatchSearch,
+
+            /// <summary>
             /// Fetches missing artwork for game data objects
             /// </summary>
             GetMissingArtwork,
@@ -245,9 +267,19 @@ namespace Classes
             FetchVIMMMetadata,
 
             /// <summary>
+            /// Fetch TheGamesDb metadata
+            /// </summary>
+            FetchTheGamesDbMetadata,
+
+            /// <summary>
             /// Loops all ROMs in the database and attempts to match them to a data object - or creates a new datao object if no match is found
             /// </summary>
-            AutoMapper
+            AutoMapper,
+
+            /// <summary>
+            /// Reserved for maintenance tasks - no actual background service is tied to this type
+            /// </summary>
+            Maintenance
         }
 
         public enum QueueItemState

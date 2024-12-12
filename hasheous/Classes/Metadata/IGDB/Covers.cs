@@ -93,9 +93,9 @@ namespace hasheous_server.Classes.Metadata.IGDB
 
             if ((!File.Exists(Path.Combine(LogoPath, "Cover.jpg"))) || forceImageDownload == true)
             {
-                //GetImageFromServer(returnValue.Url, LogoPath, LogoSize.t_thumb, returnValue.ImageId);
-                //GetImageFromServer(returnValue.Url, LogoPath, LogoSize.t_logo_med, returnValue.ImageId);
-                //GetImageFromServer(returnValue.Url, LogoPath, LogoSize.t_original, returnValue.ImageId);
+                GetImageFromServer(returnValue.Url, LogoPath, LogoSize.t_thumb, returnValue.ImageId);
+                GetImageFromServer(returnValue.Url, LogoPath, LogoSize.t_logo_med, returnValue.ImageId);
+                GetImageFromServer(returnValue.Url, LogoPath, LogoSize.t_original, returnValue.ImageId);
             }
 
             return returnValue;
@@ -114,50 +114,50 @@ namespace hasheous_server.Classes.Metadata.IGDB
             var results = await comms.APIComm<Cover>(IGDBClient.Endpoints.Covers, fieldList, WhereClause);
             var result = results.First();
 
-            //GetImageFromServer(result.Url, LogoPath, LogoSize.t_thumb, result.ImageId);
-            //GetImageFromServer(result.Url, LogoPath, LogoSize.t_logo_med, result.ImageId);
-            //GetImageFromServer(result.Url, LogoPath, LogoSize.t_original, result.ImageId);
+            GetImageFromServer(result.Url, LogoPath, LogoSize.t_thumb, result.ImageId);
+            GetImageFromServer(result.Url, LogoPath, LogoSize.t_logo_med, result.ImageId);
+            GetImageFromServer(result.Url, LogoPath, LogoSize.t_original, result.ImageId);
 
             return result;
         }
 
-        // private static void GetImageFromServer(string Url, string LogoPath, LogoSize logoSize, string ImageId)
-        // {
-        //     using (var client = new HttpClient())
-        //     {
-        //         string fileName = "Cover.jpg";
-        //         string extension = "jpg";
-        //         switch (logoSize)
-        //         {
-        //             case LogoSize.t_thumb:
-        //                 fileName = "Cover_Thumb";
-        //                 extension = "jpg";
-        //                 break;
-        //             case LogoSize.t_logo_med:
-        //                 fileName = "Cover_Medium";
-        //                 extension = "png";
-        //                 break;
-        //             case LogoSize.t_original:
-        //                 fileName = "Cover";
-        //                 extension = "png";
-        //                 break;
-        //             default:
-        //                 fileName = "Cover";
-        //                 extension = "jpg";
-        //                 break;
-        //         }
-        //         string imageUrl = Url.Replace(LogoSize.t_thumb.ToString(), logoSize.ToString()).Replace("jpg", extension);
+        private static void GetImageFromServer(string Url, string LogoPath, LogoSize logoSize, string ImageId)
+        {
+            using (var client = new HttpClient())
+            {
+                string fileName = "Cover.jpg";
+                string extension = "jpg";
+                switch (logoSize)
+                {
+                    case LogoSize.t_thumb:
+                        fileName = "Cover_Thumb";
+                        extension = "jpg";
+                        break;
+                    case LogoSize.t_logo_med:
+                        fileName = "Cover_Medium";
+                        extension = "png";
+                        break;
+                    case LogoSize.t_original:
+                        fileName = "Cover";
+                        extension = "png";
+                        break;
+                    default:
+                        fileName = "Cover";
+                        extension = "jpg";
+                        break;
+                }
+                string imageUrl = Url.Replace(LogoSize.t_thumb.ToString(), logoSize.ToString()).Replace("jpg", extension);
 
-        //         using (var s = client.GetStreamAsync("https:" + imageUrl))
-        //         {
-        //             if (!Directory.Exists(LogoPath)) { Directory.CreateDirectory(LogoPath); }
-        //             using (var fs = new FileStream(Path.Combine(LogoPath, fileName + "." + extension), FileMode.OpenOrCreate))
-        //             {
-        //                 s.Result.CopyTo(fs);
-        //             }
-        //         }
-        //     }
-        // }
+                using (var s = client.GetStreamAsync("https:" + imageUrl))
+                {
+                    if (!Directory.Exists(LogoPath)) { Directory.CreateDirectory(LogoPath); }
+                    using (var fs = new FileStream(Path.Combine(LogoPath, fileName + "." + extension), FileMode.OpenOrCreate))
+                    {
+                        s.Result.CopyTo(fs);
+                    }
+                }
+            }
+        }
 
         private enum LogoSize
         {

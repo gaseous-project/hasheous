@@ -392,6 +392,7 @@ ProcessQueue.QueueItems.Add(
         }
         )
     );
+
 ProcessQueue.QueueItems.Add(
 new ProcessQueue.QueueItem(
     ProcessQueue.QueueItemType.FetchVIMMMetadata,
@@ -402,16 +403,29 @@ new ProcessQueue.QueueItem(
     }
     )
 );
-ProcessQueue.QueueItems.Add(
-new ProcessQueue.QueueItem(
-    ProcessQueue.QueueItemType.AutoMapper,
-    10080,
-    new List<ProcessQueue.QueueItemType>
-    {
 
-    }
-    )
+ProcessQueue.QueueItem fetchTheGamesDbMetadata = new ProcessQueue.QueueItem(ProcessQueue.QueueItemType.FetchTheGamesDbMetadata, 10080, new List<ProcessQueue.QueueItemType>());
+fetchTheGamesDbMetadata.ForceExecute();
+ProcessQueue.QueueItems.Add(
+    fetchTheGamesDbMetadata
 );
+
+ProcessQueue.QueueItem MetadataSearch = new ProcessQueue.QueueItem(ProcessQueue.QueueItemType.MetadataMatchSearch, 1440, new List<ProcessQueue.QueueItemType>());
+MetadataSearch.ForceExecute();
+ProcessQueue.QueueItems.Add(
+    MetadataSearch
+);
+
+// ProcessQueue.QueueItems.Add(
+// new ProcessQueue.QueueItem(
+//     ProcessQueue.QueueItemType.AutoMapper,
+//     10080,
+//     new List<ProcessQueue.QueueItemType>
+//     {
+
+//     }
+//     )
+// );
 
 Logging.WriteToDiskOnly = false;
 

@@ -62,6 +62,25 @@ namespace hasheous_server.Models
                             {
                                 return "";
                             }
+                        case Communications.MetadataSources.TheGamesDb:
+                            if (Id.Length > 0)
+                            {
+                                switch (_ObjectType)
+                                {
+                                    case DataObjects.DataObjectType.Platform:
+                                        return "https://thegamesdb.net/platform.php?id=" + Id;
+
+                                    case DataObjects.DataObjectType.Game:
+                                        return "https://thegamesdb.net/game.php?id=" + Id;
+
+                                    default:
+                                        return "";
+                                }
+                            }
+                            else
+                            {
+                                return "";
+                            }
                         default:
                             return "";
                     }

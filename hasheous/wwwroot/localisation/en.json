@@ -71,6 +71,7 @@
     "metadatamap": "Metadata Mapping",
     "matchmethod": "Match Method",
     "igdb": "Internet Game Database (IGDB)",
+    "thegamesdb": "TheGamesDB",
     "nomatch": "Unmatched",
     "manual": "Manual",
     "automatic": "Automatic Match",

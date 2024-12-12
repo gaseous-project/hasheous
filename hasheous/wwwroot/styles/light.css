@@ -1,0 +1,39 @@
+@media (prefers-color-scheme:light) {
+    :root {
+        --page-background: #ffffff;
+        --font-color: #000000;
+        --header-label-color: rgba(0, 22, 56, 1);
+        --link-color: rgb(0, 0, 120);
+        --link-color-highlight: rgb(0, 0, 230);
+        --element-background-color: rgba(240, 240, 240);
+        --element-background-color-translucent: rgba(240, 240, 240, 0.5);
+        --element-border-color: rgb(190, 190, 190);
+        --element-border-radius: 5px;
+        --element-highlight: #ddd;
+        --element-alert-background-color: rgb(252, 255, 235);
+        --element-alert-border-color: rgb(132, 92, 0);
+        --element-alert-text-color: rgb(0, 0, 0);
+        --field-background-color: rgb(255, 255, 255);
+        --field-text-color: rgb(0, 0, 0);
+        --field-border-color: rgb(190, 190, 190);
+        --field-border-color-highlight: rgb(190, 190, 255);
+        --button-color: #555;
+        --button-text-color: #ffffff;
+        --button-color-hover: #888;
+        --button-color-disabled: #555;
+        --button-text-color-disabled: #888;
+        --redbutton-color: darkred;
+        --redbutton-text-color: #ffffff;
+        --redbutton-color-hover: red;
+        --max-page-width: 1122px;
+        --banner-height: 40px;
+        --banner-button-background-color: transparent;
+        --banner-button-text-color: rgba(0, 22, 56, 1);
+        --footer-button-background-color: transparent;
+        --footer-button-text-color: rgba(0, 22, 56, 1);
+        --valid-color: #00b50c;
+        --invalid-color: #b21a1a;
+        --badge-text-color: #ffffff;
+        --badge-background-color: #7f7f7f;
+    }
+}

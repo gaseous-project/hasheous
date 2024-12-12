@@ -383,6 +383,14 @@ namespace Classes
                     }
                 }
 
+                public string LibraryMetadataDirectory_TheGamesDb
+                {
+                    get
+                    {
+                        return Path.Combine(LibraryMetadataDirectory, "TheGamesDb");
+                    }
+                }
+
                 public string LibrarySignaturesDirectory
                 {
                     get
