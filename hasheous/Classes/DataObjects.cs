@@ -1054,6 +1054,10 @@ namespace hasheous_server.Classes
 
                 Logging.Log(Logging.LogType.Information, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Searching for metadata for " + item.Name + " (" + item.ObjectType + ")");
 
+                List<string> SearchCandidates = GetSearchCandidates(item.Name);
+
+                Logging.Log(Logging.LogType.Information, "Metadata Match", "Search candidates: " + string.Join(", ", SearchCandidates));
+
                 foreach (DataObjectItem.MetadataItem metadata in item.Metadata)
                 {
                     dbDict = new Dictionary<string, object>{
@@ -1126,8 +1130,6 @@ namespace hasheous_server.Classes
 
                                             if (PlatformId != null)
                                             {
-                                                List<string> SearchCandidates = GetSearchCandidates(item.Name);
-
                                                 bool SearchComplete = false;
                                                 foreach (string SearchCandidate in SearchCandidates)
                                                 {
@@ -1240,23 +1242,32 @@ namespace hasheous_server.Classes
                                                     tgdbPlaformId = long.Parse(tgdbPlatformMetadata.Id);
 
                                                     // search for games
-                                                    foreach (TheGamesDB.TheGamesDBDatabase.DataItem.GameItem metadataGame in tgdbMetadata.data.games)
+                                                    bool SearchComplete = false;
+                                                    foreach (string SearchCandidate in SearchCandidates)
                                                     {
-                                                        if (metadataGame.platform == tgdbPlaformId)
+                                                        foreach (TheGamesDB.TheGamesDBDatabase.DataItem.GameItem metadataGame in tgdbMetadata.data.games)
                                                         {
-                                                            if (
-                                                                metadataGame.game_title == item.Name ||
-                                                                (
-                                                                    metadataGame.alternates != null &&
-                                                                    metadataGame.alternates.Contains(item.Name)
-                                                                )
-                                                            )
+                                                            if (metadataGame.platform == tgdbPlaformId)
                                                             {
-                                                                // we have a match, add the tgdb game id to the data object
-                                                                dbDict["metadataid"] = metadataGame.id;
-                                                                dbDict["method"] = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic;
-                                                                break;
+                                                                if (
+                                                                    metadataGame.game_title == SearchCandidate ||
+                                                                    (
+                                                                        metadataGame.alternates != null &&
+                                                                        metadataGame.alternates.Contains(SearchCandidate)
+                                                                    )
+                                                                )
+                                                                {
+                                                                    // we have a match, add the tgdb game id to the data object
+                                                                    dbDict["metadataid"] = metadataGame.id;
+                                                                    dbDict["method"] = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic;
+                                                                    SearchComplete = true;
+                                                                    break;
+                                                                }
                                                             }
+                                                        }
+                                                        if (SearchComplete == true)
+                                                        {
+                                                            break;
                                                         }
                                                     }
                                                 }
