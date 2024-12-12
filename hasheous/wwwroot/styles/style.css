@@ -11,6 +11,7 @@ body {
     font-size: 13px;
     background-color: var(--page-background);
     color: var(--font-color);
+    max-width: 100%;
 }
 
 h1 {
@@ -382,7 +383,7 @@ button:disabled {
     position: relative;
     display: block;
     width: 100%;
-    overflow: auto;
+    overflow-x: auto;
 }
 
 table {
