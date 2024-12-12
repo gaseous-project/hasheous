@@ -122,10 +122,13 @@ class generateTable {
             }
             for (let i = 0; i < columns.length; i++) {
                 let headerName;
+                let cellName = '';
                 if (columns[i].name) {
                     headerName = lang.getLang(columns[i].name);
+                    cellName = columns[i].name;
                 } else {
                     headerName = lang.getLang(columns[i].split(":")[0]);
+                    cellName = columns[i].split(":")[0];
                 }
                 if (
                     (hideIndex === true && (headerName.toLowerCase() !== indexColumn.toLowerCase())) ||
@@ -133,6 +136,7 @@ class generateTable {
                 ) {
                     let headerCell = document.createElement('th');
                     headerCell.innerHTML = headerName;
+                    headerCell.setAttribute('media-selector', 'cell_' + cellName.toLowerCase());
                     headerCell.classList.add('tableheadcell');
                     headerRow.appendChild(headerCell);
                 }
@@ -223,6 +227,13 @@ class generateTable {
                     ) {
                         let cell = document.createElement('td');
                         cell.classList.add('tablecell');
+                        let cellName = '';
+                        if (columns[x].name) {
+                            cellName = columns[x].name;
+                        } else {
+                            cellName = columns[x].split(":")[0];
+                        }
+                        cell.setAttribute('media-selector', 'cell_' + cellName.toLowerCase());
                         cell.appendChild(cellContent);
                         dataRow.appendChild(cell);
                     }

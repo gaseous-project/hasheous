@@ -39,9 +39,11 @@
         --badge-background-color: rgb(127, 127, 127);
     }
 
+    .banner_button_image_no_label,
     .banner_button_image,
     .footer_button_image,
-    #dataObjectLogoImageAttributionLogo {
+    #dataObjectLogoImageAttributionLogo,
+    .linkicon {
         filter: invert(1);
     }
 

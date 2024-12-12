@@ -49,4 +49,17 @@
         padding-left: 50px;
         padding-right: 50px;
     }
+
+    #dataObjectLogoImageAttributionLogo {
+        margin-left: 5px;
+    }
+
+    [media-selector="cell_publisher"],
+    [media-selector="cell_igdb"],
+    [media-selector="cell_manufacturer"],
+    [media-selector="cell_matchmethod"],
+    [media-selector="cell_md5"],
+    [media-selector="cell_sha1"] {
+        display: none;
+    }
 }
