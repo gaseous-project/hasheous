@@ -1052,10 +1052,39 @@ namespace hasheous_server.Classes
             {
                 processedObjectCount++;
 
-                Logging.Log(Logging.LogType.Information, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Searching for metadata for " + item.Name + " (" + item.ObjectType + ")");
+                Logging.Log(Logging.LogType.Information, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Searching for metadata for " + item.Name + " (" + item.ObjectType + ") Id: " + item.Id);
 
-                foreach (DataObjectItem.MetadataItem metadata in item.Metadata)
+                List<string> SearchCandidates = GetSearchCandidates(item.Name);
+
+                Logging.Log(Logging.LogType.Information, "Metadata Match", "Search candidates: " + string.Join(", ", SearchCandidates));
+
+                foreach (Metadata.Communications.MetadataSources sourceType in Enum.GetValues(typeof(Metadata.Communications.MetadataSources)))
                 {
+                    if (sourceType == MetadataSources.None)
+                    {
+                        continue;
+                    }
+
+                    // get the metadataItem from the DataObjectItem for the sourceType
+                    DataObjectItem.MetadataItem metadata = item.Metadata.Find(x => x.Source == sourceType);
+                    bool insertMetadata = false;
+                    if (metadata == null)
+                    {
+                        insertMetadata = true;
+
+                        // create new metadata item
+                        metadata = new DataObjectItem.MetadataItem(objectType)
+                        {
+                            Id = "",
+                            MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
+                            Source = sourceType,
+                            LastSearch = DateTime.UtcNow.AddMonths(-3),
+                            NextSearch = DateTime.UtcNow.AddMonths(-1),
+                            WinningVoteCount = 0,
+                            TotalVoteCount = 0
+                        };
+                    }
+
                     dbDict = new Dictionary<string, object>{
                         { "id", item.Id },
                         { "metadataid", metadata.Id },
@@ -1075,6 +1104,7 @@ namespace hasheous_server.Classes
                         // searching is allowed
                         try
                         {
+                            Logging.Log(Logging.LogType.Information, "Metadata Match", "Searching " + metadata.Source + ": " + item.Name + " (" + item.Id + ") Type: " + item.ObjectType);
                             switch (metadata.Source)
                             {
                                 case Metadata.Communications.MetadataSources.IGDB:
@@ -1096,7 +1126,17 @@ namespace hasheous_server.Classes
                                                 {
                                                     if (attribute.attributeRelationType == DataObjectType.Platform)
                                                     {
-                                                        DataObjectItem platformDO = (DataObjectItem)attribute.Value;
+                                                        DataObjectItem platformDO;
+                                                        if (attribute.Value.GetType() == typeof(DataObjectItem))
+                                                        {
+                                                            platformDO = (DataObjectItem)attribute.Value;
+                                                        }
+                                                        else
+                                                        {
+                                                            RelationItem relationItem = (RelationItem)attribute.Value;
+                                                            platformDO = GetDataObject(DataObjectType.Platform, relationItem.relationId);
+                                                        }
+
                                                         foreach (DataObjectItem.MetadataItem provider in platformDO.Metadata)
                                                         {
                                                             if (provider.Source == MetadataSources.IGDB && (
@@ -1116,8 +1156,6 @@ namespace hasheous_server.Classes
 
                                             if (PlatformId != null)
                                             {
-                                                List<string> SearchCandidates = GetSearchCandidates(item.Name);
-
                                                 bool SearchComplete = false;
                                                 foreach (string SearchCandidate in SearchCandidates)
                                                 {
@@ -1211,7 +1249,16 @@ namespace hasheous_server.Classes
                                             if (tgdbPlatformAttribute != null)
                                             {
                                                 // get the associated platform dataobject
-                                                DataObjectItem tgdbPlatformDO = (DataObjectItem)tgdbPlatformAttribute.Value;
+                                                DataObjectItem tgdbPlatformDO;
+                                                if (tgdbPlatformAttribute.Value.GetType() == typeof(DataObjectItem))
+                                                {
+                                                    tgdbPlatformDO = (DataObjectItem)tgdbPlatformAttribute.Value;
+                                                }
+                                                else
+                                                {
+                                                    RelationItem relationItem = (RelationItem)tgdbPlatformAttribute.Value;
+                                                    tgdbPlatformDO = GetDataObject(DataObjectType.Platform, relationItem.relationId);
+                                                }
 
                                                 // check if tgdbPlatformDO has a configured metadata value for TheGamesDB
                                                 DataObjectItem.MetadataItem tgdbPlatformMetadata = tgdbPlatformDO.Metadata.Find(x => x.Source == MetadataSources.TheGamesDb);
@@ -1221,23 +1268,32 @@ namespace hasheous_server.Classes
                                                     tgdbPlaformId = long.Parse(tgdbPlatformMetadata.Id);
 
                                                     // search for games
-                                                    foreach (TheGamesDB.TheGamesDBDatabase.DataItem.GameItem metadataGame in tgdbMetadata.data.games)
+                                                    bool SearchComplete = false;
+                                                    foreach (string SearchCandidate in SearchCandidates)
                                                     {
-                                                        if (metadataGame.platform == tgdbPlaformId)
+                                                        foreach (TheGamesDB.TheGamesDBDatabase.DataItem.GameItem metadataGame in tgdbMetadata.data.games)
                                                         {
-                                                            if (
-                                                                metadataGame.game_title == item.Name ||
-                                                                (
-                                                                    metadataGame.alternates != null &&
-                                                                    metadataGame.alternates.Contains(item.Name)
-                                                                )
-                                                            )
+                                                            if (metadataGame.platform == tgdbPlaformId)
                                                             {
-                                                                // we have a match, add the tgdb game id to the data object
-                                                                dbDict["metadataid"] = metadataGame.id;
-                                                                dbDict["method"] = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic;
-                                                                break;
+                                                                if (
+                                                                    metadataGame.game_title == SearchCandidate ||
+                                                                    (
+                                                                        metadataGame.alternates != null &&
+                                                                        metadataGame.alternates.Contains(SearchCandidate)
+                                                                    )
+                                                                )
+                                                                {
+                                                                    // we have a match, add the tgdb game id to the data object
+                                                                    dbDict["metadataid"] = metadataGame.id;
+                                                                    dbDict["method"] = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic;
+                                                                    SearchComplete = true;
+                                                                    break;
+                                                                }
                                                             }
+                                                        }
+                                                        if (SearchComplete == true)
+                                                        {
+                                                            break;
                                                         }
                                                     }
                                                 }
@@ -1248,13 +1304,21 @@ namespace hasheous_server.Classes
                                     break;
                             }
 
-                            Logging.Log(Logging.LogType.Information, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Matched " + item.ObjectType + " " + item.Name + " to " + metadata.Source + " metadata: " + DataObjectSearchResults.MetadataId);
-                            sql = "UPDATE DataObject_MetadataMap SET MetadataId=@metadataid, MatchMethod=@method, LastSearched=@lastsearched, NextSearch=@nextsearch WHERE DataObjectId=@id AND SourceId=@srcid;";
+                            Logging.Log(Logging.LogType.Information, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - " + item.ObjectType + " " + item.Name + " " + metadata.MatchMethod + " to " + metadata.Source + " metadata: " + metadata.Id);
+
+                            if (insertMetadata == true)
+                            {
+                                sql = "INSERT INTO DataObject_MetadataMap (DataObjectId, MetadataId, SourceId, MatchMethod, LastSearched, NextSearch) VALUES (@id, @metadataid, @srcid, @method, @lastsearched, @nextsearch);";
+                            }
+                            else
+                            {
+                                sql = "UPDATE DataObject_MetadataMap SET MetadataId=@metadataid, MatchMethod=@method, LastSearched=@lastsearched, NextSearch=@nextsearch WHERE DataObjectId=@id AND SourceId=@srcid;";
+                            }
                             db.ExecuteNonQuery(sql, dbDict);
                         }
                         catch (Exception ex)
                         {
-                            Logging.Log(Logging.LogType.Warning, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Error processing metadata search: " + ex.Message);
+                            Logging.Log(Logging.LogType.Warning, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Error processing metadata search", ex);
                         }
                     }
                 }
