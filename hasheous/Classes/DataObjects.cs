@@ -1052,14 +1052,39 @@ namespace hasheous_server.Classes
             {
                 processedObjectCount++;
 
-                Logging.Log(Logging.LogType.Information, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Searching for metadata for " + item.Name + " (" + item.ObjectType + ")");
+                Logging.Log(Logging.LogType.Information, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Searching for metadata for " + item.Name + " (" + item.ObjectType + ") Id: " + item.Id);
 
                 List<string> SearchCandidates = GetSearchCandidates(item.Name);
 
                 Logging.Log(Logging.LogType.Information, "Metadata Match", "Search candidates: " + string.Join(", ", SearchCandidates));
 
-                foreach (DataObjectItem.MetadataItem metadata in item.Metadata)
+                foreach (Metadata.Communications.MetadataSources sourceType in Enum.GetValues(typeof(Metadata.Communications.MetadataSources)))
                 {
+                    if (sourceType == MetadataSources.None)
+                    {
+                        continue;
+                    }
+
+                    // get the metadataItem from the DataObjectItem for the sourceType
+                    DataObjectItem.MetadataItem metadata = item.Metadata.Find(x => x.Source == sourceType);
+                    bool insertMetadata = false;
+                    if (metadata == null)
+                    {
+                        insertMetadata = true;
+
+                        // create new metadata item
+                        metadata = new DataObjectItem.MetadataItem(objectType)
+                        {
+                            Id = "",
+                            MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
+                            Source = sourceType,
+                            LastSearch = DateTime.UtcNow.AddMonths(-3),
+                            NextSearch = DateTime.UtcNow.AddMonths(-1),
+                            WinningVoteCount = 0,
+                            TotalVoteCount = 0
+                        };
+                    }
+
                     dbDict = new Dictionary<string, object>{
                         { "id", item.Id },
                         { "metadataid", metadata.Id },
@@ -1079,7 +1104,7 @@ namespace hasheous_server.Classes
                         // searching is allowed
                         try
                         {
-                            Logging.Log(Logging.LogType.Information, "Metadata Match", "Searching IGDB for " + metadata.Source + " (" + item.ObjectType + ")");
+                            Logging.Log(Logging.LogType.Information, "Metadata Match", "Searching " + metadata.Source + ": " + item.Name + " (" + item.Id + ") Type: " + item.ObjectType);
                             switch (metadata.Source)
                             {
                                 case Metadata.Communications.MetadataSources.IGDB:
@@ -1280,7 +1305,15 @@ namespace hasheous_server.Classes
                             }
 
                             Logging.Log(Logging.LogType.Information, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - " + item.ObjectType + " " + item.Name + " " + metadata.MatchMethod + " to " + metadata.Source + " metadata: " + metadata.Id);
-                            sql = "UPDATE DataObject_MetadataMap SET MetadataId=@metadataid, MatchMethod=@method, LastSearched=@lastsearched, NextSearch=@nextsearch WHERE DataObjectId=@id AND SourceId=@srcid;";
+
+                            if (insertMetadata == true)
+                            {
+                                sql = "INSERT INTO DataObject_MetadataMap (DataObjectId, MetadataId, SourceId, MatchMethod, LastSearched, NextSearch) VALUES (@id, @metadataid, @srcid, @method, @lastsearched, @nextsearch);";
+                            }
+                            else
+                            {
+                                sql = "UPDATE DataObject_MetadataMap SET MetadataId=@metadataid, MatchMethod=@method, LastSearched=@lastsearched, NextSearch=@nextsearch WHERE DataObjectId=@id AND SourceId=@srcid;";
+                            }
                             db.ExecuteNonQuery(sql, dbDict);
                         }
                         catch (Exception ex)
