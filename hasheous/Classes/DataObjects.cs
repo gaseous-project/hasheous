@@ -1079,6 +1079,7 @@ namespace hasheous_server.Classes
                         // searching is allowed
                         try
                         {
+                            Logging.Log(Logging.LogType.Information, "Metadata Match", "Searching IGDB for " + metadata.Source + " (" + item.ObjectType + ")");
                             switch (metadata.Source)
                             {
                                 case Metadata.Communications.MetadataSources.IGDB:
