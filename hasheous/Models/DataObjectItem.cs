@@ -1,5 +1,6 @@
 using hasheous_server.Classes;
 using hasheous_server.Classes.Metadata;
+using hasheous_server.Classes.Metadata.IGDB;
 
 namespace hasheous_server.Models
 {
@@ -30,6 +31,7 @@ namespace hasheous_server.Models
             private DataObjects.DataObjectType _ObjectType;
 
             public string Id { get; set; }
+            public string? ImmutableId { get; set; }
             public BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod? MatchMethod { get; set; }
             public Communications.MetadataSources Source { get; set; }
             public string Link

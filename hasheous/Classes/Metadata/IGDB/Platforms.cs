@@ -47,7 +47,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
 
         public static Platform GetPlatform(string Slug, bool forceRefresh = false)
         {
-            Task<Platform> RetVal = _GetPlatform(SearchUsing.slug, Slug, forceRefresh);
+            Task<Platform> RetVal = _GetPlatform(SearchUsing.slug, Slug.ToLower(), forceRefresh);
             return RetVal.Result;
         }
 
