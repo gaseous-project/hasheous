@@ -169,5 +169,6 @@
     "clientapirevokeprompt": "Are you sure you want to revoke this key? Please enter \"REVOKE\" to confirm. Note that it may take up to 5 minutes for the key to be revoked.",
     "never": "Never",
     "expires": "Expires",
-    "create": "Create"
+    "create": "Create",
+    "apiresponse": "API Response"
 }
