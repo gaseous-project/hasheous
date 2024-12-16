@@ -62,4 +62,21 @@
     [media-selector="cell_sha1"] {
         display: none;
     }
+
+    .banner_button_label {
+        display: none;
+    }
+
+    .tablecell {
+        word-wrap: break-word;
+        word-break: break-all;
+    }
+
+    #apiResponseSection {
+        height: 400px;
+    }
+
+    #apiResponse {
+        height: 400px;
+    }
 }
