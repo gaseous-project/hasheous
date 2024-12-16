@@ -189,7 +189,7 @@ namespace hasheous_server.Classes
                 } }
         };
 
-        public DataObjectsList GetDataObjects(DataObjectType objectType, int pageNumber = 0, int pageSize = 0, string? search = null, bool GetChildRelations = false)
+        public DataObjectsList GetDataObjects(DataObjectType objectType, int pageNumber = 0, int pageSize = 0, string? search = null, bool GetChildRelations = false, bool GetMetadataMap = true)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql;
@@ -225,7 +225,8 @@ namespace hasheous_server.Classes
                     objectType,
                     (long)data.Rows[i]["Id"],
                     data.Rows[i],
-                    GetChildRelations
+                    GetChildRelations,
+                    GetMetadataMap
                 );
 
                 DataObjects.Add(item);
@@ -347,7 +348,7 @@ namespace hasheous_server.Classes
             });
         }
 
-        private Models.DataObjectItem BuildDataObject(DataObjectType ObjectType, long id, DataRow row, bool GetChildRelations = false)
+        private Models.DataObjectItem BuildDataObject(DataObjectType ObjectType, long id, DataRow row, bool GetChildRelations = false, bool GetMetadata = true)
         {
             // get attributes
             List<AttributeItem> attributes = GetAttributes(id, GetChildRelations);
@@ -366,7 +367,11 @@ namespace hasheous_server.Classes
             }
 
             // get metadata matches
-            List<DataObjectItem.MetadataItem> metadataItems = GetMetadataMap(ObjectType, id);
+            List<DataObjectItem.MetadataItem> metadataItems = new List<DataObjectItem.MetadataItem>();
+            if (GetMetadata == true)
+            {
+                metadataItems = GetMetadataMap(ObjectType, id);
+            }
 
             DataObjectItem item = new DataObjectItem
             {
@@ -506,6 +511,60 @@ namespace hasheous_server.Classes
                     WinningVoteCount = (int)Common.ReturnValueIfNull(dataRow["WinningVoteCount"], 0),
                     TotalVoteCount = (int)Common.ReturnValueIfNull(dataRow["TotalVoteCount"], 0)
                 };
+
+                if (metadataItem.Id.Length == 0)
+                {
+                    metadataItem.ImmutableId = "";
+                }
+                else
+                {
+                    switch (metadataItem.Source)
+                    {
+                        case Communications.MetadataSources.None:
+                            metadataItem.ImmutableId = metadataItem.Id;
+                            break;
+
+                        case Communications.MetadataSources.IGDB:
+                            long? objectId = null;
+                            switch (ObjectType)
+                            {
+                                case DataObjects.DataObjectType.Company:
+                                    objectId = Companies.GetCompanies(metadataItem.Id).Id;
+                                    break;
+
+                                case DataObjects.DataObjectType.Platform:
+                                    objectId = Platforms.GetPlatform(metadataItem.Id, false).Id;
+                                    break;
+
+                                case DataObjects.DataObjectType.Game:
+                                    objectId = Games.GetGame(metadataItem.Id, false, false, false).Id;
+                                    break;
+
+                                default:
+                                    objectId = null;
+                                    break;
+                            }
+
+                            if (objectId.HasValue)
+                            {
+                                metadataItem.ImmutableId = objectId.Value.ToString();
+                            }
+                            else
+                            {
+                                metadataItem.ImmutableId = metadataItem.Id;
+                            }
+                            break;
+
+                        case Communications.MetadataSources.TheGamesDb:
+                            metadataItem.ImmutableId = metadataItem.Id;
+                            break;
+
+                        default:
+                            metadataItem.ImmutableId = metadataItem.Id;
+                            break;
+
+                    }
+                }
 
                 metadataItems.Add(metadataItem);
             }

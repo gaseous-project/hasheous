@@ -10,6 +10,8 @@ ajaxCall(
         pageHeader.innerHTML = success.name;
 
         let detailsArray = [];
+        let jsonLoaded = false;
+        let jsonModel = null;
         for (const [key, value] of Object.entries(success)) {
             if (!['id', 'attributes', 'mediaDetail', 'score'].includes(key)) {
                 if (value) {
@@ -21,6 +23,25 @@ ajaxCall(
                     );
                 }
             }
+
+            if (jsonLoaded === false) {
+                if (key === 'md5') {
+                    if (value.length > 0) {
+                        jsonLoaded = true;
+                        jsonModel = {
+                            "md5": value
+                        }
+                    }
+                }
+                if (key === "sha1") {
+                    if (value.length > 0) {
+                        jsonLoaded = true;
+                        jsonModel = {
+                            "sha1": value
+                        }
+                    }
+                }
+            }
         }
         document.getElementById('dataObjectDetails').appendChild(
             new generateTable(
@@ -28,6 +49,27 @@ ajaxCall(
                 ['attribute', 'value']
             )
         )
+        if (jsonLoaded === true) {
+            fetch('/api/v1/Lookup/ByHash', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(jsonModel)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data);
+                    let romJson = JSON.stringify(data, null, 2);
+
+                    let jsonElement = document.createElement('pre');
+                    jsonElement.innerHTML = romJson;
+                    document.getElementById('apiResponse').appendChild(jsonElement);
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                });
+        }
 
         // compile attributes into table entries
         if (success.attributes) {

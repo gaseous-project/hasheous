@@ -64,7 +64,7 @@ namespace hasheous_server.Controllers.v1_0
         {
             hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
-            return Ok(DataObjects.GetDataObjects(ObjectType, pageNumber, pageSize, search, getchildrelations));
+            return Ok(DataObjects.GetDataObjects(ObjectType, pageNumber, pageSize, search, getchildrelations, true));
         }
 
         [MapToApiVersion("1.0")]
