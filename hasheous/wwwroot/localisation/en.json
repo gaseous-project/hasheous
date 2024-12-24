@@ -170,5 +170,8 @@
     "never": "Never",
     "expires": "Expires",
     "create": "Create",
-    "apiresponse": "API Response"
+    "apiresponse": "API Response",
+    "mapped": "Mapped",
+    "mappedwitherrors": "Mapped with errors",
+    "notmapped": "Not mapped"
 }

@@ -32,6 +32,13 @@ namespace hasheous_server.Models
 
             public string Id { get; set; }
             public string? ImmutableId { get; set; }
+            public MappingStatus Status { get; set; }
+            public enum MappingStatus
+            {
+                NotMapped,
+                Mapped,
+                MappedWithErrors
+            }
             public BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod? MatchMethod { get; set; }
             public Communications.MetadataSources Source { get; set; }
             public string Link
