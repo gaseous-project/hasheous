@@ -315,7 +315,7 @@ function renderContent() {
         document.getElementById('dataObjectMetadataSection').style.display = '';
         let newMetadataMapTable = new generateTable(
             dataObject.metadata,
-            ['source:lang', 'matchMethod:lang', 'link:link'],
+            ['source:lang', 'matchMethod:lang', 'link:link', 'status:lang'],
             'id',
             false
         );

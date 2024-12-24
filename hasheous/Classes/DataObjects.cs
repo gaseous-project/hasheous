@@ -515,6 +515,7 @@ namespace hasheous_server.Classes
                 if (metadataItem.Id.Length == 0)
                 {
                     metadataItem.ImmutableId = "";
+                    metadataItem.Status = MetadataItem.MappingStatus.NotMapped;
                 }
                 else
                 {
@@ -522,45 +523,69 @@ namespace hasheous_server.Classes
                     {
                         case Communications.MetadataSources.None:
                             metadataItem.ImmutableId = metadataItem.Id;
+                            metadataItem.Status = MetadataItem.MappingStatus.Mapped;
                             break;
 
                         case Communications.MetadataSources.IGDB:
                             long? objectId = null;
-                            switch (ObjectType)
+                            try
                             {
-                                case DataObjects.DataObjectType.Company:
-                                    objectId = Companies.GetCompanies(metadataItem.Id).Id;
-                                    break;
+                                switch (ObjectType)
+                                {
+                                    case DataObjects.DataObjectType.Company:
+                                        var company = Companies.GetCompanies(metadataItem.Id);
+                                        if (company != null)
+                                        {
+                                            objectId = company.Id;
+                                        }
+                                        break;
 
-                                case DataObjects.DataObjectType.Platform:
-                                    objectId = Platforms.GetPlatform(metadataItem.Id, false).Id;
-                                    break;
+                                    case DataObjects.DataObjectType.Platform:
+                                        var platform = Platforms.GetPlatform(metadataItem.Id, false);
+                                        if (platform != null)
+                                        {
+                                            objectId = platform.Id;
+                                        }
+                                        break;
 
-                                case DataObjects.DataObjectType.Game:
-                                    objectId = Games.GetGame(metadataItem.Id, false, false, false).Id;
-                                    break;
+                                    case DataObjects.DataObjectType.Game:
+                                        var game = Games.GetGame(metadataItem.Id, false, false, false);
+                                        if (game != null)
+                                        {
+                                            objectId = game.Id;
+                                        }
+                                        break;
 
-                                default:
-                                    objectId = null;
-                                    break;
+                                    default:
+                                        objectId = null;
+                                        break;
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                objectId = null;
                             }
 
                             if (objectId.HasValue)
                             {
                                 metadataItem.ImmutableId = objectId.Value.ToString();
+                                metadataItem.Status = MetadataItem.MappingStatus.Mapped;
                             }
                             else
                             {
                                 metadataItem.ImmutableId = metadataItem.Id;
+                                metadataItem.Status = MetadataItem.MappingStatus.MappedWithErrors;
                             }
                             break;
 
                         case Communications.MetadataSources.TheGamesDb:
                             metadataItem.ImmutableId = metadataItem.Id;
+                            metadataItem.Status = MetadataItem.MappingStatus.Mapped;
                             break;
 
                         default:
                             metadataItem.ImmutableId = metadataItem.Id;
+                            metadataItem.Status = MetadataItem.MappingStatus.Mapped;
                             break;
 
                     }
