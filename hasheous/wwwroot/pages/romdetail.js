@@ -79,7 +79,7 @@ ajaxCall(
                 attributeArray.push(
                     {
                         "attribute": lang.getLang(success.signatureSource.toLowerCase() + "." + key),
-                        "value": value
+                        "value": value.trim().replace(/(?:\r\n|\r|\n)/g, '<br>').trim()
                     }
                 )
             }

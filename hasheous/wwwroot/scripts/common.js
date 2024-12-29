@@ -199,7 +199,11 @@ class generateTable {
                             break;
 
                         case "bytes":
-                            cellContent.innerHTML = formatBytes(cellValue, 1);
+                            if (Number(cellValue) > 0) {
+                                cellContent.innerHTML = formatBytes(cellValue, 1);
+                            } else {
+                                cellContent.innerHTML = "";
+                            }
                             break;
 
                         case "object":
