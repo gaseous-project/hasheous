@@ -1,4 +1,4 @@
-namespace TheGamesDB
+namespace TheGamesDB.JSON
 {
     public class TheGamesDBDatabase
     {

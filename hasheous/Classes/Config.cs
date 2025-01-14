@@ -106,6 +106,8 @@ namespace Classes
             }
         }
 
+        [JsonIgnore]
+        public static bool RequireClientAPIKey = true;
         static Config()
         {
             if (_config == null)

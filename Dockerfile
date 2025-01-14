@@ -26,5 +26,8 @@ RUN dotnet publish "hasheous-cli/hasheous-cli.csproj" --use-current-runtime --se
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 ENV INDOCKER=1
 WORKDIR /App
+
+RUN apt update && apt upgrade -y && apt install mariadb-client -y
+
 COPY --from=build-env /App/out .
 ENTRYPOINT ["dotnet", "hasheous.dll"]

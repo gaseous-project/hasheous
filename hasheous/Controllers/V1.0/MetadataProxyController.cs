@@ -1333,5 +1333,45 @@ namespace hasheous_server.Controllers.v1_0
                 }
             }
         }
+
+        /// <summary>
+        /// Get Games by ID from TheGamesDB
+        /// </summary>
+        /// <param name="id" example="1,2,3" required="true">
+        /// A comma-separated list of TheGamesDB Game IDs
+        /// </param>
+        /// <param name="fields" example="players, publishers, genres, overview, last_updated, rating, platform, coop, youtube, os, processor, ram, hdd, video, sound, alternates">
+        /// A comma-separated list of fields to return
+        /// </param>
+        /// <param name="include" example="boxart, platform">
+        /// A comma-separated list of fields to include
+        /// </param>
+        /// <param name="page">
+        /// The page number to return
+        /// </param>
+        /// <param name="pageSize">
+        /// The number of results to return per page
+        /// </param>
+        /// <returns>
+        /// The game metadata object from TheGamesDB
+        /// </returns>
+        /// <response code="200">Returns the game metadata object from TheGamesDB</response>
+        /// <response code="400">If the one of the input parameters is bad</response>
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(typeof(HasheousClient.Models.Metadata.TheGamesDb.GamesByGameID), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [Route("TheGamesDB/Games/ByGameID")]
+        [ResponseCache(CacheProfileName = "7Days")]
+        public async Task<IActionResult> GetGamesByGameID(string id, string fields = "", string include = "", int page = 1, int pageSize = 10)
+        {
+            // validate input
+            if (id == "")
+            {
+                return BadRequest();
+            }
+
+            return Ok();
+        }
     }
 }

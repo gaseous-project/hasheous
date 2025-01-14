@@ -1,7 +1,7 @@
 using System.Net;
 using Classes;
 
-namespace TheGamesDB
+namespace TheGamesDB.JSON
 {
     public class DownloadManager
     {

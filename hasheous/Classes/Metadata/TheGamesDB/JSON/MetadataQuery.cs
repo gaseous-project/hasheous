@@ -1,7 +1,7 @@
 using Classes;
 using Newtonsoft.Json;
 
-namespace TheGamesDB
+namespace TheGamesDB.JSON
 {
     public class MetadataQuery
     {

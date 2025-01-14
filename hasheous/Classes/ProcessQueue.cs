@@ -187,8 +187,13 @@ namespace Classes
                                     break;
 
                                 case QueueItemType.FetchTheGamesDbMetadata:
-                                    TheGamesDB.DownloadManager tgdbDownloader = new TheGamesDB.DownloadManager();
+                                    // set up JSON
+                                    TheGamesDB.JSON.DownloadManager tgdbDownloader = new TheGamesDB.JSON.DownloadManager();
                                     tgdbDownloader.Download();
+
+                                    // set up SQL
+                                    TheGamesDB.SQL.DownloadManager tgdbSQLDownloader = new TheGamesDB.SQL.DownloadManager();
+                                    tgdbSQLDownloader.Download();
                                     break;
 
                                 case QueueItemType.AutoMapper:
@@ -196,7 +201,7 @@ namespace Classes
                                     break;
 
                                 case QueueItemType.Maintenance:
-                                    TheGamesDB.MetadataQuery.RunMaintenance();
+                                    TheGamesDB.JSON.MetadataQuery.RunMaintenance();
                                     break;
 
                             }

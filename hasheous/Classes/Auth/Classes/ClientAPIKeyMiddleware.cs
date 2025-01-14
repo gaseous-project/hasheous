@@ -48,6 +48,11 @@ namespace Authentication
         {
             public bool IsValid(string apiKey, ref AuthorizationFilterContext context)
             {
+                if (Config.RequireClientAPIKey == false)
+                {
+                    return true;
+                }
+
                 if (apiKey == null)
                 {
                     return false;
