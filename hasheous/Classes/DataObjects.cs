@@ -1307,11 +1307,11 @@ namespace hasheous_server.Classes
                                     break;
 
                                 case Metadata.Communications.MetadataSources.TheGamesDb:
-                                    TheGamesDB.TheGamesDBDatabase tgdbMetadata = TheGamesDB.MetadataQuery.metadata;
+                                    TheGamesDB.JSON.TheGamesDBDatabase tgdbMetadata = TheGamesDB.JSON.MetadataQuery.metadata;
                                     switch (objectType)
                                     {
                                         case DataObjectType.Platform:
-                                            foreach (KeyValuePair<string, TheGamesDB.TheGamesDBDatabase.IncludeItem.PlatformItem.DataItem> metadataPlatform in tgdbMetadata.include.platform.data)
+                                            foreach (KeyValuePair<string, TheGamesDB.JSON.TheGamesDBDatabase.IncludeItem.PlatformItem.DataItem> metadataPlatform in tgdbMetadata.include.platform.data)
                                             {
                                                 if (
                                                     (metadataPlatform.Value.name == item.Name) ||
@@ -1355,7 +1355,7 @@ namespace hasheous_server.Classes
                                                     bool SearchComplete = false;
                                                     foreach (string SearchCandidate in SearchCandidates)
                                                     {
-                                                        foreach (TheGamesDB.TheGamesDBDatabase.DataItem.GameItem metadataGame in tgdbMetadata.data.games)
+                                                        foreach (TheGamesDB.JSON.TheGamesDBDatabase.DataItem.GameItem metadataGame in tgdbMetadata.data.games)
                                                         {
                                                             if (metadataGame.platform == tgdbPlaformId)
                                                             {

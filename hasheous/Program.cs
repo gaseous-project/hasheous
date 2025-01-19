@@ -220,6 +220,8 @@ builder.Services.AddSwaggerGen(options =>
             }
         });
 
+        options.CustomSchemaIds(type => SwaggerSchemaHelper.GetSchemaId(type));
+
         // using System.Reflection;
         var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
         options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFilename));
@@ -276,18 +278,18 @@ builder.Services.AddSingleton<IClientApiKeyValidator, ClientApiKeyValidator>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-//if (app.Environment.IsDevelopment())
-//{
+// configure the server for use in development
+if (app.Environment.IsDevelopment())
+{
+    Config.RequireClientAPIKey = false;
+}
+
 app.UseSwagger();
 app.UseSwaggerUI(options =>
     {
         options.SwaggerEndpoint($"/swagger/v1/swagger.json", "v1.0");
     }
 );
-//}
-
-//app.UseHttpsRedirection();
 
 app.UseResponseCaching();
 
