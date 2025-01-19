@@ -1,6 +1,8 @@
+using System.Data.SqlTypes;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Net;
+using System.Web;
 using Classes;
 using Classes.Metadata;
 using hasheous_server.Classes.Metadata;
@@ -9,6 +11,7 @@ using HasheousClient;
 using IGDB;
 using IGDB.Models;
 using Microsoft.AspNetCore.Mvc;
+using TheGamesDB.SQL;
 using static Authentication.ClientApiKey;
 
 namespace hasheous_server.Controllers.v1_0
@@ -1335,12 +1338,70 @@ namespace hasheous_server.Controllers.v1_0
         }
 
         /// <summary>
+        /// Get image from TheGamesDB
+        /// </summary>
+        /// <param name="ImageSize">
+        /// The size of the image to fetch
+        /// </param>
+        /// <param name="FileName">
+        /// The name of the image to fetch
+        /// </param>
+        /// <returns></returns>
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [Route("TheGamesDB/Images/{ImageSize}/{*FileName}")]
+        [ResponseCache(CacheProfileName = "7Days")]
+        public IActionResult GetTheGamesDBImage(MetadataQuery.imageSize ImageSize, string FileName)
+        {
+            FileName = System.Uri.UnescapeDataString(FileName);
+            string imageFile = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_TheGamesDb, "Images", ImageSize.ToString(), FileName);
+            string imagePath = Path.GetDirectoryName(imageFile);
+
+            // create directory if it doesn't exist
+            if (!Directory.Exists(imagePath))
+            {
+                Directory.CreateDirectory(imagePath);
+            }
+
+            // check if image exists
+            if (System.IO.File.Exists(imageFile))
+            {
+                return PhysicalFile(imageFile, "image/jpeg");
+            }
+            else
+            {
+                // download image from url
+                try
+                {
+                    Uri theGamesDBUri = new Uri("https://cdn.thegamesdb.net/images/" + ImageSize.ToString() + "/" + FileName);
+
+                    DownloadManager downloadManager = new DownloadManager();
+                    var result = downloadManager.DownloadFile(theGamesDBUri.ToString(), imageFile);
+
+                    // wait until result is completed
+                    while (result.IsCompleted == false)
+                    {
+                        Thread.Sleep(1000);
+                    }
+
+                    return PhysicalFile(imageFile, "image/jpeg");
+                }
+                catch (Exception ex)
+                {
+                    return NotFound();
+                }
+            }
+        }
+
+        /// <summary>
         /// Get Games by ID from TheGamesDB
         /// </summary>
         /// <param name="id" example="1,2,3" required="true">
         /// A comma-separated list of TheGamesDB Game IDs
         /// </param>
-        /// <param name="fields" example="players, publishers, genres, overview, last_updated, rating, platform, coop, youtube, os, processor, ram, hdd, video, sound, alternates">
+        /// <param name="fields" example="*, players, publishers, genres, overview, last_updated, rating, platform, coop, youtube, os, processor, ram, hdd, video, sound, alternates">
         /// A comma-separated list of fields to return
         /// </param>
         /// <param name="include" example="boxart, platform">
@@ -1362,16 +1423,395 @@ namespace hasheous_server.Controllers.v1_0
         [ProducesResponseType(typeof(HasheousClient.Models.Metadata.TheGamesDb.GamesByGameID), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [Route("TheGamesDB/Games/ByGameID")]
-        [ResponseCache(CacheProfileName = "7Days")]
-        public async Task<IActionResult> GetGamesByGameID(string id, string fields = "", string include = "", int page = 1, int pageSize = 10)
+        // [ResponseCache(CacheProfileName = "7Days")]
+        public IActionResult GetGamesByGameID(string id, string fields = "", string include = "", int page = 1, int pageSize = 10)
         {
-            // validate input
-            if (id == "")
+            TheGamesDB.SQL.QueryModel queryModel = new TheGamesDB.SQL.QueryModel
             {
-                return BadRequest();
-            }
+                query = id,
+                queryField = QueryModel.QueryFieldName.id,
+                fieldList = fields,
+                includeList = include,
+                page = page,
+                pageSize = pageSize
+            };
 
-            return Ok();
+            TheGamesDB.SQL.MetadataQuery query = new TheGamesDB.SQL.MetadataQuery();
+            HasheousClient.Models.Metadata.TheGamesDb.GamesByGameID? games = query.GetMetadata<HasheousClient.Models.Metadata.TheGamesDb.GamesByGameID>(queryModel);
+
+            return Ok(games);
         }
+
+        /// <summary>
+        /// Get Games by Name from TheGamesDB
+        /// </summary>
+        /// <param name="name" required="true">
+        /// Search term
+        /// </param>
+        /// <param name="fields" example="*, players, publishers, genres, overview, last_updated, rating, platform, coop, youtube, os, processor, ram, hdd, video, sound, alternates">
+        /// A comma-separated list of fields to return
+        /// </param>
+        /// <param name="filter">
+        /// Platform ID to filter by
+        /// </param>
+        /// <param name="include" example="boxart, platform">
+        /// A comma-separated list of fields to include
+        /// </param>
+        /// <param name="page">
+        /// The page number to return
+        /// </param>
+        /// <param name="pageSize">
+        /// The number of results to return per page
+        /// </param>
+        /// <returns>
+        /// The game metadata object from TheGamesDB
+        /// </returns>
+        /// <response code="200">Returns the game metadata object from TheGamesDB</response>
+        /// <response code="400">If the one of the input parameters is bad</response>
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(typeof(HasheousClient.Models.Metadata.TheGamesDb.GamesByGameID), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [Route("TheGamesDB/Games/ByGameName")]
+        // [ResponseCache(CacheProfileName = "7Days")]
+        public IActionResult GetGamesByGameName(string name, string fields = "", string filter = "", string include = "", int page = 1, int pageSize = 10)
+        {
+            TheGamesDB.SQL.QueryModel queryModel = new TheGamesDB.SQL.QueryModel
+            {
+                query = name,
+                queryField = QueryModel.QueryFieldName.name,
+                fieldList = fields,
+                filter = filter,
+                includeList = include,
+                page = page,
+                pageSize = pageSize
+            };
+
+            TheGamesDB.SQL.MetadataQuery query = new TheGamesDB.SQL.MetadataQuery();
+            HasheousClient.Models.Metadata.TheGamesDb.GamesByGameID? games = query.GetMetadata<HasheousClient.Models.Metadata.TheGamesDb.GamesByGameID>(queryModel);
+
+            return Ok(games);
+        }
+
+        /// <summary>
+        /// Get Games by platform ID from TheGamesDB
+        /// </summary>
+        /// <param name="id" example="1" required="true">
+        /// A platform ID
+        /// </param>
+        /// <param name="fields" example="*, players, publishers, genres, overview, last_updated, rating, platform, coop, youtube, os, processor, ram, hdd, video, sound, alternates">
+        /// A comma-separated list of fields to return
+        /// </param>
+        /// <param name="include" example="boxart, platform">
+        /// A comma-separated list of fields to include
+        /// </param>
+        /// <param name="page">
+        /// The page number to return
+        /// </param>
+        /// <param name="pageSize">
+        /// The number of results to return per page
+        /// </param>
+        /// <returns>
+        /// The game metadata object from TheGamesDB
+        /// </returns>
+        /// <response code="200">Returns the game metadata object from TheGamesDB</response>
+        /// <response code="400">If the one of the input parameters is bad</response>
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(typeof(HasheousClient.Models.Metadata.TheGamesDb.GamesByGameID), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [Route("TheGamesDB/Games/ByPlatformID")]
+        // [ResponseCache(CacheProfileName = "7Days")]
+        public IActionResult GetGamesByPlatformID(string id, string fields = "", string include = "", int page = 1, int pageSize = 10)
+        {
+            TheGamesDB.SQL.QueryModel queryModel = new TheGamesDB.SQL.QueryModel
+            {
+                query = id,
+                queryField = QueryModel.QueryFieldName.platform_id,
+                fieldList = fields,
+                includeList = include,
+                page = page,
+                pageSize = pageSize
+            };
+
+            TheGamesDB.SQL.MetadataQuery query = new TheGamesDB.SQL.MetadataQuery();
+            HasheousClient.Models.Metadata.TheGamesDb.GamesByGameID? games = query.GetMetadata<HasheousClient.Models.Metadata.TheGamesDb.GamesByGameID>(queryModel);
+
+            return Ok(games);
+        }
+
+        /// <summary>
+        /// Get game images by game ID from TheGamesDB
+        /// </summary>
+        /// <param name="id" example="1,2,3" required="true">
+        /// A comma-separated list of TheGamesDB Game IDs
+        /// </param>
+        /// <param name="filter" example="fanart, banner, boxart, screenshot, clearlogo, titlescreen">
+        /// A comma-separated list of image types to return
+        /// </param>
+        /// <param name="page">
+        /// The page number to return
+        /// </param>
+        /// <param name="pageSize">
+        /// The number of results to return per page
+        /// </param>
+        /// <returns>
+        /// The game images metadata object from TheGamesDB
+        /// </returns>
+        /// <response code="200">Returns the game images metadata object from TheGamesDB</response>
+        /// <response code="400">If the one of the input parameters is bad</response>
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(typeof(HasheousClient.Models.Metadata.TheGamesDb.GamesImages), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [Route("TheGamesDB/Games/Images")]
+        // [ResponseCache(CacheProfileName = "7Days")]
+        public IActionResult GetGamesImages(string id, string filter = "", int page = 1, int pageSize = 10)
+        {
+            TheGamesDB.SQL.QueryModel queryModel = new TheGamesDB.SQL.QueryModel
+            {
+                query = id,
+                queryField = QueryModel.QueryFieldName.games_id,
+                filter = filter,
+                page = page,
+                pageSize = pageSize
+            };
+
+            TheGamesDB.SQL.MetadataQuery query = new TheGamesDB.SQL.MetadataQuery();
+            HasheousClient.Models.Metadata.TheGamesDb.GamesImages? games = query.GetMetadata<HasheousClient.Models.Metadata.TheGamesDb.GamesImages>(queryModel);
+
+            return Ok(games);
+        }
+
+        /// <summary>
+        /// Get the list of platforms from TheGamesDB
+        /// </summary>
+        /// <param name="fields" example="icon, console, controller, developer, manufacturer, media, cpu, memory, graphics, sound, maxcontrollers, display, overview, youtube" required="false">
+        /// A comma-separated list of fields to return
+        /// </param>
+        /// <returns>
+        /// The platform metadata objects from TheGamesDB
+        /// </returns>
+        /// <response code="200">Returns the platform metadata objects from TheGamesDB</response>
+        /// <response code="400">If the one of the input parameters is bad</response>
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(typeof(HasheousClient.Models.Metadata.TheGamesDb.Platforms), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [Route("TheGamesDB/Platforms")]
+        // [ResponseCache(CacheProfileName = "7Days")]
+        public IActionResult GetPlatforms(string fields = "")
+        {
+            TheGamesDB.SQL.QueryModel queryModel = new TheGamesDB.SQL.QueryModel
+            {
+                fieldList = fields
+            };
+
+            TheGamesDB.SQL.MetadataQuery query = new TheGamesDB.SQL.MetadataQuery();
+            HasheousClient.Models.Metadata.TheGamesDb.Platforms? platforms = query.GetMetadata<HasheousClient.Models.Metadata.TheGamesDb.Platforms>(queryModel);
+
+            return Ok(platforms);
+        }
+
+        /// <summary>
+        /// Get the list of platforms by ID from TheGamesDB
+        /// </summary>
+        /// <param name="id" example="1,2,3" required="true">
+        /// A comma-separated list of TheGamesDB Platform IDs
+        /// </param>
+        /// <param name="fields" example="icon, console, controller, developer, manufacturer, media, cpu, memory, graphics, sound, maxcontrollers, display, overview, youtube" required="false">
+        /// A comma-separated list of fields to return
+        /// </param>
+        /// <returns>
+        /// The platform metadata objects from TheGamesDB
+        /// </returns>
+        /// <response code="200">Returns the platform metadata objects from TheGamesDB</response>
+        /// <response code="400">If the one of the input parameters is bad</response>
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(typeof(HasheousClient.Models.Metadata.TheGamesDb.PlatformsByPlatformID), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [Route("TheGamesDB/Platforms/ByPlatformID")]
+        // [ResponseCache(CacheProfileName = "7Days")]
+        public IActionResult GetPlatformsByPlatformID(string id, string fields = "")
+        {
+            TheGamesDB.SQL.QueryModel queryModel = new TheGamesDB.SQL.QueryModel
+            {
+                query = id,
+                queryField = QueryModel.QueryFieldName.id,
+                fieldList = fields
+            };
+
+            TheGamesDB.SQL.MetadataQuery query = new TheGamesDB.SQL.MetadataQuery();
+            HasheousClient.Models.Metadata.TheGamesDb.PlatformsByPlatformID? platforms = query.GetMetadata<HasheousClient.Models.Metadata.TheGamesDb.PlatformsByPlatformID>(queryModel);
+
+            return Ok(platforms);
+        }
+
+        /// <summary>
+        /// Get the list of platforms by name from TheGamesDB
+        /// </summary>
+        /// <param name="name" required="true">
+        /// Search term
+        /// </param>
+        /// <param name="fields" example="icon, console, controller, developer, manufacturer, media, cpu, memory, graphics, sound, maxcontrollers, display, overview, youtube" required="false">
+        /// A comma-separated list of fields to return
+        /// </param>
+        /// <returns>
+        /// The platform metadata objects from TheGamesDB
+        /// </returns>
+        /// <response code="200">Returns the platform metadata objects from TheGamesDB</response>
+        /// <response code="400">If the one of the input parameters is bad</response>
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(typeof(HasheousClient.Models.Metadata.TheGamesDb.PlatformsByPlatformName), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [Route("TheGamesDB/Platforms/ByPlatformName")]
+        // [ResponseCache(CacheProfileName = "7Days")]
+        public IActionResult GetPlatformsByPlatformName(string name, string fields = "")
+        {
+            TheGamesDB.SQL.QueryModel queryModel = new TheGamesDB.SQL.QueryModel
+            {
+                query = name,
+                queryField = QueryModel.QueryFieldName.platform_name,
+                fieldList = fields
+            };
+
+            TheGamesDB.SQL.MetadataQuery query = new TheGamesDB.SQL.MetadataQuery();
+            HasheousClient.Models.Metadata.TheGamesDb.PlatformsByPlatformName? platforms = query.GetMetadata<HasheousClient.Models.Metadata.TheGamesDb.PlatformsByPlatformName>(queryModel);
+
+            return Ok(platforms);
+        }
+
+        /// <summary>
+        /// Get platform images by platform id from TheGamesDB
+        /// </summary>
+        /// <param name="id" example="1,2,3" required="true">
+        /// A comma-separated list of TheGamesDB Platform IDs
+        /// </param>
+        /// <param name="filter" example="fanart, banner, boxart">
+        /// A comma-separated list of image types to return
+        /// </param>
+        /// <param name="page">
+        /// The page number to return
+        /// </param>
+        /// <param name="pageSize">
+        /// The number of results to return per page
+        /// </param>
+        /// <returns>
+        /// The platform images metadata object from TheGamesDB
+        /// </returns>
+        /// <response code="200">Returns the platform images metadata object from TheGamesDB</response>
+        /// <response code="400">If the one of the input parameters is bad</response>
+        /// <response code="500">If an error occurs</response>
+        /// <response code="503">If the service is unavailable</response>
+        /// <response code="504">If the service request times out</response>
+        /// 
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(typeof(HasheousClient.Models.Metadata.TheGamesDb.PlatformsImages), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [Route("TheGamesDB/Platforms/Images")]
+        // [ResponseCache(CacheProfileName = "7Days")]
+        public IActionResult GetPlatformsImages(string id, string filter = "", int page = 1, int pageSize = 10)
+        {
+            TheGamesDB.SQL.QueryModel queryModel = new TheGamesDB.SQL.QueryModel
+            {
+                query = id,
+                queryField = QueryModel.QueryFieldName.platforms_id,
+                filter = filter,
+                page = page,
+                pageSize = pageSize
+            };
+
+            TheGamesDB.SQL.MetadataQuery query = new TheGamesDB.SQL.MetadataQuery();
+            HasheousClient.Models.Metadata.TheGamesDb.PlatformsImages? platforms = query.GetMetadata<HasheousClient.Models.Metadata.TheGamesDb.PlatformsImages>(queryModel);
+
+            return Ok(platforms);
+        }
+
+        /// <summary>
+        /// Get the list of Genres from TheGamesDB
+        /// </summary>
+        /// <returns>
+        /// The genre metadata objects from TheGamesDB
+        /// </returns>
+        /// <response code="200">Returns the genre metadata objects from TheGamesDB</response>
+        /// <response code="400">If the one of the input parameters is bad</response>
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(typeof(HasheousClient.Models.Metadata.TheGamesDb.Genres), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [Route("TheGamesDB/Genres")]
+        // [ResponseCache(CacheProfileName = "7Days")]
+        public IActionResult GetGenres()
+        {
+            TheGamesDB.SQL.QueryModel queryModel = new TheGamesDB.SQL.QueryModel
+            {
+
+            };
+
+            TheGamesDB.SQL.MetadataQuery query = new TheGamesDB.SQL.MetadataQuery();
+            HasheousClient.Models.Metadata.TheGamesDb.Genres? genres = query.GetMetadata<HasheousClient.Models.Metadata.TheGamesDb.Genres>(queryModel);
+
+            return Ok(genres);
+        }
+
+        /// <summary>
+        /// Get the list of Developers from TheGamesDB
+        /// </summary>
+        /// <returns>
+        /// The developer metadata objects from TheGamesDB
+        /// </returns>
+        /// <response code="200">Returns the developer metadata objects from TheGamesDB</response>
+        /// <response code="400">If the one of the input parameters is bad</response>
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(typeof(HasheousClient.Models.Metadata.TheGamesDb.Developers), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [Route("TheGamesDB/Developers")]
+        // [ResponseCache(CacheProfileName = "7Days")]
+        public IActionResult GetDevelopers(int page = 1, int pageSize = 10)
+        {
+            TheGamesDB.SQL.QueryModel queryModel = new TheGamesDB.SQL.QueryModel
+            {
+                page = page,
+                pageSize = pageSize
+            };
+
+            TheGamesDB.SQL.MetadataQuery query = new TheGamesDB.SQL.MetadataQuery();
+            HasheousClient.Models.Metadata.TheGamesDb.Developers? developers = query.GetMetadata<HasheousClient.Models.Metadata.TheGamesDb.Developers>(queryModel);
+
+            return Ok(developers);
+        }
+
+        /// <summary>
+        /// Get the list of Publishers from TheGamesDB
+        /// </summary>
+        /// <returns>
+        /// The publisher metadata objects from TheGamesDB
+        /// </returns>
+        /// <response code="200">Returns the publisher metadata objects from TheGamesDB</response>
+        /// <response code="400">If the one of the input parameters is bad</response>
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(typeof(HasheousClient.Models.Metadata.TheGamesDb.Publishers), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [Route("TheGamesDB/Publishers")]
+        // [ResponseCache(CacheProfileName = "7Days")]
+        public IActionResult GetPublishers(int page = 1, int pageSize = 10)
+        {
+            TheGamesDB.SQL.QueryModel queryModel = new TheGamesDB.SQL.QueryModel
+            {
+                page = page,
+                pageSize = pageSize
+            };
+
+            TheGamesDB.SQL.MetadataQuery query = new TheGamesDB.SQL.MetadataQuery();
+            HasheousClient.Models.Metadata.TheGamesDb.Publishers? publishers = query.GetMetadata<HasheousClient.Models.Metadata.TheGamesDb.Publishers>(queryModel);
+
+            return Ok(publishers);
+        }
+
     }
 }

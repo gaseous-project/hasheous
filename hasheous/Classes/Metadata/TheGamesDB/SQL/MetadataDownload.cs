@@ -146,7 +146,7 @@ namespace TheGamesDB.SQL
             return LocalFileName;
         }
 
-        private async Task<bool?> DownloadFile(string url, string DestinationFile)
+        public async Task<bool?> DownloadFile(string url, string DestinationFile)
         {
             var result = await _DownloadFile(new Uri(url), DestinationFile);
 
