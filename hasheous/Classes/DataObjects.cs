@@ -1216,7 +1216,10 @@ namespace hasheous_server.Classes
                         (
                             metadata.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch &&
                             metadata.NextSearch < DateTime.UtcNow
-                        ) || ForceSearch == true
+                        ) || (
+                            metadata.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch &&
+                            ForceSearch == true
+                        )
                     )
                     {
                         // searching is allowed
