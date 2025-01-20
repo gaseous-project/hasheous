@@ -3,6 +3,9 @@ class dataObjectAttributes {
         this.attribute = attribute;
 
         this.inputElement = null;
+        this.endpoint = null;
+        this.isSelect2 = false;
+
         switch (attribute.attributeType) {
             case "LongString":
                 this.inputElement = document.createElement('textarea');
@@ -155,17 +158,19 @@ class dataObjectAttributes {
 
                 let nullOption = document.createElement('option');
                 nullOption.value = '';
-                nullOption.innerHTML = " ";
+                nullOption.innerHTML = "None";
                 this.inputElement.appendChild(nullOption);
 
                 switch (attribute.attributeName) {
                     case "Platform":
-                        this.#SetupObjectMenus(this.inputElement, 'Platform');
+                        this.endpoint = 'Platform';
+                        this.isSelect2 = true;
                         break;
 
                     case "Publisher":
                     case "Manufacturer":
-                        this.#SetupObjectMenus(this.inputElement, 'Company');
+                        this.isSelect2 = true;
+                        this.endpoint = 'Company';
                         break;
 
                     default:
@@ -181,46 +186,53 @@ class dataObjectAttributes {
         }
     }
 
+    render() {
+        if (this.isSelect2 == true) {
+            this.#SetupObjectMenus(this.inputElement, this.endpoint);
+        }
+    }
+
     #SetupObjectMenus(dropdown, endpoint) {
-        $('body').on('DOMNodeInserted', 'select', function () {
-            $(dropdown).select2({
-                ajax: {
-                    allowClear: true,
-                    placeholder: {
-                        "id": "",
-                        "text": "None"
-                    },
-                    url: '/api/v1/DataObjects/' + endpoint,
-                    data: function (params) {
-                        var query = {
-                            search: params.term
-                        }
-
-                        return query;
-                    },
-                    processResults: function (data) {
-                        var arr = [];
-
-                        arr.push({
-                            id: "",
-                            text: "None"
-                        });
-
-                        for (var i = 0; i < data.objects.length; i++) {
-                            arr.push({
-                                id: data.objects[i].id,
-                                text: data.objects[i].name,
-                                fullObject: data.objects[i]
-                            });
-                        }
-
-                        return {
-                            results: arr
-                        };
+        // $('body').on('DOMContentLoaded', 'select', function () {
+        $(dropdown).select2({
+            minimumInputLength: 3,
+            ajax: {
+                allowClear: true,
+                placeholder: {
+                    "id": "",
+                    "text": "None"
+                },
+                url: '/api/v1/DataObjects/' + endpoint,
+                data: function (params) {
+                    var query = {
+                        search: params.term
                     }
+
+                    return query;
+                },
+                processResults: function (data) {
+                    var arr = [];
+
+                    arr.push({
+                        id: "",
+                        text: "None"
+                    });
+
+                    for (var i = 0; i < data.objects.length; i++) {
+                        arr.push({
+                            id: data.objects[i].id,
+                            text: data.objects[i].name,
+                            fullObject: data.objects[i]
+                        });
+                    }
+
+                    return {
+                        results: arr
+                    };
                 }
-            });
+            }
         });
+        // });
     }
 
     getValue() {

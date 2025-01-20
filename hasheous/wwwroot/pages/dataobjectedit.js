@@ -137,6 +137,7 @@ function renderContent() {
         let dataObjectAttribute = new dataObjectAttributes(attribute);
         renderedAttributes.push(dataObjectAttribute);
         inputCell.appendChild(dataObjectAttribute.inputElement);
+        dataObjectAttribute.render();
 
         tableRow.appendChild(inputCell);
 

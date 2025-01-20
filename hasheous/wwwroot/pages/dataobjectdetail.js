@@ -5,6 +5,7 @@ let editMode = false;
 if (userProfile != null) {
     if (userProfile.Roles != null) {
         if (userProfile.Roles.includes('Moderator') || userProfile.Roles.includes('Admin')) {
+            document.getElementById('metadatarescan').style.display = '';
             document.getElementById('dataObjectAdminControls').style.display = '';
             if (dataObjectDefinition.allowMerge == true) {
                 document.getElementById('dataObjectMergeButtons').style.display = '';
@@ -50,6 +51,18 @@ document.getElementById('dataObjectMerge').addEventListener("click", function (e
             console.warn(error);
         }
     );
+});
+
+document.getElementById('metadatarescan').addEventListener("click", function (e) {
+    fetch('/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int') + '/MetadataMap?forceScan=true', {
+        method: 'GET'
+    }).then(async function (response) {
+        if (response.ok) {
+            location.reload();
+        } else {
+            throw new Error('Failed to rescan metadata');
+        }
+    });
 });
 
 ajaxCall(

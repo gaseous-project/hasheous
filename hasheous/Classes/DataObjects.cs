@@ -1127,7 +1127,41 @@ namespace hasheous_server.Classes
             }
             else
             {
-                DataObjectsToProcess.AddRange(GetDataObjects(objectType).Objects);
+                // DataObjectsToProcess.AddRange(GetDataObjects(objectType).Objects);
+                sql = @"
+                    SELECT DISTINCT
+                        DataObject.*, DDMM.LastSearched
+                    FROM
+                        DataObject
+                            JOIN 
+                        (SELECT 
+                            DataObjectId, LastSearched
+                        FROM
+                            DataObject_MetadataMap GROUP BY DataObjectId ORDER BY LastSearched) DDMM ON DataObject.Id = DDMM.DataObjectId
+                    WHERE
+                        ObjectType = @objecttype AND DDMM.LastSearched < @lastsearched
+                    ORDER BY DataObject.`Name`
+                    LIMIT 10000;
+                ";
+                dbDict = new Dictionary<string, object>{
+                    { "objecttype", objectType },
+                    { "lastsearched", DateTime.UtcNow.AddMonths(-1) }
+                };
+
+                DataTable data = db.ExecuteCMD(sql, dbDict);
+                foreach (DataRow row in data.Rows)
+                {
+                    DataObjectItem item = BuildDataObject(objectType, (long)row["Id"], row, false, true);
+                    DataObjectsToProcess.Add(item);
+                }
+
+                if (DataObjectsToProcess.Count == 0)
+                {
+                    return null;
+                }
+
+                sql = "";
+                dbDict = new Dictionary<string, object> { };
             }
 
             // search for metadata

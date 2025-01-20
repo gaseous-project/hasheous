@@ -414,7 +414,7 @@ ProcessQueue.QueueItems.Add(
     fetchTheGamesDbMetadata
 );
 
-ProcessQueue.QueueItem MetadataSearch = new ProcessQueue.QueueItem(ProcessQueue.QueueItemType.MetadataMatchSearch, 1440, new List<ProcessQueue.QueueItemType> {
+ProcessQueue.QueueItem MetadataSearch = new ProcessQueue.QueueItem(ProcessQueue.QueueItemType.MetadataMatchSearch, 120, new List<ProcessQueue.QueueItemType> {
     ProcessQueue.QueueItemType.GetMissingArtwork, ProcessQueue.QueueItemType.TallyVotes, ProcessQueue.QueueItemType.AutoMapper, ProcessQueue.QueueItemType.FetchTheGamesDbMetadata, ProcessQueue.QueueItemType.FetchVIMMMetadata
 });
 MetadataSearch.ForceExecute();

@@ -14,7 +14,7 @@ namespace hasheous_server.Controllers.v1_0
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]/")]
     [ApiVersion("1.0")]
-    [ApiExplorerSettings(IgnoreApi = true)]
+    [ApiExplorerSettings(IgnoreApi = false)]
     [Authorize]
     public class DataObjectsController : ControllerBase
     {
@@ -420,10 +420,10 @@ namespace hasheous_server.Controllers.v1_0
         [AllowAnonymous]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [Route("{ObjectType}/{Id}/MetadataMap")]
-        public async Task<IActionResult> GetDataObjectMetadataMap(Classes.DataObjects.DataObjectType ObjectType, long Id)
+        public async Task<IActionResult> GetDataObjectMetadataMap(Classes.DataObjects.DataObjectType ObjectType, long Id, bool forceScan = false)
         {
             // metadata mappings aren't valid for apps
-            if (ObjectType != Classes.DataObjects.DataObjectType.App)
+            if (ObjectType == Classes.DataObjects.DataObjectType.App)
             {
                 return NotFound();
             }
@@ -438,6 +438,18 @@ namespace hasheous_server.Controllers.v1_0
             }
             else
             {
+                // only users who hold the admin or moderator role should be able to force a scan
+                // check if the logged in user has the required role
+                if (!User.IsInRole("Admin") && !User.IsInRole("Moderator"))
+                {
+                    forceScan = false;
+                }
+                
+                if (forceScan)
+                {
+                    DataObjects.DataObjectMetadataSearch(ObjectType, Id, true);
+                }
+
                 return Ok(DataObjects.GetMetadataMap(ObjectType, Id));
             }
         }

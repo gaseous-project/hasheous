@@ -173,5 +173,6 @@
     "apiresponse": "API Response",
     "mapped": "Mapped",
     "mappedwitherrors": "Mapped with errors",
-    "notmapped": "Not mapped"
+    "notmapped": "Not mapped",
+    "rescanmetadata": "Rescan Metadata"
 }
