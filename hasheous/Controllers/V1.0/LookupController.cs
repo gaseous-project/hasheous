@@ -17,18 +17,35 @@ namespace hasheous_server.Controllers.v1_0
         /// <summary>
         /// Look up the signature coresponding to the provided MD5 and SHA1 hash - and if available, any mapped metadata ids
         /// </summary>
-        /// <param name="model">A JSON element with MD5 or SHA1 key value pairs representing the hashes of the ROM being queried.</param>
-        /// <returns>Game and ROM signature from available DATs, and if available mapped metadata ids. 404 if no signature is found.</returns>
+        /// <param name="model" required="true">
+        /// A JSON element with MD5 or SHA1 key value pairs representing the hashes of the ROM being queried.
+        /// </param>
+        /// <param name="returnAllSources" required="false" default="false" example="false">
+        /// If true, all sources will be returned in the response. If false, only the first source will be returned.
+        /// </param>
+        /// <returns>
+        /// Game and ROM signature from available DATs, and if available mapped metadata ids. 404 if no signature is found.
+        /// </returns>
+        /// <response code="200">Returns the game and ROM signature from available DATs, and if available mapped metadata ids.</response>
+        /// <response code="404">If no signature is found.</response>
+        /// <response code="400">If the provided hash is invalid.</response>
+        /// <response code="500">If an error occurs while looking up the hash.</response>
+        /// <example>
+        /// {
+        ///    "MD5": "5d7550788a4d1b47ad81fbbbf5c615a9",
+        ///    "SHA1": "274ed5c2ea2ddc855f67d4c4e61c9d9b7eb68403"
+        /// }
+        /// </example>
         [MapToApiVersion("1.0")]
         [HttpPost]
-        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(HashLookup), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [Route("ByHash")]
-        public async Task<IActionResult> LookupPost(HashLookupModel model)
+        public async Task<IActionResult> LookupPost(HashLookupModel model, bool? returnAllSources = false)
         {
             try
             {
-                HashLookup hashLookup = new HashLookup(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), model);
+                HashLookup hashLookup = new HashLookup(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), model, returnAllSources);
 
                 if (hashLookup == null)
                 {
