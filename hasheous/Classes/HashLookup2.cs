@@ -35,7 +35,7 @@ namespace Classes
 
         }
 
-        public HashLookup(Database db, hasheous_server.Models.HashLookupModel model)
+        public HashLookup(Database db, hasheous_server.Models.HashLookupModel model, bool? returnAllSources = false)
         {
             SignatureManagement signature = new SignatureManagement();
             // get the raw signature
@@ -219,7 +219,24 @@ namespace Classes
                     Name = publisher.Name,
                     metadata = publisher.Metadata
                 };
-                this.Signature = new SignatureLookupItem.SignatureResult(discoveredSignature);
+
+                if (returnAllSources == true)
+                {
+                    // get all signatures
+                    this.Signatures = new Dictionary<RomSignatureObject.Game.Rom.SignatureSourceType, List<SignatureLookupItem.SignatureResult>>();
+                    foreach (Signatures_Games_2 sig in rawSignatures)
+                    {
+                        if (!this.Signatures.ContainsKey(sig.Rom.SignatureSource))
+                        {
+                            this.Signatures.Add(sig.Rom.SignatureSource, new List<SignatureLookupItem.SignatureResult>());
+                        }
+                        this.Signatures[sig.Rom.SignatureSource].Add(new SignatureLookupItem.SignatureResult(sig));
+                    }
+                }
+                else
+                {
+                    this.Signature = new SignatureLookupItem.SignatureResult(discoveredSignature);
+                }
                 this.Metadata = game.Metadata;
 
                 // attributes
@@ -290,6 +307,7 @@ namespace Classes
         public MiniDataObjectItem Publisher { get; set; }
 
         public SignatureLookupItem.SignatureResult? Signature { get; set; }
+        public Dictionary<RomSignatureObject.Game.Rom.SignatureSourceType, List<SignatureLookupItem.SignatureResult>>? Signatures { get; set; }
         public List<DataObjectItem.MetadataItem>? Metadata { get; set; }
         public List<AttributeItemCompiled>? Attributes { get; set; }
 
