@@ -127,6 +127,7 @@ function renderContent() {
                 var arr = [];
 
                 for (var i = 0; i < data.objects.length; i++) {
+                    console.log(data.objects[i]);
                     if (data.objects[i].id != getQueryString('id', 'int')) {
                         arr.push({
                             id: data.objects[i].id,
@@ -156,6 +157,34 @@ function renderContent() {
                 descBody.innerHTML = dataObject.attributes[i].value;
                 descriptionElement.appendChild(descBody);
 
+                break;
+
+            case "Country":
+                let countries = dataObject.attributes[i].value.split(',');
+
+                // replace country names with flags
+                for (let j = 0; j < countries.length; j++) {
+                    // get the country code from between the brackets
+                    let countryCode = countries[j].substring(countries[j].indexOf('(') + 1, countries[j].indexOf(')'));
+                    // get the country name from before the brackets
+                    let countryName = countries[j].substring(0, countries[j].indexOf('(') - 1);
+
+                    if (countryCode.length == 2) {
+                        // get the flag emoji from the country code
+                        let flagEmoji = countryCode.toUpperCase().replace(/./g, char => String.fromCodePoint(char.charCodeAt(0) + 127397));
+
+                        countries[j] = "<span class=\"flagemoji\" title=\"" + countryName + "\">" + flagEmoji + "</span>";
+                    } else {
+                        countries[j] = countryName + ' (' + countryCode + ')';
+                    }
+                }
+
+                attributeValues.push(
+                    {
+                        "attribute": dataObject.attributes[i].attributeName,
+                        "value": countries.join(' ')
+                    }
+                );
                 break;
 
             case "VIMMManualId":
@@ -235,10 +264,67 @@ function renderContent() {
                                 romHeader.innerHTML = lang.getLang('associatedroms');
                                 romBox.appendChild(romHeader);
 
+                                // pre-process the dataset
+                                let romData = [];
+                                for (let j = 0; j < dataObject.attributes[i].value.length; j++) {
+                                    let rom = dataObject.attributes[i].value[j];
+
+                                    // convert countries list to flags
+                                    let countries = "";
+                                    // loop all keys in the countries object
+                                    for (let key in rom.country) {
+                                        // get the flag emoji from the country code
+                                        let flagEmoji = key.toUpperCase().replace(/./g, char => String.fromCodePoint(char.charCodeAt(0) + 127397));
+
+                                        countries += "<span class=\"flagemoji\" title=\"" + rom.country[key] + "\">" + flagEmoji + "</span>";
+                                    }
+
+                                    // convert languages list to flags
+                                    let languages = "";
+                                    // loop all keys in the language object
+                                    for (let key in rom.language) {
+                                        if (languages != "") {
+                                            languages += ", ";
+                                        }
+                                        languages += rom.language[key];
+                                    }
+
+                                    // join hashes into a single string with a <br /> between them
+                                    let hashes = '';
+                                    if (rom.md5) {
+                                        hashes += 'MD5: ' + rom.md5;
+                                    }
+                                    if (rom.sha1) {
+                                        if (hashes != '') {
+                                            hashes += '<br />';
+                                        }
+                                        hashes += 'SHA1: ' + rom.sha1;
+                                    }
+                                    if (rom.crc) {
+                                        if (hashes != '') {
+                                            hashes += '<br />';
+                                        }
+                                        hashes += 'CRC: ' + rom.crc;
+                                    }
+                                    hashes = '<span style="white-space: nowrap;">' + hashes + '</span>';
+
+                                    romData.push({
+                                        "id": rom.id,
+                                        "countries": countries,
+                                        "languages": languages,
+                                        "name": rom.name,
+                                        "size": rom.size,
+                                        "hashes": hashes,
+                                        "signatureSource": rom.signatureSource
+                                    });
+                                }
+
+                                console.log(dataObject.attributes[i].value);
+                                console.log(romData);
                                 romBox.appendChild(
                                     new generateTable(
-                                        dataObject.attributes[i].value,
-                                        ['id', 'name', 'size:bytes', 'md5', 'sha1', 'signatureSource'],
+                                        romData,
+                                        ['id', 'countries:hideheading', 'languages:hideheading', 'name', 'size:bytes', 'hashes', 'signatureSource'],
                                         'id',
                                         true,
                                         function (id) {

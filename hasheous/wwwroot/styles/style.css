@@ -686,3 +686,7 @@ td {
 pre {
     margin: 0;
 }
+
+.flagemoji {
+    font-size: 24px;
+}

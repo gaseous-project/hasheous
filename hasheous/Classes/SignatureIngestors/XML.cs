@@ -176,25 +176,24 @@ namespace XML
                                     List<int> gameCountries = new List<int>();
                                     if (
                                         gameObject.Country != null &&
-                                        gameObject.Country != "Unknown"
+                                        gameObject.Country.Count > 0
                                         )
                                     {
-                                        string[] countries = gameObject.Country.Split(",");
-                                        foreach (string country in countries)
+                                        foreach (KeyValuePair<string, string> country in gameObject.Country)
                                         {
                                             int countryId = -1;
-                                            countryId = Common.GetLookupByCode(Common.LookupTypes.Country, (string)Common.ReturnValueIfNull(country.Trim(), ""));
+                                            countryId = Common.GetLookupByCode(Common.LookupTypes.Country, (string)Common.ReturnValueIfNull(country.Key.Trim(), ""));
                                             if (countryId == -1)
                                             {
-                                                countryId = Common.GetLookupByValue(Common.LookupTypes.Country, (string)Common.ReturnValueIfNull(country.Trim(), ""));
+                                                countryId = Common.GetLookupByValue(Common.LookupTypes.Country, (string)Common.ReturnValueIfNull(country.Key.Trim(), ""));
 
                                                 if (countryId == -1)
                                                 {
-                                                    Logging.Log(Logging.LogType.Warning, "Signature Ingest", "Unable to locate country id for " + country.Trim());
+                                                    Logging.Log(Logging.LogType.Warning, "Signature Ingest", "Unable to locate country id for " + country.Key.Trim());
                                                     sql = "INSERT INTO Country (`Code`, `Value`) VALUES (@code, @name); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
                                                     Dictionary<string, object> countryDict = new Dictionary<string, object>{
-                                                        { "code", country.Trim() },
-                                                        { "name", country.Trim() }
+                                                        { "code", country.Key.Trim() },
+                                                        { "name", country.Value.Trim() }
                                                     };
                                                     countryId = int.Parse(db.ExecuteCMD(sql, countryDict).Rows[0][0].ToString());
                                                 }
@@ -210,25 +209,24 @@ namespace XML
                                     List<int> gameLanguages = new List<int>();
                                     if (
                                         gameObject.Language != null &&
-                                        gameObject.Language != "nolang"
+                                        gameObject.Language.Count > 0
                                         )
                                     {
-                                        string[] languages = gameObject.Language.Split(",");
-                                        foreach (string language in languages)
+                                        foreach (KeyValuePair<string, string> language in gameObject.Language)
                                         {
                                             int languageId = -1;
-                                            languageId = Common.GetLookupByCode(Common.LookupTypes.Language, (string)Common.ReturnValueIfNull(language.Trim(), ""));
+                                            languageId = Common.GetLookupByCode(Common.LookupTypes.Language, (string)Common.ReturnValueIfNull(language.Key.Trim(), ""));
                                             if (languageId == -1)
                                             {
-                                                languageId = Common.GetLookupByValue(Common.LookupTypes.Language, (string)Common.ReturnValueIfNull(language.Trim(), ""));
+                                                languageId = Common.GetLookupByValue(Common.LookupTypes.Language, (string)Common.ReturnValueIfNull(language.Key.Trim(), ""));
 
                                                 if (languageId == -1)
                                                 {
-                                                    Logging.Log(Logging.LogType.Warning, "Signature Ingest", "Unable to locate language id for " + language.Trim());
+                                                    Logging.Log(Logging.LogType.Warning, "Signature Ingest", "Unable to locate language id for " + language.Key.Trim());
                                                     sql = "INSERT INTO Language (`Code`, `Value`) VALUES (@code, @name); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
                                                     Dictionary<string, object> langDict = new Dictionary<string, object>{
-                                                        { "code", language.Trim() },
-                                                        { "name", language.Trim() }
+                                                        { "code", language.Key.Trim() },
+                                                        { "name", language.Value.Trim() }
                                                     };
                                                     languageId = int.Parse(db.ExecuteCMD(sql, langDict).Rows[0][0].ToString());
                                                 }
@@ -357,14 +355,16 @@ namespace XML
                                         {
                                             long romId = 0;
                                             sql = "SELECT * FROM Signatures_Roms WHERE `GameId`=@gameid AND (`MD5`=@md5 AND `SHA1`=@sha1)";
-                                            dbDict = new Dictionary<string, object>();
-                                            dbDict.Add("gameid", gameId);
-                                            dbDict.Add("name", Common.ReturnValueIfNull(romObject.Name, ""));
-                                            dbDict.Add("size", Common.ReturnValueIfNull(romObject.Size, 0));
-                                            dbDict.Add("crc", Common.ReturnValueIfNull(romObject.Crc, "").ToString().ToLower());
-                                            dbDict.Add("md5", Common.ReturnValueIfNull(romObject.Md5, "").ToString().ToLower());
-                                            dbDict.Add("sha1", Common.ReturnValueIfNull(romObject.Sha1, "").ToString().ToLower());
-                                            dbDict.Add("developmentstatus", Common.ReturnValueIfNull(romObject.DevelopmentStatus, ""));
+                                            dbDict = new Dictionary<string, object>
+                                            {
+                                                { "gameid", gameId },
+                                                { "name", Common.ReturnValueIfNull(romObject.Name, "") },
+                                                { "size", Common.ReturnValueIfNull(romObject.Size, 0) },
+                                                { "crc", Common.ReturnValueIfNull(romObject.Crc, "").ToString().ToLower() },
+                                                { "md5", Common.ReturnValueIfNull(romObject.Md5, "").ToString().ToLower() },
+                                                { "sha1", Common.ReturnValueIfNull(romObject.Sha1, "").ToString().ToLower() },
+                                                { "developmentstatus", Common.ReturnValueIfNull(romObject.DevelopmentStatus, "") }
+                                            };
 
                                             if (romObject.Attributes != null)
                                             {
@@ -387,11 +387,25 @@ namespace XML
                                             dbDict.Add("metadatasource", romObject.SignatureSource);
                                             dbDict.Add("ingestorversion", 2);
 
+                                            Dictionary<string, string>? countries = new Dictionary<string, string>();
+                                            if (romObject.Country != null)
+                                            {
+                                                countries = romObject.Country;
+                                            }
+                                            dbDict.Add("countries", Newtonsoft.Json.JsonConvert.SerializeObject(countries));
+
+                                            Dictionary<string, string>? languages = new Dictionary<string, string>();
+                                            if (romObject.Language != null)
+                                            {
+                                                languages = romObject.Language;
+                                            }
+                                            dbDict.Add("languages", Newtonsoft.Json.JsonConvert.SerializeObject(languages));
+
                                             sigDB = db.ExecuteCMD(sql, dbDict);
                                             if (sigDB.Rows.Count == 0)
                                             {
                                                 // entry not present, insert it
-                                                sql = "INSERT INTO Signatures_Roms (`GameId`, `Name`, `Size`, `CRC`, `MD5`, `SHA1`, `DevelopmentStatus`, `Attributes`, `RomType`, `RomTypeMedia`, `MediaLabel`, `MetadataSource`, `IngestorVersion`) VALUES (@gameid, @name, @size, @crc, @md5, @sha1, @developmentstatus, @attributes, @romtype, @romtypemedia, @medialabel, @metadatasource, @ingestorversion); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
+                                                sql = "INSERT INTO Signatures_Roms (`GameId`, `Name`, `Size`, `CRC`, `MD5`, `SHA1`, `DevelopmentStatus`, `Attributes`, `RomType`, `RomTypeMedia`, `MediaLabel`, `MetadataSource`, `IngestorVersion`, `Countries`, `Languages`) VALUES (@gameid, @name, @size, @crc, @md5, @sha1, @developmentstatus, @attributes, @romtype, @romtypemedia, @medialabel, @metadatasource, @ingestorversion, @countries, @languages); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
                                                 sigDB = db.ExecuteCMD(sql, dbDict);
 
                                                 romId = Convert.ToInt32(sigDB.Rows[0][0]);

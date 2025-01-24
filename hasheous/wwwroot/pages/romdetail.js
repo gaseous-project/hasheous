@@ -15,10 +15,40 @@ ajaxCall(
         for (const [key, value] of Object.entries(success)) {
             if (!['id', 'attributes', 'mediaDetail', 'score'].includes(key)) {
                 if (value) {
+                    let displayValue = '';
+
+                    switch (key) {
+                        case 'country':
+                            // convert countries list to flags
+                            // loop all keys in the countries object
+                            for (let ckey in value) {
+                                // get the flag emoji from the country code
+                                let flagEmoji = ckey.toUpperCase().replace(/./g, char => String.fromCodePoint(char.charCodeAt(0) + 127397));
+
+                                displayValue += "<span class=\"flagemoji\" title=\"" + value[ckey] + "\">" + flagEmoji + "</span>";
+                            }
+                            break;
+
+                        case 'language':
+                            // convert languages list to flags
+                            // loop all keys in the language object
+                            for (let lkey in value) {
+                                if (displayValue != "") {
+                                    displayValue += ", ";
+                                }
+                                displayValue += value[lkey];
+                            }
+                            break;
+
+                        default:
+                            displayValue = value
+                            break;
+                    }
+
                     detailsArray.push(
                         {
                             "attribute": lang.getLang(key),
-                            "value": value
+                            "value": displayValue
                         }
                     );
                 }
