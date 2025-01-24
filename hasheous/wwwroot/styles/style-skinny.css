@@ -32,12 +32,33 @@
 @media screen and (max-width: 749px) {
 
     /* applies when the viewport is < 750px */
+    #banner_icon {
+        top: unset;
+        bottom: 0px;
+    }
+
+    #banner_header {
+        top: unset;
+        bottom: 0px;
+        border-bottom-color: unset;
+        border-bottom-width: unset;
+        border-bottom-style: unset;
+        border-top-color: var(--element-border-color);
+        border-top-width: 1px;
+        border-top-style: solid;
+    }
+
     #banner_search {
         display: none;
     }
 
     #banner_search_small {
         display: flex;
+    }
+
+    .pagecontainer {
+        padding-top: unset;
+        padding-bottom: var(--banner-height);
     }
 
     #login_email,
@@ -59,8 +80,7 @@
     [media-selector="cell_manufacturer"],
     [media-selector="cell_matchmethod"],
     [media-selector="cell_status"],
-    [media-selector="cell_md5"],
-    [media-selector="cell_sha1"] {
+    [media-selector="cell_hashes"] {
         display: none;
     }
 

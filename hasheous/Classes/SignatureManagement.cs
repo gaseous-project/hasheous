@@ -48,7 +48,7 @@ namespace Classes
             {
                 // lookup the provided hashes
                 Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-                string sql = "SELECT view_Signatures_Games.*, Signatures_Roms.Id AS romid, Signatures_Roms.Name AS romname, Signatures_Roms.Size, Signatures_Roms.CRC, Signatures_Roms.MD5, Signatures_Roms.SHA1, Signatures_Roms.DevelopmentStatus, Signatures_Roms.Attributes, Signatures_Roms.RomType, Signatures_Roms.RomTypeMedia, Signatures_Roms.MediaLabel, Signatures_Roms.MetadataSource FROM Signatures_Roms INNER JOIN view_Signatures_Games ON Signatures_Roms.GameId = view_Signatures_Games.Id WHERE " + string.Join(" OR ", whereClauses);
+                string sql = "SELECT view_Signatures_Games.*, Signatures_Roms.Id AS romid, Signatures_Roms.Name AS romname, Signatures_Roms.Size, Signatures_Roms.CRC, Signatures_Roms.MD5, Signatures_Roms.SHA1, Signatures_Roms.DevelopmentStatus, Signatures_Roms.Attributes, Signatures_Roms.RomType, Signatures_Roms.RomTypeMedia, Signatures_Roms.MediaLabel, Signatures_Roms.MetadataSource, Signatures_Roms.Countries, Signatures_Roms.Languages FROM Signatures_Roms INNER JOIN view_Signatures_Games ON Signatures_Roms.GameId = view_Signatures_Games.Id WHERE " + string.Join(" OR ", whereClauses);
 
                 DataTable sigDb = db.ExecuteCMD(sql, dbDict);
 
@@ -241,6 +241,20 @@ namespace Classes
 
         public Signatures_Games_2.RomItem BuildRomItem(DataRow sigDbRow)
         {
+            Dictionary<string, string> romCountries = new Dictionary<string, string>();
+            if (sigDbRow["Countries"] != DBNull.Value)
+            {
+                string strCountries = (string)sigDbRow["Countries"];
+                romCountries = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, string>>(strCountries);
+            }
+
+            Dictionary<string, string> romLanguages = new Dictionary<string, string>();
+            if (sigDbRow["Languages"] != DBNull.Value)
+            {
+                string strLanguages = (string)sigDbRow["Languages"];
+                romLanguages = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, string>>(strLanguages);
+            }
+
             return new Signatures_Games_2.RomItem
             {
                 Id = ((long)sigDbRow["romid"]).ToString(),
@@ -254,7 +268,9 @@ namespace Classes
                 RomType = (Signatures_Games_2.RomItem.RomTypes)(int)sigDbRow["RomType"],
                 RomTypeMedia = (string)sigDbRow["RomTypeMedia"],
                 MediaLabel = (string)sigDbRow["MediaLabel"],
-                SignatureSource = (Signatures_Games_2.RomItem.SignatureSourceType)(Int32)sigDbRow["MetadataSource"]
+                SignatureSource = (Signatures_Games_2.RomItem.SignatureSourceType)(Int32)sigDbRow["MetadataSource"],
+                Country = romCountries,
+                Language = romLanguages
             };
         }
 
@@ -281,12 +297,43 @@ namespace Classes
             DataTable data = db.ExecuteCMD(sql, dbDict);
 
             Dictionary<string, string> returnDict = new Dictionary<string, string>();
+            Dictionary<string, KeyValuePair<string, string>> corrections = GetLookupCorrections(LookupType);
             foreach (DataRow row in data.Rows)
             {
+                if (corrections != null)
+                {
+                    if (corrections.ContainsKey((string)row["Code"]))
+                    {
+                        returnDict.Add(corrections[(string)row["Code"]].Key, corrections[(string)row["Code"]].Value);
+                        continue;
+                    }
+                }
+
                 returnDict.Add((string)row["Code"], (string)row["Value"]);
             }
 
             return returnDict;
+        }
+
+        public Dictionary<string, KeyValuePair<string, string>> GetLookupCorrections(LookupTypes LookupType)
+        {
+            switch (LookupType)
+            {
+                case LookupTypes.Country:
+                    Dictionary<string, KeyValuePair<string, string>> countryCodeCorrections = new Dictionary<string, KeyValuePair<string, string>>{
+                        { "World", new KeyValuePair<string, string>("World", "Worldwide") },
+                        { "UK", new KeyValuePair<string, string>("UK", "United Kingdom") },
+                        { "USA", new KeyValuePair<string, string>("US", "United States") },
+                        { "Europe", new KeyValuePair<string, string>("EU", "Europe") },
+                        { "Argentina", new KeyValuePair<string, string>("AR", "Argentina") },
+                        { "Ko", new KeyValuePair<string, string>("KO", "Korea") },
+                        { "Da", new KeyValuePair<string, string>("DA", "Denmark") }
+                    };
+                    return countryCodeCorrections;
+
+                default:
+                    return new Dictionary<string, KeyValuePair<string, string>>();
+            }
         }
 
         public hasheous_server.Models.Signatures_Games_2.RomItem GetRomItemByHash(hasheous_server.Models.HashLookupModel model)

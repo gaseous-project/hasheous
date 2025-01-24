@@ -658,11 +658,20 @@ namespace hasheous_server.Classes
 
                 // get country
                 Dictionary<string, string> gameCountries = signature.GetLookup(Common.LookupTypes.Country, long.Parse(GameSignature["SignatureId"].ToString()));
+                Dictionary<string, KeyValuePair<string, string>> countryCodeCorrections = signature.GetLookupCorrections(Common.LookupTypes.Country);
                 foreach (KeyValuePair<string, string> gameCountry in gameCountries)
                 {
-                    if (!countries.ContainsKey(gameCountry.Key))
+                    string countryKey = gameCountry.Key;
+                    string countryValue = gameCountry.Value;
+                    if (countryCodeCorrections.ContainsKey(gameCountry.Key))
                     {
-                        countries.Add(gameCountry.Key, gameCountry.Value);
+                        countryKey = countryCodeCorrections[gameCountry.Key].Key;
+                        countryValue = countryCodeCorrections[gameCountry.Key].Value;
+                    }
+
+                    if (!countries.ContainsKey(countryKey))
+                    {
+                        countries.Add(countryKey, countryValue);
                     }
                 }
 
@@ -744,7 +753,9 @@ namespace hasheous_server.Classes
                         `RomType`,
                         `RomTypeMedia`,
                         `MediaLabel`,
-                        `MetadataSource`
+                        `MetadataSource`,
+                        `Countries`,
+                        `Languages`
                     FROM
                         Signatures_Roms
                     WHERE
