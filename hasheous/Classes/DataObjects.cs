@@ -461,7 +461,9 @@ namespace hasheous_server.Classes
                                 WHEN ((Signatures_Games.`Year` IS NOT NULL OR Signatures_Games.`Year` <> '') AND (Signatures_Platforms.`Platform` IS NOT NULL)) THEN CONCAT(Signatures_Games.`Name`, ' (', Signatures_Games.`Year`, ')', ' - ', Signatures_Platforms.`Platform`)
                                 WHEN ((Signatures_Games.`Year` IS NULL OR Signatures_Games.`Year` = '') AND (Signatures_Platforms.`Platform` IS NOT NULL)) THEN CONCAT(Signatures_Games.`Name`, ' - ', Signatures_Platforms.`Platform`)
                                 ELSE Signatures_Games.`Name`
-                            END AS `Game`
+                            END AS `Game`,
+                            Signatures_Games.`SourceId` AS `SourceId`,
+                            Signatures_Games.`MetadataSource` AS `MetadataSource`
                         FROM 
                             DataObject_SignatureMap 
                         JOIN 

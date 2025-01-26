@@ -37,6 +37,13 @@
         --invalid-color: rgb(178, 26, 26);
         --badge-text-color: rgb(255, 255, 255);
         --badge-background-color: rgb(127, 127, 127);
+        --signature-source-color-none: #7f7f7f;
+        --signature-source-color-tosec: #0000ff;
+        --signature-source-color-mamearcade: #ff0000;
+        --signature-source-color-mamemess: #00ff00;
+        --signature-source-color-nointros: #ff00ff;
+        --signature-source-color-redump: #00ffff;
+        --signature-source-color-whdload: #ffff00;
     }
 
     .banner_button_image_no_label,
