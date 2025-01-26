@@ -384,20 +384,38 @@ function renderContent() {
         for (let i = 0; i < dataObject.signatureDataObjects.length; i++) {
             let sigItem = document.createElement('span');
             sigItem.classList.add('signatureitem');
+
+            let sigLabel = document.createElement('span');
+            sigLabel.classList.add('signatureLabel');
+
             switch (pageType) {
                 case "company":
-                    sigItem.innerHTML = dataObject.signatureDataObjects[i].Publisher;
+                    sigLabel.innerHTML = dataObject.signatureDataObjects[i].Publisher;
                     break;
 
                 case "platform":
-                    sigItem.innerHTML = dataObject.signatureDataObjects[i].Platform;
+                    sigLabel.innerHTML = dataObject.signatureDataObjects[i].Platform;
                     break;
 
                 case "game":
-                    sigItem.innerHTML = dataObject.signatureDataObjects[i].Game;
+                    if (dataObject.signatureDataObjects[i].MetadataSource != null) {
+                        // create metadata source span
+                        let sigSource = document.createElement('span');
+                        sigSource.classList.add('signatureMetadataSource');
+                        sigSource.innerHTML = signatureSources[Number(dataObject.signatureDataObjects[i].MetadataSource)];
+                        sigSource.setAttribute('data-source', signatureSources[Number(dataObject.signatureDataObjects[i].MetadataSource)]);
+                        sigItem.appendChild(sigSource);
+
+                        sigItem.setAttribute('data-source', signatureSources[Number(dataObject.signatureDataObjects[i].MetadataSource)]);
+                    }
+
+                    sigLabel.innerHTML = dataObject.signatureDataObjects[i].Game;
+                    
                     break;
 
             }
+
+            sigItem.appendChild(sigLabel);
 
             signatureElement.appendChild(sigItem);
         }

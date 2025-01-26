@@ -431,10 +431,37 @@ class generateTable {
     }
 }
 
+function hashCode(str) {
+    var hash = 0;
+    for (var i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+
+    return hash;
+}
+
+function intToRGB(i) {
+    var c = (i & 0x00FFFFFF)
+        .toString(16)
+        .toUpperCase();
+
+    return "00000".substring(0, 6 - c.length) + c;
+}
+
 function getFlagEmoji(countryCode) {
     const codePoints = countryCode
         .toUpperCase()
         .split('')
         .map(char => 127397 + char.charCodeAt());
     return String.fromCodePoint(...codePoints);
+}
+
+let signatureSources = {
+    0: "None",
+    1: "TOSEC",
+    2: "MAMEArcade",
+    3: "MAMEMess",
+    4: "NoIntros",
+    5: "Redump",
+    6: "WHDLoad"
 }

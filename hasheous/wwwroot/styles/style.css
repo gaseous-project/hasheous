@@ -463,15 +463,57 @@ td {
     border-width: 1px;
     border-color: var(--element-border-color);
     background-color: var(--element-border-color);
-    padding-top: 2px;
-    padding-bottom: 1px;
-    padding-left: 7px;
-    padding-right: 7px;
+    padding-top: 0px;
+    padding-bottom: 0px;
+    padding-left: 0px;
+    padding-right: 0px;
     text-transform: uppercase;
     color: white;
     margin-bottom: 5px;
     margin-right: 5px;
     display: inline-block;
+}
+
+.signatureMetadataSource {
+    padding-top: 2px;
+    padding-bottom: 1px;
+    padding-left: 7px;
+    padding-right: 7px;
+}
+
+.signatureMetadataSource[data-source="None"] {
+    background-color: var(--signature-source-color-none);
+}
+
+.signatureMetadataSource[data-source="TOSEC"] {
+    background-color: var(--signature-source-color-tosec);
+}
+
+.signatureMetadataSource[data-source="MAMEArcade"] {
+    background-color: var(--signature-source-color-mamearcade);
+}
+
+.signatureMetadataSource[data-source="MAMEMESS"] {
+    background-color: var(--signature-source-color-mamemess);
+}
+
+.signatureMetadataSource[data-source="NoIntros"] {
+    background-color: var(--signature-source-color-nointros);
+}
+
+.signatureMetadataSource[data-source="Redump"] {
+    background-color: var(--signature-source-color-redump);
+}
+
+.signatureMetadataSource[data-source="WHDLoad"] {
+    background-color: var(--signature-source-color-whdload);
+}
+
+.signatureLabel {
+    padding-top: 2px;
+    padding-bottom: 1px;
+    padding-left: 7px;
+    padding-right: 7px;
 }
 
 .signatureitem.selectable:hover {

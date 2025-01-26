@@ -289,19 +289,31 @@ namespace XML
                                     sql = "SELECT * FROM Signatures_Games WHERE `Name`=@name AND `Year`=@year AND `PublisherId`=@publisherid AND `SystemId`=@systemid";
 
                                     sigDB = db.ExecuteCMD(sql, dbDict);
+
+                                    dbDict.Add("sigsource", XMLType);
+                                    dbDict.Add("sourceid", sourceId);
+
                                     if (sigDB.Rows.Count == 0)
                                     {
                                         // entry not present, insert it
                                         sql = "INSERT INTO Signatures_Games " +
-                                            "(`Name`, `Description`, `Year`, `PublisherId`, `Demo`, `SystemId`, `SystemVariant`, `Video`, `Copyright`) VALUES " +
-                                            "(@name, @description, @year, @publisherid, @demo, @systemid, @systemvariant, @video, @copyright); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
+                                            "(`Name`, `Description`, `Year`, `PublisherId`, `Demo`, `SystemId`, `SystemVariant`, `Video`, `Copyright`, `MetadataSource`, `SourceId`) VALUES " +
+                                            "(@name, @description, @year, @publisherid, @demo, @systemid, @systemvariant, @video, @copyright, @sigsource, @sourceid); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
                                         sigDB = db.ExecuteCMD(sql, dbDict);
 
                                         gameId = Convert.ToInt32(sigDB.Rows[0][0]);
                                     }
                                     else
                                     {
-                                        gameId = (long)sigDB.Rows[0][0];
+                                        gameId = (long)sigDB.Rows[0]["Id"];
+                                        long gameSourceId = (long)sigDB.Rows[0]["SourceId"];
+                                        int gameMetadataSourceId = (int)sigDB.Rows[0]["MetadataSource"];
+                                        if (gameSourceId == 0 || gameMetadataSourceId == 0)
+                                        {
+                                            string gameSourceSql = "UPDATE Signatures_Games SET `MetadataSource`=@sigsource, `SourceId`=@sourceid WHERE `Id`=@gameid;";
+                                            dbDict.Add("gameid", gameId);
+                                            db.ExecuteCMD(gameSourceSql, dbDict);
+                                        }
                                     }
 
                                     // insert countries
@@ -409,15 +421,20 @@ namespace XML
                                                 sigDB = db.ExecuteCMD(sql, dbDict);
 
                                                 romId = Convert.ToInt32(sigDB.Rows[0][0]);
+                                                dbDict.Add("romid", romId);
                                             }
                                             else
                                             {
                                                 romId = (long)sigDB.Rows[0][0];
+                                                dbDict.Add("romid", romId);
+
+                                                // update the rom
+                                                sql = "UPDATE Signatures_Roms SET `GameId`=@gameid, `Name`=@name, `Size`=@size, `CRC`=@crc, `DevelopmentStatus`=@developmentstatus, `Attributes`=@attributes, `RomType`=@romtype, `RomTypeMedia`=@romtypemedia, `MediaLabel`=@medialabel, `MetadataSource`=@metadatasource, `IngestorVersion`=@ingestorversion, `Countries`=@countries, `Languages`=@languages WHERE `Id`=@romid;";
+                                                db.ExecuteCMD(sql, dbDict);
                                             }
 
                                             // map the rom to the source
                                             sql = "SELECT * FROM Signatures_RomToSource WHERE SourceId=@sourceid AND RomId=@romid;";
-                                            dbDict.Add("romid", romId);
                                             dbDict.Add("sourceId", sourceId);
 
                                             sigDB = db.ExecuteCMD(sql, dbDict);
