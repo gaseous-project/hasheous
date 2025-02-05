@@ -414,13 +414,19 @@ ProcessQueue.QueueItems.Add(
     fetchTheGamesDbMetadata
 );
 
-ProcessQueue.QueueItem fetchRetroAchievementsMetadata = new ProcessQueue.QueueItem(ProcessQueue.QueueItemType.FetchRetroAchievementsMetadata, 10080, new List<ProcessQueue.QueueItemType> {
+if (Config.RetroAchievements.APIKey != null)
+{
+    if (Config.RetroAchievements.APIKey != "")
+    {
+        ProcessQueue.QueueItem fetchRetroAchievementsMetadata = new ProcessQueue.QueueItem(ProcessQueue.QueueItemType.FetchRetroAchievementsMetadata, 10080, new List<ProcessQueue.QueueItemType> {
     ProcessQueue.QueueItemType.GetMissingArtwork, ProcessQueue.QueueItemType.MetadataMatchSearch, ProcessQueue.QueueItemType.AutoMapper, ProcessQueue.QueueItemType.TallyVotes, ProcessQueue.QueueItemType.FetchVIMMMetadata, ProcessQueue.QueueItemType.FetchTheGamesDbMetadata
 });
-fetchRetroAchievementsMetadata.ForceExecute();
-ProcessQueue.QueueItems.Add(
-    fetchRetroAchievementsMetadata
-);
+        fetchRetroAchievementsMetadata.ForceExecute();
+        ProcessQueue.QueueItems.Add(
+            fetchRetroAchievementsMetadata
+        );
+    }
+}
 
 ProcessQueue.QueueItem MetadataSearch = new ProcessQueue.QueueItem(ProcessQueue.QueueItemType.MetadataMatchSearch, 120, new List<ProcessQueue.QueueItemType> {
     ProcessQueue.QueueItemType.GetMissingArtwork, ProcessQueue.QueueItemType.TallyVotes, ProcessQueue.QueueItemType.AutoMapper, ProcessQueue.QueueItemType.FetchTheGamesDbMetadata, ProcessQueue.QueueItemType.FetchVIMMMetadata

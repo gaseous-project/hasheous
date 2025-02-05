@@ -33,6 +33,7 @@ document.getElementById('dataObjectSave').addEventListener("click", function (e)
     let metadata = [];
     metadata.push(newMetadataObject('IGDB', document.getElementById('metadatamapigdb')));
     metadata.push(newMetadataObject('thegamesdb', document.getElementById('metadatamapthegamesdb')));
+    metadata.push(newMetadataObject('retroachievements', document.getElementById('metadatamapretroachievements')));
 
     // get attributes
     let attributes = [];
