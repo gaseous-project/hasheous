@@ -329,6 +329,7 @@ function loadData() {
     $(signatureElement).select2({
         minimumInputLength: 3,
         closeOnSelect: false,
+        templateResult: signatureSelectionFormatter,
         ajax: {
             url: '/api/v1/Signatures/Search',
             type: "POST",
@@ -349,15 +350,10 @@ function loadData() {
             },
             processResults: function (data) {
                 var arr = [];
-                console.log(data);
 
                 for (var i = 0; i < data.length; i++) {
                     let sigName;
 
-                    let labelBox = document.createElement('div');
-                    labelBox.classList.add('signatureMetadataLabel');
-
-                    let valueLabel = document.createElement('span');
                     switch (pageType) {
                         case "game":
                             let year = "";
@@ -375,41 +371,18 @@ function loadData() {
                             }
 
                             sigName = data[i][sigSearchName] + year + system;
-
-                            valueLabel.innerHTML = data[i][sigSearchName] + year;
-                            valueLabel.classList.add('signatureMetadataName');
-                            labelBox.appendChild(valueLabel);
-
-                            let systemLabel = document.createElement('span');
-                            systemLabel.innerHTML = data[i].system;
-                            systemLabel.classList.add('signatureMetadataSystem');
-                            labelBox.appendChild(systemLabel);
-
                             break;
 
                         default:
                             sigName = data[i][sigSearchName];
-
-                            valueLabel.innerHTML = sigName;
-                            labelBox.appendChild(valueLabel);
                             break;
 
                     }
 
-                    let sourceLabelBox = document.createElement('div');
-                    sourceLabelBox.classList.add('signatureMetadataSourceBox');
-
-                    let sourceLabel = document.createElement('span');
-                    sourceLabel.innerHTML = signatureSources[Number(data[i].metadataSource)];
-                    sourceLabel.classList.add('signatureMetadataSource');
-                    sourceLabel.setAttribute('data-source', signatureSources[Number(data[i].metadataSource)]);
-                    sourceLabelBox.appendChild(sourceLabel);
-
-                    labelBox.appendChild(sourceLabelBox);
-
                     arr.push({
                         id: data[i][sigSearchId],
-                        text: labelBox
+                        text: sigName,
+                        data: data[i]
                     });
                 }
 
@@ -453,6 +426,80 @@ function loadData() {
             document.getElementById('dataObjectMetadataMapInput').appendChild(metadataRow);
         }
     }
+}
+
+function signatureSelectionFormatter(state) {
+    if (!state.id) {
+        return state.text;
+    }
+
+    let data = state.data;
+
+    let sigName;
+
+    let labelBox = document.createElement('div');
+    labelBox.classList.add('signatureMetadataLabel');
+
+    let valueLabel = document.createElement('span');
+    switch (pageType) {
+        case "game":
+            let year = "";
+            if (data.year) {
+                if (data.year != "") {
+                    year = " (" + data.year + ")";
+                }
+            }
+
+            let system = "";
+            if (data.system) {
+                if (data.system != "") {
+                    system = " - " + data.system;
+                }
+            }
+
+            sigName = data.name + year + system;
+
+            valueLabel.innerHTML = data.name + year;
+            valueLabel.classList.add('signatureMetadataName');
+            labelBox.appendChild(valueLabel);
+
+            let systemLabel = document.createElement('span');
+            systemLabel.innerHTML = data.system;
+            systemLabel.classList.add('signatureMetadataSystem');
+            labelBox.appendChild(systemLabel);
+
+            break;
+
+        case "platform":
+            sigName = data.Platform;
+
+            valueLabel.innerHTML = sigName;
+            labelBox.appendChild(valueLabel);
+            break;
+
+        case "publisher":
+            sigName = data.Publisher;
+
+            valueLabel.innerHTML = sigName;
+            labelBox.appendChild(valueLabel);
+            break;
+
+    }
+
+    if (data.metadataSource != null) {
+        let sourceLabelBox = document.createElement('div');
+        sourceLabelBox.classList.add('signatureMetadataSourceBox');
+
+        let sourceLabel = document.createElement('span');
+        sourceLabel.innerHTML = signatureSources[Number(data.metadataSource)];
+        sourceLabel.classList.add('signatureMetadataSource');
+        sourceLabel.setAttribute('data-source', signatureSources[Number(data.metadataSource)]);
+        sourceLabelBox.appendChild(sourceLabel);
+
+        labelBox.appendChild(sourceLabelBox);
+    }
+
+    return labelBox;
 }
 
 function newMetadataObject(type, inputObject) {
