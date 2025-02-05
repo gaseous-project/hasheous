@@ -235,7 +235,8 @@ namespace Classes
                 Video = (string)sigDbRow["Video"],
                 Countries = new Dictionary<string, string>(GetLookup(LookupTypes.Country, (long)sigDbRow["Id"])),
                 Languages = new Dictionary<string, string>(GetLookup(LookupTypes.Language, (long)sigDbRow["Id"])),
-                Copyright = (string)sigDbRow["Copyright"]
+                Copyright = (string)sigDbRow["Copyright"],
+                MetadataSource = (int)sigDbRow["MetadataSource"]
             };
         }
 

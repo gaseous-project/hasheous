@@ -170,7 +170,12 @@ namespace hasheous_server.Classes.Metadata
             /// <summary>
             /// TheGamesDb - queries TheGamesDb service for metadata
             /// </summary>
-            TheGamesDb
+            TheGamesDb,
+
+            /// <summary>
+            /// RetroAchievements - queries RetroAchievements service for metadata
+            /// </summary>
+            RetroAchievements
         }
 
         /// <summary>

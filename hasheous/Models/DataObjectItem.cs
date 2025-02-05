@@ -90,6 +90,25 @@ namespace hasheous_server.Models
                             {
                                 return "";
                             }
+                        case Communications.MetadataSources.RetroAchievements:
+                            if (Id.Length > 0)
+                            {
+                                switch (_ObjectType)
+                                {
+                                    case DataObjects.DataObjectType.Platform:
+                                        return $"https://retroachievements.org/system/{Id}/games";
+
+                                    case DataObjects.DataObjectType.Game:
+                                        return $"https://retroachievements.org/game/{Id}";
+
+                                    default:
+                                        return "";
+                                }
+                            }
+                            else
+                            {
+                                return "";
+                            }
                         default:
                             return "";
                     }

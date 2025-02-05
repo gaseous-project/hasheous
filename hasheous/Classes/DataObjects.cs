@@ -454,14 +454,29 @@ namespace hasheous_server.Classes
                     break;
 
                 case DataObjectType.Game:
+                    // sql = @"SELECT
+                    //         DataObject_SignatureMap.`SignatureId`,
+                    //         CASE 
+                    //             WHEN ((Signatures_Games.`Year` IS NOT NULL OR Signatures_Games.`Year` <> '') AND (Signatures_Platforms.`Platform` IS NULL)) THEN CONCAT(Signatures_Games.`Name`, ' (', Signatures_Games.`Year`, ')')
+                    //             WHEN ((Signatures_Games.`Year` IS NOT NULL OR Signatures_Games.`Year` <> '') AND (Signatures_Platforms.`Platform` IS NOT NULL)) THEN CONCAT(Signatures_Games.`Name`, ' (', Signatures_Games.`Year`, ')', ' - ', Signatures_Platforms.`Platform`)
+                    //             WHEN ((Signatures_Games.`Year` IS NULL OR Signatures_Games.`Year` = '') AND (Signatures_Platforms.`Platform` IS NOT NULL)) THEN CONCAT(Signatures_Games.`Name`, ' - ', Signatures_Platforms.`Platform`)
+                    //             ELSE Signatures_Games.`Name`
+                    //         END AS `Game`,
+                    //         Signatures_Games.`SourceId` AS `SourceId`,
+                    //         Signatures_Games.`MetadataSource` AS `MetadataSource`
+                    //     FROM 
+                    //         DataObject_SignatureMap 
+                    //     JOIN 
+                    //         Signatures_Games ON DataObject_SignatureMap.`SignatureId` = Signatures_Games.`Id`
+                    //     LEFT JOIN
+                    //         Signatures_Platforms ON Signatures_Games.`SystemId` = Signatures_Platforms.`Id`
+                    //     WHERE DataObject_SignatureMap.`DataObjectId` = @id AND DataObject_SignatureMap.`DataObjectTypeId` = @typeid
+                    //     ORDER BY Signatures_Games.`Name`;";
                     sql = @"SELECT
                             DataObject_SignatureMap.`SignatureId`,
-                            CASE 
-                                WHEN ((Signatures_Games.`Year` IS NOT NULL OR Signatures_Games.`Year` <> '') AND (Signatures_Platforms.`Platform` IS NULL)) THEN CONCAT(Signatures_Games.`Name`, ' (', Signatures_Games.`Year`, ')')
-                                WHEN ((Signatures_Games.`Year` IS NOT NULL OR Signatures_Games.`Year` <> '') AND (Signatures_Platforms.`Platform` IS NOT NULL)) THEN CONCAT(Signatures_Games.`Name`, ' (', Signatures_Games.`Year`, ')', ' - ', Signatures_Platforms.`Platform`)
-                                WHEN ((Signatures_Games.`Year` IS NULL OR Signatures_Games.`Year` = '') AND (Signatures_Platforms.`Platform` IS NOT NULL)) THEN CONCAT(Signatures_Games.`Name`, ' - ', Signatures_Platforms.`Platform`)
-                                ELSE Signatures_Games.`Name`
-                            END AS `Game`,
+                            Signatures_Games.`Name`,
+                            Signatures_Games.`Year`,
+                            Signatures_Platforms.`Platform`,
                             Signatures_Games.`SourceId` AS `SourceId`,
                             Signatures_Games.`MetadataSource` AS `MetadataSource`
                         FROM 

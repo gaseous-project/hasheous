@@ -409,8 +409,16 @@ function renderContent() {
                         sigItem.setAttribute('data-source', signatureSources[Number(dataObject.signatureDataObjects[i].MetadataSource)]);
                     }
 
-                    sigLabel.innerHTML = dataObject.signatureDataObjects[i].Game;
-                    
+                    let sigLabelText = dataObject.signatureDataObjects[i].Name;
+                    if (dataObject.signatureDataObjects[i].Year != null && dataObject.signatureDataObjects[i].Year != '') {
+                        sigLabelText += ' (' + dataObject.signatureDataObjects[i].Year + ')';
+                    }
+                    if (dataObject.signatureDataObjects[i].Platform != null && dataObject.signatureDataObjects[i].Platform != '') {
+                        sigLabelText += ' - ' + dataObject.signatureDataObjects[i].Platform;
+                    }
+
+                    sigLabel.innerHTML = sigLabelText;
+
                     break;
 
             }

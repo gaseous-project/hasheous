@@ -66,6 +66,14 @@ namespace Classes
             }
         }
 
+        public static ConfigFile.RetroAchievements RetroAchievements
+        {
+            get
+            {
+                return _config.RetroAchievementsConfiguration;
+            }
+        }
+
         public static string LogPath
         {
             get
@@ -261,6 +269,8 @@ namespace Classes
 
             public IGDB IGDBConfiguration = new IGDB();
 
+            public RetroAchievements RetroAchievementsConfiguration = new RetroAchievements();
+
             public Logging LoggingConfiguration = new Logging();
 
             public EmailSMTP EmailSMTPConfiguration = new EmailSMTP();
@@ -393,6 +403,14 @@ namespace Classes
                     }
                 }
 
+                public string LibraryMetadataDirectory_RetroAchievements
+                {
+                    get
+                    {
+                        return Path.Combine(LibraryMetadataDirectory, "RetroAchievements");
+                    }
+                }
+
                 public string LibrarySignaturesDirectory
                 {
                     get
@@ -445,6 +463,8 @@ namespace Classes
                     if (!Directory.Exists(LibraryMetadataDirectory)) { Directory.CreateDirectory(LibraryMetadataDirectory); }
                     if (!Directory.Exists(LibraryMetadataDirectory_IGDB)) { Directory.CreateDirectory(LibraryMetadataDirectory_IGDB); }
                     if (!Directory.Exists(LibraryMetadataDirectory_VIMMSLair)) { Directory.CreateDirectory(LibraryMetadataDirectory_VIMMSLair); }
+                    if (!Directory.Exists(LibraryMetadataDirectory_TheGamesDb)) { Directory.CreateDirectory(LibraryMetadataDirectory_TheGamesDb); }
+                    if (!Directory.Exists(LibraryMetadataDirectory_RetroAchievements)) { Directory.CreateDirectory(LibraryMetadataDirectory_RetroAchievements); }
                     if (!Directory.Exists(LibraryTempDirectory)) { Directory.CreateDirectory(LibraryTempDirectory); }
                 }
             }
@@ -503,6 +523,26 @@ namespace Classes
 
                 public string ClientId = _DefaultIGDBClientId;
                 public string Secret = _DefaultIGDBSecret;
+            }
+
+            public class RetroAchievements
+            {
+                private static string _DefaultAPIKey
+                {
+                    get
+                    {
+                        if (!String.IsNullOrEmpty(Environment.GetEnvironmentVariable("raapikey")))
+                        {
+                            return Environment.GetEnvironmentVariable("raapikey");
+                        }
+                        else
+                        {
+                            return "";
+                        }
+                    }
+                }
+
+                public string APIKey = _DefaultAPIKey;
             }
 
             public class Logging
