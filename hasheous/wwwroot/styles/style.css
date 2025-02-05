@@ -3,8 +3,24 @@
     src: url('/fonts/Commodore Pixelized v1.2.ttf');
 }
 
+@font-face {
+    font-family: "Lato-Bold";
+    src: url('/fonts/Lato-Bold.ttf');
+}
+
+@font-face {
+    font-family: "Lato-Regular";
+    src: url('/fonts/Lato-Regular.ttf');
+}
+
+@font-face {
+    font-family: "Lato-Light";
+    src: url('/fonts/Lato-Light.ttf');
+}
+
 body {
-    font-family: "PT Sans", Arial, Helvetica, sans-serif;
+    /* font-family: "PT Sans", Arial, Helvetica, sans-serif; */
+    font-family: "Lato-Regular";
     font-kerning: normal;
     font-style: normal;
     font-weight: 100;
@@ -396,7 +412,7 @@ table {
 th {
     text-align: left;
     padding: 5px;
-    text-transform: uppercase;
+    /* text-transform: uppercase; */
 }
 
 td {
@@ -457,10 +473,17 @@ td {
     margin-bottom: 5px;
 }
 
+.signatureMetadataLabel {
+    padding: 0px;
+    width: 100%;
+    display: inline-flex;
+    flex-direction: row;
+}
+
 .signatureitem {
     border-radius: var(--element-border-radius);
     border-style: solid;
-    border-width: 1px;
+    border-width: 0px;
     border-color: var(--element-border-color);
     background-color: var(--element-border-color);
     padding-top: 0px;
@@ -471,14 +494,40 @@ td {
     color: white;
     margin-bottom: 5px;
     margin-right: 5px;
-    display: inline-block;
+    display: inline-flex;
+    flex-direction: row;
+    overflow: hidden;
 }
 
 .signatureMetadataSource {
     padding-top: 2px;
-    padding-bottom: 1px;
+    padding-bottom: 2px;
     padding-left: 7px;
     padding-right: 7px;
+    display: block;
+    flex-grow: 0;
+    flex-shrink: 1;
+}
+
+.signatureMetadataName,
+.signatureMetadataSystem {
+    padding-top: 2px;
+    padding-bottom: 2px;
+    padding-left: 7px;
+    padding-right: 7px;
+    display: block;
+    width: 35%;
+    max-width: 35%;
+    word-wrap: break-word;
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+.signatureMetadataSourceBox {
+    display: inline-flex;
+    height: 20px;
+    width: 20%;
+
 }
 
 .signatureMetadataSource[data-source="None"] {
@@ -509,11 +558,18 @@ td {
     background-color: var(--signature-source-color-whdload);
 }
 
+.signatureMetadataSource[data-source="RetroAchievements"] {
+    background-color: var(--signature-source-color-retroachievements);
+}
+
 .signatureLabel {
     padding-top: 2px;
-    padding-bottom: 1px;
+    padding-bottom: 2px;
     padding-left: 7px;
     padding-right: 7px;
+    display: block;
+    flex-grow: 1;
+    flex-shrink: 1;
 }
 
 .signatureitem.selectable:hover {

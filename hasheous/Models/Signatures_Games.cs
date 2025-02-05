@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Text.Json.Serialization;
 using gaseous_signature_parser.models.RomSignatureObject;
+using HasheousClient.Models;
 
 namespace hasheous_server.Models
 {
@@ -41,6 +42,8 @@ namespace hasheous_server.Models
 
             public Dictionary<string, string> Countries = new Dictionary<string, string>();
             public Dictionary<string, string> Languages = new Dictionary<string, string>();
+
+            public int MetadataSource { get; set; }
 
             public int Score
             {

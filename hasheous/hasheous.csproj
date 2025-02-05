@@ -15,7 +15,7 @@
     <DocumentationFile>bin\Release\net8.0\hasheous.xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="gaseous-signature-parser" Version="2.3.5" />
+    <PackageReference Include="gaseous-signature-parser" Version="2.3.8" />
     <PackageReference Include="gaseous.IGDB" Version="1.0.2" />
     <PackageReference Include="hasheous-client" Version="1.2.5.2" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="8.0.12" />
@@ -48,6 +48,7 @@
     <None Remove="Schema\hasheous-1011.sql" />
     <None Remove="Schema\hasheous-1012.sql" />
     <None Remove="Schema\hasheous-1013.sql" />
+    <None Remove="Schema\hasheous-1014.sql" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Support\Country.txt" />
@@ -66,5 +67,6 @@
     <EmbeddedResource Include="Schema\hasheous-1011.sql" />
     <EmbeddedResource Include="Schema\hasheous-1012.sql" />
     <EmbeddedResource Include="Schema\hasheous-1013.sql" />
+    <EmbeddedResource Include="Schema\hasheous-1014.sql" />
   </ItemGroup>
 </Project>

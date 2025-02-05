@@ -456,12 +456,9 @@ namespace hasheous_server.Classes
                 case DataObjectType.Game:
                     sql = @"SELECT
                             DataObject_SignatureMap.`SignatureId`,
-                            CASE 
-                                WHEN ((Signatures_Games.`Year` IS NOT NULL OR Signatures_Games.`Year` <> '') AND (Signatures_Platforms.`Platform` IS NULL)) THEN CONCAT(Signatures_Games.`Name`, ' (', Signatures_Games.`Year`, ')')
-                                WHEN ((Signatures_Games.`Year` IS NOT NULL OR Signatures_Games.`Year` <> '') AND (Signatures_Platforms.`Platform` IS NOT NULL)) THEN CONCAT(Signatures_Games.`Name`, ' (', Signatures_Games.`Year`, ')', ' - ', Signatures_Platforms.`Platform`)
-                                WHEN ((Signatures_Games.`Year` IS NULL OR Signatures_Games.`Year` = '') AND (Signatures_Platforms.`Platform` IS NOT NULL)) THEN CONCAT(Signatures_Games.`Name`, ' - ', Signatures_Platforms.`Platform`)
-                                ELSE Signatures_Games.`Name`
-                            END AS `Game`,
+                            Signatures_Games.`Name`,
+                            Signatures_Games.`Year`,
+                            Signatures_Platforms.`Platform`,
                             Signatures_Games.`SourceId` AS `SourceId`,
                             Signatures_Games.`MetadataSource` AS `MetadataSource`
                         FROM 
@@ -1419,6 +1416,116 @@ namespace hasheous_server.Classes
                                                                 {
                                                                     // we have a match, add the tgdb game id to the data object
                                                                     dbDict["metadataid"] = metadataGame.id;
+                                                                    dbDict["method"] = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic;
+                                                                    SearchComplete = true;
+                                                                    break;
+                                                                }
+                                                            }
+                                                        }
+                                                        if (SearchComplete == true)
+                                                        {
+                                                            break;
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            break;
+                                    }
+                                    break;
+
+                                case MetadataSources.RetroAchievements:
+                                    switch (objectType)
+                                    {
+                                        case DataObjectType.Platform:
+                                            // load platforms JSON
+                                            string platformsJsonPath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_RetroAchievements, "platforms.json");
+                                            if (File.Exists(platformsJsonPath))
+                                            {
+                                                string platformsJson = File.ReadAllText(platformsJsonPath);
+                                                List<RetroAchievements.Models.PlatformModel> platforms = Newtonsoft.Json.JsonConvert.DeserializeObject<List<RetroAchievements.Models.PlatformModel>>(platformsJson);
+
+                                                // search for platform
+                                                foreach (RetroAchievements.Models.PlatformModel platform in platforms)
+                                                {
+                                                    if (platform.Name.ToLower().Trim() == item.Name.ToLower().Trim())
+                                                    {
+                                                        dbDict["metadataid"] = platform.ID;
+                                                        dbDict["method"] = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                            break;
+
+                                        case DataObjectType.Game:
+                                            // get the game platform if set
+                                            long raPlaformId = 0;
+                                            AttributeItem raPlatformAttribute = item.Attributes.Find(x => x.attributeName == AttributeItem.AttributeName.Platform && x.attributeType == AttributeItem.AttributeType.ObjectRelationship);
+
+                                            if (raPlatformAttribute != null)
+                                            {
+                                                // get the associated platform dataobject
+                                                DataObjectItem raPlatformDO;
+                                                if (raPlatformAttribute.Value.GetType() == typeof(DataObjectItem))
+                                                {
+                                                    raPlatformDO = (DataObjectItem)raPlatformAttribute.Value;
+                                                }
+                                                else
+                                                {
+                                                    RelationItem relationItem = (RelationItem)raPlatformAttribute.Value;
+                                                    raPlatformDO = GetDataObject(DataObjectType.Platform, relationItem.relationId);
+                                                }
+
+                                                // check if raPlatformDO has a configured metadata value for RetroAchievements
+                                                DataObjectItem.MetadataItem raPlatformMetadata = raPlatformDO.Metadata.Find(x => x.Source == MetadataSources.RetroAchievements);
+                                                if (raPlatformMetadata != null && raPlatformMetadata.Id != "")
+                                                {
+                                                    // get the platform id
+                                                    raPlaformId = long.Parse(raPlatformMetadata.Id);
+
+                                                    // load games json for the specified raPlatformId
+                                                    List<RetroAchievements.Models.GameModel> raGames = new List<RetroAchievements.Models.GameModel>();
+                                                    string gamesJsonPath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_RetroAchievements, raPlaformId.ToString());
+                                                    string[] gamesJsonFiles = Directory.GetFiles(gamesJsonPath, "*.json");
+                                                    foreach (string gamesJsonFile in gamesJsonFiles)
+                                                    {
+                                                        string gamesJson = File.ReadAllText(gamesJsonFile);
+                                                        List<RetroAchievements.Models.GameModel> games = Newtonsoft.Json.JsonConvert.DeserializeObject<List<RetroAchievements.Models.GameModel>>(gamesJson);
+                                                        raGames.AddRange(games);
+                                                    }
+
+                                                    // search for games
+                                                    bool SearchComplete = false;
+                                                    foreach (string SearchCandidate in SearchCandidates)
+                                                    {
+                                                        foreach (RetroAchievements.Models.GameModel metadataGame in raGames)
+                                                        {
+                                                            if (metadataGame.ConsoleID == raPlaformId)
+                                                            {
+                                                                // strip leading tags from game name. e.g. "~hack~ ~demo~" or "~hack~"
+                                                                string gameName = metadataGame.Title;
+                                                                string category = "";
+                                                                if (gameName.StartsWith("~"))
+                                                                {
+                                                                    string pattern = @"~(.*?)~\s";
+                                                                    MatchCollection matches = Regex.Matches(gameName, pattern);
+                                                                    foreach (Match match in matches)
+                                                                    {
+                                                                        if (category.Length > 1)
+                                                                        {
+                                                                            category += ",";
+                                                                        }
+                                                                        category += match.Groups[1].Value.Trim();
+                                                                    }
+
+                                                                    // set gameName to everything after the last "~ "
+                                                                    gameName = gameName.Substring(gameName.LastIndexOf("~ ") + 2);
+                                                                }
+                                                                if (gameName == SearchCandidate)
+                                                                {
+                                                                    // we have a match, add the tgdb game id to the data object
+                                                                    dbDict["metadataid"] = metadataGame.ID;
                                                                     dbDict["method"] = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic;
                                                                     SearchComplete = true;
                                                                     break;

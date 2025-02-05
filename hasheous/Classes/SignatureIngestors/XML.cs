@@ -172,6 +172,7 @@ namespace XML
                                     dbDict.Add("platform", Common.ReturnValueIfNull(gameObject.System, ""));
                                     dbDict.Add("systemvariant", Common.ReturnValueIfNull(gameObject.SystemVariant, ""));
                                     dbDict.Add("video", Common.ReturnValueIfNull(gameObject.Video, ""));
+                                    dbDict.Add("category", Common.ReturnValueIfNull(gameObject.Category, ""));
 
                                     List<int> gameCountries = new List<int>();
                                     if (
@@ -297,8 +298,8 @@ namespace XML
                                     {
                                         // entry not present, insert it
                                         sql = "INSERT INTO Signatures_Games " +
-                                            "(`Name`, `Description`, `Year`, `PublisherId`, `Demo`, `SystemId`, `SystemVariant`, `Video`, `Copyright`, `MetadataSource`, `SourceId`) VALUES " +
-                                            "(@name, @description, @year, @publisherid, @demo, @systemid, @systemvariant, @video, @copyright, @sigsource, @sourceid); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
+                                            "(`Name`, `Description`, `Year`, `PublisherId`, `Demo`, `SystemId`, `SystemVariant`, `Video`, `Copyright`, `Category`, `MetadataSource`, `SourceId`) VALUES " +
+                                            "(@name, @description, @year, @publisherid, @demo, @systemid, @systemvariant, @video, @copyright, @category, @sigsource, @sourceid); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
                                         sigDB = db.ExecuteCMD(sql, dbDict);
 
                                         gameId = Convert.ToInt32(sigDB.Rows[0][0]);
@@ -308,12 +309,10 @@ namespace XML
                                         gameId = (long)sigDB.Rows[0]["Id"];
                                         long gameSourceId = (long)sigDB.Rows[0]["SourceId"];
                                         int gameMetadataSourceId = (int)sigDB.Rows[0]["MetadataSource"];
-                                        if (gameSourceId == 0 || gameMetadataSourceId == 0)
-                                        {
-                                            string gameSourceSql = "UPDATE Signatures_Games SET `MetadataSource`=@sigsource, `SourceId`=@sourceid WHERE `Id`=@gameid;";
-                                            dbDict.Add("gameid", gameId);
-                                            db.ExecuteCMD(gameSourceSql, dbDict);
-                                        }
+
+                                        string gameSourceSql = "UPDATE Signatures_Games SET `Category`=@category, `MetadataSource`=@sigsource, `SourceId`=@sourceid WHERE `Id`=@gameid;";
+                                        dbDict.Add("gameid", gameId);
+                                        db.ExecuteCMD(gameSourceSql, dbDict);
                                     }
 
                                     // insert countries

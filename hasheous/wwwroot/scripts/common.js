@@ -463,5 +463,6 @@ let signatureSources = {
     3: "MAMEMess",
     4: "NoIntros",
     5: "Redump",
-    6: "WHDLoad"
+    6: "WHDLoad",
+    7: "RetroAchievements"
 }

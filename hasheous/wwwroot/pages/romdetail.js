@@ -80,7 +80,7 @@ ajaxCall(
             )
         )
         if (jsonLoaded === true) {
-            fetch('/api/v1/Lookup/ByHash', {
+            fetch('/api/v1/Lookup/ByHash?returnAllSources=true', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

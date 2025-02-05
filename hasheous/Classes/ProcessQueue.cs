@@ -196,6 +196,12 @@ namespace Classes
                                     tgdbSQLDownloader.Download();
                                     break;
 
+                                case QueueItemType.FetchRetroAchievementsMetadata:
+                                    RetroAchievements.DownloadManager raDownloader = new RetroAchievements.DownloadManager();
+                                    raDownloader.Download();
+
+                                    break;
+
                                 case QueueItemType.AutoMapper:
                                     AutoMapper.RomAutoMapper();
                                     break;
@@ -275,6 +281,11 @@ namespace Classes
             /// Fetch TheGamesDb metadata
             /// </summary>
             FetchTheGamesDbMetadata,
+
+            /// <summary>
+            /// Fetch RetroAchievements metadata
+            /// </summary>
+            FetchRetroAchievementsMetadata,
 
             /// <summary>
             /// Loops all ROMs in the database and attempts to match them to a data object - or creates a new datao object if no match is found
