@@ -1,7 +1,7 @@
 ALTER TABLE `Signatures_Games` ADD COLUMN `Category` VARCHAR(255);
 
 DROP VIEW view_Signatures_Games;
-CREATE ALGORITHM = UNDEFINED DEFINER = `root` @`%` SQL SECURITY DEFINER VIEW `view_Signatures_Games` AS
+CREATE VIEW `view_Signatures_Games` AS
 select
     `Signatures_Games`.`Id` AS `Id`,
     `Signatures_Games`.`Name` AS `Name`,
