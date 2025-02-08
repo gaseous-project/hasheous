@@ -447,65 +447,74 @@ function renderContent() {
         document.getElementById('dataObjectMetadataMap').appendChild(newMetadataMapTable);
     }
 
-    if (pageType == "app") {
-        // app specific handling
+    switch (pageType) {
+        case "platform":
+            let linkedGamesSection = document.getElementById('dataObjectLinkedGames');
+            linkedGamesSection.style.display = '';
 
-        // app permissions handling
-        if (dataObject.userPermissions != null) {
-            document.getElementById('dataObjectAccessControlSection').style.display = '';
+            createDataObjectsTable(1, 20, 'game', dataObject.id);
 
-            // loop through permissions and add to table
-            // the value is a dictionary with the key being the users email address and the value being a list of permissions
-            let userListTarget = document.getElementById('dataObjectAccessControl');
-            for (let key in dataObject.userPermissions) {
-                if (dataObject.userPermissions[key].includes('Update')) {
-                    let userName = document.createElement('span');
-                    userName.classList.add('signatureitem');
-                    userName.innerHTML = key;
-                    userListTarget.appendChild(userName);
+            break;
+
+        case "app":
+            // app specific handling
+
+            // app permissions handling
+            if (dataObject.userPermissions != null) {
+                document.getElementById('dataObjectAccessControlSection').style.display = '';
+
+                // loop through permissions and add to table
+                // the value is a dictionary with the key being the users email address and the value being a list of permissions
+                let userListTarget = document.getElementById('dataObjectAccessControl');
+                for (let key in dataObject.userPermissions) {
+                    if (dataObject.userPermissions[key].includes('Update')) {
+                        let userName = document.createElement('span');
+                        userName.classList.add('signatureitem');
+                        userName.innerHTML = key;
+                        userListTarget.appendChild(userName);
+                    }
                 }
             }
-        }
 
-        // client api key handling
-        if (dataObject.permissions.includes('Update')) {
-            document.getElementById('dataObjectClientAPIKeysSection').style.display = '';
+            // client api key handling
+            if (dataObject.permissions.includes('Update')) {
+                document.getElementById('dataObjectClientAPIKeysSection').style.display = '';
 
-            // set up the create client api key button
-            let createClientAPIKeyBtn = document.getElementById('dataObjectClientAPIKeyCreate');
-            createClientAPIKeyBtn.addEventListener("click", function (e) {
-                // create client api key model
-                let clientAPIKeyUrl = '/api/v1/DataObjects/app/' + getQueryString('id', 'int') + '/ClientAPIKeys' + '?name=' + encodeURIComponent(document.getElementById('dataObjectClientAPIKeyName').value);
+                // set up the create client api key button
+                let createClientAPIKeyBtn = document.getElementById('dataObjectClientAPIKeyCreate');
+                createClientAPIKeyBtn.addEventListener("click", function (e) {
+                    // create client api key model
+                    let clientAPIKeyUrl = '/api/v1/DataObjects/app/' + getQueryString('id', 'int') + '/ClientAPIKeys' + '?name=' + encodeURIComponent(document.getElementById('dataObjectClientAPIKeyName').value);
 
-                if (
-                    document.getElementById('dataObjectClientAPIKeyExpiresCustom').checked == true &&
-                    document.getElementById('dataObjectClientAPIKeyExpires').value != ''
-                ) {
-                    clientAPIKeyUrl += '&expires=' + document.getElementById('dataObjectClientAPIKeyExpires').value;
-                }
-
-                fetch(clientAPIKeyUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
+                    if (
+                        document.getElementById('dataObjectClientAPIKeyExpiresCustom').checked == true &&
+                        document.getElementById('dataObjectClientAPIKeyExpires').value != ''
+                    ) {
+                        clientAPIKeyUrl += '&expires=' + document.getElementById('dataObjectClientAPIKeyExpires').value;
                     }
-                }).then(async function (response) {
-                    if (response.ok) {
-                        let value = await response.json();
-                        console.log(response.json());
-                        document.getElementById('dataObjectClientAPIKeysResponseSection').style.display = '';
 
-                        document.getElementById('dataObjectClientAPIKeysResponse').innerHTML = lang.getLang('clientapikeyresponse', [value.key]);
+                    fetch(clientAPIKeyUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    }).then(async function (response) {
+                        if (response.ok) {
+                            let value = await response.json();
+                            console.log(response.json());
+                            document.getElementById('dataObjectClientAPIKeysResponseSection').style.display = '';
 
-                        GetApiKeys();
-                    } else {
-                        throw new Error('Failed to create client API key');
-                    }
+                            document.getElementById('dataObjectClientAPIKeysResponse').innerHTML = lang.getLang('clientapikeyresponse', [value.key]);
+
+                            GetApiKeys();
+                        } else {
+                            throw new Error('Failed to create client API key');
+                        }
+                    });
                 });
-            });
 
-            GetApiKeys();
-        }
+                GetApiKeys();
+            }
     }
 }
 

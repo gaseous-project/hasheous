@@ -189,21 +189,32 @@ namespace hasheous_server.Classes
                 } }
         };
 
-        public DataObjectsList GetDataObjects(DataObjectType objectType, int pageNumber = 0, int pageSize = 0, string? search = null, bool GetChildRelations = false, bool GetMetadataMap = true)
+        public DataObjectsList GetDataObjects(DataObjectType objectType, int pageNumber = 0, int pageSize = 0, string? search = null, bool GetChildRelations = false, bool GetMetadataMap = true, AttributeItem.AttributeName? filterAttribute = null, string? filterValue = null)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql;
             Dictionary<string, object> dbDict = new Dictionary<string, object>{
-                { "objecttype", objectType },
+                { "objecttype", objectType }
             };
-            if (search == null)
+
+            if (filterAttribute == null)
             {
-                sql = "SELECT * FROM DataObject WHERE ObjectType = @objecttype ORDER BY `Name`;";
+                if (search == null)
+                {
+                    sql = "SELECT * FROM DataObject WHERE ObjectType = @objecttype ORDER BY `Name`;";
+                }
+                else
+                {
+                    sql = "SELECT * FROM DataObject WHERE ObjectType = @objecttype AND `Name` LIKE @search ORDER BY `Name`;";
+                    dbDict.Add("search", "%" + search + "%");
+                }
             }
             else
             {
-                sql = "SELECT * FROM DataObject WHERE ObjectType = @objecttype AND `Name` LIKE @search ORDER BY `Name`;";
-                dbDict.Add("search", "%" + search + "%");
+                dbDict.Add("filterAttribute", filterAttribute);
+                dbDict.Add("filterValue", filterValue);
+
+                sql = "SELECT DISTINCT DataObject.* FROM DataObject JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId WHERE ObjectType = @objecttype AND DataObject_Attributes.AttributeName = @filterAttribute AND (DataObject_Attributes.AttributeValue = @filterValue OR DataObject_Attributes.AttributeRelation = @filterValue) ORDER BY `Name`;";
             }
             DataTable data = db.ExecuteCMD(sql, dbDict);
 

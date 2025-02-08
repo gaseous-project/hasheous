@@ -1,3 +1,9 @@
+@media screen and (max-width: 1200px) {
+    #sources_hashes {
+        columns: 2;
+    }
+}
+
 @media screen and (max-width: 1024px) {
 
     /* applies when the viewport is < 1025px */
@@ -26,6 +32,14 @@
         float: initial;
         width: 100%;
         margin-bottom: 20px;
+    }
+
+    #sources_hashes {
+        columns: 1;
+    }
+
+    .source-box {
+        width: 95%;
     }
 }
 
