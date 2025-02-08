@@ -276,6 +276,9 @@ function createDataObjectsTable(pageNumber, pageSize, objectType, filterByPlatfo
     if (!pageSize) {
         pageSize = 20;
     }
+    if (!objectType) {
+        objectType = pageType;
+    }
 
     let filterString = '';
     if (filterByPlatformId) {
@@ -384,7 +387,7 @@ function createDataObjectsTable(pageNumber, pageSize, objectType, filterByPlatfo
                 success.pageNumber,
                 success.totalPages,
                 function (p) {
-                    createDataObjectsTable(p, pageSize);
+                    createDataObjectsTable(p, pageSize, objectType, filterByPlatformId);
                 }
             );
             let tableTarget = document.getElementById('dataObjectTable');
