@@ -721,6 +721,7 @@ td {
     height: 50px;
     display: flex;
     justify-content: center;
+    align-items: center;
 }
 
 .dataObjectLogoTableImg {
@@ -787,4 +788,75 @@ pre {
 
 .flagemoji {
     font-size: 24px;
+}
+
+#sources_hashes {
+    display: inline-block;
+    width: 100%;
+    vertical-align: top;
+    columns: 3;
+}
+
+.color-none {
+    background-color: var(--signature-source-color-none);
+}
+
+.color-tosec {
+    background-color: var(--signature-source-color-tosec);
+}
+
+.color-mamearcade {
+    background-color: var(--signature-source-color-mamearcade);
+}
+
+.color-mamemess {
+    background-color: var(--signature-source-color-mamemess);
+}
+
+.color-nointros {
+    background-color: var(--signature-source-color-nointros);
+}
+
+.color-redump {
+    background-color: var(--signature-source-color-redump);
+}
+
+.color-whdload {
+    background-color: var(--signature-source-color-whdload);
+}
+
+.color-retroachievements {
+    background-color: var(--signature-source-color-retroachievements);
+}
+
+.source-box {
+    display: inline-block;
+    width: 95%;
+    margin-bottom: 20px;
+    border-color: var(--element-border-color);
+    border-width: 1px;
+    border-style: solid;
+    border-radius: var(--element-border-radius);
+    background-color: var(--element-background-color-translucent);
+    position: relative;
+}
+
+.heading-text {
+    text-transform: uppercase;
+    font-weight: bold;
+    left: 0px;
+    right: 0xp;
+    display: block;
+    padding: 10px;
+    color: var(--badge-text-color);
+}
+
+.source-description,
+.source-homepage,
+.source-count {
+    word-wrap: break-word;
+    padding: 10px;
+    display: block;
+    left: 0px;
+    right: 0px;
 }

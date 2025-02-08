@@ -40,10 +40,10 @@
         --signature-source-color-none: #7f7f7f;
         --signature-source-color-tosec: #8080ff;
         --signature-source-color-mamearcade: #ff0000;
-        --signature-source-color-mamemess: #00ff00;
+        --signature-source-color-mamemess: #00d100;
         --signature-source-color-nointros: #ff00ff;
-        --signature-source-color-redump: #00ffff;
-        --signature-source-color-whdload: #ffff00;
+        --signature-source-color-redump: #00d7d7;
+        --signature-source-color-whdload: #d7d700;
         --signature-source-color-retroachievements: #ffc388;
     }
 

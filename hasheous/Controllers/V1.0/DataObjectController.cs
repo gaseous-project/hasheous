@@ -14,7 +14,7 @@ namespace hasheous_server.Controllers.v1_0
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]/")]
     [ApiVersion("1.0")]
-    [ApiExplorerSettings(IgnoreApi = true)]
+    [ApiExplorerSettings(IgnoreApi = false)]
     [Authorize]
     public class DataObjectsController : ControllerBase
     {
@@ -60,11 +60,11 @@ namespace hasheous_server.Controllers.v1_0
         [ProducesResponseType(StatusCodes.Status200OK)]
         [AllowAnonymous]
         [Route("{ObjectType}")]
-        public async Task<IActionResult> DataObjectsList(Classes.DataObjects.DataObjectType ObjectType, string? search, int pageNumber = 0, int pageSize = 0, bool getchildrelations = false)
+        public async Task<IActionResult> DataObjectsList(Classes.DataObjects.DataObjectType ObjectType, string? search, int pageNumber = 0, int pageSize = 0, bool getchildrelations = false, AttributeItem.AttributeName? filterAttribute = null, string? filterValue = null)
         {
             hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
-            return Ok(DataObjects.GetDataObjects(ObjectType, pageNumber, pageSize, search, getchildrelations, true));
+            return Ok(DataObjects.GetDataObjects(ObjectType, pageNumber, pageSize, search, getchildrelations, true, filterAttribute, filterValue));
         }
 
         [MapToApiVersion("1.0")]

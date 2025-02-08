@@ -131,6 +131,9 @@ function createDataObjectsTableFromMD5Search(hashType) {
 
     }
 
+    let resultsPanel = document.getElementById('searchresultspanel');
+    resultsPanel.style.display = '';
+
     ajaxCall(
         '/api/v1/Lookup/ByHash/?getchildrelations=true',
         'POST',
@@ -139,9 +142,6 @@ function createDataObjectsTableFromMD5Search(hashType) {
 
             if (success) {
                 let arr = [success];
-
-                let resultsPanel = document.getElementById('searchresultspanel');
-                resultsPanel.style.display = '';
 
                 let newTable = new generateTable(
                     arr,
