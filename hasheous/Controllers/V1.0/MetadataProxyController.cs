@@ -377,6 +377,37 @@ namespace hasheous_server.Controllers.v1_0
         }
 
         /// <summary>
+        /// Get GameLocalisation metadata from IGDB
+        /// </summary>
+        /// <param name="Id">
+        /// The Id of the GameLocalisation object to fetch
+        /// </param>
+        /// <returns>
+        /// The GameLocalisation metadata object from IGDB
+        /// </returns>
+        /// <remarks>
+        /// 
+        /// </remarks>
+        /// 
+        /// <response code="200">Returns the metadata object from IGDB</response>
+        /// <response code="404">If the metadata object is not found</response>
+        /// <response code="400">If the Id or slug is invalid</response>
+        /// <response code="500">If an error occurs</response>
+        /// 
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(typeof(HasheousClient.Models.Metadata.IGDB.GameLocalization), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Dictionary<string, string>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [Route("IGDB/GameLocalizations")]
+        [ResponseCache(CacheProfileName = "7Days")]
+        public async Task<IActionResult> GetMetadata_GameLocalisations(long Id)
+        {
+            return await _GetMetadata("GameLocalization", Id);
+        }
+
+        /// <summary>
         /// Get Game metadata from IGDB
         /// </summary>
         /// <param name="Id">
@@ -693,6 +724,37 @@ namespace hasheous_server.Controllers.v1_0
         }
 
         /// <summary>
+        /// Get Region metadata from IGDB
+        /// </summary>
+        /// <param name="Id">
+        /// The Id of the Region object to fetch
+        /// </param>
+        /// <returns>
+        /// The Region metadata object from IGDB
+        /// </returns>
+        /// <remarks>
+        /// 
+        /// </remarks>
+        /// 
+        /// <response code="200">Returns the metadata object from IGDB</response>
+        /// <response code="404">If the metadata object is not found</response>
+        /// <response code="400">If the Id or slug is invalid</response>
+        /// <response code="500">If an error occurs</response>
+        /// 
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(typeof(HasheousClient.Models.Metadata.IGDB.Region), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Dictionary<string, string>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [Route("IGDB/Region")]
+        [ResponseCache(CacheProfileName = "7Days")]
+        public async Task<IActionResult> GetMetadata_Region(long Id)
+        {
+            return await _GetMetadata("Region", Id);
+        }
+
+        /// <summary>
         /// Get Screenshot metadata from IGDB
         /// </summary>
         /// <param name="Id">
@@ -964,6 +1026,20 @@ namespace hasheous_server.Controllers.v1_0
                     }
                     break;
 
+                case "GameLocalization":
+                    supportsSlugSearch = false;
+                    if (isSlugSearch)
+                    {
+                        break;
+                    }
+
+                    GameLocalization? gameLocalisation = GameLocalisations.GetGame_Localisations(Id);
+                    if (gameLocalisation != null)
+                    {
+                        returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.GameLocalization>(gameLocalisation, new HasheousClient.Models.Metadata.IGDB.GameLocalization());
+                    }
+                    break;
+
                 case "GameVideo":
                     supportsSlugSearch = false;
                     if (isSlugSearch)
@@ -1092,6 +1168,20 @@ namespace hasheous_server.Controllers.v1_0
                     if (releaseDate != null)
                     {
                         returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.ReleaseDate>(releaseDate, new HasheousClient.Models.Metadata.IGDB.ReleaseDate());
+                    }
+                    break;
+
+                case "Region":
+                    supportsSlugSearch = false;
+                    if (isSlugSearch)
+                    {
+                        break;
+                    }
+
+                    IGDB.Models.Region? region = Regions.GetGame_Regions(Id);
+                    if (region != null)
+                    {
+                        returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.Region>(region, new HasheousClient.Models.Metadata.IGDB.Region());
                     }
                     break;
 
