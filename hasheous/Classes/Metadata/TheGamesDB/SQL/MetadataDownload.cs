@@ -94,6 +94,10 @@ namespace TheGamesDB.SQL
                 string sqlFile = Directory.GetFiles(extractedFolder, "*.sql", SearchOption.AllDirectories).FirstOrDefault();
 
                 // move the sql file to the correct location
+                if (File.Exists(LocalFileName))
+                {
+                    File.Delete(LocalFileName);
+                }
                 File.Move(sqlFile, LocalFileName);
 
                 // reset the last modified date

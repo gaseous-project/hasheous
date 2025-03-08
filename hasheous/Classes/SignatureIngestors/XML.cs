@@ -448,10 +448,20 @@ namespace XML
                             }
                         }
 
-                        File.Move(XMLFile, Path.Combine(ProcessedDirectory, Path.GetFileName(XMLFile)));
+                        string destFile = Path.Combine(ProcessedDirectory, Path.GetFileName(XMLFile));
+                        if (File.Exists(destFile))
+                        {
+                            File.Delete(destFile);
+                        }
+                        File.Move(XMLFile, destFile);
                         if (DBFile != null)
                         {
-                            File.Move(DBFile, Path.Combine(XMLDBProcessedDirectory, Path.GetFileName(DBFile)));
+                            string destDBFile = Path.Combine(XMLDBProcessedDirectory, Path.GetFileName(DBFile));
+                            if (File.Exists(destDBFile))
+                            {
+                                File.Delete(destDBFile);
+                            }
+                            File.Move(DBFile, destDBFile);
                         }
                     }
                     catch (Exception ex)
@@ -462,7 +472,12 @@ namespace XML
                 else
                 {
                     Logging.Log(Logging.LogType.Information, "Signature Ingest", "Rejecting already imported " + XMLType.ToString() + " file: " + XMLFile);
-                    File.Move(XMLFile, Path.Combine(ProcessedDirectory, Path.GetFileName(XMLFile)));
+                    string destFile = Path.Combine(ProcessedDirectory, Path.GetFileName(XMLFile));
+                    if (File.Exists(destFile))
+                    {
+                        File.Delete(destFile);
+                    }
+                    File.Move(XMLFile, destFile);
                     if (DBFile != null)
                     {
                         File.Move(DBFile, Path.Combine(XMLDBProcessedDirectory, Path.GetFileName(DBFile)));
