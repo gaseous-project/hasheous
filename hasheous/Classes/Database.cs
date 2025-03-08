@@ -166,7 +166,17 @@ namespace Classes
 				}
 				else
 				{
-					switch (property.PropertyType.Name.ToLower())
+					Type propertyType = default(Type);
+					if (property.PropertyType.IsGenericType && property.PropertyType.GetGenericTypeDefinition() == typeof(Nullable<>))
+					{
+						propertyType = Nullable.GetUnderlyingType(property.PropertyType);
+					}
+					else
+					{
+						propertyType = property.PropertyType;
+					}
+
+					switch (propertyType.Name.ToLower())
 					{
 						case "int32":
 						case "int16":
