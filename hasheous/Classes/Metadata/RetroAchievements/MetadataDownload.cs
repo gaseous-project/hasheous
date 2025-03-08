@@ -181,7 +181,12 @@ namespace RetroAchievements
                 if (datFile.allowOverwrite == true)
                 {
                     // copy the DAT file to the signature ingest directory
-                    File.Copy(datFile.FileName, Path.Combine(Config.LibraryConfiguration.LibrarySignaturesDirectory, "RetroAchievements", Path.GetFileName(datFile.FileName)));
+                    string ingestPath = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesDirectory, "RetroAchievements", Path.GetFileName(datFile.FileName));
+                    if (File.Exists(ingestPath))
+                    {
+                        File.Delete(ingestPath);
+                    }
+                    File.Copy(datFile.FileName, ingestPath);
                 }
             }
 
