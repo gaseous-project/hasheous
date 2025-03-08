@@ -181,6 +181,7 @@ namespace Classes
 							sql += "VARCHAR(255),";
 							break;
 						case "datetime":
+						case "datetimeoffset":
 							sql += "DATETIME,";
 							break;
 						case "boolean":

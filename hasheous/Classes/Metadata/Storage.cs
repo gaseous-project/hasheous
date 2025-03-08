@@ -6,14 +6,14 @@ using IGDB.Models;
 
 namespace Classes.Metadata
 {
-	public class Storage
-	{
-		public enum CacheStatus
-		{
-			NotPresent,
-			Current,
-			Expired
-		}
+    public class Storage
+    {
+        public enum CacheStatus
+        {
+            NotPresent,
+            Current,
+            Expired
+        }
 
         public enum TablePrefix
         {
@@ -25,14 +25,14 @@ namespace Classes.Metadata
             return prefix.ToString() + "_" + Endpoint;
         }
 
-		public static CacheStatus GetCacheStatus(TablePrefix prefix, string Endpoint, string Slug)
-		{
-			return _GetCacheStatus(prefix, Endpoint, "slug", Slug);
-		}
+        public static CacheStatus GetCacheStatus(TablePrefix prefix, string Endpoint, string Slug)
+        {
+            return _GetCacheStatus(prefix, Endpoint, "slug", Slug);
+        }
 
         public static CacheStatus GetCacheStatus(TablePrefix prefix, string Endpoint, long Id)
         {
-			return _GetCacheStatus(prefix, Endpoint, "id", Id);
+            return _GetCacheStatus(prefix, Endpoint, "id", Id);
         }
 
         public static CacheStatus GetCacheStatus(DataRow Row)
@@ -56,38 +56,38 @@ namespace Classes.Metadata
         }
 
         private static CacheStatus _GetCacheStatus(TablePrefix prefix, string Endpoint, string SearchField, object SearchValue)
-		{
+        {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
 
-			string sql = "SELECT lastUpdated FROM " + GetTableName(prefix, Endpoint) + " WHERE " + SearchField + " = @" + SearchField;
+            string sql = "SELECT lastUpdated FROM " + GetTableName(prefix, Endpoint) + " WHERE " + SearchField + " = @" + SearchField;
 
-			Dictionary<string, object> dbDict = new Dictionary<string, object>();
-			dbDict.Add("Endpoint", Endpoint);
-			dbDict.Add(SearchField, SearchValue);
-			
-			DataTable dt = db.ExecuteCMD(sql, dbDict);
-			if (dt.Rows.Count == 0)
-			{
-				// no data stored for this item, or lastUpdated
-				return CacheStatus.NotPresent;
-			}
-			else
-			{
-				DateTime CacheExpiryTime = DateTime.UtcNow.AddHours(-168);
-				if ((DateTime)dt.Rows[0]["lastUpdated"] < CacheExpiryTime)
-				{
-					return CacheStatus.Expired;
-				}
-				else
-				{
-					return CacheStatus.Current;
-				}
-			}
+            Dictionary<string, object> dbDict = new Dictionary<string, object>();
+            dbDict.Add("Endpoint", Endpoint);
+            dbDict.Add(SearchField, SearchValue);
+
+            DataTable dt = db.ExecuteCMD(sql, dbDict);
+            if (dt.Rows.Count == 0)
+            {
+                // no data stored for this item, or lastUpdated
+                return CacheStatus.NotPresent;
+            }
+            else
+            {
+                DateTime CacheExpiryTime = DateTime.UtcNow.AddHours(-168);
+                if ((DateTime)dt.Rows[0]["lastUpdated"] < CacheExpiryTime)
+                {
+                    return CacheStatus.Expired;
+                }
+                else
+                {
+                    return CacheStatus.Current;
+                }
+            }
         }
 
-		public static void NewCacheValue(TablePrefix prefix, object ObjectToCache, bool UpdateRecord = false)
-		{
-			// get the object type name
+        public static void NewCacheValue(TablePrefix prefix, object ObjectToCache, bool UpdateRecord = false)
+        {
+            // get the object type name
             if (ObjectToCache != null)
             {
                 string ObjectTypeName = ObjectToCache.GetType().Name;
@@ -172,8 +172,8 @@ namespace Classes.Metadata
             }
         }
 
-		public static T GetCacheValue<T>(T EndpointType, TablePrefix prefix, string SearchField, object SearchValue)
-		{
+        public static T GetCacheValue<T>(T EndpointType, TablePrefix prefix, string SearchField, object SearchValue)
+        {
             string Endpoint = EndpointType.GetType().Name;
 
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
@@ -187,18 +187,18 @@ namespace Classes.Metadata
             DataTable dt = db.ExecuteCMD(sql, dbDict);
             if (dt.Rows.Count == 0)
             {
-				// no data stored for this item
-				throw new Exception("No record found that matches endpoint " + Endpoint + " with search value " + SearchValue);
+                // no data stored for this item
+                throw new Exception("No record found that matches endpoint " + Endpoint + " with search value " + SearchValue);
             }
             else
             {
-				DataRow dataRow = dt.Rows[0];
+                DataRow dataRow = dt.Rows[0];
                 return BuildCacheObject<T>(EndpointType, dataRow);
             }
         }
 
-		public static T BuildCacheObject<T>(T EndpointType, DataRow dataRow)
-		{
+        public static T BuildCacheObject<T>(T EndpointType, DataRow dataRow)
+        {
             foreach (PropertyInfo property in EndpointType.GetType().GetProperties())
             {
                 if (dataRow.Table.Columns.Contains(property.Name))
@@ -256,6 +256,9 @@ namespace Classes.Metadata
                                         case "platformversioncompany":
                                             objectToStore = new IdentityOrValue<PlatformVersionCompany>(id: (long)dataRow[property.Name]);
                                             break;
+                                        case "region":
+                                            objectToStore = new IdentityOrValue<Region>(id: (long)dataRow[property.Name]);
+                                            break;
                                     }
 
                                     if (objectToStore != null)
@@ -298,6 +301,9 @@ namespace Classes.Metadata
                                         case "gamemode":
                                             objectToStore = new IdentitiesOrValues<GameMode>(ids: fromJsonObject);
                                             break;
+                                        case "gamelocalization":
+                                            objectToStore = new IdentitiesOrValues<GameLocalization>(ids: fromJsonObject);
+                                            break;
                                         case "gamevideo":
                                             objectToStore = new IdentitiesOrValues<GameVideo>(ids: fromJsonObject);
                                             break;
@@ -327,6 +333,9 @@ namespace Classes.Metadata
                                             break;
                                         case "playerperspective":
                                             objectToStore = new IdentitiesOrValues<PlayerPerspective>(ids: fromJsonObject);
+                                            break;
+                                        case "region":
+                                            objectToStore = new IdentitiesOrValues<Region>(ids: fromJsonObject);
                                             break;
                                         case "releasedate":
                                             objectToStore = new IdentitiesOrValues<ReleaseDate>(ids: fromJsonObject);
