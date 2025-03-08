@@ -400,7 +400,7 @@ namespace hasheous_server.Controllers.v1_0
         [ProducesResponseType(typeof(Dictionary<string, string>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        [Route("IGDB/GameLocalizations")]
+        [Route("IGDB/GameLocalization")]
         [ResponseCache(CacheProfileName = "7Days")]
         public async Task<IActionResult> GetMetadata_GameLocalisations(long Id)
         {
