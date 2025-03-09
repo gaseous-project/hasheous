@@ -129,9 +129,9 @@ namespace Classes
 						}
 					}
 
-					// generate table from object
-					CreateTableFromObject<GameLocalization>("IGDB", "Id");
-					CreateTableFromObject<Region>("IGDB", "Id");
+					// // generate table from object
+					// CreateTableFromObject<GameLocalization>("IGDB", "Id");
+					// CreateTableFromObject<Region>("IGDB", "Id");
 
 					Logging.Log(Logging.LogType.Information, "Database", "Database setup complete");
 					break;
