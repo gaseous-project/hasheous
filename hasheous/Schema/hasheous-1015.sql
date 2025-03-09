@@ -1,12 +1,12 @@
 CREATE TABLE `IGDB_GameLocalization` (
     `Checksum` longtext DEFAULT NULL,
     `Cover` BIGINT DEFAULT NULL,
-    `CreatedAt` BIGINT DEFAULT NULL,
+    `CreatedAt` DATETIME DEFAULT NULL,
     `Game` BIGINT DEFAULT NULL,
     `Id` BIGINT NOT NULL,
     `Name` longtext DEFAULT NULL,
     `Region` BIGINT DEFAULT NULL,
-    `UpdatedAt` BIGINT DEFAULT NULL,
+    `UpdatedAt` DATETIME DEFAULT NULL,
     `dateAdded` datetime DEFAULT NULL,
     `lastUpdated` datetime DEFAULT NULL,
     PRIMARY KEY (`Id`)
