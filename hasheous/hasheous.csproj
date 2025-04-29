@@ -18,7 +18,7 @@
     <PackageReference Include="gaseous-signature-parser" Version="2.3.8" />
     <PackageReference Include="gaseous.IGDB" Version="1.0.2" />
     <PackageReference Include="hasheous-client" Version="1.2.5.2" />
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="8.0.13" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="8.0.15" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Versioning" Version="5.1.0" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Versioning.ApiExplorer" Version="5.1.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="7.3.1" />
