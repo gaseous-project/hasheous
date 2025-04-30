@@ -40,6 +40,7 @@ namespace hasheous_server.Controllers.v1_0
         [HttpPost]
         [ProducesResponseType(typeof(HashLookup), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ResponseCache(CacheProfileName = "5Minute")]
         [Route("ByHash")]
         public async Task<IActionResult> LookupPost(HashLookupModel model, bool? returnAllSources = false)
         {
@@ -77,7 +78,7 @@ namespace hasheous_server.Controllers.v1_0
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        [ResponseCache(CacheProfileName = "7Days")]
+        [ResponseCache(CacheProfileName = "5Minute")]
         [Route("ByHash/md5/{md5}")]
         [Route("ByHash/sha1/{sha1}")]
         public async Task<IActionResult> LookupGet(string? md5, string? sha1)
