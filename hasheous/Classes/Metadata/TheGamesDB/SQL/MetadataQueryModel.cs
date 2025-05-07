@@ -120,7 +120,10 @@ namespace TheGamesDB.SQL
                     return validFieldList;
                 }
 
-                return queryModel.filter.ToLower().Split(',').Select(s => s.Trim()).Where(s => validFilterList.Contains(s)).ToList();
+                return queryModel.filter.ToLower().Split(',')
+                    .Select(s => $"`{new string(s.Trim().Where(char.IsLetterOrDigit).ToArray())}`")
+                    .Where(s => validFilterList.Contains(s.Trim('`')))
+                    .ToList();
             }
         }
 
