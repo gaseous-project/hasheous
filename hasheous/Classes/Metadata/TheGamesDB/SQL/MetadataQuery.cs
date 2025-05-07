@@ -723,6 +723,11 @@ namespace TheGamesDB.SQL
                         "id", "name"
                     };
 
+                    queryValidator.validFieldList = new List<string>
+                    {
+
+                    };
+
                     // create new instance of Publishers
                     HasheousClient.Models.Metadata.TheGamesDb.Publishers publishers = new HasheousClient.Models.Metadata.TheGamesDb.Publishers();
                     publishers.data = new HasheousClient.Models.Metadata.TheGamesDb.Publishers.DataItem();
