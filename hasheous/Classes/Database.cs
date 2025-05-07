@@ -450,8 +450,6 @@ namespace Classes
 				catch (Exception ex)
 				{
 					Logging.Log(Logging.LogType.Critical, "Database", "Error while executing '" + SQL + "'", ex);
-					Trace.WriteLine("Error executing " + SQL);
-					Trace.WriteLine("Full exception: " + ex.ToString());
 				}
 
 				Logging.Log(Logging.LogType.Debug, "Database", "Closing database connection", null, true);
