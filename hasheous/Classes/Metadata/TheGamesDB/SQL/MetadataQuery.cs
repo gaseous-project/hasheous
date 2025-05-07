@@ -654,6 +654,11 @@ namespace TheGamesDB.SQL
                         "id", "name"
                     };
 
+                    queryValidator.validFieldList = new List<string>
+                    {
+
+                    };
+
                     // create new instance of Developers
                     HasheousClient.Models.Metadata.TheGamesDb.Developers developers = new HasheousClient.Models.Metadata.TheGamesDb.Developers();
                     developers.data = new HasheousClient.Models.Metadata.TheGamesDb.Developers.DataItem();
