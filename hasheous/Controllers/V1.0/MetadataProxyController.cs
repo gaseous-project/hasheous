@@ -1373,6 +1373,14 @@ namespace hasheous_server.Controllers.v1_0
             // check if image exists
             if (System.IO.File.Exists(imagePath))
             {
+                // check the file is non-zero length
+                FileInfo fileInfo = new FileInfo(imagePath);
+                if (fileInfo.Length == 0)
+                {
+                    System.IO.File.Delete(imagePath);
+                    return NotFound();
+                }
+
                 return PhysicalFile(imagePath, "image/jpeg");
             }
             else
@@ -1418,6 +1426,17 @@ namespace hasheous_server.Controllers.v1_0
                         }
                     }
 
+                    if (System.IO.File.Exists(imagePath))
+                    {
+                        // check the file is non-zero length
+                        FileInfo fileInfo = new FileInfo(imagePath);
+                        if (fileInfo.Length == 0)
+                        {
+                            System.IO.File.Delete(imagePath);
+                            return NotFound();
+                        }
+                    }
+
                     return PhysicalFile(imagePath, "image/jpeg");
                 }
                 catch (Exception ex)
@@ -1446,6 +1465,10 @@ namespace hasheous_server.Controllers.v1_0
         public IActionResult GetTheGamesDBImage(MetadataQuery.imageSize ImageSize, string FileName)
         {
             FileName = System.Uri.UnescapeDataString(FileName);
+            if (FileName.Contains("..") || FileName.Contains("/") || FileName.Contains("\\"))
+            {
+                return BadRequest("Invalid image ID");
+            }
             string imageFile = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_TheGamesDb, "Images", ImageSize.ToString(), FileName);
             string imagePath = Path.GetDirectoryName(imageFile);
 
@@ -1458,6 +1481,14 @@ namespace hasheous_server.Controllers.v1_0
             // check if image exists
             if (System.IO.File.Exists(imageFile))
             {
+                // check the file is non-zero length
+                FileInfo fileInfo = new FileInfo(imageFile);
+                if (fileInfo.Length == 0)
+                {
+                    System.IO.File.Delete(imageFile);
+                    return NotFound();
+                }
+
                 return PhysicalFile(imageFile, "image/jpeg");
             }
             else
@@ -1474,6 +1505,14 @@ namespace hasheous_server.Controllers.v1_0
                     while (result.IsCompleted == false)
                     {
                         Thread.Sleep(1000);
+                    }
+
+                    // check the file is non-zero length
+                    FileInfo fileInfo = new FileInfo(imageFile);
+                    if (fileInfo.Length == 0)
+                    {
+                        System.IO.File.Delete(imageFile);
+                        return NotFound();
                     }
 
                     return PhysicalFile(imageFile, "image/jpeg");
