@@ -22,6 +22,9 @@ namespace TheGamesDB.SQL
             // create validator
             QueryValidator queryValidator = new QueryValidator(queryModel);
 
+            // set blank default field list
+            queryValidator.validFieldList = new List<string>();
+
             // select query based on type
             switch (typeName)
             {
