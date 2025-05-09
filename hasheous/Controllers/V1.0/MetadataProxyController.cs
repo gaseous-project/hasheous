@@ -1465,9 +1465,13 @@ namespace hasheous_server.Controllers.v1_0
         public IActionResult GetTheGamesDBImage(MetadataQuery.imageSize ImageSize, string FileName)
         {
             FileName = System.Uri.UnescapeDataString(FileName);
-            if (FileName.Contains("..") || FileName.Contains("/") || FileName.Contains("\\"))
+            if (FileName.Contains("..") || FileName.Contains("\\"))
             {
                 return BadRequest("Invalid image ID");
+            }
+            else if (FileName.Contains("/"))
+            {
+                // forward slashes are allowed in the file name
             }
             string imageFile = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_TheGamesDb, "Images", ImageSize.ToString(), FileName);
             string imagePath = Path.GetDirectoryName(imageFile);
