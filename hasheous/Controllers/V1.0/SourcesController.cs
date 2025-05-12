@@ -74,6 +74,8 @@ namespace hasheous_server.Controllers.v1_0
                 case RomSignatureObject.Game.Rom.SignatureSourceType.MAMEMess:
                 case RomSignatureObject.Game.Rom.SignatureSourceType.NoIntros:
                 case RomSignatureObject.Game.Rom.SignatureSourceType.Redump:
+                case RomSignatureObject.Game.Rom.SignatureSourceType.RetroAchievements:
+                case RomSignatureObject.Game.Rom.SignatureSourceType.FBNeo:
                     hasheous_server.Classes.Sources sources = new hasheous_server.Classes.Sources();
                     return Ok(sources.GetSources(sourceType));
 

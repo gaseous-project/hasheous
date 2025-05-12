@@ -15,6 +15,8 @@ namespace hasheous_server.Classes
                 case RomSignatureObject.Game.Rom.SignatureSourceType.MAMEArcade:
                 case RomSignatureObject.Game.Rom.SignatureSourceType.MAMEMess:
                 case RomSignatureObject.Game.Rom.SignatureSourceType.Redump:
+                case RomSignatureObject.Game.Rom.SignatureSourceType.RetroAchievements:
+                case RomSignatureObject.Game.Rom.SignatureSourceType.FBNeo:
                     SourceTypeLabel = sourceType.ToString();
                     break;
 
