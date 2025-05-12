@@ -125,6 +125,12 @@ function createDataObjectsTableFromMD5Search(hashType) {
             };
             break;
 
+        case 'crc32':
+            searchModel = {
+                'crc': pageSearchBox.value
+            };
+            break;
+
         default:
             resultDiv.innerHTML = '';
             return;
@@ -180,12 +186,16 @@ function createDataObjectsTableFromMD5Search(hashType) {
 function performSearch() {
     const regexExp_md5 = /^[a-f0-9]{32}$/gi;
     const regexExp_sha1 = /\b([a-f0-9]{40})\b/;
+    const regexExp_crc32 = /\b([a-f0-9]{8})\b/;
     if (regexExp_md5.test(pageSearchBox.value)) {
         // is an MD5
         createDataObjectsTableFromMD5Search('md5');
     } else if (regexExp_sha1.test(pageSearchBox.value)) {
         // is an SHA1
         createDataObjectsTableFromMD5Search('sha1');
+    } else if (regexExp_crc32.test(pageSearchBox.value)) {
+        // is a CRC32
+        createDataObjectsTableFromMD5Search('crc32');
     } else {
         createDataObjectsTable('gamesearchresults', 'game');
         createDataObjectsTable('platformsearchresults', 'platform');

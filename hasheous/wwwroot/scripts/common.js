@@ -464,5 +464,6 @@ let signatureSources = {
     4: "NoIntros",
     5: "Redump",
     6: "WHDLoad",
-    7: "RetroAchievements"
+    7: "RetroAchievements",
+    8: "FBNeo"
 }

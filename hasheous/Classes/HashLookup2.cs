@@ -165,6 +165,18 @@ namespace Classes
                     // add signature mapping to game
                     dataObjects.AddSignature(game.Id, DataObjects.DataObjectType.Game, long.Parse(discoveredSignature.Game.Id));
 
+                    // add all raw signatures to the game
+                    foreach (Signatures_Games_2 sig in rawSignatures)
+                    {
+                        if (sig.Game != null)
+                        {
+                            if (sig.Game.Id != discoveredSignature.Game.Id)
+                            {
+                                dataObjects.AddSignature(game.Id, DataObjects.DataObjectType.Game, long.Parse(sig.Game.Id));
+                            }
+                        }
+                    }
+
                     // VIMMSLair manual search
                     foreach (AttributeItem attribute in platform.Attributes)
                     {

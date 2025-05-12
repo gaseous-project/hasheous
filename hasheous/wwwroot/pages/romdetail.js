@@ -71,6 +71,14 @@ ajaxCall(
                         }
                     }
                 }
+                if (key === "crc") {
+                    if (value.length > 0) {
+                        jsonLoaded = true;
+                        jsonModel = {
+                            "crc": value
+                        }
+                    }
+                }
             }
         }
         document.getElementById('dataObjectDetails').appendChild(

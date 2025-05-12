@@ -44,6 +44,15 @@ namespace Classes
                 }
             }
 
+            if (model.CRC != null)
+            {
+                if (model.CRC.Length == 8)
+                {
+                    whereClauses.Add("Signatures_Roms.CRC = @crc");
+                    dbDict.Add("crc", model.CRC);
+                }
+            }
+
             if (whereClauses.Count > 0)
             {
                 // lookup the provided hashes
@@ -223,19 +232,19 @@ namespace Classes
             return new Signatures_Games_2.GameItem
             {
                 Id = ((long)sigDbRow["Id"]).ToString(),
-                Name = (string)sigDbRow["Name"],
-                Description = (string)sigDbRow["Description"],
-                Year = (string)sigDbRow["Year"],
+                Name = (string)Common.ReturnValueIfNull(sigDbRow["Name"], ""),
+                Description = (string)Common.ReturnValueIfNull(sigDbRow["Description"], ""),
+                Year = (string)Common.ReturnValueIfNull(sigDbRow["Year"], ""),
                 Publisher = (string)Common.ReturnValueIfNull(sigDbRow["Publisher"], ""),
                 PublisherId = (long)(int)Common.ReturnValueIfNull(sigDbRow["PublisherId"], ""),
                 Demo = (Signatures_Games_2.GameItem.DemoTypes)(int)sigDbRow["Demo"],
-                SystemId = (int)sigDbRow["PlatformId"],
-                System = (string)sigDbRow["Platform"],
-                SystemVariant = (string)sigDbRow["SystemVariant"],
-                Video = (string)sigDbRow["Video"],
+                SystemId = (int)Common.ReturnValueIfNull(sigDbRow["PlatformId"], 0),
+                System = (string)Common.ReturnValueIfNull(sigDbRow["Platform"], ""),
+                SystemVariant = (string)Common.ReturnValueIfNull(sigDbRow["SystemVariant"], ""),
+                Video = (string)Common.ReturnValueIfNull(sigDbRow["Video"], ""),
                 Countries = new Dictionary<string, string>(GetLookup(LookupTypes.Country, (long)sigDbRow["Id"])),
                 Languages = new Dictionary<string, string>(GetLookup(LookupTypes.Language, (long)sigDbRow["Id"])),
-                Copyright = (string)sigDbRow["Copyright"],
+                Copyright = (string)Common.ReturnValueIfNull(sigDbRow["Copyright"], ""),
                 MetadataSource = (int)sigDbRow["MetadataSource"],
                 Category = (string)Common.ReturnValueIfNull(sigDbRow["Category"], "")
             };
@@ -341,11 +350,12 @@ namespace Classes
         public hasheous_server.Models.Signatures_Games_2.RomItem GetRomItemByHash(hasheous_server.Models.HashLookupModel model)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql = "SELECT `Id` AS romid, `Name` AS romname, Signatures_Roms.* FROM Signatures_Roms WHERE MD5 = @md5 OR SHA1 = @sha1;";
+            string sql = "SELECT `Id` AS romid, `Name` AS romname, Signatures_Roms.* FROM Signatures_Roms WHERE MD5 = @md5 OR SHA1 = @sha1 OR CRC = @crc;";
 
             return BuildRomItem(db.ExecuteCMD(sql, new Dictionary<string, object>{
                 { "md5", model.MD5 },
-                { "sha1", model.SHA1 }
+                { "sha1", model.SHA1 },
+                { "crc", model.CRC }
             }).Rows[0]);
         }
 
