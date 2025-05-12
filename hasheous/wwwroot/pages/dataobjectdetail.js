@@ -53,7 +53,9 @@ document.getElementById('dataObjectMerge').addEventListener("click", function (e
     );
 });
 
-document.getElementById('metadatarescan').addEventListener("click", function (e) {
+let rescanButton = document.getElementById('metadatarescan');
+rescanButton.addEventListener("click", (e) => {
+    rescanButton.setAttribute('disabled', 'disabled');
     fetch('/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int') + '/MetadataMap?forceScan=true', {
         method: 'GET'
     }).then(async function (response) {

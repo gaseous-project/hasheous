@@ -1,0 +1,1 @@
+ALTER TABLE `hasheous`.`Signatures_Roms` ADD INDEX `crc_idx` (`CRC` ASC) VISIBLE;

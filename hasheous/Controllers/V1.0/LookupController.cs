@@ -81,14 +81,16 @@ namespace hasheous_server.Controllers.v1_0
         [ResponseCache(CacheProfileName = "5Minute")]
         [Route("ByHash/md5/{md5}")]
         [Route("ByHash/sha1/{sha1}")]
-        public async Task<IActionResult> LookupGet(string? md5, string? sha1)
+        [Route("ByHash/crc/{crc}")]
+        public async Task<IActionResult> LookupGet(string? md5, string? sha1, string? crc)
         {
             try
             {
                 HashLookup hashLookup = new HashLookup(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), new HashLookupModel
                 {
                     MD5 = md5,
-                    SHA1 = sha1
+                    SHA1 = sha1,
+                    CRC = crc
                 });
 
                 if (hashLookup == null)

@@ -570,6 +570,10 @@ td {
     background-color: var(--signature-source-color-retroachievements);
 }
 
+.signatureMetadataSource[data-source="FBNeo"] {
+    background-color: var(--signature-source-color-fbneo);
+}
+
 .signatureLabel {
     padding-top: 2px;
     padding-bottom: 2px;
@@ -835,6 +839,10 @@ pre {
 
 .color-retroachievements {
     background-color: var(--signature-source-color-retroachievements);
+}
+
+.color-fbneo {
+    background-color: var(--signature-source-color-fbneo);
 }
 
 .source-box {

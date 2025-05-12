@@ -362,10 +362,10 @@ namespace XML
                                     // store rom
                                     foreach (RomSignatureObject.Game.Rom romObject in gameObject.Roms)
                                     {
-                                        if (romObject.Md5 != null || romObject.Sha1 != null)
+                                        if (romObject.Md5 != null || romObject.Sha1 != null || romObject.Crc != null)
                                         {
                                             long romId = 0;
-                                            sql = "SELECT * FROM Signatures_Roms WHERE `GameId`=@gameid AND (`MD5`=@md5 AND `SHA1`=@sha1)";
+                                            sql = "SELECT * FROM Signatures_Roms WHERE `GameId`=@gameid AND (`MD5`=@md5 AND `SHA1`=@sha1 AND `CRC`=@crc);";
                                             dbDict = new Dictionary<string, object>
                                             {
                                                 { "gameid", gameId },
