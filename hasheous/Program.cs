@@ -9,7 +9,6 @@ using Microsoft.OpenApi.Models;
 using Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
-using System.Threading.RateLimiting;
 using static Classes.Common;
 using System.Net.Mail;
 using System.Net;
@@ -124,27 +123,6 @@ var smtpClient = new SmtpClient(Config.EmailSMTPConfiguration.Host)
 };
 builder.Services.AddSingleton(smtpClient);
 builder.Services.AddTransient<IEmailSender, SmtpEmailSender>();
-
-// rate limiting
-builder.Services.AddRateLimiter(options =>
-{
-    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
-    {
-        return RateLimitPartition.GetFixedWindowLimiter(partitionKey: httpContext.Request.Headers.Host.ToString(), partition =>
-            new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 80,
-                AutoReplenishment = true,
-                Window = TimeSpan.FromSeconds(10)
-            });
-    });
-    options.OnRejected = async (context, token) =>
-    {
-        context.HttpContext.Response.StatusCode = 429;
-        Logging.Log(Logging.LogType.Warning, "RateLimiting", "Rate limit exceeded for " + context.HttpContext.Request.Path + " from " + context.HttpContext.Connection.RemoteIpAddress.ToString());
-        await context.HttpContext.Response.WriteAsync("Too many requests. Please try later again... ", cancellationToken: token);
-    };
-});
 
 // api versioning
 builder.Services.AddApiVersioning(config =>
