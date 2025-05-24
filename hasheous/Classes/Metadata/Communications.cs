@@ -1,6 +1,7 @@
 using System;
 using System.Data;
 using System.Net;
+using System.Threading.Tasks;
 using Classes;
 using Classes.Metadata;
 using IGDB;
@@ -256,7 +257,7 @@ namespace hasheous_server.Classes.Metadata
             }
         }
 
-        public static T? GetSearchCache<T>(string SearchFields, string SearchString)
+        public static async Task<T?> GetSearchCache<T>(string SearchFields, string SearchString)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "SELECT * FROM SearchCache WHERE SearchFields = @searchfields AND SearchString = @searchstring;";
@@ -265,7 +266,7 @@ namespace hasheous_server.Classes.Metadata
                 { "searchfields", SearchFields },
                 { "searchstring", SearchString }
             };
-            DataTable data = db.ExecuteCMD(sql, dbDict);
+            DataTable data = await db.ExecuteCMDAsync(sql, dbDict);
             if (data.Rows.Count > 0)
             {
                 // cache hit

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Classes;
 using Classes.Metadata;
 using IGDB;
@@ -15,7 +16,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
         }
 
 
-        public static Theme? GetGame_Themes(long? Id)
+        public static async Task<Theme?> GetGame_Themes(long? Id)
         {
             if ((Id == 0) || (Id == null))
             {
@@ -23,15 +24,13 @@ namespace hasheous_server.Classes.Metadata.IGDB
             }
             else
             {
-                Task<Theme> RetVal = _GetGame_Themes(SearchUsing.id, Id);
-                return RetVal.Result;
+                return await _GetGame_Themes(SearchUsing.id, Id);
             }
         }
 
-        public static Theme GetGame_Themes(string Slug)
+        public static async Task<Theme> GetGame_Themes(string Slug)
         {
-            Task<Theme> RetVal = _GetGame_Themes(SearchUsing.slug, Slug);
-            return RetVal.Result;
+            return await _GetGame_Themes(SearchUsing.slug, Slug);
         }
 
         private static async Task<Theme> _GetGame_Themes(SearchUsing searchUsing, object searchValue)
@@ -40,11 +39,11 @@ namespace hasheous_server.Classes.Metadata.IGDB
             Storage.CacheStatus? cacheStatus = new Storage.CacheStatus();
             if (searchUsing == SearchUsing.id)
             {
-                cacheStatus = Storage.GetCacheStatus(Storage.TablePrefix.IGDB, "Theme", (long)searchValue);
+                cacheStatus = await Storage.GetCacheStatusAsync(Storage.TablePrefix.IGDB, "Theme", (long)searchValue);
             }
             else
             {
-                cacheStatus = Storage.GetCacheStatus(Storage.TablePrefix.IGDB, "Theme", (string)searchValue);
+                cacheStatus = await Storage.GetCacheStatusAsync(Storage.TablePrefix.IGDB, "Theme", (string)searchValue);
             }
 
             // set up where clause
@@ -66,22 +65,22 @@ namespace hasheous_server.Classes.Metadata.IGDB
             {
                 case Storage.CacheStatus.NotPresent:
                     returnValue = await GetObjectFromServer(WhereClause);
-                    Storage.NewCacheValue(Storage.TablePrefix.IGDB, returnValue);
+                    await Storage.NewCacheValueAsync(Storage.TablePrefix.IGDB, returnValue);
                     break;
                 case Storage.CacheStatus.Expired:
                     try
                     {
                         returnValue = await GetObjectFromServer(WhereClause);
-                        Storage.NewCacheValue(Storage.TablePrefix.IGDB, returnValue, true);
+                        await Storage.NewCacheValueAsync(Storage.TablePrefix.IGDB, returnValue, true);
                         return returnValue;
                     }
                     catch (Exception ex)
                     {
                         Console.Error.WriteLine("Metadata: " + returnValue.GetType().Name + ": An error occurred while connecting to IGDB. WhereClause: " + WhereClause + ex.ToString());
-                        return Storage.GetCacheValue<Theme>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
+                        return await Storage.GetCacheValueAsync<Theme>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
                     }
                 case Storage.CacheStatus.Current:
-                    returnValue = Storage.GetCacheValue<Theme>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
+                    returnValue = await Storage.GetCacheValueAsync<Theme>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
                     break;
                 default:
                     throw new Exception("How did you get here?");

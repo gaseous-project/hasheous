@@ -1,4 +1,5 @@
 using System.Data;
+using System.Threading.Tasks;
 using Classes;
 using hasheous_server.Classes.Metadata;
 using hasheous_server.Models;
@@ -14,7 +15,7 @@ namespace hasheous_server.Classes
         /// <param name="UserId"></param>
         /// <param name="model"></param>
         /// <returns></returns>
-        public SubmissionsMatchFixModel AddVote(string UserId, SubmissionsMatchFixModel model)
+        public async Task<SubmissionsMatchFixModel> AddVote(string UserId, SubmissionsMatchFixModel model)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
 
@@ -34,8 +35,8 @@ namespace hasheous_server.Classes
                     switch (metadataMatch.Source)
                     {
                         case Communications.MetadataSources.IGDB:
-                            IGDB.Models.Platform platform = Metadata.IGDB.Platforms.GetPlatform(metadataMatch.PlatformId, false);
-                            IGDB.Models.Game game = Metadata.IGDB.Games.GetGame(metadataMatch.GameId, false, false, false);
+                            IGDB.Models.Platform platform = await Metadata.IGDB.Platforms.GetPlatform(metadataMatch.PlatformId, false);
+                            IGDB.Models.Game game = await Metadata.IGDB.Games.GetGame(metadataMatch.GameId, false, false, false);
                             if (platform != null && game != null)
                             {
                                 if (game.Platforms.Ids.ToList<long>().Contains((long)platform.Id))

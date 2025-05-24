@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Data;
 using System.Reflection;
+using System.Threading.Tasks;
 using IGDB;
 using IGDB.Models;
 
@@ -25,14 +26,14 @@ namespace Classes.Metadata
             return prefix.ToString() + "_" + Endpoint;
         }
 
-        public static CacheStatus GetCacheStatus(TablePrefix prefix, string Endpoint, string Slug)
+        public static async Task<CacheStatus> GetCacheStatusAsync(TablePrefix prefix, string Endpoint, string Slug)
         {
-            return _GetCacheStatus(prefix, Endpoint, "slug", Slug);
+            return await _GetCacheStatus(prefix, Endpoint, "slug", Slug);
         }
 
-        public static CacheStatus GetCacheStatus(TablePrefix prefix, string Endpoint, long Id)
+        public static async Task<CacheStatus> GetCacheStatusAsync(TablePrefix prefix, string Endpoint, long Id)
         {
-            return _GetCacheStatus(prefix, Endpoint, "id", Id);
+            return await _GetCacheStatus(prefix, Endpoint, "id", Id);
         }
 
         public static CacheStatus GetCacheStatus(DataRow Row)
@@ -55,7 +56,7 @@ namespace Classes.Metadata
             }
         }
 
-        private static CacheStatus _GetCacheStatus(TablePrefix prefix, string Endpoint, string SearchField, object SearchValue)
+        private static async Task<CacheStatus> _GetCacheStatus(TablePrefix prefix, string Endpoint, string SearchField, object SearchValue)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
 
@@ -65,7 +66,7 @@ namespace Classes.Metadata
             dbDict.Add("Endpoint", Endpoint);
             dbDict.Add(SearchField, SearchValue);
 
-            DataTable dt = db.ExecuteCMD(sql, dbDict);
+            DataTable dt = await db.ExecuteCMDAsync(sql, dbDict);
             if (dt.Rows.Count == 0)
             {
                 // no data stored for this item, or lastUpdated
@@ -85,7 +86,7 @@ namespace Classes.Metadata
             }
         }
 
-        public static void NewCacheValue(TablePrefix prefix, object ObjectToCache, bool UpdateRecord = false)
+        public static async Task NewCacheValueAsync(TablePrefix prefix, object ObjectToCache, bool UpdateRecord = false)
         {
             // get the object type name
             if (ObjectToCache != null)
@@ -168,11 +169,11 @@ namespace Classes.Metadata
 
                 // execute sql
                 Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-                db.ExecuteCMD(sql, objectDict);
+                await db.ExecuteCMDAsync(sql, objectDict);
             }
         }
 
-        public static T GetCacheValue<T>(T EndpointType, TablePrefix prefix, string SearchField, object SearchValue)
+        public static async Task<T> GetCacheValueAsync<T>(T EndpointType, TablePrefix prefix, string SearchField, object SearchValue)
         {
             string Endpoint = EndpointType.GetType().Name;
 
@@ -184,7 +185,7 @@ namespace Classes.Metadata
             dbDict.Add("Endpoint", Endpoint);
             dbDict.Add(SearchField, SearchValue);
 
-            DataTable dt = db.ExecuteCMD(sql, dbDict);
+            DataTable dt = await db.ExecuteCMDAsync(sql, dbDict);
             if (dt.Rows.Count == 0)
             {
                 // no data stored for this item

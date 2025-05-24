@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Classes;
 using Classes.Metadata;
 using IGDB;
@@ -14,7 +15,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
         {
         }
 
-        public static Company? GetCompanies(long? Id)
+        public static async Task<Company?> GetCompanies(long? Id)
         {
             if ((Id == 0) || (Id == null))
             {
@@ -22,15 +23,13 @@ namespace hasheous_server.Classes.Metadata.IGDB
             }
             else
             {
-                Task<Company> RetVal = _GetCompanies(SearchUsing.id, Id);
-                return RetVal.Result;
+                return await _GetCompanies(SearchUsing.id, Id);
             }
         }
 
-        public static Company GetCompanies(string Slug)
+        public static async Task<Company> GetCompanies(string Slug)
         {
-            Task<Company> RetVal = _GetCompanies(SearchUsing.slug, Slug.ToLower());
-            return RetVal.Result;
+            return await _GetCompanies(SearchUsing.slug, Slug.ToLower());
         }
 
         private static async Task<Company> _GetCompanies(SearchUsing searchUsing, object searchValue)
@@ -39,11 +38,11 @@ namespace hasheous_server.Classes.Metadata.IGDB
             Storage.CacheStatus? cacheStatus = new Storage.CacheStatus();
             if (searchUsing == SearchUsing.id)
             {
-                cacheStatus = Storage.GetCacheStatus(Storage.TablePrefix.IGDB, "Company", (long)searchValue);
+                cacheStatus = await Storage.GetCacheStatusAsync(Storage.TablePrefix.IGDB, "Company", (long)searchValue);
             }
             else
             {
-                cacheStatus = Storage.GetCacheStatus(Storage.TablePrefix.IGDB, "Company", (string)searchValue);
+                cacheStatus = await Storage.GetCacheStatusAsync(Storage.TablePrefix.IGDB, "Company", (string)searchValue);
             }
 
             // set up where clause
@@ -68,23 +67,23 @@ namespace hasheous_server.Classes.Metadata.IGDB
             {
                 case Storage.CacheStatus.NotPresent:
                     returnValue = await GetObjectFromServer(WhereClause);
-                    if (returnValue != null) { Storage.NewCacheValue(Storage.TablePrefix.IGDB, returnValue); }
-                    UpdateSubClasses(returnValue);
+                    if (returnValue != null) { await Storage.NewCacheValueAsync(Storage.TablePrefix.IGDB, returnValue); }
+                    await UpdateSubClasses(returnValue);
                     break;
                 case Storage.CacheStatus.Expired:
                     try
                     {
                         returnValue = await GetObjectFromServer(WhereClause);
-                        Storage.NewCacheValue(Storage.TablePrefix.IGDB, returnValue, true);
+                        await Storage.NewCacheValueAsync(Storage.TablePrefix.IGDB, returnValue, true);
                     }
                     catch (Exception ex)
                     {
                         Console.Error.WriteLine("Metadata: " + returnValue.GetType().Name + ": An error occurred while connecting to IGDB. WhereClause: " + WhereClause + ex.ToString());
-                        returnValue = Storage.GetCacheValue<Company>(returnValue, Storage.TablePrefix.IGDB, WhereClauseField, searchValue);
+                        returnValue = await Storage.GetCacheValueAsync<Company>(returnValue, Storage.TablePrefix.IGDB, WhereClauseField, searchValue);
                     }
                     break;
                 case Storage.CacheStatus.Current:
-                    return Storage.GetCacheValue<Company>(returnValue, Storage.TablePrefix.IGDB, WhereClauseField, searchValue);
+                    return await Storage.GetCacheValueAsync<Company>(returnValue, Storage.TablePrefix.IGDB, WhereClauseField, searchValue);
                     break;
                 default:
                     throw new Exception("How did you get here?");
@@ -93,11 +92,11 @@ namespace hasheous_server.Classes.Metadata.IGDB
             return returnValue;
         }
 
-        private static void UpdateSubClasses(Company company)
+        private static async Task UpdateSubClasses(Company company)
         {
             if (company.Logo != null)
             {
-                CompanyLogo companyLogo = CompanyLogos.GetCompanyLogo(company.Logo.Id, Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB_Company(company));
+                CompanyLogo companyLogo = await CompanyLogos.GetCompanyLogo(company.Logo.Id, Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB_Company(company));
             }
         }
 

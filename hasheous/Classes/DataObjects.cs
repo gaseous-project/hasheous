@@ -1288,7 +1288,7 @@ namespace hasheous_server.Classes
                                                                 )
                                                             )
                                                             {
-                                                                IGDB.Models.Platform platform = Metadata.IGDB.Platforms.GetPlatform((string?)provider.Id, false);
+                                                                IGDB.Models.Platform platform = await Metadata.IGDB.Platforms.GetPlatform((string?)provider.Id, false);
                                                                 PlatformId = platform.Id;
                                                             }
                                                         }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Data;
+using System.Threading.Tasks;
 using Classes;
 using Classes.Metadata;
 using IGDB;
@@ -17,12 +18,12 @@ namespace hasheous_server.Classes.Metadata.IGDB
         }
 
 
-        public static Game? GetGame(long Id, bool getAllMetadata, bool followSubGames, bool forceRefresh)
+        public async static Task<Game>? GetGame(long Id, bool getAllMetadata, bool followSubGames, bool forceRefresh)
         {
             if (Id == 0)
             {
                 Game returnValue = new Game();
-                if (Storage.GetCacheStatus(Storage.TablePrefix.IGDB, "Game", 0) == Storage.CacheStatus.NotPresent)
+                if (await Storage.GetCacheStatusAsync(Storage.TablePrefix.IGDB, "Game", 0) == Storage.CacheStatus.NotPresent)
                 {
                     returnValue = new Game
                     {
@@ -30,26 +31,24 @@ namespace hasheous_server.Classes.Metadata.IGDB
                         Name = "Unknown Title",
                         Slug = "Unknown"
                     };
-                    Storage.NewCacheValue(Storage.TablePrefix.IGDB, returnValue);
+                    await Storage.NewCacheValueAsync(Storage.TablePrefix.IGDB, returnValue);
 
                     return returnValue;
                 }
                 else
                 {
-                    return Storage.GetCacheValue<Game>(returnValue, Storage.TablePrefix.IGDB, "id", 0);
+                    return await Storage.GetCacheValueAsync<Game>(returnValue, Storage.TablePrefix.IGDB, "id", 0);
                 }
             }
             else
             {
-                Task<Game> RetVal = _GetGame(SearchUsing.id, Id, getAllMetadata, followSubGames, forceRefresh);
-                return RetVal.Result;
+                return await _GetGame(SearchUsing.id, Id, getAllMetadata, followSubGames, forceRefresh);
             }
         }
 
-        public static Game GetGame(string Slug, bool getAllMetadata, bool followSubGames, bool forceRefresh)
+        public static async Task<Game> GetGame(string Slug, bool getAllMetadata, bool followSubGames, bool forceRefresh)
         {
-            Task<Game> RetVal = _GetGame(SearchUsing.slug, Slug.ToLower(), getAllMetadata, followSubGames, forceRefresh);
-            return RetVal.Result;
+            return await _GetGame(SearchUsing.slug, Slug.ToLower(), getAllMetadata, followSubGames, forceRefresh);
         }
 
         public static Game GetGame(DataRow dataRow)
@@ -63,11 +62,11 @@ namespace hasheous_server.Classes.Metadata.IGDB
             Storage.CacheStatus? cacheStatus = new Storage.CacheStatus();
             if (searchUsing == SearchUsing.id)
             {
-                cacheStatus = Storage.GetCacheStatus(Storage.TablePrefix.IGDB, "Game", (long)searchValue);
+                cacheStatus = await Storage.GetCacheStatusAsync(Storage.TablePrefix.IGDB, "Game", (long)searchValue);
             }
             else
             {
-                cacheStatus = Storage.GetCacheStatus(Storage.TablePrefix.IGDB, "Game", (string)searchValue);
+                cacheStatus = await Storage.GetCacheStatusAsync(Storage.TablePrefix.IGDB, "Game", (string)searchValue);
             }
 
             if (forceRefresh == true)
@@ -97,33 +96,33 @@ namespace hasheous_server.Classes.Metadata.IGDB
             {
                 case Storage.CacheStatus.NotPresent:
                     returnValue = await GetObjectFromServer(WhereClause);
-                    Storage.NewCacheValue(Storage.TablePrefix.IGDB, returnValue);
+                    await Storage.NewCacheValueAsync(Storage.TablePrefix.IGDB, returnValue);
                     UpdateSubClasses(returnValue, getAllMetadata, followSubGames);
                     return returnValue;
                 case Storage.CacheStatus.Expired:
                     try
                     {
                         returnValue = await GetObjectFromServer(WhereClause);
-                        Storage.NewCacheValue(Storage.TablePrefix.IGDB, returnValue, true);
+                        await Storage.NewCacheValueAsync(Storage.TablePrefix.IGDB, returnValue, true);
                     }
                     catch (Exception ex)
                     {
                         Console.Error.WriteLine("Metadata: " + returnValue.GetType().Name + ": An error occurred while connecting to IGDB. WhereClause: " + WhereClause + ex.ToString());
-                        returnValue = Storage.GetCacheValue<Game>(returnValue, Storage.TablePrefix.IGDB, WhereClauseField, searchValue);
+                        returnValue = await Storage.GetCacheValueAsync<Game>(returnValue, Storage.TablePrefix.IGDB, WhereClauseField, searchValue);
                     }
                     return returnValue;
                 case Storage.CacheStatus.Current:
-                    return Storage.GetCacheValue<Game>(returnValue, Storage.TablePrefix.IGDB, WhereClauseField, searchValue);
+                    return await Storage.GetCacheValueAsync<Game>(returnValue, Storage.TablePrefix.IGDB, WhereClauseField, searchValue);
                 default:
                     throw new Exception("How did you get here?");
             }
         }
 
-        private static void UpdateSubClasses(Game Game, bool getAllMetadata, bool followSubGames)
+        private static async Task UpdateSubClasses(Game Game, bool getAllMetadata, bool followSubGames)
         {
             if (Game.Cover != null)
             {
-                Cover GameCover = Covers.GetCover(Game.Cover.Id, Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB_Game(Game));
+                Cover GameCover = await Covers.GetCover(Game.Cover.Id, Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB_Game(Game));
             }
 
             if (getAllMetadata == true)
@@ -132,7 +131,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
                 {
                     foreach (long AgeRatingId in Game.AgeRatings.Ids)
                     {
-                        AgeRating GameAgeRating = AgeRatings.GetAgeRatings(AgeRatingId);
+                        AgeRating GameAgeRating = await AgeRatings.GetAgeRatings(AgeRatingId);
                     }
                 }
 
@@ -140,7 +139,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
                 {
                     foreach (long AlternativeNameId in Game.AlternativeNames.Ids)
                     {
-                        AlternativeName GameAlternativeName = AlternativeNames.GetAlternativeNames(AlternativeNameId);
+                        AlternativeName GameAlternativeName = await AlternativeNames.GetAlternativeNames(AlternativeNameId);
                     }
                 }
 
@@ -148,7 +147,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
                 {
                     foreach (long ArtworkId in Game.Artworks.Ids)
                     {
-                        Artwork GameArtwork = Artworks.GetArtwork(ArtworkId, Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB_Game(Game));
+                        Artwork GameArtwork = await Artworks.GetArtwork(ArtworkId, Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB_Game(Game));
                     }
                 }
 
@@ -165,33 +164,33 @@ namespace hasheous_server.Classes.Metadata.IGDB
 
                     foreach (long gameId in gamesToFetch)
                     {
-                        Game relatedGame = GetGame(gameId, false, true, false);
+                        Game relatedGame = await GetGame(gameId, false, true, false);
                     }
                 }
 
                 if (Game.Collection != null)
                 {
-                    Collection GameCollection = Collections.GetCollections(Game.Collection.Id);
+                    Collection GameCollection = await Collections.GetCollections(Game.Collection.Id);
                 }
 
                 if (Game.ExternalGames != null)
                 {
                     foreach (long ExternalGameId in Game.ExternalGames.Ids)
                     {
-                        ExternalGame GameExternalGame = ExternalGames.GetExternalGames(ExternalGameId);
+                        ExternalGame GameExternalGame = await ExternalGames.GetExternalGames(ExternalGameId);
                     }
                 }
 
                 if (Game.Franchise != null)
                 {
-                    Franchise GameFranchise = Franchises.GetFranchises(Game.Franchise.Id);
+                    Franchise GameFranchise = await Franchises.GetFranchises(Game.Franchise.Id);
                 }
 
                 if (Game.Franchises != null)
                 {
                     foreach (long FranchiseId in Game.Franchises.Ids)
                     {
-                        Franchise GameFranchise = Franchises.GetFranchises(FranchiseId);
+                        Franchise GameFranchise = await Franchises.GetFranchises(FranchiseId);
                     }
                 }
 
@@ -199,7 +198,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
                 {
                     foreach (long GenreId in Game.Genres.Ids)
                     {
-                        Genre GameGenre = Genres.GetGenres(GenreId);
+                        Genre GameGenre = await Genres.GetGenres(GenreId);
                     }
                 }
 
@@ -207,7 +206,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
                 {
                     foreach (long involvedCompanyId in Game.InvolvedCompanies.Ids)
                     {
-                        InvolvedCompany involvedCompany = InvolvedCompanies.GetInvolvedCompanies(involvedCompanyId);
+                        InvolvedCompany involvedCompany = await InvolvedCompanies.GetInvolvedCompanies(involvedCompanyId);
                     }
                 }
 
@@ -215,7 +214,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
                 {
                     foreach (long gameModeId in Game.GameModes.Ids)
                     {
-                        GameMode gameMode = GameModes.GetGame_Modes(gameModeId);
+                        GameMode gameMode = await GameModes.GetGame_Modes(gameModeId);
                     }
                 }
 
@@ -223,7 +222,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
                 {
                     foreach (long multiplayerModeId in Game.MultiplayerModes.Ids)
                     {
-                        MultiplayerMode multiplayerMode = MultiplayerModes.GetGame_MultiplayerModes(multiplayerModeId);
+                        MultiplayerMode multiplayerMode = await MultiplayerModes.GetGame_MultiplayerModes(multiplayerModeId);
                     }
                 }
 
@@ -231,7 +230,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
                 {
                     foreach (long PlatformId in Game.Platforms.Ids)
                     {
-                        Platform GamePlatform = Platforms.GetPlatform(PlatformId);
+                        Platform GamePlatform = await Platforms.GetPlatform(PlatformId);
                     }
                 }
 
@@ -239,7 +238,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
                 {
                     foreach (long PerspectiveId in Game.PlayerPerspectives.Ids)
                     {
-                        PlayerPerspective GamePlayPerspective = PlayerPerspectives.GetGame_PlayerPerspectives(PerspectiveId);
+                        PlayerPerspective GamePlayPerspective = await PlayerPerspectives.GetGame_PlayerPerspectives(PerspectiveId);
                     }
                 }
 
@@ -247,7 +246,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
                 {
                     foreach (long ScreenshotId in Game.Screenshots.Ids)
                     {
-                        Screenshot GameScreenshot = Screenshots.GetScreenshot(ScreenshotId, Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB_Game(Game));
+                        Screenshot GameScreenshot = await Screenshots.GetScreenshot(ScreenshotId, Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB_Game(Game));
                     }
                 }
 
@@ -255,7 +254,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
                 {
                     foreach (long ThemeId in Game.Themes.Ids)
                     {
-                        Theme GameTheme = Themes.GetGame_Themes(ThemeId);
+                        Theme GameTheme = await Themes.GetGame_Themes(ThemeId);
                     }
                 }
 
@@ -263,7 +262,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
                 {
                     foreach (long GameVideoId in Game.Videos.Ids)
                     {
-                        GameVideo gameVideo = GamesVideos.GetGame_Videos(GameVideoId);
+                        GameVideo gameVideo = await GamesVideos.GetGame_Videos(GameVideoId);
                     }
                 }
             }
