@@ -16,12 +16,12 @@ namespace hasheous_server.Classes.Metadata.IGDB
         }
 
 
-        public static Platform? GetPlatform(long Id, bool forceRefresh = false)
+        public async static Task<Platform?> GetPlatform(long Id, bool forceRefresh = false)
         {
             if (Id == 0)
             {
                 Platform returnValue = new Platform();
-                if (Storage.GetCacheStatus(Storage.TablePrefix.IGDB, "Platform", 0) == Storage.CacheStatus.NotPresent)
+                if (await Storage.GetCacheStatusAsync(Storage.TablePrefix.IGDB, "Platform", 0) == Storage.CacheStatus.NotPresent)
                 {
                     returnValue = new Platform
                     {
@@ -29,26 +29,24 @@ namespace hasheous_server.Classes.Metadata.IGDB
                         Name = "Unknown Platform",
                         Slug = "Unknown"
                     };
-                    Storage.NewCacheValue(Storage.TablePrefix.IGDB, returnValue);
+                    await Storage.NewCacheValueAsync(Storage.TablePrefix.IGDB, returnValue);
 
                     return returnValue;
                 }
                 else
                 {
-                    return Storage.GetCacheValue<Platform>(returnValue, Storage.TablePrefix.IGDB, "id", 0);
+                    return await Storage.GetCacheValueAsync<Platform>(returnValue, Storage.TablePrefix.IGDB, "id", 0);
                 }
             }
             else
             {
-                Task<Platform> RetVal = _GetPlatform(SearchUsing.id, Id, forceRefresh);
-                return RetVal.Result;
+                return await _GetPlatform(SearchUsing.id, Id, forceRefresh);
             }
         }
 
-        public static Platform GetPlatform(string Slug, bool forceRefresh = false)
+        public async static Task<Platform> GetPlatform(string Slug, bool forceRefresh = false)
         {
-            Task<Platform> RetVal = _GetPlatform(SearchUsing.slug, Slug.ToLower(), forceRefresh);
-            return RetVal.Result;
+            return await _GetPlatform(SearchUsing.slug, Slug.ToLower(), forceRefresh);
         }
 
         private static async Task<Platform> _GetPlatform(SearchUsing searchUsing, object searchValue, bool forceRefresh)
@@ -57,11 +55,11 @@ namespace hasheous_server.Classes.Metadata.IGDB
             Storage.CacheStatus? cacheStatus = new Storage.CacheStatus();
             if (searchUsing == SearchUsing.id)
             {
-                cacheStatus = Storage.GetCacheStatus(Storage.TablePrefix.IGDB, "Platform", (long)searchValue);
+                cacheStatus = await Storage.GetCacheStatusAsync(Storage.TablePrefix.IGDB, "Platform", (long)searchValue);
             }
             else
             {
-                cacheStatus = Storage.GetCacheStatus(Storage.TablePrefix.IGDB, "Platform", (string)searchValue);
+                cacheStatus = await Storage.GetCacheStatusAsync(Storage.TablePrefix.IGDB, "Platform", (string)searchValue);
             }
 
             if (forceRefresh == true)
@@ -91,7 +89,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
             {
                 case Storage.CacheStatus.NotPresent:
                     returnValue = await GetObjectFromServer(WhereClause);
-                    Storage.NewCacheValue(Storage.TablePrefix.IGDB, returnValue);
+                    await Storage.NewCacheValueAsync(Storage.TablePrefix.IGDB, returnValue);
                     UpdateSubClasses(returnValue);
                     return returnValue;
                 case Storage.CacheStatus.Expired:
@@ -100,7 +98,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
                         returnValue = await GetObjectFromServer(WhereClause);
                         if (returnValue != null)
                         {
-                            Storage.NewCacheValue(Storage.TablePrefix.IGDB, returnValue, true);
+                            await Storage.NewCacheValueAsync(Storage.TablePrefix.IGDB, returnValue, true);
                             UpdateSubClasses(returnValue);
                         }
                         return returnValue;
@@ -108,10 +106,10 @@ namespace hasheous_server.Classes.Metadata.IGDB
                     catch (Exception ex)
                     {
                         Console.Error.WriteLine("Metadata: " + returnValue.GetType().Name + ": An error occurred while connecting to IGDB. WhereClause: " + WhereClause + ex.ToString());
-                        return Storage.GetCacheValue<Platform>(returnValue, Storage.TablePrefix.IGDB, searchField, searchValue);
+                        return await Storage.GetCacheValueAsync<Platform>(returnValue, Storage.TablePrefix.IGDB, searchField, searchValue);
                     }
                 case Storage.CacheStatus.Current:
-                    return Storage.GetCacheValue<Platform>(returnValue, Storage.TablePrefix.IGDB, searchField, searchValue);
+                    return await Storage.GetCacheValueAsync<Platform>(returnValue, Storage.TablePrefix.IGDB, searchField, searchValue);
                 default:
                     throw new Exception("How did you get here?");
             }

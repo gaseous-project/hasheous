@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Classes;
 using Classes.Metadata;
 using IGDB;
@@ -15,7 +16,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
         {
         }
 
-        public static CompanyLogo? GetCompanyLogo(long? Id, string LogoPath)
+        public static async Task<CompanyLogo?> GetCompanyLogo(long? Id, string LogoPath)
         {
             if ((Id == 0) || (Id == null))
             {
@@ -23,15 +24,13 @@ namespace hasheous_server.Classes.Metadata.IGDB
             }
             else
             {
-                Task<CompanyLogo> RetVal = _GetCompanyLogo(SearchUsing.id, Id, LogoPath);
-                return RetVal.Result;
+                return await _GetCompanyLogo(SearchUsing.id, Id, LogoPath);
             }
         }
 
-        public static CompanyLogo GetCompanyLogo(string Slug, string LogoPath)
+        public static async Task<CompanyLogo> GetCompanyLogo(string Slug, string LogoPath)
         {
-            Task<CompanyLogo> RetVal = _GetCompanyLogo(SearchUsing.slug, Slug, LogoPath);
-            return RetVal.Result;
+            return await _GetCompanyLogo(SearchUsing.slug, Slug, LogoPath);
         }
 
         private static async Task<CompanyLogo> _GetCompanyLogo(SearchUsing searchUsing, object searchValue, string LogoPath)
@@ -40,11 +39,11 @@ namespace hasheous_server.Classes.Metadata.IGDB
             Storage.CacheStatus? cacheStatus = new Storage.CacheStatus();
             if (searchUsing == SearchUsing.id)
             {
-                cacheStatus = Storage.GetCacheStatus(Storage.TablePrefix.IGDB, "CompanyLogo", (long)searchValue);
+                cacheStatus = await Storage.GetCacheStatusAsync(Storage.TablePrefix.IGDB, "CompanyLogo", (long)searchValue);
             }
             else
             {
-                cacheStatus = Storage.GetCacheStatus(Storage.TablePrefix.IGDB, "CompanyLogo", (string)searchValue);
+                cacheStatus = await Storage.GetCacheStatusAsync(Storage.TablePrefix.IGDB, "CompanyLogo", (string)searchValue);
             }
 
             // set up where clause
@@ -69,7 +68,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
                     returnValue = await GetObjectFromServer(WhereClause, LogoPath);
                     if (returnValue != null)
                     {
-                        Storage.NewCacheValue(Storage.TablePrefix.IGDB, returnValue);
+                        await Storage.NewCacheValueAsync(Storage.TablePrefix.IGDB, returnValue);
                         forceImageDownload = true;
                     }
                     break;
@@ -77,17 +76,17 @@ namespace hasheous_server.Classes.Metadata.IGDB
                     try
                     {
                         returnValue = await GetObjectFromServer(WhereClause, LogoPath);
-                        Storage.NewCacheValue(Storage.TablePrefix.IGDB, returnValue, true);
+                        await Storage.NewCacheValueAsync(Storage.TablePrefix.IGDB, returnValue, true);
                         forceImageDownload = true;
                     }
                     catch (Exception ex)
                     {
                         Console.Error.WriteLine("Metadata: " + returnValue.GetType().Name + ": An error occurred while connecting to IGDB. WhereClause: " + WhereClause + ex.ToString());
-                        returnValue = Storage.GetCacheValue<CompanyLogo>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
+                        returnValue = await Storage.GetCacheValueAsync<CompanyLogo>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
                     }
                     break;
                 case Storage.CacheStatus.Current:
-                    returnValue = Storage.GetCacheValue<CompanyLogo>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
+                    returnValue = await Storage.GetCacheValueAsync<CompanyLogo>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
                     break;
                 default:
                     throw new Exception("How did you get here?");

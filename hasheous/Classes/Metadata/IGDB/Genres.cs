@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Classes;
 using Classes.Metadata;
 using IGDB;
@@ -6,7 +7,7 @@ using IGDB.Models;
 
 namespace hasheous_server.Classes.Metadata.IGDB
 {
-	public class Genres
+    public class Genres
     {
         const string fieldList = "fields checksum,created_at,name,slug,updated_at,url;";
 
@@ -15,7 +16,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
         }
 
 
-        public static Genre? GetGenres(long? Id)
+        public static async Task<Genre?> GetGenres(long? Id)
         {
             if ((Id == 0) || (Id == null))
             {
@@ -23,15 +24,13 @@ namespace hasheous_server.Classes.Metadata.IGDB
             }
             else
             {
-                Task<Genre> RetVal = _GetGenres(SearchUsing.id, Id);
-                return RetVal.Result;
+                return await _GetGenres(SearchUsing.id, Id);
             }
         }
 
-        public static Genre GetGenres(string Slug)
+        public static async Task<Genre> GetGenres(string Slug)
         {
-            Task<Genre> RetVal = _GetGenres(SearchUsing.slug, Slug);
-            return RetVal.Result;
+            return await _GetGenres(SearchUsing.slug, Slug);
         }
 
         private static async Task<Genre> _GetGenres(SearchUsing searchUsing, object searchValue)
@@ -40,11 +39,11 @@ namespace hasheous_server.Classes.Metadata.IGDB
             Storage.CacheStatus? cacheStatus = new Storage.CacheStatus();
             if (searchUsing == SearchUsing.id)
             {
-                cacheStatus = Storage.GetCacheStatus(Storage.TablePrefix.IGDB, "Genre", (long)searchValue);
+                cacheStatus = await Storage.GetCacheStatusAsync(Storage.TablePrefix.IGDB, "Genre", (long)searchValue);
             }
             else
             {
-                cacheStatus = Storage.GetCacheStatus(Storage.TablePrefix.IGDB, "Genre", (string)searchValue);
+                cacheStatus = await Storage.GetCacheStatusAsync(Storage.TablePrefix.IGDB, "Genre", (string)searchValue);
             }
 
             // set up where clause
@@ -66,22 +65,22 @@ namespace hasheous_server.Classes.Metadata.IGDB
             {
                 case Storage.CacheStatus.NotPresent:
                     returnValue = await GetObjectFromServer(WhereClause);
-                    Storage.NewCacheValue(Storage.TablePrefix.IGDB, returnValue);
-                    break;  
+                    await Storage.NewCacheValueAsync(Storage.TablePrefix.IGDB, returnValue);
+                    break;
                 case Storage.CacheStatus.Expired:
                     try
                     {
                         returnValue = await GetObjectFromServer(WhereClause);
-                        Storage.NewCacheValue(Storage.TablePrefix.IGDB, returnValue, true);
+                        await Storage.NewCacheValueAsync(Storage.TablePrefix.IGDB, returnValue, true);
                     }
                     catch (Exception ex)
                     {
                         Console.Error.WriteLine("Metadata: " + returnValue.GetType().Name + ": An error occurred while connecting to IGDB. WhereClause: " + WhereClause + ex.ToString());
-                        returnValue = Storage.GetCacheValue<Genre>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
+                        returnValue = await Storage.GetCacheValueAsync<Genre>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
                     }
                     break;
                 case Storage.CacheStatus.Current:
-                    returnValue = Storage.GetCacheValue<Genre>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
+                    returnValue = await Storage.GetCacheValueAsync<Genre>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
                     break;
                 default:
                     throw new Exception("How did you get here?");
@@ -105,6 +104,6 @@ namespace hasheous_server.Classes.Metadata.IGDB
 
             return result;
         }
-	}
+    }
 }
 

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Classes;
 using Classes.Metadata;
 using IGDB;
@@ -6,8 +7,8 @@ using IGDB.Models;
 
 namespace hasheous_server.Classes.Metadata.IGDB
 {
-	public class InvolvedCompanies
-	{
+    public class InvolvedCompanies
+    {
         const string fieldList = "fields *;";
 
         public InvolvedCompanies()
@@ -15,7 +16,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
         }
 
 
-        public static InvolvedCompany? GetInvolvedCompanies(long? Id)
+        public static async Task<InvolvedCompany?> GetInvolvedCompanies(long? Id)
         {
             if ((Id == 0) || (Id == null))
             {
@@ -23,15 +24,13 @@ namespace hasheous_server.Classes.Metadata.IGDB
             }
             else
             {
-                Task<InvolvedCompany> RetVal = _GetInvolvedCompanies(SearchUsing.id, Id);
-                return RetVal.Result;
+                return await _GetInvolvedCompanies(SearchUsing.id, Id);
             }
         }
 
-        public static InvolvedCompany GetInvolvedCompanies(string Slug)
+        public static async Task<InvolvedCompany> GetInvolvedCompanies(string Slug)
         {
-            Task<InvolvedCompany> RetVal = _GetInvolvedCompanies(SearchUsing.slug, Slug);
-            return RetVal.Result;
+            return await _GetInvolvedCompanies(SearchUsing.slug, Slug);
         }
 
         private static async Task<InvolvedCompany> _GetInvolvedCompanies(SearchUsing searchUsing, object searchValue)
@@ -40,11 +39,11 @@ namespace hasheous_server.Classes.Metadata.IGDB
             Storage.CacheStatus? cacheStatus = new Storage.CacheStatus();
             if (searchUsing == SearchUsing.id)
             {
-                cacheStatus = Storage.GetCacheStatus(Storage.TablePrefix.IGDB, "InvolvedCompany", (long)searchValue);
+                cacheStatus = await Storage.GetCacheStatusAsync(Storage.TablePrefix.IGDB, "InvolvedCompany", (long)searchValue);
             }
             else
             {
-                cacheStatus = Storage.GetCacheStatus(Storage.TablePrefix.IGDB, "InvolvedCompany", (string)searchValue);
+                cacheStatus = await Storage.GetCacheStatusAsync(Storage.TablePrefix.IGDB, "InvolvedCompany", (string)searchValue);
             }
 
             // set up where clause
@@ -66,23 +65,23 @@ namespace hasheous_server.Classes.Metadata.IGDB
             {
                 case Storage.CacheStatus.NotPresent:
                     returnValue = await GetObjectFromServer(WhereClause);
-                    Storage.NewCacheValue(Storage.TablePrefix.IGDB, returnValue);
-                    UpdateSubClasses(returnValue);
+                    await Storage.NewCacheValueAsync(Storage.TablePrefix.IGDB, returnValue);
+                    await UpdateSubClasses(returnValue);
                     break;
                 case Storage.CacheStatus.Expired:
                     try
                     {
                         returnValue = await GetObjectFromServer(WhereClause);
-                        Storage.NewCacheValue(Storage.TablePrefix.IGDB, returnValue, true);
+                        await Storage.NewCacheValueAsync(Storage.TablePrefix.IGDB, returnValue, true);
                     }
                     catch (Exception ex)
                     {
                         Console.Error.WriteLine("Metadata: " + returnValue.GetType().Name + ": An error occurred while connecting to IGDB. WhereClause: " + WhereClause + ex.ToString());
-                        returnValue = Storage.GetCacheValue<InvolvedCompany>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
+                        returnValue = await Storage.GetCacheValueAsync<InvolvedCompany>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
                     }
                     break;
                 case Storage.CacheStatus.Current:
-                    returnValue = Storage.GetCacheValue<InvolvedCompany>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
+                    returnValue = await Storage.GetCacheValueAsync<InvolvedCompany>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
                     break;
                 default:
                     throw new Exception("How did you get here?");
@@ -91,11 +90,11 @@ namespace hasheous_server.Classes.Metadata.IGDB
             return returnValue;
         }
 
-        private static void UpdateSubClasses(InvolvedCompany involvedCompany)
+        private static async Task UpdateSubClasses(InvolvedCompany involvedCompany)
         {
             if (involvedCompany.Company != null)
             {
-                Company company = Companies.GetCompanies(involvedCompany.Company.Id);
+                Company company = await Companies.GetCompanies(involvedCompany.Company.Id);
             }
         }
 
@@ -111,7 +110,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
             try
             {
                 Communications comms = new Communications(Communications.MetadataSources.IGDB);
-            var results = await comms.APIComm<InvolvedCompany>(IGDBClient.Endpoints.InvolvedCompanies, fieldList, WhereClause);
+                var results = await comms.APIComm<InvolvedCompany>(IGDBClient.Endpoints.InvolvedCompanies, fieldList, WhereClause);
                 var result = results.First();
 
                 return result;

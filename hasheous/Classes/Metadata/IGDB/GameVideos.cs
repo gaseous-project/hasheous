@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Classes;
 using Classes.Metadata;
 using IGDB;
@@ -6,7 +7,7 @@ using IGDB.Models;
 
 namespace hasheous_server.Classes.Metadata.IGDB
 {
-	public class GamesVideos
+    public class GamesVideos
     {
         const string fieldList = "fields checksum,game,name,video_id;";
 
@@ -15,7 +16,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
         }
 
 
-        public static GameVideo? GetGame_Videos(long? Id)
+        public static async Task<GameVideo?> GetGame_Videos(long? Id)
         {
             if ((Id == 0) || (Id == null))
             {
@@ -23,15 +24,13 @@ namespace hasheous_server.Classes.Metadata.IGDB
             }
             else
             {
-                Task<GameVideo> RetVal = _GetGame_Videos(SearchUsing.id, Id);
-                return RetVal.Result;
+                return await _GetGame_Videos(SearchUsing.id, Id);
             }
         }
 
-        public static GameVideo GetGame_Videos(string Slug)
+        public static async Task<GameVideo> GetGame_Videos(string Slug)
         {
-            Task<GameVideo> RetVal = _GetGame_Videos(SearchUsing.slug, Slug);
-            return RetVal.Result;
+            return await _GetGame_Videos(SearchUsing.slug, Slug);
         }
 
         private static async Task<GameVideo> _GetGame_Videos(SearchUsing searchUsing, object searchValue)
@@ -40,11 +39,11 @@ namespace hasheous_server.Classes.Metadata.IGDB
             Storage.CacheStatus? cacheStatus = new Storage.CacheStatus();
             if (searchUsing == SearchUsing.id)
             {
-                cacheStatus = Storage.GetCacheStatus(Storage.TablePrefix.IGDB, "GameVideo", (long)searchValue);
+                cacheStatus = await Storage.GetCacheStatusAsync(Storage.TablePrefix.IGDB, "GameVideo", (long)searchValue);
             }
             else
             {
-                cacheStatus = Storage.GetCacheStatus(Storage.TablePrefix.IGDB, "GameVideo", (string)searchValue);
+                cacheStatus = await Storage.GetCacheStatusAsync(Storage.TablePrefix.IGDB, "GameVideo", (string)searchValue);
             }
 
             // set up where clause
@@ -66,22 +65,22 @@ namespace hasheous_server.Classes.Metadata.IGDB
             {
                 case Storage.CacheStatus.NotPresent:
                     returnValue = await GetObjectFromServer(WhereClause);
-                    Storage.NewCacheValue(Storage.TablePrefix.IGDB, returnValue);
-                    break;  
+                    await Storage.NewCacheValueAsync(Storage.TablePrefix.IGDB, returnValue);
+                    break;
                 case Storage.CacheStatus.Expired:
                     try
                     {
                         returnValue = await GetObjectFromServer(WhereClause);
-                        Storage.NewCacheValue(Storage.TablePrefix.IGDB, returnValue, true);
+                        await Storage.NewCacheValueAsync(Storage.TablePrefix.IGDB, returnValue, true);
                     }
                     catch (Exception ex)
                     {
                         Console.Error.WriteLine("Metadata: " + returnValue.GetType().Name + ": An error occurred while connecting to IGDB. WhereClause: " + WhereClause + ex.ToString());
-                        returnValue = Storage.GetCacheValue<GameVideo>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
+                        returnValue = await Storage.GetCacheValueAsync<GameVideo>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
                     }
                     break;
                 case Storage.CacheStatus.Current:
-                    returnValue = Storage.GetCacheValue<GameVideo>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
+                    returnValue = await Storage.GetCacheValueAsync<GameVideo>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
                     break;
                 default:
                     throw new Exception("How did you get here?");
@@ -105,6 +104,6 @@ namespace hasheous_server.Classes.Metadata.IGDB
 
             return result;
         }
-	}
+    }
 }
 

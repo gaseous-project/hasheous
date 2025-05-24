@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Classes;
 using Classes.Metadata;
 using IGDB;
@@ -15,7 +16,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
         }
 
 
-        public static PlatformVersion? GetPlatformVersion(long Id)//, Platform ParentPlatform)
+        public static async Task<PlatformVersion?> GetPlatformVersion(long Id)//, Platform ParentPlatform)
         {
             if (Id == 0)
             {
@@ -23,15 +24,13 @@ namespace hasheous_server.Classes.Metadata.IGDB
             }
             else
             {
-                Task<PlatformVersion> RetVal = _GetPlatformVersion(SearchUsing.id, Id);//, ParentPlatform);
-                return RetVal.Result;
+                return await _GetPlatformVersion(SearchUsing.id, Id);//, ParentPlatform);
             }
         }
 
-        public static PlatformVersion GetPlatformVersion(string Slug)//, Platform ParentPlatform)
+        public static async Task<PlatformVersion> GetPlatformVersion(string Slug)//, Platform ParentPlatform)
         {
-            Task<PlatformVersion> RetVal = _GetPlatformVersion(SearchUsing.slug, Slug);//, ParentPlatform);
-            return RetVal.Result;
+            return await _GetPlatformVersion(SearchUsing.slug, Slug);//, ParentPlatform);
         }
 
         private static async Task<PlatformVersion> _GetPlatformVersion(SearchUsing searchUsing, object searchValue)//, Platform ParentPlatform)
@@ -40,11 +39,11 @@ namespace hasheous_server.Classes.Metadata.IGDB
             Storage.CacheStatus? cacheStatus = new Storage.CacheStatus();
             if (searchUsing == SearchUsing.id)
             {
-                cacheStatus = Storage.GetCacheStatus(Storage.TablePrefix.IGDB, "PlatformVersion", (long)searchValue);
+                cacheStatus = await Storage.GetCacheStatusAsync(Storage.TablePrefix.IGDB, "PlatformVersion", (long)searchValue);
             }
             else
             {
-                cacheStatus = Storage.GetCacheStatus(Storage.TablePrefix.IGDB, "PlatformVersion", (string)searchValue);
+                cacheStatus = await Storage.GetCacheStatusAsync(Storage.TablePrefix.IGDB, "PlatformVersion", (string)searchValue);
             }
 
             // set up where clause
@@ -68,7 +67,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
                     returnValue = await GetObjectFromServer(WhereClause);
                     if (returnValue != null)
                     {
-                        Storage.NewCacheValue(Storage.TablePrefix.IGDB, returnValue);
+                        await Storage.NewCacheValueAsync(Storage.TablePrefix.IGDB, returnValue);
                         // UpdateSubClasses(ParentPlatform, returnValue);
                     }
                     return returnValue;
@@ -76,17 +75,17 @@ namespace hasheous_server.Classes.Metadata.IGDB
                     try
                     {
                         returnValue = await GetObjectFromServer(WhereClause);
-                        Storage.NewCacheValue(Storage.TablePrefix.IGDB, returnValue, true);
+                        await Storage.NewCacheValueAsync(Storage.TablePrefix.IGDB, returnValue, true);
                         // UpdateSubClasses(ParentPlatform, returnValue);
                     }
                     catch (Exception ex)
                     {
                         Console.Error.WriteLine("Metadata: " + returnValue.GetType().Name + ": An error occurred while connecting to IGDB. WhereClause: " + WhereClause + ex.ToString());
-                        returnValue = Storage.GetCacheValue<PlatformVersion>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
+                        returnValue = await Storage.GetCacheValueAsync<PlatformVersion>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
                     }
                     return returnValue;
                 case Storage.CacheStatus.Current:
-                    return Storage.GetCacheValue<PlatformVersion>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
+                    return await Storage.GetCacheValueAsync<PlatformVersion>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
                 default:
                     throw new Exception("How did you get here?");
             }

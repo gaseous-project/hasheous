@@ -845,7 +845,7 @@ namespace hasheous_server.Controllers.v1_0
                         break;
                     }
 
-                    AgeRating? ageRating = AgeRatings.GetAgeRatings(Id);
+                    AgeRating? ageRating = await AgeRatings.GetAgeRatings(Id);
                     if (ageRating != null)
                     {
                         returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.AgeRating>(ageRating, new HasheousClient.Models.Metadata.IGDB.AgeRating());
@@ -859,7 +859,7 @@ namespace hasheous_server.Controllers.v1_0
                         break;
                     }
 
-                    AgeRatingContentDescription? ageRatingContentDescription = AgeRatingContentDescriptions.GetAgeRatingContentDescriptions(Id);
+                    AgeRatingContentDescription? ageRatingContentDescription = await AgeRatingContentDescriptions.GetAgeRatingContentDescriptions(Id);
                     if (ageRatingContentDescription != null)
                     {
                         returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.AgeRatingContentDescription>(ageRatingContentDescription, new HasheousClient.Models.Metadata.IGDB.AgeRatingContentDescription());
@@ -873,7 +873,7 @@ namespace hasheous_server.Controllers.v1_0
                         break;
                     }
 
-                    AlternativeName? alternativeName = AlternativeNames.GetAlternativeNames(Id);
+                    AlternativeName? alternativeName = await AlternativeNames.GetAlternativeNames(Id);
                     if (alternativeName != null)
                     {
                         returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.AlternativeName>(alternativeName, new HasheousClient.Models.Metadata.IGDB.AlternativeName());
@@ -887,7 +887,7 @@ namespace hasheous_server.Controllers.v1_0
                         break;
                     }
 
-                    Artwork? artwork = Artworks.GetArtwork(Id, Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB);
+                    Artwork? artwork = await Artworks.GetArtwork(Id, Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB);
                     if (artwork != null)
                     {
                         returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.Artwork>(artwork, new HasheousClient.Models.Metadata.IGDB.Artwork());
@@ -900,11 +900,11 @@ namespace hasheous_server.Controllers.v1_0
 
                     if (isSlugSearch == true)
                     {
-                        collection = Collections.GetCollections(slug);
+                        collection = await Collections.GetCollections(slug);
                     }
                     else
                     {
-                        collection = Collections.GetCollections(Id);
+                        collection = await Collections.GetCollections(Id);
                     }
 
                     if (collection != null)
@@ -919,11 +919,11 @@ namespace hasheous_server.Controllers.v1_0
 
                     if (isSlugSearch == true)
                     {
-                        company = Companies.GetCompanies(slug);
+                        company = await Companies.GetCompanies(slug);
                     }
                     else
                     {
-                        company = Companies.GetCompanies(Id);
+                        company = await Companies.GetCompanies(Id);
                     }
 
                     if (company != null)
@@ -939,7 +939,7 @@ namespace hasheous_server.Controllers.v1_0
                         break;
                     }
 
-                    CompanyLogo? companyLogo = CompanyLogos.GetCompanyLogo(Id, Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB);
+                    CompanyLogo? companyLogo = await CompanyLogos.GetCompanyLogo(Id, Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB);
                     if (companyLogo != null)
                     {
                         returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.CompanyLogo>(companyLogo, new HasheousClient.Models.Metadata.IGDB.CompanyLogo());
@@ -953,7 +953,7 @@ namespace hasheous_server.Controllers.v1_0
                         break;
                     }
 
-                    Cover? cover = Covers.GetCover(Id, Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB);
+                    Cover? cover = await Covers.GetCover(Id, Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB);
                     if (cover != null)
                     {
                         returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.Cover>(cover, new HasheousClient.Models.Metadata.IGDB.Cover());
@@ -967,7 +967,7 @@ namespace hasheous_server.Controllers.v1_0
                         break;
                     }
 
-                    ExternalGame? externalGame = ExternalGames.GetExternalGames(Id);
+                    ExternalGame? externalGame = await ExternalGames.GetExternalGames(Id);
                     if (externalGame != null)
                     {
                         returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.ExternalGame>(externalGame, new HasheousClient.Models.Metadata.IGDB.ExternalGame());
@@ -980,11 +980,11 @@ namespace hasheous_server.Controllers.v1_0
 
                     if (isSlugSearch == true)
                     {
-                        franchise = Franchises.GetFranchises(slug);
+                        franchise = await Franchises.GetFranchises(slug);
                     }
                     else
                     {
-                        franchise = Franchises.GetFranchises(Id);
+                        franchise = await Franchises.GetFranchises(Id);
                     }
 
                     if (franchise != null)
@@ -1000,7 +1000,7 @@ namespace hasheous_server.Controllers.v1_0
                         break;
                     }
 
-                    GameMode? gameMode = GameModes.GetGame_Modes(Id);
+                    GameMode? gameMode = await GameModes.GetGame_Modes(Id);
                     if (gameMode != null)
                     {
                         returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.GameMode>(gameMode, new HasheousClient.Models.Metadata.IGDB.GameMode());
@@ -1013,11 +1013,11 @@ namespace hasheous_server.Controllers.v1_0
 
                     if (isSlugSearch == true)
                     {
-                        game = Games.GetGame(slug, false, false, false);
+                        game = await Games.GetGame(slug, false, false, false);
                     }
                     else
                     {
-                        game = Games.GetGame(Id, false, false, false);
+                        game = await Games.GetGame(Id, false, false, false);
                     }
 
                     if (game != null)
@@ -1033,7 +1033,7 @@ namespace hasheous_server.Controllers.v1_0
                         break;
                     }
 
-                    GameLocalization? gameLocalisation = GameLocalisations.GetGame_Localisations(Id);
+                    GameLocalization? gameLocalisation = await GameLocalisations.GetGame_Localisations(Id);
                     if (gameLocalisation != null)
                     {
                         returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.GameLocalization>(gameLocalisation, new HasheousClient.Models.Metadata.IGDB.GameLocalization());
@@ -1047,7 +1047,7 @@ namespace hasheous_server.Controllers.v1_0
                         break;
                     }
 
-                    GameVideo? gameVideo = GamesVideos.GetGame_Videos(Id);
+                    GameVideo? gameVideo = await GamesVideos.GetGame_Videos(Id);
                     if (gameVideo != null)
                     {
                         returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.GameVideo>(gameVideo, new HasheousClient.Models.Metadata.IGDB.GameVideo());
@@ -1061,7 +1061,7 @@ namespace hasheous_server.Controllers.v1_0
                         break;
                     }
 
-                    Genre? genre = Genres.GetGenres(Id);
+                    Genre? genre = await Genres.GetGenres(Id);
                     if (genre != null)
                     {
                         returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.Genre>(genre, new HasheousClient.Models.Metadata.IGDB.Genre());
@@ -1075,7 +1075,7 @@ namespace hasheous_server.Controllers.v1_0
                         break;
                     }
 
-                    InvolvedCompany? involvedCompany = InvolvedCompanies.GetInvolvedCompanies(Id);
+                    InvolvedCompany? involvedCompany = await InvolvedCompanies.GetInvolvedCompanies(Id);
                     if (involvedCompany != null)
                     {
                         returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.InvolvedCompany>(involvedCompany, new HasheousClient.Models.Metadata.IGDB.InvolvedCompany());
@@ -1089,7 +1089,7 @@ namespace hasheous_server.Controllers.v1_0
                         break;
                     }
 
-                    MultiplayerMode? multiplayerMode = MultiplayerModes.GetGame_MultiplayerModes(Id);
+                    MultiplayerMode? multiplayerMode = await MultiplayerModes.GetGame_MultiplayerModes(Id);
                     if (multiplayerMode != null)
                     {
                         returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.MultiplayerMode>(multiplayerMode, new HasheousClient.Models.Metadata.IGDB.MultiplayerMode());
@@ -1103,7 +1103,7 @@ namespace hasheous_server.Controllers.v1_0
                         break;
                     }
 
-                    PlatformLogo? platformLogo = PlatformLogos.GetPlatformLogo(Id, Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB);
+                    PlatformLogo? platformLogo = await PlatformLogos.GetPlatformLogo(Id, Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB);
                     if (platformLogo != null)
                     {
                         returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.PlatformLogo>(platformLogo, new HasheousClient.Models.Metadata.IGDB.PlatformLogo());
@@ -1116,11 +1116,11 @@ namespace hasheous_server.Controllers.v1_0
 
                     if (isSlugSearch == true)
                     {
-                        platform = Platforms.GetPlatform(slug);
+                        platform = await Platforms.GetPlatform(slug);
                     }
                     else
                     {
-                        platform = Platforms.GetPlatform(Id);
+                        platform = await Platforms.GetPlatform(Id);
                     }
 
                     if (platform != null)
@@ -1136,7 +1136,7 @@ namespace hasheous_server.Controllers.v1_0
                         break;
                     }
 
-                    PlatformVersion? platformVersion = PlatformVersions.GetPlatformVersion(Id);
+                    PlatformVersion? platformVersion = await PlatformVersions.GetPlatformVersion(Id);
                     if (platformVersion != null)
                     {
                         returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.PlatformVersion>(platformVersion, new HasheousClient.Models.Metadata.IGDB.PlatformVersion());
@@ -1150,7 +1150,7 @@ namespace hasheous_server.Controllers.v1_0
                         break;
                     }
 
-                    PlayerPerspective? playerPerspective = PlayerPerspectives.GetGame_PlayerPerspectives(Id);
+                    PlayerPerspective? playerPerspective = await PlayerPerspectives.GetGame_PlayerPerspectives(Id);
                     if (playerPerspective != null)
                     {
                         returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.PlayerPerspective>(playerPerspective, new HasheousClient.Models.Metadata.IGDB.PlayerPerspective());
@@ -1164,7 +1164,7 @@ namespace hasheous_server.Controllers.v1_0
                         break;
                     }
 
-                    ReleaseDate? releaseDate = ReleaseDates.GetReleaseDates(Id);
+                    ReleaseDate? releaseDate =await ReleaseDates.GetReleaseDates(Id);
                     if (releaseDate != null)
                     {
                         returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.ReleaseDate>(releaseDate, new HasheousClient.Models.Metadata.IGDB.ReleaseDate());
@@ -1178,7 +1178,7 @@ namespace hasheous_server.Controllers.v1_0
                         break;
                     }
 
-                    IGDB.Models.Region? region = Regions.GetGame_Regions(Id);
+                    IGDB.Models.Region? region =await  Regions.GetGame_Regions(Id);
                     if (region != null)
                     {
                         returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.Region>(region, new HasheousClient.Models.Metadata.IGDB.Region());
@@ -1192,7 +1192,7 @@ namespace hasheous_server.Controllers.v1_0
                         break;
                     }
 
-                    Screenshot? screenshot = Screenshots.GetScreenshot(Id, Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB);
+                    Screenshot? screenshot =await  Screenshots.GetScreenshot(Id, Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB);
                     if (screenshot != null)
                     {
                         returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.Screenshot>(screenshot, new HasheousClient.Models.Metadata.IGDB.Screenshot());
@@ -1206,7 +1206,7 @@ namespace hasheous_server.Controllers.v1_0
                         break;
                     }
 
-                    Theme? theme = Themes.GetGame_Themes(Id);
+                    Theme? theme = await Themes.GetGame_Themes(Id);
                     if (theme != null)
                     {
                         returnValue = HasheousClient.Models.Metadata.IGDB.ITools.ConvertFromIGDB<HasheousClient.Models.Metadata.IGDB.Theme>(theme, new HasheousClient.Models.Metadata.IGDB.Theme());
@@ -1260,7 +1260,7 @@ namespace hasheous_server.Controllers.v1_0
             string searchFields = "fields abbreviation,alternative_name,category,checksum,created_at,generation,name,platform_family,platform_logo,slug,summary,updated_at,url,versions,websites; ";
             searchBody += "where name ~ *\"" + SearchString + "\"*;";
 
-            List<HasheousClient.Models.Metadata.IGDB.Platform>? searchCache = Communications.GetSearchCache<List<HasheousClient.Models.Metadata.IGDB.Platform>>(searchFields, searchBody);
+            List<HasheousClient.Models.Metadata.IGDB.Platform>? searchCache = await Communications.GetSearchCache<List<HasheousClient.Models.Metadata.IGDB.Platform>>(searchFields, searchBody);
 
             if (searchCache == null)
             {
@@ -1311,7 +1311,7 @@ namespace hasheous_server.Controllers.v1_0
             searchBody += "where platforms = (" + PlatformId + ");";
             searchBody += "limit 100;";
 
-            List<HasheousClient.Models.Metadata.IGDB.Game>? searchCache = Communications.GetSearchCache<List<HasheousClient.Models.Metadata.IGDB.Game>>(searchFields, searchBody);
+            List<HasheousClient.Models.Metadata.IGDB.Game>? searchCache = await Communications.GetSearchCache<List<HasheousClient.Models.Metadata.IGDB.Game>>(searchFields, searchBody);
 
             if (searchCache == null)
             {

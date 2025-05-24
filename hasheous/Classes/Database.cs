@@ -3,6 +3,7 @@ using System.Data;
 using System.Data.SqlClient;
 using System.Diagnostics;
 using System.Reflection;
+using System.Threading.Tasks;
 using IGDB.Models;
 using Microsoft.VisualStudio.Web.CodeGenerators.Mvc.Templates.Blazor;
 using MySqlConnector;
@@ -55,7 +56,7 @@ namespace Classes
 			}
 		}
 
-		public void InitDB()
+		public async Task InitDB()
 		{
 			// load resources
 			var assembly = Assembly.GetExecutingAssembly();
@@ -67,17 +68,17 @@ namespace Classes
 					string sql = "CREATE DATABASE IF NOT EXISTS `" + Config.DatabaseConfiguration.DatabaseName + "`;";
 					Dictionary<string, object> dbDict = new Dictionary<string, object>();
 					Logging.Log(Logging.LogType.Information, "Database", "Creating database if it doesn't exist");
-					ExecuteCMD(sql, dbDict, 30, "server=" + Config.DatabaseConfiguration.HostName + ";port=" + Config.DatabaseConfiguration.Port + ";userid=" + Config.DatabaseConfiguration.UserName + ";password=" + Config.DatabaseConfiguration.Password);
+					await ExecuteCMDAsync(sql, dbDict, 30, "server=" + Config.DatabaseConfiguration.HostName + ";port=" + Config.DatabaseConfiguration.Port + ";userid=" + Config.DatabaseConfiguration.UserName + ";password=" + Config.DatabaseConfiguration.Password);
 
 					// check if schema version table is in place - if not, create the schema version table
 					sql = "SELECT TABLE_SCHEMA, TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = '" + Config.DatabaseConfiguration.DatabaseName + "' AND TABLE_NAME = 'schema_version';";
-					DataTable SchemaVersionPresent = ExecuteCMD(sql, dbDict);
+					DataTable SchemaVersionPresent = await ExecuteCMDAsync(sql, dbDict);
 					if (SchemaVersionPresent.Rows.Count == 0)
 					{
 						// no schema table present - create it
 						Logging.Log(Logging.LogType.Information, "Database", "Schema version table doesn't exist. Creating it.");
 						sql = "CREATE TABLE `schema_version` (`schema_version` INT NOT NULL, PRIMARY KEY (`schema_version`)); INSERT INTO `schema_version` (`schema_version`) VALUES (0);";
-						ExecuteCMD(sql, dbDict);
+						await ExecuteCMDAsync(sql, dbDict);
 					}
 
 					for (int i = 1000; i < 10000; i++)
@@ -96,7 +97,7 @@ namespace Classes
 								// apply script
 								sql = "SELECT schema_version FROM schema_version;";
 								dbDict = new Dictionary<string, object>();
-								DataTable SchemaVersion = ExecuteCMD(sql, dbDict);
+								DataTable SchemaVersion = await ExecuteCMDAsync(sql, dbDict);
 								if (SchemaVersion.Rows.Count == 0)
 								{
 									// something is broken here... where's the table?
@@ -114,12 +115,12 @@ namespace Classes
 
 										// apply schema!
 										Logging.Log(Logging.LogType.Information, "Database", "Updating schema to version " + i);
-										ExecuteCMD(dbScript, dbDict);
+										await ExecuteCMDAsync(dbScript, dbDict);
 
 										sql = "UPDATE schema_version SET schema_version=@schemaver";
 										dbDict = new Dictionary<string, object>();
 										dbDict.Add("schemaver", i);
-										ExecuteCMD(sql, dbDict);
+										await ExecuteCMDAsync(sql, dbDict);
 
 										// run post-upgrade code
 										DatabaseMigration.PostUpgradeScript(i, _ConnectorType);
@@ -138,7 +139,7 @@ namespace Classes
 			}
 		}
 
-		public void CreateTableFromObject<T>(string Prefix, string PrimaryKeyField)
+		public async Task CreateTableFromObject<T>(string Prefix, string PrimaryKeyField)
 		{
 			// get object properties
 			Type type = typeof(T);
@@ -229,9 +230,10 @@ namespace Classes
 			sql += ");";
 
 			// execute sql
-			ExecuteCMD(sql);
+			await ExecuteCMDAsync(sql);
 		}
 
+		#region Synchronous Database Access
 		public DataTable ExecuteCMD(string Command)
 		{
 			Dictionary<string, object> dbDict = new Dictionary<string, object>();
@@ -263,6 +265,41 @@ namespace Classes
 		{
 			return _ExecuteCMDDict(Command, Parameters, Timeout, ConnectionString);
 		}
+		#endregion Synchronous Database Access
+
+		#region Asynchronous Database Access
+		public async Task<DataTable> ExecuteCMDAsync(string Command)
+		{
+			Dictionary<string, object> dbDict = new Dictionary<string, object>();
+			return _ExecuteCMD(Command, dbDict, 30, "");
+		}
+
+		public async Task<DataTable> ExecuteCMDAsync(string Command, Dictionary<string, object> Parameters)
+		{
+			return _ExecuteCMD(Command, Parameters, 30, "");
+		}
+
+		public async Task<DataTable> ExecuteCMDAsync(string Command, Dictionary<string, object> Parameters, int Timeout = 30, string ConnectionString = "")
+		{
+			return _ExecuteCMD(Command, Parameters, Timeout, ConnectionString);
+		}
+
+		public async Task<List<Dictionary<string, object>>> ExecuteCMDDictAsync(string Command)
+		{
+			Dictionary<string, object> dbDict = new Dictionary<string, object>();
+			return _ExecuteCMDDict(Command, dbDict, 30, "");
+		}
+
+		public async Task<List<Dictionary<string, object>>> ExecuteCMDDictAsync(string Command, Dictionary<string, object> Parameters)
+		{
+			return _ExecuteCMDDict(Command, Parameters, 30, "");
+		}
+
+		public async Task<List<Dictionary<string, object>>> ExecuteCMDDictAsync(string Command, Dictionary<string, object> Parameters, int Timeout = 30, string ConnectionString = "")
+		{
+			return _ExecuteCMDDict(Command, Parameters, Timeout, ConnectionString);
+		}
+		#endregion Asynchronous Database Access
 
 		private List<Dictionary<string, object>> _ExecuteCMDDict(string Command, Dictionary<string, object> Parameters, int Timeout = 30, string ConnectionString = "")
 		{
@@ -357,13 +394,13 @@ namespace Classes
 			}
 		}
 
-		public int GetDatabaseSchemaVersion()
+		public async Task<int> GetDatabaseSchemaVersion()
 		{
 			switch (_ConnectorType)
 			{
 				case databaseType.MySql:
 					string sql = "SELECT schema_version FROM schema_version;";
-					DataTable SchemaVersion = ExecuteCMD(sql);
+					DataTable SchemaVersion = await ExecuteCMDAsync(sql);
 					if (SchemaVersion.Rows.Count == 0)
 					{
 						return 0;

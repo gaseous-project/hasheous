@@ -10,6 +10,7 @@ using hasheous_server.Classes.Metadata;
 using hasheous_server.Classes.Metadata.IGDB;
 using hasheous_server.Models;
 using hasheous_server.Classes;
+using System.Threading.Tasks;
 
 namespace BackgroundMetadataMatcher
 {
@@ -89,7 +90,7 @@ namespace BackgroundMetadataMatcher
             }
         }
 
-        public void GetGameArtwork(long DataObjectId)
+        public async Task GetGameArtwork(long DataObjectId)
         {
             DataObjects dataObjects = new DataObjects();
             DataObjectItem dataObjectItem = dataObjects.GetDataObject(DataObjects.DataObjectType.Game, DataObjectId);
@@ -132,12 +133,12 @@ namespace BackgroundMetadataMatcher
                                 {
                                     case Communications.MetadataSources.IGDB:
                                         // get game metadata
-                                        Game game = hasheous_server.Classes.Metadata.IGDB.Games.GetGame(metadata.Id, false, false, false);
+                                        Game game = await hasheous_server.Classes.Metadata.IGDB.Games.GetGame(metadata.Id, false, false, false);
                                         if (game.Cover != null)
                                         {
                                             if (game.Cover.Id != null)
                                             {
-                                                Cover cover = Covers.GetCover((long)game.Cover.Id, Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB_Game(game));
+                                                Cover cover = await Covers.GetCover((long)game.Cover.Id, Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB_Game(game));
                                                 if (cover != null)
                                                 {
                                                     string CoverPath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB_Game(game), "Cover.png");

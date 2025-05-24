@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Classes;
 using Classes.Metadata;
 using IGDB;
@@ -14,7 +15,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
         {
         }
 
-        public static GameLocalization? GetGame_Localisations(long? Id)
+        public static async Task<GameLocalization?> GetGame_Localisations(long? Id)
         {
             if ((Id == 0) || (Id == null))
             {
@@ -22,15 +23,13 @@ namespace hasheous_server.Classes.Metadata.IGDB
             }
             else
             {
-                Task<GameLocalization> RetVal = _GetGame_Localisations(SearchUsing.id, Id);
-                return RetVal.Result;
+                return await _GetGame_Localisations(SearchUsing.id, Id);
             }
         }
 
-        public static GameLocalization GetGame_Localisations(string Slug)
+        public static async Task<GameLocalization> GetGame_Localisations(string Slug)
         {
-            Task<GameLocalization> RetVal = _GetGame_Localisations(SearchUsing.slug, Slug);
-            return RetVal.Result;
+            return await _GetGame_Localisations(SearchUsing.slug, Slug);
         }
 
         private static async Task<GameLocalization> _GetGame_Localisations(SearchUsing searchUsing, object searchValue)
@@ -39,11 +38,11 @@ namespace hasheous_server.Classes.Metadata.IGDB
             Storage.CacheStatus? cacheStatus = new Storage.CacheStatus();
             if (searchUsing == SearchUsing.id)
             {
-                cacheStatus = Storage.GetCacheStatus(Storage.TablePrefix.IGDB, "GameLocalization", (long)searchValue);
+                cacheStatus = await Storage.GetCacheStatusAsync(Storage.TablePrefix.IGDB, "GameLocalization", (long)searchValue);
             }
             else
             {
-                cacheStatus = Storage.GetCacheStatus(Storage.TablePrefix.IGDB, "GameLocalization", (string)searchValue);
+                cacheStatus = await Storage.GetCacheStatusAsync(Storage.TablePrefix.IGDB, "GameLocalization", (string)searchValue);
             }
 
             // set up where clause
@@ -65,22 +64,22 @@ namespace hasheous_server.Classes.Metadata.IGDB
             {
                 case Storage.CacheStatus.NotPresent:
                     returnValue = await GetObjectFromServer(WhereClause);
-                    Storage.NewCacheValue(Storage.TablePrefix.IGDB, returnValue);
+                    await Storage.NewCacheValueAsync(Storage.TablePrefix.IGDB, returnValue);
                     break;
                 case Storage.CacheStatus.Expired:
                     try
                     {
                         returnValue = await GetObjectFromServer(WhereClause);
-                        Storage.NewCacheValue(Storage.TablePrefix.IGDB, returnValue, true);
+                        await Storage.NewCacheValueAsync(Storage.TablePrefix.IGDB, returnValue, true);
                     }
                     catch (Exception ex)
                     {
                         Console.Error.WriteLine("Metadata: " + returnValue.GetType().Name + ": An error occurred while connecting to IGDB. WhereClause: " + WhereClause + ex.ToString());
-                        returnValue = Storage.GetCacheValue<GameLocalization>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
+                        returnValue = await Storage.GetCacheValueAsync<GameLocalization>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
                     }
                     break;
                 case Storage.CacheStatus.Current:
-                    returnValue = Storage.GetCacheValue<GameLocalization>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
+                    returnValue = await Storage.GetCacheValueAsync<GameLocalization>(returnValue, Storage.TablePrefix.IGDB, "id", (long)searchValue);
                     break;
                 default:
                     throw new Exception("How did you get here?");
