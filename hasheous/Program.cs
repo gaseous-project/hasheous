@@ -39,6 +39,7 @@ do
 db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
 
 db.InitDB();
+Classes.Metadata.Utility.TableBuilder.BuildTables();
 
 // load app settings
 Config.InitSettings();
