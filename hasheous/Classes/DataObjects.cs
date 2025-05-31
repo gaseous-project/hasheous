@@ -1,6 +1,7 @@
 using System.Data;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using Classes;
 using hasheous_server.Classes.Metadata;
 using hasheous_server.Classes.Metadata.IGDB;
@@ -189,7 +190,7 @@ namespace hasheous_server.Classes
                 } }
         };
 
-        public DataObjectsList GetDataObjects(DataObjectType objectType, int pageNumber = 0, int pageSize = 0, string? search = null, bool GetChildRelations = false, bool GetMetadataMap = true, AttributeItem.AttributeName? filterAttribute = null, string? filterValue = null)
+        public async Task<DataObjectsList> GetDataObjects(DataObjectType objectType, int pageNumber = 0, int pageSize = 0, string? search = null, bool GetChildRelations = false, bool GetMetadataMap = true, AttributeItem.AttributeName? filterAttribute = null, string? filterValue = null)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql;
@@ -232,7 +233,7 @@ namespace hasheous_server.Classes
                     }
                 }
 
-                Models.DataObjectItem item = BuildDataObject(
+                Models.DataObjectItem item = await BuildDataObject(
                     objectType,
                     (long)data.Rows[i]["Id"],
                     data.Rows[i],
@@ -256,7 +257,7 @@ namespace hasheous_server.Classes
             return objectsList;
         }
 
-        public Models.DataObjectItem? GetDataObject(DataObjectType objectType, long id)
+        public async Task<Models.DataObjectItem?> GetDataObject(DataObjectType objectType, long id)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "SELECT * FROM DataObject WHERE ObjectType=@objecttype AND Id=@id;";
@@ -269,7 +270,7 @@ namespace hasheous_server.Classes
 
             if (data.Rows.Count > 0)
             {
-                DataObjectItem item = BuildDataObject(objectType, id, data.Rows[0], true);
+                DataObjectItem item = await BuildDataObject(objectType, id, data.Rows[0], true);
 
                 return item;
             }
@@ -279,7 +280,7 @@ namespace hasheous_server.Classes
             }
         }
 
-        public Models.DataObjectItem? SearchDataObject(DataObjectType objectType, string? objectName, List<DataObjectSearchCriteriaItem> searchCriteria)
+        public async Task<Models.DataObjectItem?> SearchDataObject(DataObjectType objectType, string? objectName, List<DataObjectSearchCriteriaItem> searchCriteria)
         {
             if (searchCriteria.Count == 0)
             {
@@ -333,7 +334,7 @@ namespace hasheous_server.Classes
 
             if (data.Rows.Count > 0)
             {
-                DataObjectItem item = BuildDataObject(objectType, (long)data.Rows[0]["Id"], data.Rows[0], true);
+                DataObjectItem item = await BuildDataObject(objectType, (long)data.Rows[0]["Id"], data.Rows[0], true);
 
                 return item;
             }
@@ -359,7 +360,7 @@ namespace hasheous_server.Classes
             });
         }
 
-        private Models.DataObjectItem BuildDataObject(DataObjectType ObjectType, long id, DataRow row, bool GetChildRelations = false, bool GetMetadata = true)
+        private async Task<Models.DataObjectItem> BuildDataObject(DataObjectType ObjectType, long id, DataRow row, bool GetChildRelations = false, bool GetMetadata = true)
         {
             // get attributes
             List<AttributeItem> attributes = GetAttributes(id, GetChildRelations);
@@ -381,7 +382,7 @@ namespace hasheous_server.Classes
             List<DataObjectItem.MetadataItem> metadataItems = new List<DataObjectItem.MetadataItem>();
             if (GetMetadata == true)
             {
-                metadataItems = GetMetadataMap(ObjectType, id);
+                metadataItems = await GetMetadataMap(ObjectType, id);
             }
 
             DataObjectItem item = new DataObjectItem
@@ -500,7 +501,7 @@ namespace hasheous_server.Classes
             return signatureItems;
         }
 
-        public List<DataObjectItem.MetadataItem> GetMetadataMap(DataObjectType ObjectType, long DataObjectId)
+        public async Task<List<DataObjectItem.MetadataItem>> GetMetadataMap(DataObjectType ObjectType, long DataObjectId)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "SELECT * FROM DataObject_MetadataMap WHERE DataObjectId = @id ORDER BY SourceId";
@@ -543,7 +544,7 @@ namespace hasheous_server.Classes
                                 switch (ObjectType)
                                 {
                                     case DataObjects.DataObjectType.Company:
-                                        var company = Companies.GetCompanies(metadataItem.Id);
+                                        var company = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Company>(metadataItem.Id);
                                         if (company != null)
                                         {
                                             objectId = company.Id;
@@ -551,7 +552,7 @@ namespace hasheous_server.Classes
                                         break;
 
                                     case DataObjects.DataObjectType.Platform:
-                                        var platform = Platforms.GetPlatform(metadataItem.Id, false);
+                                        var platform = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Platform>(metadataItem.Id);
                                         if (platform != null)
                                         {
                                             objectId = platform.Id;
@@ -559,7 +560,7 @@ namespace hasheous_server.Classes
                                         break;
 
                                     case DataObjects.DataObjectType.Game:
-                                        var game = Games.GetGame(metadataItem.Id, false, false, false);
+                                        var game = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Game>(metadataItem.Id);
                                         if (game != null)
                                         {
                                             objectId = game.Id;
@@ -793,7 +794,7 @@ namespace hasheous_server.Classes
             return attribute;
         }
 
-        public Models.DataObjectItem NewDataObject(DataObjectType objectType, Models.DataObjectItemModel model)
+        public async Task<Models.DataObjectItem> NewDataObject(DataObjectType objectType, Models.DataObjectItemModel model)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "INSERT INTO DataObject (`Name`, `ObjectType`, `CreatedDate`, `UpdatedDate`) VALUES (@name, @objecttype, @createddate, @updateddate); SELECT LAST_INSERT_ID();";
@@ -836,10 +837,10 @@ namespace hasheous_server.Classes
                     break;
             }
 
-            return GetDataObject(objectType, (long)(ulong)data.Rows[0][0]);
+            return await GetDataObject(objectType, (long)(ulong)data.Rows[0][0]);
         }
 
-        public Models.DataObjectItem EditDataObject(DataObjectType objectType, long id, Models.DataObjectItemModel model)
+        public async Task<Models.DataObjectItem> EditDataObject(DataObjectType objectType, long id, Models.DataObjectItemModel model)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "UPDATE DataObject SET `Name`=@name, `UpdatedDate`=@updateddate WHERE ObjectType=@objecttype AND Id=@id";
@@ -854,7 +855,7 @@ namespace hasheous_server.Classes
 
             DataObjectMetadataSearch(objectType, id);
 
-            return GetDataObject(objectType, id);
+            return await GetDataObject(objectType, id);
         }
 
         public void DeleteDataObject(DataObjectType objectType, long id)
@@ -870,7 +871,7 @@ namespace hasheous_server.Classes
             db.ExecuteNonQuery(sql, dbDict);
         }
 
-        public Models.DataObjectItem EditDataObject(DataObjectType objectType, long id, Models.DataObjectItem model)
+        public async Task<Models.DataObjectItem> EditDataObject(DataObjectType objectType, long id, Models.DataObjectItem model)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "UPDATE DataObject SET `Name`=@name, `UpdatedDate`=@updateddate WHERE ObjectType=@objecttype AND Id=@id";
@@ -883,7 +884,7 @@ namespace hasheous_server.Classes
 
             db.ExecuteNonQuery(sql, dbDict);
 
-            DataObjectItem EditedObject = GetDataObject(objectType, id);
+            DataObjectItem EditedObject = await GetDataObject(objectType, id);
 
             // update attributes
             foreach (AttributeItem newAttribute in model.Attributes)
@@ -1095,7 +1096,7 @@ namespace hasheous_server.Classes
                 }
             }
 
-            return GetDataObject(objectType, id);
+            return await GetDataObject(objectType, id);
         }
 
         /// <summary>
@@ -1144,7 +1145,7 @@ namespace hasheous_server.Classes
 
             if (id != null)
             {
-                DataObjectsToProcess.Add(GetDataObject(objectType, (long)id));
+                DataObjectsToProcess.Add(await GetDataObject(objectType, (long)id));
             }
             else
             {
@@ -1172,7 +1173,7 @@ namespace hasheous_server.Classes
                 DataTable data = db.ExecuteCMD(sql, dbDict);
                 foreach (DataRow row in data.Rows)
                 {
-                    DataObjectItem item = BuildDataObject(objectType, (long)row["Id"], row, false, true);
+                    DataObjectItem item = await BuildDataObject(objectType, (long)row["Id"], row, false, true);
                     DataObjectsToProcess.Add(item);
                 }
 
@@ -1276,7 +1277,7 @@ namespace hasheous_server.Classes
                                                         else
                                                         {
                                                             RelationItem relationItem = (RelationItem)attribute.Value;
-                                                            platformDO = GetDataObject(DataObjectType.Platform, relationItem.relationId);
+                                                            platformDO = await GetDataObject(DataObjectType.Platform, relationItem.relationId);
                                                         }
 
                                                         foreach (DataObjectItem.MetadataItem provider in platformDO.Metadata)
@@ -1288,7 +1289,7 @@ namespace hasheous_server.Classes
                                                                 )
                                                             )
                                                             {
-                                                                IGDB.Models.Platform platform = await Metadata.IGDB.Platforms.GetPlatform((string?)provider.Id, false);
+                                                                IGDB.Models.Platform platform = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Platform>((string?)provider.Id);
                                                                 PlatformId = platform.Id;
                                                             }
                                                         }
@@ -1399,7 +1400,7 @@ namespace hasheous_server.Classes
                                                 else
                                                 {
                                                     RelationItem relationItem = (RelationItem)tgdbPlatformAttribute.Value;
-                                                    tgdbPlatformDO = GetDataObject(DataObjectType.Platform, relationItem.relationId);
+                                                    tgdbPlatformDO = await GetDataObject(DataObjectType.Platform, relationItem.relationId);
                                                 }
 
                                                 // check if tgdbPlatformDO has a configured metadata value for TheGamesDB
@@ -1485,7 +1486,7 @@ namespace hasheous_server.Classes
                                                 else
                                                 {
                                                     RelationItem relationItem = (RelationItem)raPlatformAttribute.Value;
-                                                    raPlatformDO = GetDataObject(DataObjectType.Platform, relationItem.relationId);
+                                                    raPlatformDO = await GetDataObject(DataObjectType.Platform, relationItem.relationId);
                                                 }
 
                                                 // check if raPlatformDO has a configured metadata value for RetroAchievements

@@ -10,30 +10,41 @@ namespace Classes.Metadata.Utility
         public static void BuildTables()
         {
             BuildTableFromType(typeof(AgeRating));
-            BuildTableFromType(typeof(AgeRatingContentDescription));
+            BuildTableFromType(typeof(AgeRatingCategory));
+            BuildTableFromType(typeof(AgeRatingContentDescriptionV2));
+            BuildTableFromType(typeof(AgeRatingOrganization));
             BuildTableFromType(typeof(AlternativeName));
             BuildTableFromType(typeof(Artwork));
             BuildTableFromType(typeof(Character));
+            BuildTableFromType(typeof(CharacterGender));
             BuildTableFromType(typeof(CharacterMugShot));
+            BuildTableFromType(typeof(CharacterSpecies));
             BuildTableFromType(typeof(Collection));
             BuildTableFromType(typeof(CollectionMembership));
             BuildTableFromType(typeof(CollectionMembershipType));
             BuildTableFromType(typeof(CollectionRelation));
             BuildTableFromType(typeof(CollectionRelationType));
+            BuildTableFromType(typeof(CollectionType));
             BuildTableFromType(typeof(Company));
             BuildTableFromType(typeof(CompanyLogo));
+            BuildTableFromType(typeof(CompanyStatus));
             BuildTableFromType(typeof(CompanyWebsite));
             BuildTableFromType(typeof(Cover));
             BuildTableFromType(typeof(Event));
             BuildTableFromType(typeof(EventLogo));
             BuildTableFromType(typeof(EventNetwork));
             BuildTableFromType(typeof(ExternalGame));
+            BuildTableFromType(typeof(ExternalGameSource));
             BuildTableFromType(typeof(Franchise));
             BuildTableFromType(typeof(Game));
             BuildTableFromType(typeof(GameEngine));
             BuildTableFromType(typeof(GameEngineLogo));
             BuildTableFromType(typeof(GameLocalization));
             BuildTableFromType(typeof(GameMode));
+            BuildTableFromType(typeof(GameReleaseFormat));
+            BuildTableFromType(typeof(GameStatus));
+            BuildTableFromType(typeof(GameTimeToBeat));
+            BuildTableFromType(typeof(GameType));
             BuildTableFromType(typeof(GameVersion));
             BuildTableFromType(typeof(GameVersionFeature));
             BuildTableFromType(typeof(GameVersionFeatureValue));
@@ -54,14 +65,16 @@ namespace Classes.Metadata.Utility
             BuildTableFromType(typeof(PlatformVersionReleaseDate));
             BuildTableFromType(typeof(PlatformWebsite));
             BuildTableFromType(typeof(PlayerPerspective));
+            BuildTableFromType(typeof(PopularityPrimitive));
+            BuildTableFromType(typeof(PopularityType));
             BuildTableFromType(typeof(Region));
             BuildTableFromType(typeof(ReleaseDate));
-            BuildTableFromType(typeof(ReleaseDateCategory));
             BuildTableFromType(typeof(ReleaseDateRegion));
             BuildTableFromType(typeof(ReleaseDateStatus));
             BuildTableFromType(typeof(Screenshot));
             BuildTableFromType(typeof(Theme));
             BuildTableFromType(typeof(Website));
+            BuildTableFromType(typeof(WebsiteType));
         }
 
         /// <summary>
@@ -129,10 +142,10 @@ namespace Classes.Metadata.Utility
                     case "Double":
                         columnType = "DOUBLE";
                         break;
-                    case "IdentityOrValue":
+                    case "IdentityOrValue`1":
                         columnType = "BIGINT";
                         break;
-                    case "IdentityOrValues":
+                    case "IdentitiesOrValues`1":
                         columnType = "LONGTEXT";
                         break;
                 }

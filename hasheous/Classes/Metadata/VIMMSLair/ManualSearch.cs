@@ -1,5 +1,6 @@
 using System.Security.Cryptography.Xml;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using Classes;
 using hasheous_server.Classes;
 using hasheous_server.Models;
@@ -40,7 +41,7 @@ namespace VIMMSLair
             return "";
         }
 
-        public static void MatchManuals(string manualFile, DataObjectItem platformDataObject)
+        public static async Task MatchManuals(string manualFile, DataObjectItem platformDataObject)
         {
             // load the json into a ManualObject
             var manualObject = new ManualObject();
@@ -129,7 +130,7 @@ namespace VIMMSLair
                     {
                         bool found = false;
 
-                        hasheous_server.Models.DataObjectsList dataObjectItems = DataObjects.GetDataObjects(DataObjects.DataObjectType.Game, 0, 0, searchCandidate);
+                        hasheous_server.Models.DataObjectsList dataObjectItems = await DataObjects.GetDataObjects(DataObjects.DataObjectType.Game, 0, 0, searchCandidate);
                         foreach (DataObjectItem dataObjectItem in dataObjectItems.Objects)
                         {
                             // don't add the manual if it already has one
