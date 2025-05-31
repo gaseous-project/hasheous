@@ -59,6 +59,7 @@ namespace hasheous_server.Controllers.v1_0
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [Route("IGDB/{MetadataType}")]
         [ResponseCache(CacheProfileName = "7Days")]
+        [ApiExplorerSettings(IgnoreApi = true)]
         public async Task<IActionResult> GetMetadata(string MetadataType, long Id, string slug = "")
         {
             // check that MetadataType is a valid class in IGDB.Models
