@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Classes;
 using hasheous_server.Classes.Metadata;
 using hasheous_server.Models;
+// using HasheousClient.Models.Metadata.IGDB;
 using static hasheous_server.Models.DataObjectItem;
 
 namespace hasheous_server.Classes
@@ -35,8 +36,8 @@ namespace hasheous_server.Classes
                     switch (metadataMatch.Source)
                     {
                         case Communications.MetadataSources.IGDB:
-                            IGDB.Models.Platform platform = await Metadata.IGDB.Platforms.GetPlatform(metadataMatch.PlatformId, false);
-                            IGDB.Models.Game game = await Metadata.IGDB.Games.GetGame(metadataMatch.GameId, false, false, false);
+                            IGDB.Models.Platform platform = await hasheous_server.Classes.Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Platform>(metadataMatch.PlatformId);
+                            IGDB.Models.Game game = await hasheous_server.Classes.Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Game>(metadataMatch.GameId);
                             if (platform != null && game != null)
                             {
                                 if (game.Platforms.Ids.ToList<long>().Contains((long)platform.Id))
@@ -100,13 +101,13 @@ namespace hasheous_server.Classes
         /// <summary>
         /// Tally the votes and apply the results where appropriate
         /// </summary>
-        public void TallyVotes()
+        public async Task TallyVotes()
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
 
             // loop all game dataobjects, then fetch all votes for each game
             DataObjects dataObjects = new DataObjects();
-            DataObjectsList dataObjectsList = dataObjects.GetDataObjects(DataObjects.DataObjectType.Game, 0, 0, null, false);
+            DataObjectsList dataObjectsList = await dataObjects.GetDataObjects(DataObjects.DataObjectType.Game, 0, 0, null, false);
 
             foreach (DataObjectItem dataObject in dataObjectsList.Objects)
             {

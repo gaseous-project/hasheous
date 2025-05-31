@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Data.Common;
+using System.Threading.Tasks;
 using Classes;
 using hasheous_server.Classes;
 using hasheous_server.Classes.Metadata;
@@ -89,7 +90,7 @@ namespace Classes
             public object? Options { get; set; } = null;
             public List<QueueItemType> Blocks => _Blocks;
 
-            public void Execute()
+            public async Task Execute()
             {
                 if (_ItemState != QueueItemState.Disabled)
                 {
@@ -167,7 +168,7 @@ namespace Classes
                                     DataObjectsList Platforms = new DataObjectsList();
 
                                     // get VIMMSLair manual metadata for each platform
-                                    Platforms = DataObjects.GetDataObjects(DataObjects.DataObjectType.Platform);
+                                    Platforms = await DataObjects.GetDataObjects(DataObjects.DataObjectType.Platform);
                                     foreach (DataObjectItem Platform in Platforms.Objects)
                                     {
                                         AttributeItem VIMMPlatformName = Platform.Attributes.Find(x => x.attributeName == AttributeItem.AttributeName.VIMMPlatformName);

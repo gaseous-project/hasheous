@@ -141,7 +141,7 @@ namespace hasheous_server.Controllers.v1_0
             try
             {
                 DataObjects dataObjects = new DataObjects();
-                DataObjectsList platforms = dataObjects.GetDataObjects(DataObjects.DataObjectType.Platform, PageNumber, PageSize);
+                DataObjectsList platforms = await dataObjects.GetDataObjects(DataObjects.DataObjectType.Platform, PageNumber, PageSize);
 
                 if (platforms.Count == 0)
                 {

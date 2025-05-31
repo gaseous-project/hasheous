@@ -148,6 +148,7 @@ namespace Classes.Metadata
                                         objectDict[key.Key] = newObjectValue;
                                         break;
                                     case "int32[]":
+                                    case "int64[]":
                                         newObjectValue = Newtonsoft.Json.JsonConvert.SerializeObject(objectValue);
                                         objectDict[key.Key] = newObjectValue;
                                         break;
@@ -215,141 +216,51 @@ namespace Classes.Metadata
                         }
                         try
                         {
+                            // Use the assembly of a known IGDB.Models type to resolve the type
+                            var igdbAssembly = typeof(IGDB.Models.Game).Assembly;
+                            Type? genericArgType;
+
                             switch (objectTypeName)
                             {
-                                //case "boolean":
-                                //    Boolean storedBool = Convert.ToBoolean((int)dataRow[property.Name]);
-                                //    property.SetValue(EndpointType, storedBool);
-                                //    break;
                                 case "datetimeoffset":
                                     DateTimeOffset? storedDate = (DateTime?)dataRow[property.Name];
                                     property.SetValue(EndpointType, storedDate);
                                     break;
-                                //case "nullable":
-                                //	Console.WriteLine("Nullable: " + property.PropertyType.UnderlyingSystemType);
-                                //	break;
                                 case "identityorvalue":
-                                    subObjectTypeName = property.PropertyType.UnderlyingSystemType.ToString().Split("`1")[1].Replace("[IGDB.Models.", "").Replace("]", "").ToLower();
+                                    subObjectTypeName = property.PropertyType.UnderlyingSystemType.ToString().Split("`1")[1].Replace("[IGDB.Models.", "").Replace("]", "");
 
-                                    switch (subObjectTypeName)
+                                    // Use reflection to create IdentityOrValue<T> dynamically
+                                    genericArgType = igdbAssembly.GetType("IGDB.Models." + subObjectTypeName, false, true);
+                                    if (genericArgType == null)
                                     {
-                                        case "collection":
-                                            objectToStore = new IdentityOrValue<Collection>(id: (long)dataRow[property.Name]);
-                                            break;
-                                        case "company":
-                                            objectToStore = new IdentityOrValue<Company>(id: (long)dataRow[property.Name]);
-                                            break;
-                                        case "cover":
-                                            objectToStore = new IdentityOrValue<Cover>(id: (long)dataRow[property.Name]);
-                                            break;
-                                        case "franchise":
-                                            objectToStore = new IdentityOrValue<Franchise>(id: (long)dataRow[property.Name]);
-                                            break;
-                                        case "game":
-                                            objectToStore = new IdentityOrValue<Game>(id: (long)dataRow[property.Name]);
-                                            break;
-                                        case "platformfamily":
-                                            objectToStore = new IdentityOrValue<PlatformFamily>(id: (long)dataRow[property.Name]);
-                                            break;
-                                        case "platformlogo":
-                                            objectToStore = new IdentityOrValue<PlatformLogo>(id: (long)dataRow[property.Name]);
-                                            break;
-                                        case "platformversioncompany":
-                                            objectToStore = new IdentityOrValue<PlatformVersionCompany>(id: (long)dataRow[property.Name]);
-                                            break;
-                                        case "region":
-                                            objectToStore = new IdentityOrValue<Region>(id: (long)dataRow[property.Name]);
-                                            break;
+                                        throw new Exception("Could not find type IGDB.Models." + subObjectTypeName);
                                     }
 
-                                    if (objectToStore != null)
-                                    {
-                                        property.SetValue(EndpointType, objectToStore);
-                                    }
+                                    Type identityOrValueType = typeof(IdentityOrValue<>).MakeGenericType(genericArgType);
+                                    objectToStore = Activator.CreateInstance(identityOrValueType, new object[] { (object)dataRow[property.Name] });
+                                    property.SetValue(EndpointType, objectToStore);
 
                                     break;
                                 case "identitiesorvalues":
-                                    subObjectTypeName = property.PropertyType.UnderlyingSystemType.ToString().Split("`1")[1].Replace("[IGDB.Models.", "").Replace("]", "").ToLower();
+                                    subObjectTypeName = property.PropertyType.UnderlyingSystemType.ToString().Split("`1")[1].Replace("[IGDB.Models.", "").Replace("]", "");
 
                                     long[] fromJsonObject = Newtonsoft.Json.JsonConvert.DeserializeObject<long[]>((string)dataRow[property.Name]);
 
-                                    switch (subObjectTypeName)
+                                    genericArgType = igdbAssembly.GetType("IGDB.Models." + subObjectTypeName, false, true);
+                                    if (genericArgType == null)
                                     {
-                                        case "agerating":
-                                            objectToStore = new IdentitiesOrValues<AgeRating>(ids: fromJsonObject);
-                                            break;
-                                        case "alternativename":
-                                            objectToStore = new IdentitiesOrValues<AlternativeName>(ids: fromJsonObject);
-                                            break;
-                                        case "artwork":
-                                            objectToStore = new IdentitiesOrValues<Artwork>(ids: fromJsonObject);
-                                            break;
-                                        case "ageratingcontentdescription":
-                                            objectToStore = new IdentitiesOrValues<AgeRatingContentDescription>(ids: fromJsonObject);
-                                            break;
-                                        case "game":
-                                            objectToStore = new IdentitiesOrValues<Game>(ids: fromJsonObject);
-                                            break;
-                                        case "externalgame":
-                                            objectToStore = new IdentitiesOrValues<ExternalGame>(ids: fromJsonObject);
-                                            break;
-                                        case "franchise":
-                                            objectToStore = new IdentitiesOrValues<Franchise>(ids: fromJsonObject);
-                                            break;
-                                        case "gameengine":
-                                            objectToStore = new IdentitiesOrValues<GameEngine>(ids: fromJsonObject);
-                                            break;
-                                        case "gamemode":
-                                            objectToStore = new IdentitiesOrValues<GameMode>(ids: fromJsonObject);
-                                            break;
-                                        case "gamelocalization":
-                                            objectToStore = new IdentitiesOrValues<GameLocalization>(ids: fromJsonObject);
-                                            break;
-                                        case "gamevideo":
-                                            objectToStore = new IdentitiesOrValues<GameVideo>(ids: fromJsonObject);
-                                            break;
-                                        case "genre":
-                                            objectToStore = new IdentitiesOrValues<Genre>(ids: fromJsonObject);
-                                            break;
-                                        case "involvedcompany":
-                                            objectToStore = new IdentitiesOrValues<InvolvedCompany>(ids: fromJsonObject);
-                                            break;
-                                        case "multiplayermode":
-                                            objectToStore = new IdentitiesOrValues<MultiplayerMode>(ids: fromJsonObject);
-                                            break;
-                                        case "platform":
-                                            objectToStore = new IdentitiesOrValues<Platform>(ids: fromJsonObject);
-                                            break;
-                                        case "platformversion":
-                                            objectToStore = new IdentitiesOrValues<PlatformVersion>(ids: fromJsonObject);
-                                            break;
-                                        case "platformwebsite":
-                                            objectToStore = new IdentitiesOrValues<PlatformWebsite>(ids: fromJsonObject);
-                                            break;
-                                        case "platformversioncompany":
-                                            objectToStore = new IdentitiesOrValues<PlatformVersionCompany>(ids: fromJsonObject);
-                                            break;
-                                        case "platformversionreleasedate":
-                                            objectToStore = new IdentitiesOrValues<PlatformVersionReleaseDate>(ids: fromJsonObject);
-                                            break;
-                                        case "playerperspective":
-                                            objectToStore = new IdentitiesOrValues<PlayerPerspective>(ids: fromJsonObject);
-                                            break;
-                                        case "region":
-                                            objectToStore = new IdentitiesOrValues<Region>(ids: fromJsonObject);
-                                            break;
-                                        case "releasedate":
-                                            objectToStore = new IdentitiesOrValues<ReleaseDate>(ids: fromJsonObject);
-                                            break;
-                                        case "screenshot":
-                                            objectToStore = new IdentitiesOrValues<Screenshot>(ids: fromJsonObject);
-                                            break;
-                                        case "theme":
-                                            objectToStore = new IdentitiesOrValues<Theme>(ids: fromJsonObject);
-                                            break;
-                                        case "website":
-                                            objectToStore = new IdentitiesOrValues<Website>(ids: fromJsonObject);
-                                            break;
+                                        throw new Exception("Could not find type IGDB.Models." + subObjectTypeName);
+                                    }
+
+                                    // Create a generic type for IdentitiesOrValues<T>
+                                    Type identitiesOrValuesType = typeof(IdentitiesOrValues<>).MakeGenericType(genericArgType);
+
+                                    // Create an instance of IdentitiesOrValues<T> with the deserialized IDs
+                                    objectToStore = Activator.CreateInstance(identitiesOrValuesType, new object[] { fromJsonObject });
+
+                                    if (objectToStore == null)
+                                    {
+                                        throw new Exception("Could not create instance of IdentitiesOrValues<" + subObjectTypeName + ">");
                                     }
 
                                     if (objectToStore != null)
@@ -365,27 +276,34 @@ namespace Classes.Metadata
                                         property.SetValue(EndpointType, fromJsonObject_int32Array);
                                     }
                                     break;
-                                case "[igdb.models.category":
-                                    property.SetValue(EndpointType, (Category)dataRow[property.Name]);
+                                case "int64[]":
+                                    Int64[] fromJsonObject_int64Array = Newtonsoft.Json.JsonConvert.DeserializeObject<Int64[]>((string)dataRow[property.Name]);
+                                    if (fromJsonObject_int64Array != null)
+                                    {
+                                        property.SetValue(EndpointType, fromJsonObject_int64Array);
+                                    }
                                     break;
-                                case "[igdb.models.gamestatus":
-                                    property.SetValue(EndpointType, (GameStatus)dataRow[property.Name]);
-                                    break;
-                                case "[igdb.models.ageratingcategory":
-                                    property.SetValue(EndpointType, (AgeRatingCategory)dataRow[property.Name]);
-                                    break;
-                                case "[igdb.models.ageratingcontentdescriptioncategory":
-                                    property.SetValue(EndpointType, (AgeRatingContentDescriptionCategory)dataRow[property.Name]);
-                                    break;
-                                case "[igdb.models.ageratingtitle":
-                                    property.SetValue(EndpointType, (AgeRatingTitle)dataRow[property.Name]);
-                                    break;
-                                case "[igdb.models.externalcategory":
-                                    property.SetValue(EndpointType, (ExternalCategory)dataRow[property.Name]);
-                                    break;
-                                case "[igdb.models.startdatecategory":
-                                    property.SetValue(EndpointType, (StartDateCategory)dataRow[property.Name]);
-                                    break;
+                                // case "[igdb.models.category":
+                                //     property.SetValue(EndpointType, (Category)dataRow[property.Name]);
+                                //     break;
+                                // case "[igdb.models.gamestatus":
+                                //     property.SetValue(EndpointType, (GameStatus)dataRow[property.Name]);
+                                //     break;
+                                // case "[igdb.models.ageratingcategory":
+                                //     property.SetValue(EndpointType, (AgeRatingCategory)dataRow[property.Name]);
+                                //     break;
+                                // case "[igdb.models.ageratingcontentdescriptioncategory":
+                                //     property.SetValue(EndpointType, (AgeRatingContentDescriptionCategory)dataRow[property.Name]);
+                                //     break;
+                                // case "[igdb.models.ageratingtitle":
+                                //     property.SetValue(EndpointType, (AgeRatingTitle)dataRow[property.Name]);
+                                //     break;
+                                // case "[igdb.models.externalcategory":
+                                //     property.SetValue(EndpointType, (ExternalCategory)dataRow[property.Name]);
+                                //     break;
+                                // case "[igdb.models.startdatecategory":
+                                //     property.SetValue(EndpointType, (StartDateCategory)dataRow[property.Name]);
+                                //     break;
                                 default:
                                     property.SetValue(EndpointType, dataRow[property.Name]);
                                     break;

@@ -64,7 +64,7 @@ namespace hasheous_server.Controllers.v1_0
         {
             hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
-            return Ok(DataObjects.GetDataObjects(ObjectType, pageNumber, pageSize, search, getchildrelations, true, filterAttribute, filterValue));
+            return Ok(await DataObjects.GetDataObjects(ObjectType, pageNumber, pageSize, search, getchildrelations, true, filterAttribute, filterValue));
         }
 
         [MapToApiVersion("1.0")]
@@ -77,7 +77,7 @@ namespace hasheous_server.Controllers.v1_0
         {
             hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
-            Models.DataObjectItem? DataObject = DataObjects.GetDataObject(ObjectType, Id);
+            Models.DataObjectItem? DataObject = await DataObjects.GetDataObject(ObjectType, Id);
 
             if (DataObject == null)
             {
@@ -116,7 +116,7 @@ namespace hasheous_server.Controllers.v1_0
             {
                 hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
-                Models.DataObjectItem? DataObject = DataObjects.NewDataObject(ObjectType, model);
+                Models.DataObjectItem? DataObject = await DataObjects.NewDataObject(ObjectType, model);
 
                 if (DataObject == null)
                 {
@@ -149,7 +149,7 @@ namespace hasheous_server.Controllers.v1_0
             {
                 hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
-                Models.DataObjectItem? DataObject = DataObjects.GetDataObject(ObjectType, Id);
+                Models.DataObjectItem? DataObject = await DataObjects.GetDataObject(ObjectType, Id);
 
                 if (DataObject == null)
                 {
@@ -183,7 +183,7 @@ namespace hasheous_server.Controllers.v1_0
             {
                 hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
-                Models.DataObjectItem? DataObject = DataObjects.EditDataObject(ObjectType, Id, model);
+                Models.DataObjectItem? DataObject = await DataObjects.EditDataObject(ObjectType, Id, model);
 
                 if (DataObject == null)
                 {
@@ -207,7 +207,7 @@ namespace hasheous_server.Controllers.v1_0
         [Route("{ObjectType}/{Id}/FullObject")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> EditDataObject(Classes.DataObjects.DataObjectType ObjectType, long Id, Models.DataObjectItem model)
+        public async Task<IActionResult> EditDataObjectFull(Classes.DataObjects.DataObjectType ObjectType, long Id, Models.DataObjectItem model)
         {
             if (ModelState.IsValid)
             {
@@ -219,7 +219,7 @@ namespace hasheous_server.Controllers.v1_0
                 {
                     hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
-                    Models.DataObjectItem? DataObject = DataObjects.EditDataObject(ObjectType, Id, model);
+                    Models.DataObjectItem? DataObject = await DataObjects.EditDataObject(ObjectType, Id, model);
 
                     if (DataObject == null)
                     {
@@ -250,7 +250,7 @@ namespace hasheous_server.Controllers.v1_0
         {
             hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
-            Models.DataObjectItem? DataObject = DataObjects.GetDataObject(ObjectType, Id);
+            Models.DataObjectItem? DataObject = await DataObjects.GetDataObject(ObjectType, Id);
 
             if (DataObject == null)
             {
@@ -277,7 +277,7 @@ namespace hasheous_server.Controllers.v1_0
             {
                 hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
-                Models.DataObjectItem? DataObject = DataObjects.GetDataObject(ObjectType, Id);
+                Models.DataObjectItem? DataObject = await DataObjects.GetDataObject(ObjectType, Id);
 
                 if (DataObject == null)
                 {
@@ -311,7 +311,7 @@ namespace hasheous_server.Controllers.v1_0
             {
                 hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
-                Models.DataObjectItem? DataObject = DataObjects.GetDataObject(ObjectType, Id);
+                Models.DataObjectItem? DataObject = await DataObjects.GetDataObject(ObjectType, Id);
 
                 if (DataObject == null)
                 {
@@ -345,7 +345,7 @@ namespace hasheous_server.Controllers.v1_0
 
             hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
-            Models.DataObjectItem? DataObject = DataObjects.GetDataObject(ObjectType, Id);
+            Models.DataObjectItem? DataObject = await DataObjects.GetDataObject(ObjectType, Id);
 
             if (DataObject == null)
             {
@@ -372,7 +372,7 @@ namespace hasheous_server.Controllers.v1_0
 
             hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
-            Models.DataObjectItem? DataObject = DataObjects.GetDataObject(ObjectType, Id);
+            Models.DataObjectItem? DataObject = await DataObjects.GetDataObject(ObjectType, Id);
 
             if (DataObject == null)
             {
@@ -401,7 +401,7 @@ namespace hasheous_server.Controllers.v1_0
 
             hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
-            Models.DataObjectItem? DataObject = DataObjects.GetDataObject(ObjectType, Id);
+            Models.DataObjectItem? DataObject = await DataObjects.GetDataObject(ObjectType, Id);
 
             if (DataObject == null)
             {
@@ -430,7 +430,7 @@ namespace hasheous_server.Controllers.v1_0
 
             hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
-            Models.DataObjectItem? DataObject = DataObjects.GetDataObject(ObjectType, Id);
+            Models.DataObjectItem? DataObject = await DataObjects.GetDataObject(ObjectType, Id);
 
             if (DataObject == null)
             {
@@ -469,7 +469,7 @@ namespace hasheous_server.Controllers.v1_0
 
             hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
-            Models.DataObjectItem? DataObject = DataObjects.GetDataObject(ObjectType, Id);
+            Models.DataObjectItem? DataObject = await DataObjects.GetDataObject(ObjectType, Id);
 
             if (DataObject == null)
             {
@@ -496,7 +496,7 @@ namespace hasheous_server.Controllers.v1_0
 
             hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
-            Models.DataObjectItem? DataObject = DataObjects.GetDataObject(ObjectType, Id);
+            Models.DataObjectItem? DataObject = await DataObjects.GetDataObject(ObjectType, Id);
 
             if (DataObject == null)
             {
@@ -504,7 +504,7 @@ namespace hasheous_server.Controllers.v1_0
             }
             else
             {
-                Models.DataObjectItem? TargetDataObject = DataObjects.GetDataObject(ObjectType, TargetId);
+                Models.DataObjectItem? TargetDataObject = await DataObjects.GetDataObject(ObjectType, TargetId);
 
                 if (TargetDataObject == null)
                 {

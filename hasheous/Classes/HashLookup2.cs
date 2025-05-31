@@ -71,14 +71,14 @@ namespace Classes
                 DataObjects dataObjects = new DataObjects();
 
                 // publisher
-                DataObjectItem? publisher = GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
+                DataObjectItem? publisher = GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId).Result;
                 if (publisher == null)
                 {
                     // no returned publisher! create one
                     publisher = dataObjects.NewDataObject(DataObjects.DataObjectType.Company, new DataObjectItemModel
                     {
                         Name = discoveredSignature.Game.Publisher
-                    });
+                    }).Result;
                     // add signature mappinto to publisher
                     dataObjects.AddSignature(publisher.Id, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
 
@@ -86,18 +86,18 @@ namespace Classes
                     dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Company, publisher.Id, true);
 
                     // re-get the publisher
-                    publisher = dataObjects.GetDataObject(DataObjects.DataObjectType.Company, publisher.Id);
+                    publisher = dataObjects.GetDataObject(DataObjects.DataObjectType.Company, publisher.Id).Result;
                 }
 
                 // platform
-                DataObjectItem? platform = GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId);
+                DataObjectItem? platform = GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId).Result;
                 if (platform == null)
                 {
                     // no returned platform! create one
                     platform = dataObjects.NewDataObject(DataObjects.DataObjectType.Platform, new DataObjectItemModel
                     {
                         Name = discoveredSignature.Game.System
-                    });
+                    }).Result;
                     // add signature mapping to platform
                     dataObjects.AddSignature(platform.Id, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId);
 
@@ -105,11 +105,11 @@ namespace Classes
                     dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Platform, platform.Id, true);
 
                     // re-get the platform
-                    platform = dataObjects.GetDataObject(DataObjects.DataObjectType.Platform, platform.Id);
+                    platform = dataObjects.GetDataObject(DataObjects.DataObjectType.Platform, platform.Id).Result;
                 }
 
                 // game
-                DataObjectItem? game = GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Game, long.Parse(discoveredSignature.Game.Id));
+                DataObjectItem? game = GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Game, long.Parse(discoveredSignature.Game.Id)).Result;
                 if (game == null)
                 {
                     // no returned game! trim up the name and check if one exists with the same name and platform
@@ -134,13 +134,13 @@ namespace Classes
                             Field = AttributeItem.AttributeName.Platform,
                             Value = platform.Id.ToString()
                         }
-                    });
+                    }).Result;
                     if (game == null)
                     {
                         game = dataObjects.NewDataObject(DataObjects.DataObjectType.Game, new DataObjectItemModel
                         {
                             Name = gameName
-                        });
+                        }).Result;
 
                         // add platform reference
                         dataObjects.AddAttribute(game.Id, new AttributeItem
@@ -215,7 +215,7 @@ namespace Classes
                     }
 
                     // re-get the game
-                    game = dataObjects.GetDataObject(DataObjects.DataObjectType.Game, game.Id);
+                    game = dataObjects.GetDataObject(DataObjects.DataObjectType.Game, game.Id).Result;
                 }
 
                 // build return item
@@ -286,7 +286,7 @@ namespace Classes
         /// <param name="objectType">The type of the object to retrieve</param>
         /// <param name="sigId">The signature id to search for</param>
         /// <returns>Null if not found; otherwise returns a DataObjectItem of type objectType</returns>
-        private DataObjectItem? GetDataObjectFromSignatureId(Database db, DataObjects.DataObjectType objectType, long sigId)
+        private async Task<DataObjectItem?> GetDataObjectFromSignatureId(Database db, DataObjects.DataObjectType objectType, long sigId)
         {
             string sql = @"
                 SELECT 
@@ -304,7 +304,7 @@ namespace Classes
             if (data.Rows.Count > 0)
             {
                 DataObjects dataObject = new DataObjects();
-                DataObjectItem item = dataObject.GetDataObject(objectType, (long)data.Rows[0][0]);
+                DataObjectItem item = await dataObject.GetDataObject(objectType, (long)data.Rows[0][0]);
                 return item;
             }
             else

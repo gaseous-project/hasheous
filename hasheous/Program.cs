@@ -14,6 +14,8 @@ using System.Net.Mail;
 using System.Net;
 using static Authentication.ApiKey;
 using static Authentication.ClientApiKey;
+using hasheous_server.Classes.Metadata.IGDB;
+using HasheousClient.Models.Metadata.IGDB;
 
 Logging.WriteToDiskOnly = true;
 Logging.Log(Logging.LogType.Information, "Startup", "Starting Hasheous Server " + Assembly.GetExecutingAssembly().GetName().Version);
@@ -39,11 +41,14 @@ do
 db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
 
 db.InitDB();
+Classes.Metadata.Utility.TableBuilder.BuildTables();
 
 // load app settings
 Config.InitSettings();
 // write updated settings back to the config file
 Config.UpdateConfig();
+
+var poo = await Metadata.GetMetadata<IGDB.Models.Platform>("c64");
 
 // set up server
 var builder = WebApplication.CreateBuilder(args);
@@ -179,6 +184,7 @@ builder.Services.AddSwaggerGen(options =>
         });
 
         options.OperationFilter<AuthorizationOperationFilter>();
+        options.DocumentFilter<IGDBMetadataDocumentFilter>();
 
         options.SwaggerDoc("v1", new OpenApiInfo
         {
@@ -198,11 +204,24 @@ builder.Services.AddSwaggerGen(options =>
             }
         });
 
-        options.CustomSchemaIds(type => SwaggerSchemaHelper.GetSchemaId(type));
+        options.CustomSchemaIds(type =>
+        {
+            if (type.IsGenericType)
+            {
+                var genericTypeName = type.GetGenericTypeDefinition().Name;
+                genericTypeName = genericTypeName.Substring(0, genericTypeName.IndexOf('`'));
+                var genericArgs = string.Join("_", type.GetGenericArguments().Select(t => t.Name));
+                return genericTypeName + "_" + genericArgs;
+            }
+            return type.FullName?.Replace("+", "_") ?? type.Name;
+        });
 
         // using System.Reflection;
         var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
         options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFilename));
+
+        // sort the endpoints
+        options.OrderActionsBy((apiDesc) => $"{apiDesc.RelativePath}_{apiDesc.HttpMethod}");
     }
 );
 builder.Services.AddHostedService<TimedHostedService>();
@@ -287,28 +306,6 @@ using (var scope = app.Services.CreateScope())
             await roleManager.CreateAsync(applicationRole, CancellationToken.None);
         }
     }
-
-    // // set up administrator account
-    // var userManager = scope.ServiceProvider.GetRequiredService<UserStore>();
-    // if (await userManager.FindByNameAsync("admin@localhost", CancellationToken.None) == null)
-    // {
-    //     ApplicationUser adminUser = new ApplicationUser{
-    //         Id = Guid.NewGuid().ToString(),
-    //         Email = "admin@localhost",
-    //         NormalizedEmail = "ADMIN@LOCALHOST",
-    //         EmailConfirmed = true,
-    //         UserName = "administrator",
-    //         NormalizedUserName = "ADMINISTRATOR"
-    //     };
-
-    //     //set user password
-    //     PasswordHasher<ApplicationUser> ph = new PasswordHasher<ApplicationUser>();
-    //     adminUser.PasswordHash = ph.HashPassword(adminUser, "letmein");
-
-    //     await userManager.CreateAsync(adminUser, CancellationToken.None);
-    //     await userManager.AddToRoleAsync(adminUser, "Admin", CancellationToken.None);
-    //     await userManager.AddToRoleAsync(adminUser, "Moderator", CancellationToken.None);
-    // }
 }
 
 app.UseAuthorization();
