@@ -363,17 +363,17 @@ namespace hasheous_server.Classes
         private async Task<Models.DataObjectItem> BuildDataObject(DataObjectType ObjectType, long id, DataRow row, bool GetChildRelations = false, bool GetMetadata = true)
         {
             // get attributes
-            List<AttributeItem> attributes = GetAttributes(id, GetChildRelations);
+            List<AttributeItem> attributes = await GetAttributes(id, GetChildRelations);
 
             // get signature items
-            List<Dictionary<string, object>> signatureItems = GetSignatures(ObjectType, id);
+            List<Dictionary<string, object>> signatureItems = await GetSignatures(ObjectType, id);
 
             // get extra attributes if dataobjecttype is game
             if (ObjectType == DataObjectType.Game)
             {
                 if (GetChildRelations == true)
                 {
-                    attributes.Add(GetRoms(signatureItems));
+                    attributes.Add(await GetRoms(signatureItems));
                     attributes.AddRange(GetCountriesAndLanguagesForGame(signatureItems));
                 }
             }
@@ -400,11 +400,11 @@ namespace hasheous_server.Classes
             return item;
         }
 
-        public List<AttributeItem> GetAttributes(long DataObjectId, bool GetChildRelations)
+        public async Task<List<AttributeItem>> GetAttributes(long DataObjectId, bool GetChildRelations)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "SELECT * FROM DataObject_Attributes WHERE DataObjectId = @id";
-            DataTable data = db.ExecuteCMD(sql, new Dictionary<string, object>{
+            DataTable data = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>{
                 { "id", DataObjectId }
             });
             List<AttributeItem> attributes = new List<AttributeItem>();
@@ -412,7 +412,7 @@ namespace hasheous_server.Classes
             {
                 try
                 {
-                    AttributeItem attributeItem = BuildAttributeItem(dataRow, GetChildRelations);
+                    AttributeItem attributeItem = await BuildAttributeItem(dataRow, GetChildRelations);
 
                     // further processing
                     switch (attributeItem.attributeType)
@@ -447,7 +447,7 @@ namespace hasheous_server.Classes
             return attributes;
         }
 
-        public List<Dictionary<string, object>> GetSignatures(DataObjectType ObjectType, long DataObjectId)
+        public async Task<List<Dictionary<string, object>>> GetSignatures(DataObjectType ObjectType, long DataObjectId)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "";
@@ -493,7 +493,7 @@ namespace hasheous_server.Classes
                 return new List<Dictionary<string, object>>();
             }
 
-            List<Dictionary<string, object>> signatureItems = db.ExecuteCMDDict(sql, new Dictionary<string, object>{
+            List<Dictionary<string, object>> signatureItems = await db.ExecuteCMDDictAsync(sql, new Dictionary<string, object>{
                 { "id", DataObjectId },
                 { "typeid", ObjectType }
             });
@@ -742,7 +742,7 @@ namespace hasheous_server.Classes
             return attributeItems;
         }
 
-        public AttributeItem GetRoms(List<Dictionary<string, object>> GameSignatures)
+        public async Task<AttributeItem> GetRoms(List<Dictionary<string, object>> GameSignatures)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
 
@@ -772,7 +772,7 @@ namespace hasheous_server.Classes
                     WHERE
                         GameId=@gameid
                     ORDER BY `Name`;";
-                DataTable data = db.ExecuteCMD(sql, new Dictionary<string, object>{
+                DataTable data = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>{
                     { "gameid", GameSignature["SignatureId"] }
                 });
 
@@ -1665,7 +1665,7 @@ namespace hasheous_server.Classes
             public string MetadataId { get; set; } = "";
         }
 
-        public AttributeItem AddAttribute(long DataObjectId, AttributeItem attribute)
+        public async Task<AttributeItem> AddAttribute(long DataObjectId, AttributeItem attribute)
         {
             object? attributeValue = null;
             long? attributeRelation = null;
@@ -1697,7 +1697,7 @@ namespace hasheous_server.Classes
             DataTable returnValue = db.ExecuteCMD(sql, new Dictionary<string, object>{
                 { "id", data.Rows[0][0] }
             });
-            AttributeItem attributeItem = BuildAttributeItem(returnValue.Rows[0], true);
+            AttributeItem attributeItem = await BuildAttributeItem(returnValue.Rows[0], true);
 
             UpdateDataObjectDate(DataObjectId);
 
@@ -1716,7 +1716,7 @@ namespace hasheous_server.Classes
             UpdateDataObjectDate(DataObjectId);
         }
 
-        private AttributeItem BuildAttributeItem(DataRow row, bool GetChildRelations = false)
+        private async Task<AttributeItem> BuildAttributeItem(DataRow row, bool GetChildRelations = false)
         {
             AttributeItem attributeItem = new AttributeItem()
             {
@@ -1730,7 +1730,7 @@ namespace hasheous_server.Classes
                 case AttributeItem.AttributeType.ObjectRelationship:
                     if (GetChildRelations == true)
                     {
-                        attributeItem.Value = GetDataObject(attributeItem.attributeRelationType, (long)row["AttributeRelation"]);
+                        attributeItem.Value = await GetDataObject(attributeItem.attributeRelationType, (long)row["AttributeRelation"]);
                     }
                     else
                     {
@@ -1789,7 +1789,7 @@ namespace hasheous_server.Classes
         /// <param name="ObjectType">The ObjectType to search signatures for</param>
         /// <param name="SearchString">The search term</param>
         /// <returns>A list of signatures</returns>
-        public List<Dictionary<string, object>> SignatureSearch(long DataObjectId, DataObjectType ObjectType, string SearchString)
+        public async Task<List<Dictionary<string, object>>> SignatureSearch(long DataObjectId, DataObjectType ObjectType, string SearchString)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string tableName;
@@ -1819,7 +1819,7 @@ namespace hasheous_server.Classes
                     fieldName = "`Name`";
 
                     // get a list of platform signature ids to filter results on
-                    List<AttributeItem> attributes = GetAttributes(DataObjectId, true);
+                    List<AttributeItem> attributes = await GetAttributes(DataObjectId, true);
 
                     List<int> platformIds = new List<int>();
 
@@ -1833,7 +1833,7 @@ namespace hasheous_server.Classes
                         {
                             DataObjectItem platformObject = (DataObjectItem)attribute.Value;
 
-                            List<Dictionary<string, object>> platformSignatures = GetSignatures(DataObjectType.Platform, platformObject.Id);
+                            List<Dictionary<string, object>> platformSignatures = await GetSignatures(DataObjectType.Platform, platformObject.Id);
                             foreach (Dictionary<string, object> platformSignature in platformSignatures)
                             {
                                 platformIds.Add(int.Parse((string)platformSignature["SignatureId"]));
