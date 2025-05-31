@@ -285,7 +285,7 @@ namespace hasheous_server.Controllers.v1_0
                 }
                 else
                 {
-                    AttributeItem attributeItem = DataObjects.AddAttribute(Id, model);
+                    AttributeItem attributeItem = await DataObjects.AddAttribute(Id, model);
 
                     return Ok(attributeItem);
                 }
