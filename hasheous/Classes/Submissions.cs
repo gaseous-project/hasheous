@@ -25,6 +25,7 @@ namespace hasheous_server.Classes
                 MD5 = model.MD5,
                 SHA1 = model.SHA1
             });
+            await hashLookup.PerformLookup();
             if (hashLookup != null)
             {
                 // rom hash was found - store vote

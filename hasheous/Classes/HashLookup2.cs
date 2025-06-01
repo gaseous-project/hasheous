@@ -1,11 +1,13 @@
 using System.Data;
 using System.Security.Cryptography.Xml;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using gaseous_signature_parser.models.RomSignatureObject;
 using hasheous_server.Classes;
 using hasheous_server.Classes.Metadata.IGDB;
 using hasheous_server.Models;
 using IGDB.Models;
+using Newtonsoft.Json;
 using NuGet.Common;
 using static Classes.Common;
 
@@ -30,16 +32,68 @@ namespace Classes
             }
         }
 
+        [Newtonsoft.Json.JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
+        public Database db { get; set; }
+
+        [Newtonsoft.Json.JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
+        public hasheous_server.Models.HashLookupModel model { get; set; }
+
+        [Newtonsoft.Json.JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
+        public bool returnAllSources { get; set; } = false;
+
+        [Newtonsoft.Json.JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
+        public string returnFields { get; set; } = "All";
+
+        public enum ValidFields
+        {
+            All,
+            Publisher,
+            Platform,
+            Signatures,
+            Metadata,
+            Attributes
+        }
+
         public HashLookup()
         {
 
         }
 
-        public HashLookup(Database db, hasheous_server.Models.HashLookupModel model, bool? returnAllSources = false)
+        public HashLookup(Database db, hasheous_server.Models.HashLookupModel model, bool? returnAllSources = false, string? returnFields = "All")
         {
+            this.db = db;
+            this.model = model;
+            this.returnAllSources = returnAllSources ?? false;
+            this.returnFields = returnFields ?? "All";
+        }
+
+        public async Task PerformLookup()
+        {
+            // parse return fields
+            List<ValidFields> validFields = new List<ValidFields>();
+            if (returnFields == "All")
+            {
+                validFields.Add(ValidFields.All);
+            }
+            else
+            {
+                string[] fields = returnFields.Split(',');
+                foreach (string field in fields)
+                {
+                    if (Enum.TryParse<ValidFields>(field.Trim(), true, out ValidFields validField))
+                    {
+                        validFields.Add(validField);
+                    }
+                }
+            }
+
             SignatureManagement signature = new SignatureManagement();
             // get the raw signature
-            List<Signatures_Games_2> rawSignatures = signature.GetRawSignatures(model);
+            List<Signatures_Games_2> rawSignatures = await signature.GetRawSignatures(model);
 
             // narrow down the options
             Signatures_Games_2 discoveredSignature = new Signatures_Games_2();
@@ -71,45 +125,53 @@ namespace Classes
                 DataObjects dataObjects = new DataObjects();
 
                 // publisher
-                DataObjectItem? publisher = GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId).Result;
-                if (publisher == null)
+                DataObjectItem? publisher = null;
+                if (validFields.Contains(ValidFields.Publisher) || validFields.Contains(ValidFields.All))
                 {
-                    // no returned publisher! create one
-                    publisher = dataObjects.NewDataObject(DataObjects.DataObjectType.Company, new DataObjectItemModel
+                    publisher = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
+                    if (publisher == null)
                     {
-                        Name = discoveredSignature.Game.Publisher
-                    }).Result;
-                    // add signature mappinto to publisher
-                    dataObjects.AddSignature(publisher.Id, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
+                        // no returned publisher! create one
+                        publisher = await dataObjects.NewDataObject(DataObjects.DataObjectType.Company, new DataObjectItemModel
+                        {
+                            Name = discoveredSignature.Game.Publisher
+                        });
+                        // add signature mappinto to publisher
+                        dataObjects.AddSignature(publisher.Id, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
 
-                    // force metadata search
-                    dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Company, publisher.Id, true);
+                        // force metadata search
+                        dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Company, publisher.Id, true);
 
-                    // re-get the publisher
-                    publisher = dataObjects.GetDataObject(DataObjects.DataObjectType.Company, publisher.Id).Result;
+                        // re-get the publisher
+                        publisher = await dataObjects.GetDataObject(DataObjects.DataObjectType.Company, publisher.Id);
+                    }
                 }
 
                 // platform
-                DataObjectItem? platform = GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId).Result;
-                if (platform == null)
+                DataObjectItem? platform = null;
+                if (validFields.Contains(ValidFields.Platform) || validFields.Contains(ValidFields.All))
                 {
-                    // no returned platform! create one
-                    platform = dataObjects.NewDataObject(DataObjects.DataObjectType.Platform, new DataObjectItemModel
+                    platform = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId);
+                    if (platform == null)
                     {
-                        Name = discoveredSignature.Game.System
-                    }).Result;
-                    // add signature mapping to platform
-                    dataObjects.AddSignature(platform.Id, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId);
+                        // no returned platform! create one
+                        platform = await dataObjects.NewDataObject(DataObjects.DataObjectType.Platform, new DataObjectItemModel
+                        {
+                            Name = discoveredSignature.Game.System
+                        });
+                        // add signature mapping to platform
+                        dataObjects.AddSignature(platform.Id, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId);
 
-                    // force metadata search
-                    dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Platform, platform.Id, true);
+                        // force metadata search
+                        dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Platform, platform.Id, true);
 
-                    // re-get the platform
-                    platform = dataObjects.GetDataObject(DataObjects.DataObjectType.Platform, platform.Id).Result;
+                        // re-get the platform
+                        platform = await dataObjects.GetDataObject(DataObjects.DataObjectType.Platform, platform.Id);
+                    }
                 }
 
                 // game
-                DataObjectItem? game = GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Game, long.Parse(discoveredSignature.Game.Id)).Result;
+                DataObjectItem? game = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Game, long.Parse(discoveredSignature.Game.Id));
                 if (game == null)
                 {
                     // no returned game! trim up the name and check if one exists with the same name and platform
@@ -127,23 +189,23 @@ namespace Classes
                     }
 
                     // check if the game exists - create a new one if it doesn't
-                    game = dataObjects.SearchDataObject(DataObjects.DataObjectType.Game, gameName, new List<DataObjects.DataObjectSearchCriteriaItem>
+                    game = await dataObjects.SearchDataObject(DataObjects.DataObjectType.Game, gameName, new List<DataObjects.DataObjectSearchCriteriaItem>
                     {
                         new DataObjects.DataObjectSearchCriteriaItem
                         {
                             Field = AttributeItem.AttributeName.Platform,
                             Value = platform.Id.ToString()
                         }
-                    }).Result;
+                    });
                     if (game == null)
                     {
-                        game = dataObjects.NewDataObject(DataObjects.DataObjectType.Game, new DataObjectItemModel
+                        game = await dataObjects.NewDataObject(DataObjects.DataObjectType.Game, new DataObjectItemModel
                         {
                             Name = gameName
-                        }).Result;
+                        });
 
                         // add platform reference
-                        dataObjects.AddAttribute(game.Id, new AttributeItem
+                        await dataObjects.AddAttribute(game.Id, new AttributeItem
                         {
                             attributeName = AttributeItem.AttributeName.Platform,
                             attributeType = AttributeItem.AttributeType.ObjectRelationship,
@@ -151,7 +213,7 @@ namespace Classes
                             Value = platform.Id
                         });
                         // add publisher reference
-                        dataObjects.AddAttribute(game.Id, new AttributeItem
+                        await dataObjects.AddAttribute(game.Id, new AttributeItem
                         {
                             attributeName = AttributeItem.AttributeName.Publisher,
                             attributeType = AttributeItem.AttributeType.ObjectRelationship,
@@ -197,11 +259,11 @@ namespace Classes
                             {
                                 string platformName = (string)attribute.Value;
 
-                                string manualId = VIMMSLair.ManualSearch.Search(platformName, Path.GetFileNameWithoutExtension(discoveredSignature.Rom.Name));
+                                string manualId = await VIMMSLair.ManualSearch.Search(platformName, Path.GetFileNameWithoutExtension(discoveredSignature.Rom.Name));
                                 if (manualId != "")
                                 {
                                     // add manual reference
-                                    dataObjects.AddAttribute(game.Id, new AttributeItem
+                                    await dataObjects.AddAttribute(game.Id, new AttributeItem
                                     {
                                         attributeName = AttributeItem.AttributeName.VIMMManualId,
                                         attributeType = AttributeItem.AttributeType.ShortString,
@@ -215,65 +277,81 @@ namespace Classes
                     }
 
                     // re-get the game
-                    game = dataObjects.GetDataObject(DataObjects.DataObjectType.Game, game.Id).Result;
+                    game = await dataObjects.GetDataObject(DataObjects.DataObjectType.Game, game.Id);
                 }
 
                 // build return item
                 this.Id = game.Id;
                 this.Name = game.Name;
-                this.Platform = new MiniDataObjectItem
+                if (platform != null)
                 {
-                    Name = platform.Name,
-                    metadata = platform.Metadata
-                };
-                this.Publisher = new MiniDataObjectItem
-                {
-                    Name = publisher.Name,
-                    metadata = publisher.Metadata
-                };
-
-                if (returnAllSources == true)
-                {
-                    // get all signatures
-                    this.Signatures = new Dictionary<RomSignatureObject.Game.Rom.SignatureSourceType, List<SignatureLookupItem.SignatureResult>>();
-                    foreach (Signatures_Games_2 sig in rawSignatures)
+                    this.Platform = new MiniDataObjectItem
                     {
-                        if (!this.Signatures.ContainsKey(sig.Rom.SignatureSource))
+                        Name = platform.Name,
+                        metadata = platform.Metadata
+                    };
+                }
+                if (publisher != null)
+                {
+                    this.Publisher = new MiniDataObjectItem
+                    {
+                        Name = publisher.Name,
+                        metadata = publisher.Metadata
+                    };
+                }
+
+                if (validFields.Contains(ValidFields.Signatures) || validFields.Contains(ValidFields.All))
+                {
+                    if (returnAllSources == true)
+                    {
+                        // get all signatures
+                        this.Signatures = new Dictionary<RomSignatureObject.Game.Rom.SignatureSourceType, List<SignatureLookupItem.SignatureResult>>();
+                        foreach (Signatures_Games_2 sig in rawSignatures)
                         {
-                            this.Signatures.Add(sig.Rom.SignatureSource, new List<SignatureLookupItem.SignatureResult>());
+                            if (!this.Signatures.ContainsKey(sig.Rom.SignatureSource))
+                            {
+                                this.Signatures.Add(sig.Rom.SignatureSource, new List<SignatureLookupItem.SignatureResult>());
+                            }
+                            this.Signatures[sig.Rom.SignatureSource].Add(new SignatureLookupItem.SignatureResult(sig));
                         }
-                        this.Signatures[sig.Rom.SignatureSource].Add(new SignatureLookupItem.SignatureResult(sig));
+                    }
+                    else
+                    {
+                        this.Signature = new SignatureLookupItem.SignatureResult(discoveredSignature);
                     }
                 }
-                else
+
+                if (validFields.Contains(ValidFields.Metadata) || validFields.Contains(ValidFields.All))
                 {
-                    this.Signature = new SignatureLookupItem.SignatureResult(discoveredSignature);
+                    this.Metadata = game.Metadata;
                 }
-                this.Metadata = game.Metadata;
 
                 // attributes
-                this.Attributes = new List<AttributeItemCompiled>();
-                foreach (AttributeItem attribute in game.Attributes)
+                if (validFields.Contains(ValidFields.Attributes) || validFields.Contains(ValidFields.All))
                 {
-                    switch (attribute.attributeName)
+                    this.Attributes = new List<AttributeItemCompiled>();
+                    foreach (AttributeItem attribute in game.Attributes)
                     {
-                        case AttributeItem.AttributeName.Publisher:
-                        case AttributeItem.AttributeName.Platform:
-                        case AttributeItem.AttributeName.ROMs:
-                        case AttributeItem.AttributeName.Country:
-                            break;
+                        switch (attribute.attributeName)
+                        {
+                            case AttributeItem.AttributeName.Publisher:
+                            case AttributeItem.AttributeName.Platform:
+                            case AttributeItem.AttributeName.ROMs:
+                            case AttributeItem.AttributeName.Country:
+                                break;
 
-                        default:
-                            AttributeItemCompiled attributeItemCompiled = new AttributeItemCompiled
-                            {
-                                Id = attribute.Id,
-                                attributeName = attribute.attributeName,
-                                attributeRelationType = attribute.attributeRelationType,
-                                attributeType = attribute.attributeType,
-                                Value = attribute.Value
-                            };
-                            this.Attributes.Add(attributeItemCompiled);
-                            break;
+                            default:
+                                AttributeItemCompiled attributeItemCompiled = new AttributeItemCompiled
+                                {
+                                    Id = attribute.Id,
+                                    attributeName = attribute.attributeName,
+                                    attributeRelationType = attribute.attributeRelationType,
+                                    attributeType = attribute.attributeType,
+                                    Value = attribute.Value
+                                };
+                                this.Attributes.Add(attributeItemCompiled);
+                                break;
+                        }
                     }
                 }
             }

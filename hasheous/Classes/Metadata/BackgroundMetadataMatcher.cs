@@ -141,12 +141,38 @@ namespace BackgroundMetadataMatcher
                                                 Cover cover = await hasheous_server.Classes.Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Cover>((long)game.Cover.Id);
                                                 if (cover != null)
                                                 {
-                                                    string CoverPath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB_Game(game), "Cover.png");
+                                                    string CoverPath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB_Game(game), "Cover.jpg");
+                                                    if (!File.Exists(CoverPath))
+                                                    {
+                                                        // download the cover image
+                                                        if (!Directory.Exists(Path.GetDirectoryName(CoverPath)))
+                                                        {
+                                                            Directory.CreateDirectory(Path.GetDirectoryName(CoverPath));
+                                                        }
+
+                                                        using (var client = new System.Net.Http.HttpClient())
+                                                        {
+                                                            Uri coverUri = new Uri("https://images.igdb.com/igdb/image/upload/t_original/" + cover.ImageId + ".jpg");
+
+                                                            var response = await client.GetAsync(coverUri);
+                                                            if (response.IsSuccessStatusCode)
+                                                            {
+                                                                var imageBytes = await response.Content.ReadAsByteArrayAsync();
+                                                                await File.WriteAllBytesAsync(CoverPath, imageBytes);
+                                                            }
+                                                            else
+                                                            {
+                                                                Logging.Log(Logging.LogType.Warning, "Background Metadata Matcher", "Failed to download cover image for game: " + game.Name);
+                                                                return;
+                                                            }
+                                                        }
+                                                    }
+
                                                     if (File.Exists(CoverPath))
                                                     {
                                                         Images images = new Images();
                                                         coverProvider = Communications.MetadataSources.IGDB;
-                                                        imageRef = images.AddImage("Cover.png", File.ReadAllBytes(CoverPath)) + ":" + coverProvider.ToString();
+                                                        imageRef = images.AddImage("Cover.jpg", File.ReadAllBytes(CoverPath)) + ":" + coverProvider.ToString();
                                                     }
                                                 }
                                             }
@@ -156,7 +182,7 @@ namespace BackgroundMetadataMatcher
 
                                 if (imageRef != null)
                                 {
-                                    dataObjects.AddAttribute(DataObjectId, new AttributeItem
+                                    await dataObjects.AddAttribute(DataObjectId, new AttributeItem
                                     {
                                         attributeName = AttributeItem.AttributeName.Logo,
                                         attributeType = AttributeItem.AttributeType.ImageId,

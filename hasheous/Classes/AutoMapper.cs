@@ -1,4 +1,5 @@
 using System.Data;
+using System.Threading.Tasks;
 using hasheous_server.Models;
 
 namespace Classes
@@ -8,7 +9,7 @@ namespace Classes
         /// <summary>
         /// Loops all ROMs in the database and maps them to the correct data object
         /// </summary>
-        public static void RomAutoMapper()
+        public static async Task RomAutoMapper()
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "SELECT Signatures_Roms.`Name`, Signatures_Roms.`MD5`, Signatures_Roms.`SHA1` FROM Signatures_Roms JOIN Signatures_Games ON Signatures_Games.Id = Signatures_Roms.GameId LEFT JOIN DataObject_SignatureMap ON DataObject_SignatureMap.DataObjectTypeId = 2 AND Signatures_Games.Id = DataObject_SignatureMap.SignatureId WHERE DataObject_SignatureMap.DataObjectId IS NULL;";
@@ -31,6 +32,7 @@ namespace Classes
 
                 // search
                 HashLookup hashLookup = new HashLookup(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), hashLookupModel);
+                await hashLookup.PerformLookup();
             }
         }
     }

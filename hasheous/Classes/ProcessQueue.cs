@@ -175,13 +175,13 @@ namespace Classes
                                         if (VIMMPlatformName != null)
                                         {
                                             VIMMSLair.ManualDownloader tDownloader = new VIMMSLair.ManualDownloader(VIMMPlatformName.Value.ToString());
-                                            tDownloader.Download();
+                                            await tDownloader.Download();
 
                                             // if we have a manual metadata file, load it into an object and process it
                                             if (tDownloader.LocalFileName != "")
                                             {
                                                 // search for the game
-                                                VIMMSLair.ManualSearch.MatchManuals(tDownloader.LocalFileName, Platform);
+                                                await VIMMSLair.ManualSearch.MatchManuals(tDownloader.LocalFileName, Platform);
                                             }
                                         }
                                     }
@@ -204,7 +204,7 @@ namespace Classes
                                     break;
 
                                 case QueueItemType.AutoMapper:
-                                    AutoMapper.RomAutoMapper();
+                                    await AutoMapper.RomAutoMapper();
                                     break;
 
                                 case QueueItemType.Maintenance:
