@@ -215,7 +215,18 @@ namespace hasheous_server.Classes
                 dbDict.Add("filterAttribute", filterAttribute);
                 dbDict.Add("filterValue", filterValue);
 
-                sql = "SELECT DISTINCT DataObject.* FROM DataObject JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId WHERE ObjectType = @objecttype AND DataObject_Attributes.AttributeName = @filterAttribute AND (DataObject_Attributes.AttributeValue = @filterValue OR DataObject_Attributes.AttributeRelation = @filterValue) ORDER BY `Name`;";
+                switch (filterAttribute)
+                {
+                    case AttributeItem.AttributeName.Manufacturer:
+                    case AttributeItem.AttributeName.Publisher:
+                    case AttributeItem.AttributeName.Platform:
+                        sql = "SELECT DISTINCT DataObject.* FROM DataObject JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId WHERE ObjectType = @objecttype AND DataObject_Attributes.AttributeName = @filterAttribute AND (DataObject_Attributes.AttributeRelation = @filterValue) ORDER BY `Name`;";
+                        break;
+
+                    default:
+                        sql = "SELECT DISTINCT DataObject.* FROM DataObject JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId WHERE ObjectType = @objecttype AND DataObject_Attributes.AttributeName = @filterAttribute AND (DataObject_Attributes.AttributeValue = @filterValue) ORDER BY `Name`;";
+                        break;
+                }
             }
             DataTable data = db.ExecuteCMD(sql, dbDict);
 
