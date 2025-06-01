@@ -120,7 +120,8 @@ function renderContent() {
             dataType: 'json',
             data: function (params) {
                 var query = {
-                    search: params.term
+                    search: params.term,
+                    getchildrelations: false
                 }
 
                 return query;
@@ -131,9 +132,20 @@ function renderContent() {
                 for (var i = 0; i < data.objects.length; i++) {
                     console.log(data.objects[i]);
                     if (data.objects[i].id != getQueryString('id', 'int')) {
+                        let platformIdAttribute = data.objects[i].attributes.find(attr => attr.attributeName === 'Platform');
+                        let platformId;
+                        let platformName = '';
+                        if (platformIdAttribute) {
+                            platformId = platformIdAttribute.value.relationId;
+
+                            // check platforms for a matching ID
+                            console.log(platforms);
+                            platformName = platforms.find(platform => platform.id === platformId)?.name || '';
+                        }
+
                         arr.push({
                             id: data.objects[i].id,
-                            text: data.objects[i].name + ' (' + data.objects[i].id + ')',
+                            text: data.objects[i].name + ' (' + data.objects[i].id + ') ' + platformName,
                             fullObject: data.objects[i]
                         });
                     }
@@ -321,8 +333,8 @@ function renderContent() {
                                     });
                                 }
 
-                                console.log(dataObject.attributes[i].value);
-                                console.log(romData);
+                                // console.log(dataObject.attributes[i].value);
+                                // console.log(romData);
                                 romBox.appendChild(
                                     new generateTable(
                                         romData,
@@ -565,3 +577,13 @@ function GetApiKeys() {
         }
     );
 }
+
+let platforms = fetch('/api/v1/DataObjects/platform?getchildrelations=false', {
+    method: 'GET'
+}).then(response => response.json())
+    .then(data => {
+        platforms = data.objects;
+    })
+    .catch((error) => {
+        console.error('Error fetching platforms:', error);
+    });
