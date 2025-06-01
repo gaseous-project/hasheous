@@ -11,17 +11,17 @@ namespace VIMMSLair
 {
     public class ManualSearch
     {
-        public static string? Search(string PlatformName, string GameName)
+        public static async Task<string?> Search(string PlatformName, string GameName)
         {
             Logging.Log(Logging.LogType.Information, "VIMMSLair", "Searching for manual for " + GameName + " on " + PlatformName);
 
             // download the manual list
             var manualDownloader = new ManualDownloader(PlatformName);
-            manualDownloader.Download();
+            await manualDownloader.Download();
 
             // load the json into a ManualObject
             var manualObject = new ManualObject();
-            string json = File.ReadAllText(manualDownloader.LocalFileName);
+            string json = await File.ReadAllTextAsync(manualDownloader.LocalFileName);
             manualObject = JsonConvert.DeserializeObject<ManualObject>(json);
 
             // search for the game
@@ -45,7 +45,7 @@ namespace VIMMSLair
         {
             // load the json into a ManualObject
             var manualObject = new ManualObject();
-            string json = File.ReadAllText(manualFile);
+            string json = await File.ReadAllTextAsync(manualFile);
             manualObject = JsonConvert.DeserializeObject<ManualObject>(json);
 
             // search for the game
@@ -161,7 +161,7 @@ namespace VIMMSLair
                                         attributeRelationType = DataObjects.DataObjectType.Game,
                                         Value = manual.id
                                     };
-                                    DataObjects.AddAttribute(dataObjectItem.Id, manualAttribute);
+                                    await DataObjects.AddAttribute(dataObjectItem.Id, manualAttribute);
 
                                     found = true;
                                 }

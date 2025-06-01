@@ -1,4 +1,5 @@
 using System.Data;
+using System.Threading.Tasks;
 using hasheous_server.Models;
 using static Classes.Common;
 
@@ -23,7 +24,7 @@ namespace Classes
             }
         }
 
-        public List<Signatures_Games_2> GetRawSignatures(HashLookupModel model)
+        public async Task<List<Signatures_Games_2>> GetRawSignatures(HashLookupModel model)
         {
             Dictionary<string, object> dbDict = new Dictionary<string, object>();
             List<string> whereClauses = new List<string>();
@@ -59,7 +60,7 @@ namespace Classes
                 Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
                 string sql = "SELECT view_Signatures_Games.*, Signatures_Roms.Id AS romid, Signatures_Roms.Name AS romname, Signatures_Roms.Size, Signatures_Roms.CRC, Signatures_Roms.MD5, Signatures_Roms.SHA1, Signatures_Roms.DevelopmentStatus, Signatures_Roms.Attributes, Signatures_Roms.RomType, Signatures_Roms.RomTypeMedia, Signatures_Roms.MediaLabel, Signatures_Roms.MetadataSource, Signatures_Roms.Countries, Signatures_Roms.Languages FROM Signatures_Roms INNER JOIN view_Signatures_Games ON Signatures_Roms.GameId = view_Signatures_Games.Id WHERE " + string.Join(" OR ", whereClauses);
 
-                DataTable sigDb = db.ExecuteCMD(sql, dbDict);
+                DataTable sigDb = await db.ExecuteCMDAsync(sql, dbDict);
 
                 List<Signatures_Games_2> GamesList = new List<Signatures_Games_2>();
 

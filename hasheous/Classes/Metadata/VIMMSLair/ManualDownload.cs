@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Net;
 using System.Text.Json;
+using System.Threading.Tasks;
 using Classes;
 
 namespace VIMMSLair
@@ -61,7 +62,7 @@ namespace VIMMSLair
             return age.TotalDays > MaxAgeInDays;
         }
 
-        public string Download()
+        public async Task<string> Download()
         {
             if (!Directory.Exists(LocalFilePath))
             {
@@ -74,7 +75,7 @@ namespace VIMMSLair
                 using (var client = new WebClient())
                 {
                     var json = client.DownloadString(Url);
-                    File.WriteAllText(LocalFileName, json);
+                    await File.WriteAllTextAsync(LocalFileName, json);
                 }
             }
             else

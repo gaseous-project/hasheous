@@ -23,6 +23,10 @@ namespace hasheous_server.Controllers.v1_0
         /// <param name="returnAllSources" required="false" default="false" example="false">
         /// If true, all sources will be returned in the response. If false, only the first source will be returned.
         /// </param>
+        /// <param name="returnFields" required="false" default="All" example="All">
+        /// A comma-separated list of fields to return in the response. If "All", all fields will be returned. Valid options are:
+        /// All, Publisher, Platform, Signatures, Metadata, Attributes
+        /// </param>
         /// <returns>
         /// Game and ROM signature from available DATs, and if available mapped metadata ids. 404 if no signature is found.
         /// </returns>
@@ -42,11 +46,12 @@ namespace hasheous_server.Controllers.v1_0
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ResponseCache(CacheProfileName = "5Minute")]
         [Route("ByHash")]
-        public async Task<IActionResult> LookupPost(HashLookupModel model, bool? returnAllSources = false)
+        public async Task<IActionResult> LookupPost(HashLookupModel model, bool? returnAllSources = false, string? returnFields = "All")
         {
             try
             {
-                HashLookup hashLookup = new HashLookup(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), model, returnAllSources);
+                HashLookup hashLookup = new HashLookup(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), model, returnAllSources, returnFields);
+                await hashLookup.PerformLookup();
 
                 if (hashLookup == null)
                 {
@@ -92,6 +97,7 @@ namespace hasheous_server.Controllers.v1_0
                     SHA1 = sha1,
                     CRC = crc
                 });
+                await hashLookup.PerformLookup();
 
                 if (hashLookup == null)
                 {

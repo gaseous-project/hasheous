@@ -33,6 +33,7 @@ namespace hasheous_server.Controllers.v1_0
             {
                 // send legacy lookups to new lookup code as well - we'll do this until we're sure no one is using this old endpoint anymore
                 HashLookup hashLookup = new HashLookup(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), model);
+                await hashLookup.PerformLookup();
 
                 if (hashLookup == null)
                 {
