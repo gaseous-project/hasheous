@@ -125,49 +125,41 @@ namespace Classes
                 DataObjects dataObjects = new DataObjects();
 
                 // publisher
-                DataObjectItem? publisher = null;
-                if (validFields.Contains(ValidFields.Publisher) || validFields.Contains(ValidFields.All))
+                DataObjectItem? publisher = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
+                if (publisher == null)
                 {
-                    publisher = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
-                    if (publisher == null)
+                    // no returned publisher! create one
+                    publisher = await dataObjects.NewDataObject(DataObjects.DataObjectType.Company, new DataObjectItemModel
                     {
-                        // no returned publisher! create one
-                        publisher = await dataObjects.NewDataObject(DataObjects.DataObjectType.Company, new DataObjectItemModel
-                        {
-                            Name = discoveredSignature.Game.Publisher
-                        });
-                        // add signature mappinto to publisher
-                        dataObjects.AddSignature(publisher.Id, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
+                        Name = discoveredSignature.Game.Publisher
+                    });
+                    // add signature mappinto to publisher
+                    dataObjects.AddSignature(publisher.Id, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
 
-                        // force metadata search
-                        dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Company, publisher.Id, true);
+                    // force metadata search
+                    dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Company, publisher.Id, true);
 
-                        // re-get the publisher
-                        publisher = await dataObjects.GetDataObject(DataObjects.DataObjectType.Company, publisher.Id);
-                    }
+                    // re-get the publisher
+                    publisher = await dataObjects.GetDataObject(DataObjects.DataObjectType.Company, publisher.Id);
                 }
 
                 // platform
-                DataObjectItem? platform = null;
-                if (validFields.Contains(ValidFields.Platform) || validFields.Contains(ValidFields.All))
+                DataObjectItem? platform = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId);
+                if (platform == null)
                 {
-                    platform = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId);
-                    if (platform == null)
+                    // no returned platform! create one
+                    platform = await dataObjects.NewDataObject(DataObjects.DataObjectType.Platform, new DataObjectItemModel
                     {
-                        // no returned platform! create one
-                        platform = await dataObjects.NewDataObject(DataObjects.DataObjectType.Platform, new DataObjectItemModel
-                        {
-                            Name = discoveredSignature.Game.System
-                        });
-                        // add signature mapping to platform
-                        dataObjects.AddSignature(platform.Id, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId);
+                        Name = discoveredSignature.Game.System
+                    });
+                    // add signature mapping to platform
+                    dataObjects.AddSignature(platform.Id, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId);
 
-                        // force metadata search
-                        dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Platform, platform.Id, true);
+                    // force metadata search
+                    dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Platform, platform.Id, true);
 
-                        // re-get the platform
-                        platform = await dataObjects.GetDataObject(DataObjects.DataObjectType.Platform, platform.Id);
-                    }
+                    // re-get the platform
+                    platform = await dataObjects.GetDataObject(DataObjects.DataObjectType.Platform, platform.Id);
                 }
 
                 // game
@@ -283,7 +275,7 @@ namespace Classes
                 // build return item
                 this.Id = game.Id;
                 this.Name = game.Name;
-                if (platform != null)
+                if (validFields.Contains(ValidFields.Platform) || validFields.Contains(ValidFields.All))
                 {
                     this.Platform = new MiniDataObjectItem
                     {
@@ -291,7 +283,7 @@ namespace Classes
                         metadata = platform.Metadata
                     };
                 }
-                if (publisher != null)
+                if (validFields.Contains(ValidFields.Publisher) || validFields.Contains(ValidFields.All))
                 {
                     this.Publisher = new MiniDataObjectItem
                     {
