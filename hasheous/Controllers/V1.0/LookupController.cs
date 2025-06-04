@@ -51,7 +51,18 @@ namespace hasheous_server.Controllers.v1_0
             try
             {
                 HashLookup hashLookup = new HashLookup(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), model, returnAllSources, returnFields);
-                await hashLookup.PerformLookup();
+                var lookupTask = hashLookup.PerformLookup();
+                if (await Task.WhenAny(lookupTask, Task.Delay(TimeSpan.FromSeconds(10))) == lookupTask)
+                {
+                    // Completed within timeout
+                    await lookupTask;
+                }
+                else
+                {
+                    // Timed out
+                    Response.Headers["Retry-After"] = "90";
+                    return StatusCode(StatusCodes.Status503ServiceUnavailable, "Lookup operation is taking too long, and will continue in the background. Please try again later.");
+                }
 
                 if (hashLookup == null)
                 {

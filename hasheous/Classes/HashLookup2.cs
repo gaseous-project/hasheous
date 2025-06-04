@@ -125,22 +125,26 @@ namespace Classes
                 DataObjects dataObjects = new DataObjects();
 
                 // publisher
-                DataObjectItem? publisher = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
-                if (publisher == null)
+                DataObjectItem? publisher = null;
+                if (discoveredSignature.Game != null && (discoveredSignature.Game.PublisherId != 0 || discoveredSignature.Game.Publisher != null && discoveredSignature.Game.Publisher != ""))
                 {
-                    // no returned publisher! create one
-                    publisher = await dataObjects.NewDataObject(DataObjects.DataObjectType.Company, new DataObjectItemModel
+                    publisher = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
+                    if (publisher == null)
                     {
-                        Name = discoveredSignature.Game.Publisher
-                    });
-                    // add signature mappinto to publisher
-                    dataObjects.AddSignature(publisher.Id, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
+                        // no returned publisher! create one
+                        publisher = await dataObjects.NewDataObject(DataObjects.DataObjectType.Company, new DataObjectItemModel
+                        {
+                            Name = discoveredSignature.Game.Publisher
+                        });
+                        // add signature mappinto to publisher
+                        dataObjects.AddSignature(publisher.Id, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
 
-                    // force metadata search
-                    dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Company, publisher.Id, true);
+                        // force metadata search
+                        dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Company, publisher.Id, true);
 
-                    // re-get the publisher
-                    publisher = await dataObjects.GetDataObject(DataObjects.DataObjectType.Company, publisher.Id);
+                        // re-get the publisher
+                        publisher = await dataObjects.GetDataObject(DataObjects.DataObjectType.Company, publisher.Id);
+                    }
                 }
 
                 // platform
@@ -205,13 +209,16 @@ namespace Classes
                             Value = platform.Id
                         });
                         // add publisher reference
-                        await dataObjects.AddAttribute(game.Id, new AttributeItem
+                        if (publisher != null)
                         {
-                            attributeName = AttributeItem.AttributeName.Publisher,
-                            attributeType = AttributeItem.AttributeType.ObjectRelationship,
-                            attributeRelationType = DataObjects.DataObjectType.Company,
-                            Value = publisher.Id
-                        });
+                            await dataObjects.AddAttribute(game.Id, new AttributeItem
+                            {
+                                attributeName = AttributeItem.AttributeName.Publisher,
+                                attributeType = AttributeItem.AttributeType.ObjectRelationship,
+                                attributeRelationType = DataObjects.DataObjectType.Company,
+                                Value = publisher.Id
+                            });
+                        }
                         // force metadata search
                         dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true);
                     }
@@ -283,7 +290,7 @@ namespace Classes
                         metadata = platform.Metadata
                     };
                 }
-                if (validFields.Contains(ValidFields.Publisher) || validFields.Contains(ValidFields.All))
+                if (validFields.Contains(ValidFields.Publisher) || validFields.Contains(ValidFields.All) && publisher != null)
                 {
                     this.Publisher = new MiniDataObjectItem
                     {
