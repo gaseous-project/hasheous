@@ -422,6 +422,22 @@ ProcessQueue.QueueItems.Add(
 //     )
 // );
 
+ProcessQueue.QueueItems.Add(
+    new ProcessQueue.QueueItem(
+        ProcessQueue.QueueItemType.DailyMaintenance,
+        1440,
+        new List<ProcessQueue.QueueItemType>()
+        )
+    );
+
+ProcessQueue.QueueItems.Add(
+    new ProcessQueue.QueueItem(
+        ProcessQueue.QueueItemType.WeeklyMaintenance,
+        10080,
+        new List<ProcessQueue.QueueItemType>()
+        )
+    );
+
 Logging.WriteToDiskOnly = false;
 
 // start the app

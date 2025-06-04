@@ -211,6 +211,17 @@ namespace Classes
                                     TheGamesDB.JSON.MetadataQuery.RunMaintenance();
                                     break;
 
+                                case QueueItemType.DailyMaintenance:
+                                    Maintenance dMaintenance = new Maintenance();
+                                    await dMaintenance.RunDailyMaintenance();
+
+                                    break;
+
+                                case QueueItemType.WeeklyMaintenance:
+                                    Maintenance wMaintenance = new Maintenance();
+                                    await wMaintenance.RunWeeklyMaintenance();
+
+                                    break;
                             }
                         }
                         catch (Exception ex)
@@ -296,7 +307,17 @@ namespace Classes
             /// <summary>
             /// Reserved for maintenance tasks - no actual background service is tied to this type
             /// </summary>
-            Maintenance
+            Maintenance,
+
+            /// <summary>
+            /// Runs daily maintenance tasks
+            /// </summary>
+            DailyMaintenance,
+
+            /// <summary>
+            /// Runs weekly maintenance tasks
+            /// </summary>
+            WeeklyMaintenance,
         }
 
         public enum QueueItemState
