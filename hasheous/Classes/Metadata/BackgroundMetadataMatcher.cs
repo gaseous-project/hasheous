@@ -86,7 +86,7 @@ namespace BackgroundMetadataMatcher
             foreach (DataRow row in data.Rows)
             {
                 Logging.Log(Logging.LogType.Information, "Background Metadata Matcher", "Getting artwork for game " + (string)row["Name"]);
-                GetGameArtwork((long)row["Id"]);
+                _ = GetGameArtwork((long)row["Id"]);
             }
         }
 

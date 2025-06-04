@@ -9,11 +9,25 @@ using static Classes.Common;
 
 namespace Classes
 {
-	public class Logging
-	{
+    /// <summary>
+    /// Provides logging functionality for events, errors, and diagnostics.
+    /// </summary>
+    public class Logging
+    {
         private static DateTime lastDiskRetentionSweep = DateTime.UtcNow;
+        /// <summary>
+        /// Gets or sets a value indicating whether logs should be written only to disk.
+        /// </summary>
         public static bool WriteToDiskOnly { get; set; } = false;
 
+        /// <summary>
+        /// Logs an event with the specified type, process, message, and optional exception, and writes to disk or database as configured.
+        /// </summary>
+        /// <param name="EventType">The type of the log event.</param>
+        /// <param name="ServerProcess">The name of the server process generating the log.</param>
+        /// <param name="Message">The log message.</param>
+        /// <param name="ExceptionValue">The exception associated with the log entry, if any.</param>
+        /// <param name="LogToDiskOnly">If true, logs only to disk; otherwise, logs to disk and database as configured.</param>
         static public void Log(LogType EventType, string ServerProcess, string Message, Exception? ExceptionValue = null, bool LogToDiskOnly = false)
         {
             LogItem logItem = new LogItem
@@ -46,7 +60,8 @@ namespace Classes
                 {
                     TraceOutput += Environment.NewLine + logItem.ExceptionValue.ToString();
                 }
-                switch(logItem.EventType) {
+                switch (logItem.EventType)
+                {
                     case LogType.Information:
                         Console.ForegroundColor = ConsoleColor.Blue;
                         break;
@@ -131,7 +146,7 @@ namespace Classes
                     }
 
                     Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-                    string sql = "DELETE FROM ServerLogs WHERE EventTime < @EventRententionDate; INSERT INTO ServerLogs (EventTime, EventType, Process, Message, Exception, CorrelationId, CallingProcess, CallingUser) VALUES (@EventTime, @EventType, @Process, @Message, @Exception, @correlationid, @callingprocess, @callinguser);";
+                    string sql = "INSERT INTO ServerLogs (EventTime, EventType, Process, Message, Exception, CorrelationId, CallingProcess, CallingUser) VALUES (@EventTime, @EventType, @Process, @Message, @Exception, @correlationid, @callingprocess, @callinguser);";
                     Dictionary<string, object> dbDict = new Dictionary<string, object>();
                     dbDict.Add("EventRententionDate", DateTime.UtcNow.AddDays(Config.LoggingConfiguration.LogRetention * -1));
                     dbDict.Add("EventTime", logItem.EventTime);
@@ -143,14 +158,17 @@ namespace Classes
                     dbDict.Add("callingprocess", callingProcess);
                     dbDict.Add("callinguser", callingUser);
 
-                    try
+                    Task.Run(async () =>
                     {
-                        db.ExecuteCMD(sql, dbDict);
-                    }
-                    catch (Exception ex)
-                    {   
-                        LogToDisk(logItem, TraceOutput, ex);
-                    }
+                        try
+                        {
+                            await db.ExecuteCMDAsync(sql, dbDict);
+                        }
+                        catch (Exception ex)
+                        {
+                            LogToDisk(logItem, TraceOutput, ex);
+                        }
+                    });
                 }
                 else
                 {
@@ -167,9 +185,9 @@ namespace Classes
                 foreach (string file in files)
                 {
                     FileInfo fi = new FileInfo(file);
-                    if (fi.LastAccessTime < DateTime.Now.AddDays(Config.LoggingConfiguration.LogRetention * -1)) 
-                    { 
-                        fi.Delete(); 
+                    if (fi.LastAccessTime < DateTime.Now.AddDays(Config.LoggingConfiguration.LogRetention * -1))
+                    {
+                        fi.Delete();
                     }
                 }
             }
@@ -181,7 +199,7 @@ namespace Classes
             {
                 // dump the error
                 File.AppendAllText(Config.LogFilePath, logItem.EventTime.ToString("yyyyMMdd HHmmss") + ": " + logItem.EventType.ToString() + ": " + logItem.Process + ": " + logItem.Message + Environment.NewLine + exception.ToString());
-            
+
 
                 // something went wrong writing to the db
                 File.AppendAllText(Config.LogFilePath, logItem.EventTime.ToString("yyyyMMdd HHmmss") + ": The following event was unable to be written to the log database:");
@@ -190,13 +208,20 @@ namespace Classes
             File.AppendAllText(Config.LogFilePath, TraceOutput);
         }
 
-        static public List<LogItem> GetLogs(LogsViewModel model) 
+        /// <summary>
+        /// Retrieves a list of log entries based on the specified search criteria.
+        /// </summary>
+        /// <param name="model">The search criteria for retrieving logs.</param>
+        /// <returns>A list of <see cref="LogItem"/> objects matching the criteria.</returns>
+        static public List<LogItem> GetLogs(LogsViewModel model)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            Dictionary<string, object> dbDict = new Dictionary<string, object>();
-            dbDict.Add("StartIndex", model.StartIndex);
-            dbDict.Add("PageNumber", (model.PageNumber - 1) * model.PageSize);
-            dbDict.Add("PageSize", model.PageSize);
+            Dictionary<string, object> dbDict = new Dictionary<string, object>
+            {
+                { "StartIndex", model.StartIndex },
+                { "PageNumber", (model.PageNumber - 1) * model.PageSize },
+                { "PageSize", model.PageSize }
+            };
             string sql = "";
 
             List<string> whereClauses = new List<string>();
@@ -283,7 +308,7 @@ namespace Classes
                 {
                     whereClause = "WHERE " + whereClause;
                 }
-                
+
                 sql = "SELECT ServerLogs.Id, ServerLogs.EventTime, ServerLogs.EventType, ServerLogs.`Process`, ServerLogs.Message, ServerLogs.Exception, ServerLogs.CorrelationId, ServerLogs.CallingProcess, Users.Email FROM ServerLogs LEFT JOIN Users ON ServerLogs.CallingUser = Users.Id " + whereClause + " ORDER BY ServerLogs.Id DESC LIMIT @PageSize OFFSET @PageNumber;";
             }
             else
@@ -292,7 +317,7 @@ namespace Classes
                 {
                     whereClause = "AND " + whereClause;
                 }
-                
+
                 sql = "SELECT ServerLogs.Id, ServerLogs.EventTime, ServerLogs.EventType, ServerLogs.`Process`, ServerLogs.Message, ServerLogs.Exception, ServerLogs.CorrelationId, ServerLogs.CallingProcess, Users.Email FROM ServerLogs LEFT JOIN Users ON ServerLogs.CallingUser = Users.Id  WHERE ServerLogs.Id < @StartIndex " + whereClause + " ORDER BY ServerLogs.Id DESC LIMIT @PageSize OFFSET @PageNumber;";
             }
             DataTable dataTable = db.ExecuteCMD(sql, dbDict);
@@ -319,24 +344,109 @@ namespace Classes
             return logs;
         }
 
+        /// <summary>
+        /// Asynchronously deletes old log entries from the database based on the configured log retention period.
+        /// </summary>
+        static public async Task PurgeLogsAsync()
+        {
+            // delete old logs
+            Logging.Log(Logging.LogType.Information, "Maintenance", "Removing logs older than " + Config.LoggingConfiguration.LogRetention + " days");
+            long deletedCount = 1;
+            long deletedEventCount = 0;
+            long maxLoops = 10000;
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql = "DELETE FROM ServerLogs WHERE EventTime < @EventRetentionDate LIMIT 1000; SELECT ROW_COUNT() AS Count;";
+            Dictionary<string, object> dbDict = new Dictionary<string, object>
+            {
+                { "EventRetentionDate", DateTime.UtcNow.AddDays(Config.LoggingConfiguration.LogRetention * -1) }
+            };
+            while (deletedCount > 0)
+            {
+                DataTable deletedCountTable = await db.ExecuteCMDAsync(sql, dbDict);
+                deletedCount = (long)deletedCountTable.Rows[0][0];
+                deletedEventCount += deletedCount;
+
+                Logging.Log(Logging.LogType.Information, "Maintenance", "Deleted " + deletedCount + " log entries");
+
+                // check if we've hit the limit
+                maxLoops -= 1;
+                if (maxLoops <= 0)
+                {
+                    Logging.Log(Logging.LogType.Warning, "Maintenance", "Hit the maximum number of loops for deleting logs. Stopping.");
+                    break;
+                }
+            }
+            Logging.Log(Logging.LogType.Information, "Maintenance", "Deleted " + deletedEventCount + " log entries");
+        }
+
+        /// <summary>
+        /// Specifies the type of log entry.
+        /// </summary>
         public enum LogType
         {
+            /// <summary>
+            /// Represents an informational log entry.
+            /// </summary>
             Information = 0,
+            /// <summary>
+            /// Represents a debug log entry.
+            /// </summary>
             Debug = 1,
+            /// <summary>
+            /// Represents a warning log entry.
+            /// </summary>
             Warning = 2,
+            /// <summary>
+            /// Represents a critical log entry.
+            /// </summary>
             Critical = 3
         }
 
+        /// <summary>
+        /// Represents a single log entry.
+        /// </summary>
         public class LogItem
         {
+            /// <summary>
+            /// Gets or sets the unique identifier for the log entry.
+            /// </summary>
             public long Id { get; set; }
+
+            /// <summary>
+            /// Gets or sets the date and time when the log event occurred (in UTC).
+            /// </summary>
             public DateTime EventTime { get; set; }
+
+            /// <summary>
+            /// Gets or sets the type of the log event.
+            /// </summary>
             public LogType? EventType { get; set; }
+
+            /// <summary>
+            /// Gets or sets the process or component that generated the log entry.
+            /// </summary>
             public string Process { get; set; } = "";
+
+            /// <summary>
+            /// Gets or sets the correlation identifier for related log entries.
+            /// </summary>
             public string CorrelationId { get; set; } = "";
+
+            /// <summary>
+            /// Gets or sets the background process or API endpoint that generated the log entry.
+            /// </summary>
             public string? CallingProcess { get; set; } = "";
+
+            /// <summary>
+            /// Gets or sets the user that generated the log entry.
+            /// </summary>
             public string? CallingUser { get; set; } = "";
+
             private string _Message = "";
+
+            /// <summary>
+            /// Gets or sets the message associated with the log entry.
+            /// </summary>
             public string Message
             {
                 get
@@ -348,6 +458,9 @@ namespace Classes
                     _Message = value;
                 }
             }
+            /// <summary>
+            /// Gets or sets the exception details associated with the log entry, if any.
+            /// </summary>
             public string? ExceptionValue { get; set; }
         }
 
@@ -384,7 +497,7 @@ namespace Classes
             /// The start date and time of the returned logs - all dates are in UTC
             /// </summary>
             public DateTime? StartDateTime { get; set; }
-            
+
             /// <summary>
             /// The end date and time of the returned logs - all dates are in UTC
             /// </summary>

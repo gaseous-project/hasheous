@@ -463,10 +463,10 @@ function renderContent() {
 
     switch (pageType) {
         case "platform":
-            let linkedGamesSection = document.getElementById('dataObjectLinkedGames');
-            linkedGamesSection.style.display = '';
+            // let linkedGamesSection = document.getElementById('dataObjectLinkedGames');
+            // linkedGamesSection.style.display = '';
 
-            createDataObjectsTable(1, 20, 'game', dataObject.id);
+            // createDataObjectsTable(1, 20, 'game', dataObject.id);
 
             break;
 
