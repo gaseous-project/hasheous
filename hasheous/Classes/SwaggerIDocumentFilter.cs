@@ -193,7 +193,7 @@ public class IGDBMetadataDocumentFilter : IDocumentFilter
                                     Reference = new OpenApiReference
                                     {
                                         Type = ReferenceType.SecurityScheme,
-                                        Id = "API Key"
+                                        Id = "Client API Key"
                                     }
                                 },
                                 securityRequirements
