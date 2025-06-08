@@ -109,17 +109,13 @@ namespace Classes.Metadata.Utility
                 string columnName = property.Name;
                 string columnType = "VARCHAR(255)"; // Default type, can be changed based on property type
 
-                // check if there is a column with the name of the property
-                string checkColumnQuery = $"SHOW COLUMNS FROM `{tableName}` LIKE '{columnName}'";
-                var result = db.ExecuteCMD(checkColumnQuery);
-                if (result.Rows.Count > 0)
-                {
-                    // Column already exists, skip adding it
-                    continue;
-                }
-
                 // Convert the property type name to a string
                 string propertyTypeName = property.PropertyType.Name;
+                if (propertyTypeName == "Nullable`1")
+                {
+                    // If the property is nullable, get the underlying type
+                    propertyTypeName = property.PropertyType.GetGenericArguments()[0].Name;
+                }
 
                 // Determine the SQL type based on the property type
                 switch (propertyTypeName)
@@ -137,6 +133,7 @@ namespace Classes.Metadata.Utility
                         columnType = "BOOLEAN";
                         break;
                     case "DateTime":
+                    case "DateTimeOffset":
                         columnType = "DATETIME";
                         break;
                     case "Double":
@@ -148,6 +145,32 @@ namespace Classes.Metadata.Utility
                     case "IdentitiesOrValues`1":
                         columnType = "LONGTEXT";
                         break;
+                }
+
+                // check if there is a column with the name of the property
+                string checkColumnQuery = $"SHOW COLUMNS FROM `{tableName}` LIKE '{columnName}'";
+                var result = db.ExecuteCMD(checkColumnQuery);
+                if (result.Rows.Count > 0)
+                {
+                    // Column already exists, check if the type matches
+                    string existingType = result.Rows[0]["Type"].ToString();
+                    if (existingType.ToLower().Split("(")[0] != columnType.ToLower().Split("(")[0] && existingType != "text" && existingType != "longtext")
+                    {
+                        // If the type does not match, we cannot change the column type in MySQL without dropping it first
+                        Console.WriteLine($"Column '{columnName}' in table '{tableName}' already exists with type '{existingType}', but expected type is '{columnType}'.");
+                        string alterColumnQuery = $"ALTER TABLE `{tableName}` MODIFY COLUMN `{columnName}` {columnType}";
+                        Console.WriteLine($"Executing query: {alterColumnQuery}");
+                        try
+                        {
+                            db.ExecuteNonQuery(alterColumnQuery);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Error altering column '{columnName}' in table '{tableName}': {ex.Message}");
+                        }
+                        continue; // Skip this column as we cannot change its type
+                    }
+                    continue; // Skip this column as it already exists
                 }
 
                 // Add the column to the table if it does not already exist

@@ -124,6 +124,10 @@ namespace hasheous_server.Classes.Metadata.IGDB
                     endpoint.Endpoint = IGDBClient.Endpoints.AgeRatingCategories;
                     break;
 
+                case "AgeRatingContentDescriptionV2":
+                    endpoint.Endpoint = "age_rating_content_descriptions_v2";
+                    break;
+
                 case "Collection":
                     endpoint.Endpoint = IGDBClient.Endpoints.Collections;
                     endpoint.SupportsSlugSearch = true;
