@@ -16,6 +16,7 @@ using static Authentication.ApiKey;
 using static Authentication.ClientApiKey;
 using hasheous_server.Classes.Metadata.IGDB;
 using HasheousClient.Models.Metadata.IGDB;
+using System.Diagnostics;
 
 Logging.WriteToDiskOnly = true;
 Logging.Log(Logging.LogType.Information, "Startup", "Starting Hasheous Server " + Assembly.GetExecutingAssembly().GetName().Version);
@@ -382,11 +383,19 @@ new ProcessQueue.QueueItem(
 );
 
 ProcessQueue.QueueItem fetchTheGamesDbMetadata = new ProcessQueue.QueueItem(ProcessQueue.QueueItemType.FetchTheGamesDbMetadata, 10080, new List<ProcessQueue.QueueItemType> {
-    ProcessQueue.QueueItemType.GetMissingArtwork, ProcessQueue.QueueItemType.MetadataMatchSearch, ProcessQueue.QueueItemType.AutoMapper, ProcessQueue.QueueItemType.TallyVotes, ProcessQueue.QueueItemType.FetchVIMMMetadata, ProcessQueue.QueueItemType.FetchRetroAchievementsMetadata
+    ProcessQueue.QueueItemType.GetMissingArtwork, ProcessQueue.QueueItemType.MetadataMatchSearch, ProcessQueue.QueueItemType.AutoMapper, ProcessQueue.QueueItemType.TallyVotes, ProcessQueue.QueueItemType.FetchVIMMMetadata, ProcessQueue.QueueItemType.FetchRetroAchievementsMetadata, ProcessQueue.QueueItemType.FetchIGDBMetadata
 });
 fetchTheGamesDbMetadata.ForceExecute();
 ProcessQueue.QueueItems.Add(
     fetchTheGamesDbMetadata
+);
+
+ProcessQueue.QueueItem fetchIGDBMetadata = new ProcessQueue.QueueItem(ProcessQueue.QueueItemType.FetchIGDBMetadata, 10080, new List<ProcessQueue.QueueItemType> {
+    ProcessQueue.QueueItemType.GetMissingArtwork, ProcessQueue.QueueItemType.MetadataMatchSearch, ProcessQueue.QueueItemType.AutoMapper, ProcessQueue.QueueItemType.TallyVotes, ProcessQueue.QueueItemType.FetchVIMMMetadata, ProcessQueue.QueueItemType.FetchRetroAchievementsMetadata, ProcessQueue.QueueItemType.FetchTheGamesDbMetadata
+});
+fetchIGDBMetadata.ForceExecute();
+ProcessQueue.QueueItems.Add(
+    fetchIGDBMetadata
 );
 
 if (Config.RetroAchievements.APIKey != null)
@@ -394,7 +403,7 @@ if (Config.RetroAchievements.APIKey != null)
     if (Config.RetroAchievements.APIKey != "")
     {
         ProcessQueue.QueueItem fetchRetroAchievementsMetadata = new ProcessQueue.QueueItem(ProcessQueue.QueueItemType.FetchRetroAchievementsMetadata, 10080, new List<ProcessQueue.QueueItemType> {
-    ProcessQueue.QueueItemType.GetMissingArtwork, ProcessQueue.QueueItemType.MetadataMatchSearch, ProcessQueue.QueueItemType.AutoMapper, ProcessQueue.QueueItemType.TallyVotes, ProcessQueue.QueueItemType.FetchVIMMMetadata, ProcessQueue.QueueItemType.FetchTheGamesDbMetadata
+    ProcessQueue.QueueItemType.GetMissingArtwork, ProcessQueue.QueueItemType.MetadataMatchSearch, ProcessQueue.QueueItemType.AutoMapper, ProcessQueue.QueueItemType.TallyVotes, ProcessQueue.QueueItemType.FetchVIMMMetadata, ProcessQueue.QueueItemType.FetchTheGamesDbMetadata, ProcessQueue.QueueItemType.FetchIGDBMetadata
 });
         fetchRetroAchievementsMetadata.ForceExecute();
         ProcessQueue.QueueItems.Add(
