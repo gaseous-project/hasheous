@@ -203,6 +203,11 @@ namespace Classes
 
                                     break;
 
+                                case QueueItemType.FetchIGDBMetadata:
+                                    InternetGameDatabase.DownloadManager igdbDownloader = new InternetGameDatabase.DownloadManager();
+                                    igdbDownloader.Download();
+                                    break;
+
                                 case QueueItemType.AutoMapper:
                                     await AutoMapper.RomAutoMapper();
                                     break;
@@ -298,6 +303,11 @@ namespace Classes
             /// Fetch RetroAchievements metadata
             /// </summary>
             FetchRetroAchievementsMetadata,
+
+            /// <summary>
+            /// Fetch IGDB metadata
+            /// </summary>
+            FetchIGDBMetadata,
 
             /// <summary>
             /// Loops all ROMs in the database and attempts to match them to a data object - or creates a new datao object if no match is found

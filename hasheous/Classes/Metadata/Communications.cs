@@ -195,6 +195,7 @@ namespace hasheous_server.Classes.Metadata
                     return null;
                 case MetadataSources.IGDB:
                     return await IGDBAPI<T>(Endpoint, Fields, Query);
+
                 default:
                     return null;
             }

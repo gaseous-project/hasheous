@@ -1,6 +1,6 @@
 services:
   development:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile
     volumes:
@@ -13,10 +13,11 @@ services:
       - dbpass=hasheous
       - igdbclientid=${IGDBCLIENTID}
       - igdbclientsecret=${IGDBCLIENTSECRET}
+      - igdbusedumps=${IGDBUSEDUMPS}
   mariadb:
     hostname: mariadb
     image: mariadb:latest
-    ports: 
+    ports:
       - 3307:3306
     environment:
       - MARIADB_ROOT_PASSWORD=hasheous
