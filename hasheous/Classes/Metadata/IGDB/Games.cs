@@ -43,10 +43,17 @@ namespace hasheous_server.Classes.Metadata.IGDB
 
 
             // get Game metadata
-            Communications comms = new Communications(Communications.MetadataSources.IGDB);
-            var results = await comms.APIComm<Game>(IGDBClient.Endpoints.Games, searchFields, searchBody);
+            if (Config.IGDB.UseDumps == true && Config.IGDB.DumpsAvailable == true)
+            {
+                return await Metadata.GetObjectsFromDatabase<Game>(IGDBClient.Endpoints.Games, searchFields, searchBody);
+            }
+            else
+            {
+                Communications comms = new Communications(Communications.MetadataSources.IGDB);
+                var results = await comms.APIComm<Game>(IGDBClient.Endpoints.Games, searchFields, searchBody);
 
-            return results;
+                return results;
+            }
         }
 
         public enum SearchType

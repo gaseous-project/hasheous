@@ -19,6 +19,7 @@ services:
       - dbpass=hasheous
       - igdbclientid=<clientid>
       - igdbclientsecret=<clientsecret>
+      - igdbusedumps=false
   hsdb:
     container_name: hsdb
     image: mariadb

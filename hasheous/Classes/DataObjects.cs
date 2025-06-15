@@ -1316,32 +1316,35 @@ namespace hasheous_server.Classes
                                                     foreach (Games.SearchType searchType in Enum.GetValues(typeof(Games.SearchType)))
                                                     {
                                                         IGDB.Models.Game[] games = Games.SearchForGame(SearchCandidate, (long)PlatformId, searchType);
-                                                        if (games.Length == 1)
+                                                        if (games != null)
                                                         {
-                                                            // exact match!
-                                                            DataObjectSearchResults = new MatchItem
+                                                            if (games.Length == 1)
                                                             {
-                                                                MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic,
-                                                                MetadataId = games[0].Slug
-                                                            };
-                                                            SearchComplete = true;
-                                                            break;
-                                                        }
-                                                        else if (games.Length > 1)
-                                                        {
-                                                            // too many matches - high likelihood of sequels and other variants
-                                                            foreach (Game game in games)
-                                                            {
-                                                                if (game.Name == SearchCandidate)
+                                                                // exact match!
+                                                                DataObjectSearchResults = new MatchItem
                                                                 {
-                                                                    // found game title matches the search candidate
-                                                                    DataObjectSearchResults = new MatchItem
+                                                                    MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic,
+                                                                    MetadataId = games[0].Slug
+                                                                };
+                                                                SearchComplete = true;
+                                                                break;
+                                                            }
+                                                            else if (games.Length > 1)
+                                                            {
+                                                                // too many matches - high likelihood of sequels and other variants
+                                                                foreach (Game game in games)
+                                                                {
+                                                                    if (game.Name == SearchCandidate)
                                                                     {
-                                                                        MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic,
-                                                                        MetadataId = game.Slug
-                                                                    };
-                                                                    SearchComplete = true;
-                                                                    break;
+                                                                        // found game title matches the search candidate
+                                                                        DataObjectSearchResults = new MatchItem
+                                                                        {
+                                                                            MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic,
+                                                                            MetadataId = game.Slug
+                                                                        };
+                                                                        SearchComplete = true;
+                                                                        break;
+                                                                    }
                                                                 }
                                                             }
                                                         }
@@ -1626,6 +1629,39 @@ namespace hasheous_server.Classes
                 SearchCandidates.Add(GameName.Substring(0, GameName.IndexOf(": ")).Trim());
             }
 
+            // strip any leading "The " from the game name
+            if (GameName.StartsWith("The ", StringComparison.OrdinalIgnoreCase))
+            {
+                SearchCandidates.Add(GameName.Substring(4).Trim());
+            }
+
+            // strip any ", The" from the end of the game name
+            if (GameName.EndsWith(", The", StringComparison.OrdinalIgnoreCase))
+            {
+                SearchCandidates.Add(GameName.Substring(0, GameName.Length - 5).Trim());
+            }
+
+            // strip any leading "A " from the game name
+            if (GameName.StartsWith("A ", StringComparison.OrdinalIgnoreCase))
+            {
+                SearchCandidates.Add(GameName.Substring(2).Trim());
+            }
+
+            // strip any leading "An " from the game name
+            if (GameName.StartsWith("An ", StringComparison.OrdinalIgnoreCase))
+            {
+                SearchCandidates.Add(GameName.Substring(3).Trim());
+            }
+
+            // add the original name as a candidate
+            SearchCandidates.Add(GameName);
+
+            // remove duplicates
+            SearchCandidates = SearchCandidates.Distinct().ToList();
+
+            // remove any empty candidates
+            SearchCandidates.RemoveAll(x => string.IsNullOrWhiteSpace(x));
+
             Logging.Log(Logging.LogType.Information, "Import Game", "Search candidates: " + String.Join(", ", SearchCandidates));
 
             return SearchCandidates;
@@ -1634,7 +1670,16 @@ namespace hasheous_server.Classes
         private async Task<MatchItem> GetDataObject<T>(MetadataSources Source, string Endpoint, string Fields, string Query)
         {
             Communications communications = new Communications(Source);
-            var results = await communications.APIComm<T>(Endpoint, Fields, Query);
+            T[]? results;
+
+            if (Config.IGDB.UseDumps == true && Config.IGDB.DumpsAvailable == true)
+            {
+                results = await hasheous_server.Classes.Metadata.IGDB.Metadata.GetObjectsFromDatabase<T>(Endpoint, Fields, Query);
+            }
+            else
+            {
+                results = await communications.APIComm<T>(Endpoint, Fields, Query);
+            }
 
             MatchItem matchItem = new MatchItem();
 

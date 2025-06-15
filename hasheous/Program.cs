@@ -390,13 +390,16 @@ ProcessQueue.QueueItems.Add(
     fetchTheGamesDbMetadata
 );
 
-ProcessQueue.QueueItem fetchIGDBMetadata = new ProcessQueue.QueueItem(ProcessQueue.QueueItemType.FetchIGDBMetadata, 10080, new List<ProcessQueue.QueueItemType> {
+if (Config.IGDB.UseDumps == true)
+{
+    ProcessQueue.QueueItem fetchIGDBMetadata = new ProcessQueue.QueueItem(ProcessQueue.QueueItemType.FetchIGDBMetadata, 10080, new List<ProcessQueue.QueueItemType> {
     ProcessQueue.QueueItemType.GetMissingArtwork, ProcessQueue.QueueItemType.MetadataMatchSearch, ProcessQueue.QueueItemType.AutoMapper, ProcessQueue.QueueItemType.TallyVotes, ProcessQueue.QueueItemType.FetchVIMMMetadata, ProcessQueue.QueueItemType.FetchRetroAchievementsMetadata, ProcessQueue.QueueItemType.FetchTheGamesDbMetadata
 });
-fetchIGDBMetadata.ForceExecute();
-ProcessQueue.QueueItems.Add(
-    fetchIGDBMetadata
-);
+    fetchIGDBMetadata.ForceExecute();
+    ProcessQueue.QueueItems.Add(
+        fetchIGDBMetadata
+    );
+}
 
 if (Config.RetroAchievements.APIKey != null)
 {

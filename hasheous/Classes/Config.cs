@@ -521,8 +521,43 @@ namespace Classes
                     }
                 }
 
+                private static bool _UseDumps
+                {
+                    get
+                    {
+                        if (!String.IsNullOrEmpty(Environment.GetEnvironmentVariable("igdbusedumps")))
+                        {
+                            return bool.Parse(Environment.GetEnvironmentVariable("igdbusedumps"));
+                        }
+                        else
+                        {
+                            return false;
+                        }
+                    }
+                }
+
                 public string ClientId = _DefaultIGDBClientId;
                 public string Secret = _DefaultIGDBSecret;
+                public bool UseDumps = _UseDumps;
+
+                [JsonIgnore]
+                public bool DumpsAvailable
+                {
+                    get
+                    {
+                        if (
+                            File.Exists(Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB, "Dumps", "existing_dumps.json")) &&
+                            File.Exists(Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB, "Dumps", "dumps_downloaded.flag"))
+                            )
+                        {
+                            return true;
+                        }
+                        else
+                        {
+                            return false;
+                        }
+                    }
+                }
             }
 
             public class RetroAchievements

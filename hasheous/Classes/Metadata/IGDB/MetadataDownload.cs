@@ -343,7 +343,7 @@ namespace InternetGameDatabase
                                         break;
 
                                     case "INTEGER[]":
-                                        columnType = "TEXT"; // use TEXT for INTEGER arrays
+                                        columnType = "JSON"; // use JSON for INTEGER arrays
                                         break;
 
                                     case "BOOLEAN":
@@ -359,7 +359,7 @@ namespace InternetGameDatabase
                                         break;
 
                                     case "STRING":
-                                        if (column == "name")
+                                        if (column == "name" || column == "slug")
                                         {
                                             columnType = "VARCHAR(255)"; // use VARCHAR for STRING
                                         }
@@ -370,7 +370,7 @@ namespace InternetGameDatabase
                                         break;
 
                                     case "LONG[]":
-                                        columnType = "TEXT"; // use TEXT for LONG arrays
+                                        columnType = "JSON"; // use JSON for LONG arrays
                                         break;
 
                                     case "DOUBLE":
@@ -401,6 +401,11 @@ namespace InternetGameDatabase
                                     case "name":
                                         // add fulltext index for name
                                         indexes += "FULLTEXT KEY `ft_name` (`name`), INDEX `idx_name` (`name` ASC) VISIBLE,";
+                                        break;
+
+                                    case "slug":
+                                        // add index for slug
+                                        indexes += "INDEX `idx_slug` (`slug` ASC) VISIBLE,";
                                         break;
                                 }
 
@@ -453,6 +458,13 @@ namespace InternetGameDatabase
                                             sql += $"`{columns[j]}`";
                                             columnValueParams += $"@{columns[j]}";
 
+                                            string columnValue = Fields[j];
+                                            if (columnValue.StartsWith("\"") && columnValue.EndsWith("\""))
+                                            {
+                                                // remove the quotes from the column value
+                                                columnValue = columnValue.Trim('"');
+                                            }
+
                                             // add the column value to the dictionary
                                             if (Fields[j] == "null" || Fields[j] == "")
                                             {
@@ -463,19 +475,24 @@ namespace InternetGameDatabase
                                                 switch (schema.schema[columns[j]].ToString())
                                                 {
                                                     case "BOOLEAN":
-                                                        // if fields[j] is any value other than "0" or "1", treat it as true
-                                                        columnValues.Add(columns[j], Fields[j] == "1" || Fields[j].ToLower() == "true");
+                                                        // if columnValue is any value other than "0" or "1", treat it as true
+                                                        columnValues.Add(columns[j], columnValue == "1" || columnValue.ToLower() == "true");
                                                         break;
 
                                                     case "INTEGER[]":
                                                     case "LONG[]":
-                                                        // for arrays, remove any quotes
-                                                        columnValues.Add(columns[j], Fields[j].Replace("\"", "").Replace("'", ""));
+                                                        columnValues.Add(columns[j], columnValue);
+
+                                                        // these are arrays, but the source is wrapping them in curly braces, so need to replace them with square brackets
+                                                        if (columnValue.StartsWith("{") && columnValue.EndsWith("}"))
+                                                        {
+                                                            columnValues[columns[j]] = "[" + columnValue.Trim('{', '}') + "]";
+                                                        }
                                                         break;
 
                                                     default:
                                                         // for all other types, just add the value as a string
-                                                        columnValues.Add(columns[j], Fields[j]);
+                                                        columnValues.Add(columns[j], columnValue);
                                                         break;
                                                 }
                                             }
@@ -498,6 +515,12 @@ namespace InternetGameDatabase
                     }
                 }
             }
+
+            // save a flag to indicate that the dumps have been downloaded and processed
+            File.WriteAllText(Path.Combine(LocalFilePath, "dumps_downloaded.flag"), DateTime.UtcNow.ToString("o"));
+
+            // log the completion of the download
+            Logging.Log(Logging.LogType.Information, "IGDB Dumps", "Dumps download and import completed successfully.");
         }
 
         private string[] SplitCSVIntoLines(string csvContent)
