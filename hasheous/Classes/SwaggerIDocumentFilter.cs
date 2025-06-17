@@ -76,6 +76,43 @@ public class IGDBMetadataDocumentFilter : IDocumentFilter
                         }
                     });
                 }
+                if (Metadata.Endpoints.ContainsKey(type.Name))
+                {
+                    if (Metadata.Endpoints[type.Name].FieldNames != null && Metadata.Endpoints[type.Name].FieldNames.Count > 0)
+                    {
+                        string example = "";
+                        foreach (var field in Metadata.Endpoints[type.Name].FieldNames)
+                        {
+                            // get the endpoint from the target type
+                            string targetType = field.Value.TargetType;
+                            if (targetType != null)
+                            {
+                                targetType = type.Name;
+
+                                if (Metadata.Endpoints.ContainsKey(targetType))
+                                {
+                                    example += $"{Metadata.Endpoints[targetType].Endpoint},";
+                                }
+                            }
+                        }
+                        if (example.Length > 0)
+                        {
+                            example = "*, " + example.TrimEnd(',');
+                        }
+
+                        operation.Parameters.Add(new OpenApiParameter
+                        {
+                            Name = "expandColumns",
+                            In = ParameterLocation.Query,
+                            Description = "A comma-separated list of columns to expand in the response. If not provided, only a list of object id's will be returned. Allowed values: " + example,
+                            Required = false,
+                            Schema = new OpenApiSchema
+                            {
+                                Type = "string"
+                            }
+                        });
+                    }
+                }
 
                 // create response properties
                 var properties = new Dictionary<string, OpenApiSchema>

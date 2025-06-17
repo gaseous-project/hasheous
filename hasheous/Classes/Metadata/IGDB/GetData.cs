@@ -792,317 +792,462 @@ namespace hasheous_server.Classes.Metadata.IGDB
             return results;
         }
 
+        public static readonly Dictionary<string, EndpointDataItem> Endpoints = new Dictionary<string, EndpointDataItem>
+        {
+            { "AgeRating", new EndpointDataItem {
+                Endpoint = "age_ratings",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "Organization", new EndpointDataItem.FieldNameItem { TargetType = "AgeRatingOrganization" }},
+                    { "RatingCategory", new EndpointDataItem.FieldNameItem { TargetType = "AgeRatingCategory" }},
+                    { "RatingContentDescriptions", new EndpointDataItem.FieldNameItem { TargetType = "AgeRatingContentDescriptionV2" }}
+                }
+            } },
+            { "AgeRatingCategory", new EndpointDataItem {
+                Endpoint = "age_rating_categories",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "Organization", new EndpointDataItem.FieldNameItem { TargetType = "AgeRatingOrganization" } }
+                }
+            } },
+            { "AgeRatingContentDescriptionV2", new EndpointDataItem {
+                Endpoint = "age_rating_content_descriptions_v2",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "Organization", new EndpointDataItem.FieldNameItem { TargetType = "AgeRatingOrganization" } }
+                }
+            } },
+            { "AgeRatingOrganization", new EndpointDataItem { Endpoint = "age_rating_organizations" } },
+            { "AlternativeName", new EndpointDataItem {
+                Endpoint = "alternative_names",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "Game", new EndpointDataItem.FieldNameItem { TargetType = "Game" } }
+                }
+            } },
+            { "Artwork", new EndpointDataItem {
+                Endpoint = "artworks",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "Game", new EndpointDataItem.FieldNameItem { TargetType = "Game" } }
+                }
+            } },
+            { "Character", new EndpointDataItem {
+                Endpoint = "characters",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "CharacterGender", new EndpointDataItem.FieldNameItem { TargetType = "CharacterGender" } },
+                    { "CharacterSpecies", new EndpointDataItem.FieldNameItem { TargetType = "CharacterSpecies" } },
+                    { "Games", new EndpointDataItem.FieldNameItem { TargetType = "Game" } },
+                    { "Mugshot", new EndpointDataItem.FieldNameItem { TargetType = "CharacterMugshot" } }
+                }
+            } },
+            { "CharacterGender", new EndpointDataItem { Endpoint = "character_genders" } },
+            { "CharacterMugshot", new EndpointDataItem { Endpoint = "character_mug_shots" } },
+            { "CharacterSpecies", new EndpointDataItem { Endpoint = "character_species" } },
+            { "Collection", new EndpointDataItem {
+                Endpoint = "collections",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "AsChildRelations", new EndpointDataItem.FieldNameItem { TargetType = "CollectionRelation" } },
+                    { "AsParentRelations", new EndpointDataItem.FieldNameItem { TargetType = "CollectionRelation" } },
+                    { "Games", new EndpointDataItem.FieldNameItem { TargetType = "Game" } },
+                    { "Type", new EndpointDataItem.FieldNameItem { TargetType = "CollectionType" } }
+                },
+                SupportsSlugSearch = true
+            } },
+            { "CollectionMembership", new EndpointDataItem {
+                Endpoint = "collection_memberships",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "Collection", new EndpointDataItem.FieldNameItem { TargetType = "Collection" } },
+                    { "Game", new EndpointDataItem.FieldNameItem { TargetType = "Game" } },
+                    { "Type", new EndpointDataItem.FieldNameItem { TargetType = "CollectionMembershipType" } }
+                }
+            } },
+            { "CollectionMembershipType", new EndpointDataItem {
+                Endpoint = "collection_membership_types",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "AllowedCollectionType", new EndpointDataItem.FieldNameItem { TargetType = "CollectionType" } },
+                }
+            } },
+            { "CollectionRelation", new EndpointDataItem {
+                Endpoint = "collection_relations",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "ParentCollection", new EndpointDataItem.FieldNameItem { TargetType = "Collection" } },
+                    { "ChildCollection", new EndpointDataItem.FieldNameItem { TargetType = "Collection" } },
+                    { "Type", new EndpointDataItem.FieldNameItem { TargetType = "CollectionRelationType" } }
+                }
+            } },
+            { "CollectionRelationType", new EndpointDataItem {
+                Endpoint = "collection_relation_types",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "AllowedChildType", new EndpointDataItem.FieldNameItem { TargetType = "CollectionType" } },
+                    { "AllowedParentType", new EndpointDataItem.FieldNameItem { TargetType = "CollectionType" } }
+                }
+            } },
+            { "CollectionType", new EndpointDataItem { Endpoint = "collection_types" } },
+            { "Company", new EndpointDataItem {
+                Endpoint = "companies",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "ChangeDateFormats", new EndpointDataItem.FieldNameItem { TargetType = "DateFormat" } },
+                    { "ChangedCompanyId", new EndpointDataItem.FieldNameItem { TargetType = "Company" } },
+                    { "Developed", new EndpointDataItem.FieldNameItem { TargetType = "Game" } },
+                    { "Logo", new EndpointDataItem.FieldNameItem { TargetType = "CompanyLogo" } },
+                    { "Parent", new EndpointDataItem.FieldNameItem { TargetType = "Company" } },
+                    { "Published", new EndpointDataItem.FieldNameItem { TargetType = "Game" } },
+                    { "StartDateFormat", new EndpointDataItem.FieldNameItem { TargetType = "DateFormat" } },
+                    { "Status", new EndpointDataItem.FieldNameItem { TargetType = "CompanyStatus" } },
+                    { "Websites", new EndpointDataItem.FieldNameItem { TargetType = "CompanyWebsite" } }
+                },
+                SupportsSlugSearch = true
+            } },
+            { "CompanyLogo", new EndpointDataItem { Endpoint = "company_logos" } },
+            { "CompanyStatus", new EndpointDataItem { Endpoint = "company_statuses" } },
+            { "CompanyWebsite", new EndpointDataItem {
+                Endpoint = "company_websites",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "Type", new EndpointDataItem.FieldNameItem { TargetType = "WebsiteType" } },
+                }
+            } },
+            { "Cover", new EndpointDataItem {
+                Endpoint = "covers",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "Game", new EndpointDataItem.FieldNameItem { TargetType = "Game" } },
+                    { "GameLocalization", new EndpointDataItem.FieldNameItem { TargetType = "GameLocalization" } }
+                }
+            } },
+            { "DateFormat", new EndpointDataItem { Endpoint = "date_formats" } },
+            { "Event", new EndpointDataItem {
+                Endpoint = "events",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "EventLogo", new EndpointDataItem.FieldNameItem { TargetType = "EventLogo" } },
+                    { "EventNetwork", new EndpointDataItem.FieldNameItem { TargetType = "EventNetwork" } },
+                    { "Games", new EndpointDataItem.FieldNameItem { TargetType = "Game" } }
+                }
+            } },
+            { "EventLogo", new EndpointDataItem { Endpoint = "event_logos" } },
+            { "EventNetwork", new EndpointDataItem {
+                Endpoint = "event_networks",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "Event", new EndpointDataItem.FieldNameItem { TargetType = "Event" } },
+                    { "NetworkType", new EndpointDataItem.FieldNameItem { TargetType = "NetworkType" } }
+                }
+            } },
+            { "ExternalGame", new EndpointDataItem {
+                Endpoint = "external_games",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "ExternalGameSource", new EndpointDataItem.FieldNameItem { TargetType = "ExternalGameSource" } },
+                    { "GameReleaseFormat", new EndpointDataItem.FieldNameItem { TargetType = "GameReleaseFormat" } },
+                    { "Game", new EndpointDataItem.FieldNameItem { TargetType = "Game" } },
+                    { "Platform", new EndpointDataItem.FieldNameItem { TargetType = "Platform" } }
+                }
+            } },
+            { "ExternalGameSource", new EndpointDataItem { Endpoint = "external_game_sources" } },
+            { "Franchise", new EndpointDataItem {
+                Endpoint = "franchises",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "Games", new EndpointDataItem.FieldNameItem { TargetType = "Game" } }
+                },
+                SupportsSlugSearch = true
+            } },
+            { "Game", new EndpointDataItem {
+                Endpoint = "games",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "AgeRatings", new EndpointDataItem.FieldNameItem { TargetType = "AgeRating" } },
+                    { "AlternativeNames", new EndpointDataItem.FieldNameItem { TargetType = "AlternativeName" } },
+                    { "Artworks", new EndpointDataItem.FieldNameItem { TargetType = "Artwork" } },
+                    { "Bundles", new EndpointDataItem.FieldNameItem { TargetType = "Game" } },
+                    { "Collections", new EndpointDataItem.FieldNameItem { TargetType = "Collection" } },
+                    { "Cover", new EndpointDataItem.FieldNameItem { TargetType = "Cover" } },
+                    { "ExpandedGames", new EndpointDataItem.FieldNameItem { TargetType = "Game" } },
+                    { "ExternalGames", new EndpointDataItem.FieldNameItem { TargetType = "ExternalGame" } },
+                    { "Franchise", new EndpointDataItem.FieldNameItem { TargetType = "Franchise" } },
+                    { "GameEngines", new EndpointDataItem.FieldNameItem { TargetType = "GameEngine" } },
+                    { "GameLocalizations", new EndpointDataItem.FieldNameItem { TargetType = "GameLocalization" } },
+                    { "GameModes", new EndpointDataItem.FieldNameItem { TargetType = "GameMode" } },
+                    { "GameStatus", new EndpointDataItem.FieldNameItem { TargetType = "GameStatus" } },
+                    { "GameType", new EndpointDataItem.FieldNameItem { TargetType = "GameType" } },
+                    { "Genres", new EndpointDataItem.FieldNameItem { TargetType = "Genre" } },
+                    { "Keywords", new EndpointDataItem.FieldNameItem { TargetType = "Keyword" } },
+                    { "InvolvedCompanies", new EndpointDataItem.FieldNameItem { TargetType = "InvolvedCompany" } },
+                    { "LanguageSupports", new EndpointDataItem.FieldNameItem { TargetType = "LanguageSupport" } },
+                    { "MultiplayerModes", new EndpointDataItem.FieldNameItem { TargetType = "MultiplayerMode" } },
+                    { "ParentGame", new EndpointDataItem.FieldNameItem { TargetType = "Game" } },
+                    { "Platforms", new EndpointDataItem.FieldNameItem { TargetType = "Platform" } },
+                    { "PlayerPerspectives", new EndpointDataItem.FieldNameItem { TargetType = "PlayerPerspective" } },
+                    { "Ports", new EndpointDataItem.FieldNameItem { TargetType = "Game" } },
+                    { "ReleaseDates", new EndpointDataItem.FieldNameItem { TargetType = "ReleaseDate" } },
+                    { "Remasters", new EndpointDataItem.FieldNameItem { TargetType = "Game" } },
+                    { "Screenshots", new EndpointDataItem.FieldNameItem { TargetType = "Screenshot" } },
+                    { "SimilarGames", new EndpointDataItem.FieldNameItem { TargetType = "Game" } },
+                    { "Themes", new EndpointDataItem.FieldNameItem { TargetType = "Theme" } },
+                    { "VersionParent", new EndpointDataItem.FieldNameItem { TargetType = "Game" } },
+                    { "Videos", new EndpointDataItem.FieldNameItem { TargetType = "GameVideo" } },
+                    { "Websites", new EndpointDataItem.FieldNameItem { TargetType = "Website" } }
+                },
+                SupportsSlugSearch = true
+                }},
+            { "GameEngine", new EndpointDataItem {
+                Endpoint = "game_engines",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "Companies", new EndpointDataItem.FieldNameItem { TargetType = "Company" } },
+                    { "Logo", new EndpointDataItem.FieldNameItem { TargetType = "GameEngineLogo" } },
+                    { "Platforms", new EndpointDataItem.FieldNameItem { TargetType = "Platform" } }
+                }
+            } },
+            { "GameEngineLogo", new EndpointDataItem {Endpoint = "game_engine_logos" } },
+            { "GameLocalization", new EndpointDataItem {
+                Endpoint = "game_localizations",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "Cover", new EndpointDataItem.FieldNameItem { TargetType = "Cover" } },
+                    { "Game", new EndpointDataItem.FieldNameItem { TargetType = "Game" } },
+                    { "Region", new EndpointDataItem.FieldNameItem { TargetType = "Region" } }
+                }
+            } },
+            { "GameMode", new EndpointDataItem { Endpoint = "game_modes" } },
+            { "GameReleaseFormat", new EndpointDataItem { Endpoint = "game_release_formats" } },
+            { "GameStatus", new EndpointDataItem { Endpoint = "game_statuses" } },
+            { "GameTimeToBeat", new EndpointDataItem {
+                Endpoint = "game_time_to_beats",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "GameId", new EndpointDataItem.FieldNameItem { TargetType = "Game" } }
+                }
+            } },
+            { "GameType", new EndpointDataItem { Endpoint = "game_types" } },
+            { "GameVersion", new EndpointDataItem {
+                Endpoint = "game_versions",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    {"Features", new EndpointDataItem.FieldNameItem { TargetType = "GameVersionFeature" }},
+                    { "Game", new EndpointDataItem.FieldNameItem { TargetType = "Game" } },
+                    { "Games", new EndpointDataItem.FieldNameItem { TargetType = "Game" } }
+                }
+            } },
+            { "GameVersionFeature", new EndpointDataItem {
+                Endpoint = "game_version_features",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "Values", new EndpointDataItem.FieldNameItem { TargetType = "GameVersionFeatureValue" } }
+                }
+            } },
+            { "GameVersionFeatureValue", new EndpointDataItem {
+                Endpoint = "game_version_feature_values",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "Game", new EndpointDataItem.FieldNameItem { TargetType = "Game" } },
+                    { "GameFeature", new EndpointDataItem.FieldNameItem { TargetType = "GameVersionFeature" } }
+                }
+            } },
+            { "GameVideo", new EndpointDataItem {
+                Endpoint = "game_videos",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "Game", new EndpointDataItem.FieldNameItem { TargetType = "Game" } }
+                }
+            } },
+            { "Genre", new EndpointDataItem { Endpoint = "genres" } },
+            { "Keyword", new EndpointDataItem { Endpoint = "keywords" } },
+            { "InvolvedCompany", new EndpointDataItem {
+                Endpoint = "involved_companies",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "Company", new EndpointDataItem.FieldNameItem { TargetType = "Company" } },
+                    { "Game", new EndpointDataItem.FieldNameItem { TargetType = "Game" } }
+                }
+            } },
+            { "Language", new EndpointDataItem { Endpoint = "languages" } },
+            { "LanguageSupport", new EndpointDataItem {
+                Endpoint = "language_supports",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "Game", new EndpointDataItem.FieldNameItem { TargetType = "Game" } },
+                    { "Language", new EndpointDataItem.FieldNameItem { TargetType = "Language" } },
+                    { "LanguageSupportType", new EndpointDataItem.FieldNameItem { TargetType = "LanguageSupportType" } }
+                }
+            } },
+            { "LanguageSupportType", new EndpointDataItem { Endpoint = "language_support_types" } },
+            { "MultiplayerMode", new EndpointDataItem {
+                Endpoint = "multiplayer_modes",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "Game", new EndpointDataItem.FieldNameItem { TargetType = "Game" } },
+                    { "Platform", new EndpointDataItem.FieldNameItem { TargetType = "Platform" } }
+                }
+            } },
+            { "NetworkType", new EndpointDataItem {
+                Endpoint = "network_types",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "EventNetwork", new EndpointDataItem.FieldNameItem { TargetType = "EventNetwork" } }
+                }
+            } },
+            { "Platform", new EndpointDataItem {
+                Endpoint = "platforms",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "PlatformFamily", new EndpointDataItem.FieldNameItem { TargetType = "PlatformFamily" } },
+                    { "PlatformLogo", new EndpointDataItem.FieldNameItem { TargetType = "PlatformLogo" } },
+                    { "PlatformType", new EndpointDataItem.FieldNameItem { TargetType = "PlatformType" } },
+                    { "Versions", new EndpointDataItem.FieldNameItem { TargetType = "PlatformVersion" } },
+                    { "Websites", new EndpointDataItem.FieldNameItem { TargetType = "PlatformWebsite" } }
+                },
+                SupportsSlugSearch = true
+            } },
+            { "PlatformFamily", new EndpointDataItem { Endpoint = "platform_families" } },
+            { "PlatformLogo", new EndpointDataItem { Endpoint = "platform_logos" } },
+            { "PlatformType", new EndpointDataItem { Endpoint = "platform_types" } },
+            { "PlatformVersion", new EndpointDataItem {
+                Endpoint = "platform_versions",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "Companies", new EndpointDataItem.FieldNameItem { TargetType = "PlatformVersionCompany" } },
+                    { "Manufacturer", new EndpointDataItem.FieldNameItem { TargetType = "Company" } },
+                    { "PlatformLogo", new EndpointDataItem.FieldNameItem { TargetType = "PlatformLogo" } },
+                    { "PlatformVersionReleaseDates", new EndpointDataItem.FieldNameItem { TargetType = "PlatformVersionReleaseDate" } }
+                }
+            } },
+            { "PlatformVersionCompany", new EndpointDataItem {
+                Endpoint = "platform_version_companies",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "Company", new EndpointDataItem.FieldNameItem { TargetType = "Company" } },
+                    { "Manufacturer", new EndpointDataItem.FieldNameItem { TargetType = "Company" } }
+                }
+            } },
+            { "PlatformVersionReleaseDate", new EndpointDataItem {
+                Endpoint = "platform_version_release_dates",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "DateFormat", new EndpointDataItem.FieldNameItem { TargetType = "DateFormat" } },
+                    { "PlatformVersion", new EndpointDataItem.FieldNameItem { TargetType = "PlatformVersion" } },
+                    { "ReleaseRegion", new EndpointDataItem.FieldNameItem { TargetType = "Region" } }
+                }
+            } },
+            { "PlatformWebsite", new EndpointDataItem { Endpoint = "platform_websites" } },
+            { "PlayerPerspective", new EndpointDataItem { Endpoint = "player_perspectives" } },
+            { "PopularityPrimitive", new EndpointDataItem {
+                Endpoint = "popularity_primitives",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "GameId", new EndpointDataItem.FieldNameItem { TargetType = "Game" } },
+                    { "ExternalPopularitySource", new EndpointDataItem.FieldNameItem { TargetType = "ExternalGameSource" } },
+                    { "PopularityType", new EndpointDataItem.FieldNameItem { TargetType = "PopularityType" } }
+                }
+            } },
+            { "PopularityType", new EndpointDataItem {
+                Endpoint = "popularity_types",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "ExternalPopularitySource", new EndpointDataItem.FieldNameItem { TargetType = "ExternalGameSource" } }
+                }
+            } },
+            { "Region", new EndpointDataItem { Endpoint = "regions" } },
+            { "ReleaseDate", new EndpointDataItem {
+                Endpoint = "release_dates",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "DateFormat", new EndpointDataItem.FieldNameItem { TargetType = "DateFormat" } },
+                    { "Game", new EndpointDataItem.FieldNameItem { TargetType = "Game" } },
+                    { "Platform", new EndpointDataItem.FieldNameItem { TargetType = "Platform" } },
+                    { "ReleaseRegion", new EndpointDataItem.FieldNameItem { TargetType = "ReleaseDateRegion" } },
+                    { "Status", new EndpointDataItem.FieldNameItem { TargetType = "ReleaseDateStatus" } }
+                }
+            } },
+            { "ReleaseDateRegion", new EndpointDataItem { Endpoint = "release_date_regions" } },
+            { "ReleaseDateStatus", new EndpointDataItem { Endpoint = "release_date_statuses" } },
+            { "Screenshot", new EndpointDataItem {
+                Endpoint = "screenshots",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "Game", new EndpointDataItem.FieldNameItem { TargetType = "Game" } }
+                }
+            } },
+            { "Search", new EndpointDataItem { Endpoint = "search" } },
+            { "Theme", new EndpointDataItem { Endpoint = "themes" } },
+            { "Website", new EndpointDataItem {
+                Endpoint = "websites",
+                FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
+                {
+                    { "Game", new EndpointDataItem.FieldNameItem { TargetType = "Game" } }
+                }
+            } },
+            { "WebsiteType", new EndpointDataItem { Endpoint = "website_types" } }
+        };
+
         public static EndpointDataItem GetEndpointData<T>()
         {
             // use reflection to get the endpoint for the type T. The endpoint is a public const and is the name of the type, and is under IGDBClient.Endpoints
             var typeName = typeof(T).Name;
             EndpointDataItem endpoint = new EndpointDataItem();
 
-            switch (typeName)
+            if (Endpoints.TryGetValue(typeName, out var endpointData))
             {
-                case "AgeRating":
-                    endpoint.Endpoint = "age_ratings";
-                    break;
+                endpoint = endpointData;
+            }
+            else
+            {
+                var endpointField = typeof(IGDBClient.Endpoints).GetField(typeName);
+                if (endpointField == null)
+                {
+                    // try again with pluralized type name
+                    endpointField = typeof(IGDBClient.Endpoints).GetField(typeName + "s");
 
-                case "AgeRatingCategory":
-                    endpoint.Endpoint = "age_rating_categories";
-                    break;
-
-                case "AgeRatingContentDescriptionV2":
-                    endpoint.Endpoint = "age_rating_content_descriptions_v2";
-                    break;
-
-                case "AgeRatingOrganization":
-                    endpoint.Endpoint = "age_rating_organizations";
-                    break;
-
-                case "AlternativeName":
-                    endpoint.Endpoint = "alternative_names";
-                    break;
-
-                case "Artwork":
-                    endpoint.Endpoint = "artworks";
-                    break;
-
-                case "Character":
-                    endpoint.Endpoint = "characters";
-                    break;
-
-                case "CharacterGender":
-                    endpoint.Endpoint = "character_genders";
-                    break;
-
-                case "CharacterMugshot":
-                    endpoint.Endpoint = "character_mug_shots";
-                    break;
-
-                case "CharacterSpecies":
-                    endpoint.Endpoint = "character_species";
-                    break;
-
-                case "Collection":
-                    endpoint.Endpoint = "collections";
-                    endpoint.SupportsSlugSearch = true;
-                    break;
-
-                case "CollectionMembership":
-                    endpoint.Endpoint = "collection_memberships";
-                    break;
-
-                case "CollectionMembershipType":
-                    endpoint.Endpoint = "collection_membership_types";
-                    break;
-
-                case "CollectionRelation":
-                    endpoint.Endpoint = "collection_relations";
-                    break;
-
-                case "CollectionRelationType":
-                    endpoint.Endpoint = "collection_relation_types";
-                    break;
-
-                case "CollectionType":
-                    endpoint.Endpoint = "collection_types";
-                    break;
-
-                case "Company":
-                    endpoint.Endpoint = "companies";
-                    endpoint.SupportsSlugSearch = true;
-                    break;
-
-                case "CompanyLogo":
-                    endpoint.Endpoint = "company_logos";
-                    break;
-
-                case "CompanyStatus":
-                    endpoint.Endpoint = "company_statuses";
-                    break;
-
-                case "CompanyWebsite":
-                    endpoint.Endpoint = "company_websites";
-                    break;
-
-                case "Cover":
-                    endpoint.Endpoint = "covers";
-                    break;
-
-                case "DateFormat":
-                    endpoint.Endpoint = "date_formats";
-                    break;
-
-                case "Event":
-                    endpoint.Endpoint = "events";
-                    break;
-
-                case "EventLogo":
-                    endpoint.Endpoint = "event_logos";
-                    break;
-
-                case "EventNetwork":
-                    endpoint.Endpoint = "event_networks";
-                    break;
-
-                case "ExternalGame":
-                    endpoint.Endpoint = "external_games";
-                    break;
-
-                case "ExternalGameSource":
-                    endpoint.Endpoint = "external_game_sources";
-                    break;
-
-                case "Franchise":
-                    endpoint.Endpoint = "franchises";
-                    endpoint.SupportsSlugSearch = true;
-                    break;
-
-                case "Game":
-                    endpoint.Endpoint = "games";
-                    endpoint.SupportsSlugSearch = true;
-                    break;
-
-                case "GameEngine":
-                    endpoint.Endpoint = "game_engines";
-                    break;
-
-                case "GameEngineLogo":
-                    endpoint.Endpoint = "game_engine_logos";
-                    break;
-
-                case "GameLocalization":
-                    endpoint.Endpoint = "game_localizations";
-                    break;
-
-                case "GameMode":
-                    endpoint.Endpoint = "game_modes";
-                    break;
-
-                case "GameReleaseFormat":
-                    endpoint.Endpoint = "game_release_formats";
-                    break;
-
-                case "GameStatus":
-                    endpoint.Endpoint = "game_statuses";
-                    break;
-
-                case "GameTimeToBeat":
-                    endpoint.Endpoint = "game_time_to_beats";
-                    break;
-
-                case "GameType":
-                    endpoint.Endpoint = "game_types";
-                    break;
-
-                case "GameVersion":
-                    endpoint.Endpoint = "game_versions";
-                    break;
-
-                case "GameVersionFeature":
-                    endpoint.Endpoint = "game_version_features";
-                    break;
-
-                case "GameVersionFeatureValue":
-                    endpoint.Endpoint = "game_version_feature_values";
-                    break;
-
-                case "GameVideo":
-                    endpoint.Endpoint = "game_videos";
-                    break;
-
-                case "Genre":
-                    endpoint.Endpoint = "genres";
-                    break;
-
-                case "Keyword":
-                    endpoint.Endpoint = "keywords";
-                    break;
-
-                case "InvolvedCompany":
-                    endpoint.Endpoint = "involved_companies";
-                    break;
-
-                case "Language":
-                    endpoint.Endpoint = "languages";
-                    break;
-
-                case "LanguageSupport":
-                    endpoint.Endpoint = "language_supports";
-                    break;
-
-                case "LanguageSupportType":
-                    endpoint.Endpoint = "language_support_types";
-                    break;
-
-                case "MultiplayerMode":
-                    endpoint.Endpoint = "multiplayer_modes";
-                    break;
-
-                case "NetworkType":
-                    endpoint.Endpoint = "network_types";
-                    break;
-
-                case "Platform":
-                    endpoint.Endpoint = "platforms";
-                    endpoint.SupportsSlugSearch = true;
-                    break;
-
-                case "PlatformFamily":
-                    endpoint.Endpoint = "platform_families";
-                    break;
-
-                case "PlatformLogo":
-                    endpoint.Endpoint = "platform_logos";
-                    break;
-
-                case "PlatformType":
-                    endpoint.Endpoint = "platform_types";
-                    break;
-
-                case "PlatformVersion":
-                    endpoint.Endpoint = "platform_versions";
-                    break;
-
-                case "PlatformVersionCompany":
-                    endpoint.Endpoint = "platform_version_companies";
-                    break;
-
-                case "PlatformVersionReleaseDate":
-                    endpoint.Endpoint = "platform_version_release_dates";
-                    break;
-
-                case "PlatformWebsite":
-                    endpoint.Endpoint = "platform_websites";
-                    break;
-
-                case "PlayerPerspective":
-                    endpoint.Endpoint = "player_perspectives";
-                    break;
-
-                case "PopularityPrimitive":
-                    endpoint.Endpoint = "popularity_primitives";
-                    break;
-
-                case "PopularityType":
-                    endpoint.Endpoint = "popularity_types";
-                    break;
-
-                case "Region":
-                    endpoint.Endpoint = "regions";
-                    break;
-
-                case "ReleaseDate":
-                    endpoint.Endpoint = "release_dates";
-                    break;
-
-                case "ReleaseDateRegion":
-                    endpoint.Endpoint = "release_date_regions";
-                    break;
-
-                case "ReleaseDateStatus":
-                    endpoint.Endpoint = "release_date_statuses";
-                    break;
-
-                case "Screenshot":
-                    endpoint.Endpoint = "screenshots";
-                    break;
-
-                case "Search":
-                    endpoint.Endpoint = "search";
-                    break;
-
-                case "Theme":
-                    endpoint.Endpoint = "themes";
-                    break;
-
-                case "Website":
-                    endpoint.Endpoint = "websites";
-                    break;
-
-                case "WebsiteType":
-                    endpoint.Endpoint = "website_types";
-                    break;
-
-                default:
-                    var endpointField = typeof(IGDBClient.Endpoints).GetField(typeName);
                     if (endpointField == null)
-                    {
-                        // try again with pluralized type name
-                        endpointField = typeof(IGDBClient.Endpoints).GetField(typeName + "s");
+                        return null;
+                }
 
-                        if (endpointField == null)
-                            return null;
-                    }
-
-                    endpoint.Endpoint = (string)endpointField.GetValue(null);
-                    break;
+                endpoint.Endpoint = (string)endpointField.GetValue(null);
             }
 
             return endpoint;
         }
 
+        public static string GetEndpointFromSourceTypeAndFieldName(string SourceType, string fieldName)
+        {
+            // get the endpoint data for the source type
+            EndpointDataItem? endpointData = Endpoints.GetValueOrDefault(SourceType);
+
+            // if the endpoint data is null, return null
+            if (endpointData == null)
+            {
+                return string.Empty;
+            }
+
+            // if the field name is not in the endpoint data, return the endpoint
+            if (!endpointData.FieldNames.ContainsKey(fieldName))
+            {
+                return string.Empty;
+            }
+
+            // if the field name is in the endpoint data, return the target type of the field name
+            return endpointData.FieldNames[fieldName].TargetType;
+        }
+
         public class EndpointDataItem
         {
             public string Endpoint { get; set; }
+            public Dictionary<string, FieldNameItem> FieldNames { get; set; } = new Dictionary<string, FieldNameItem>();
             public bool SupportsSlugSearch { get; set; } = false;
+
+            public class FieldNameItem
+            {
+                public string TargetType { get; set; } = string.Empty; // the type that this field name is for
+            }
         }
     }
 }

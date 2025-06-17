@@ -17,7 +17,7 @@ namespace hasheous_server.Controllers.v1_0
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]")]
     [ApiVersion("1.0")]
-    [ApiExplorerSettings(IgnoreApi = true)]
+    [ApiExplorerSettings(IgnoreApi = false)]
     [Authorize]
     public class AccountController : Controller
     {
@@ -106,7 +106,7 @@ namespace hasheous_server.Controllers.v1_0
 
         [HttpGet]
         [Route("Profile/Basic/profile.js")]
-        // [ApiExplorerSettings(IgnoreApi = true)]
+        [ApiExplorerSettings(IgnoreApi = true)]
         [AllowAnonymous]
         public async Task<IActionResult> ProfileBasicFile()
         {
@@ -120,7 +120,7 @@ namespace hasheous_server.Controllers.v1_0
                 profile.Roles = new List<string>(await _userManager.GetRolesAsync(user));
                 profile.SecurityProfile = user.SecurityProfile;
                 profile.Roles.Sort();
-                
+
                 string profileString = "var userProfile = " + Newtonsoft.Json.JsonConvert.SerializeObject(profile, Newtonsoft.Json.Formatting.Indented) + ";";
 
                 byte[] bytes = Encoding.UTF8.GetBytes(profileString);
@@ -137,6 +137,7 @@ namespace hasheous_server.Controllers.v1_0
 
         [HttpPost]
         [Route("ChangePassword")]
+        [ApiExplorerSettings(IgnoreApi = true)]
         [Authorize]
         public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model)
         {
@@ -176,24 +177,26 @@ namespace hasheous_server.Controllers.v1_0
         [HttpPost]
         [AllowAnonymous]
         [Route("Register")]
+        [ApiExplorerSettings(IgnoreApi = true)]
         public async Task<IActionResult> Register(RegisterViewModel model, string returnUrl = null)
         {
             // ViewData["ReturnUrl"] = returnUrl;
             if (ModelState.IsValid)
             {
                 ApplicationUser user = new ApplicationUser
-                { 
-                    UserName = model.UserName, 
+                {
+                    UserName = model.UserName,
                     NormalizedUserName = model.UserName.ToUpper(),
                     Email = model.Email,
                     NormalizedEmail = model.Email.ToUpper()
                 };
                 // check for a duplicate email address
-                if (_userManager.Options.User.RequireUniqueEmail == true) {
+                if (_userManager.Options.User.RequireUniqueEmail == true)
+                {
                     var existingUser = await _userManager.FindByEmailAsync(user.NormalizedEmail);
                     if (existingUser != null)
                     {
-                        IdentityError identityError = new IdentityError{ Code = "NotUniqueEmail", Description = user.UserName + " is already taken" };
+                        IdentityError identityError = new IdentityError { Code = "NotUniqueEmail", Description = user.UserName + " is already taken" };
                         IdentityResult identityResult = IdentityResult.Failed(identityError);
                         Logging.Log(Logging.LogType.Information, "User Management", "Unable to create new user " + model.Email + ". Account already exists.");
                         return Ok(identityResult);
@@ -213,7 +216,7 @@ namespace hasheous_server.Controllers.v1_0
                     await _userManager.AddToRoleAsync(user, "Member");
 
                     //await _signInManager.SignInAsync(user, isPersistent: false);
-                    
+
                     Logging.Log(Logging.LogType.Information, "User Management", "New user " + model.Email + " created with password.");
 
                     if (returnUrl != null)
@@ -240,6 +243,7 @@ namespace hasheous_server.Controllers.v1_0
         [HttpGet]
         [AllowAnonymous]
         [Route("ConfirmEmail")]
+        [ApiExplorerSettings(IgnoreApi = true)]
         public async Task<IActionResult> ConfirmEmail(string userId, string code)
         {
             if (userId == null || code == null)
@@ -267,6 +271,7 @@ namespace hasheous_server.Controllers.v1_0
         [HttpPost]
         [AllowAnonymous]
         [Route("ForgotPassword")]
+        [ApiExplorerSettings(IgnoreApi = true)]
         public async Task<IActionResult> ForgotPassword(ForgotPasswordViewModel model)
         {
             if (ModelState.IsValid)
@@ -282,7 +287,7 @@ namespace hasheous_server.Controllers.v1_0
                 // Send an email with this link
                 var code = await _userManager.GeneratePasswordResetTokenAsync(user);
                 //var callbackUrl = Url.Action("ResetPassword", "Account", new { userId = user.Id, code = code }, protocol: HttpContext.Request.Scheme);
-                var callbackUrl = new Uri(string.Format("{0}://{1}{2}&userId={3}&code={4}", [ Request.Scheme, Request.Host, "/index.html?page=resetpassword", user.Id, HttpUtility.UrlEncode(code) ]));
+                var callbackUrl = new Uri(string.Format("{0}://{1}{2}&userId={3}&code={4}", [Request.Scheme, Request.Host, "/index.html?page=resetpassword", user.Id, HttpUtility.UrlEncode(code)]));
                 await _emailSender.SendEmailAsync(model.Email, "Reset Password",
                   "Please reset your password by clicking here: <a href=\"" + callbackUrl + "\">link</a>");
                 return Ok();
@@ -297,6 +302,7 @@ namespace hasheous_server.Controllers.v1_0
         [HttpPost]
         [AllowAnonymous]
         [Route("ResetPassword")]
+        [ApiExplorerSettings(IgnoreApi = true)]
         public async Task<IActionResult> ResetPassword(ResetPasswordViewModel model)
         {
             if (!ModelState.IsValid)
@@ -321,6 +327,7 @@ namespace hasheous_server.Controllers.v1_0
         // POST: /Account/Delete
         [HttpPost]
         [Route("Delete")]
+        [ApiExplorerSettings(IgnoreApi = true)]
         public async Task<IActionResult> Delete()
         {
             var user = await _userManager.GetUserAsync(User);
@@ -349,7 +356,7 @@ namespace hasheous_server.Controllers.v1_0
             {
                 Authentication.ApiKey apiKey = new ApiKey();
                 string? userKey = apiKey.GetApiKey(user.Id);
-                if (userKey != null) 
+                if (userKey != null)
                 {
                     return Ok(userKey);
                 }
