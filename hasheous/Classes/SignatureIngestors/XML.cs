@@ -362,10 +362,10 @@ namespace XML
                                     // store rom
                                     foreach (RomSignatureObject.Game.Rom romObject in gameObject.Roms)
                                     {
-                                        if (romObject.Md5 != null || romObject.Sha1 != null || romObject.Crc != null)
+                                        if (romObject.Md5 != null || romObject.Sha1 != null || romObject.Sha256 != null || romObject.Crc != null)
                                         {
                                             long romId = 0;
-                                            sql = "SELECT * FROM Signatures_Roms WHERE `GameId`=@gameid AND (`MD5`=@md5 AND `SHA1`=@sha1 AND `CRC`=@crc);";
+                                            sql = "SELECT * FROM Signatures_Roms WHERE `GameId`=@gameid AND (`MD5`=@md5 AND `SHA1`=@sha1 AND `SHA256`=@sha256 AND `CRC`=@crc);";
                                             dbDict = new Dictionary<string, object>
                                             {
                                                 { "gameid", gameId },
@@ -374,6 +374,7 @@ namespace XML
                                                 { "crc", Common.ReturnValueIfNull(romObject.Crc, "").ToString().ToLower() },
                                                 { "md5", Common.ReturnValueIfNull(romObject.Md5, "").ToString().ToLower() },
                                                 { "sha1", Common.ReturnValueIfNull(romObject.Sha1, "").ToString().ToLower() },
+                                                { "sha256", Common.ReturnValueIfNull(romObject.Sha256, "").ToString().ToLower() },
                                                 { "developmentstatus", Common.ReturnValueIfNull(romObject.DevelopmentStatus, "") }
                                             };
 
@@ -416,7 +417,7 @@ namespace XML
                                             if (sigDB.Rows.Count == 0)
                                             {
                                                 // entry not present, insert it
-                                                sql = "INSERT INTO Signatures_Roms (`GameId`, `Name`, `Size`, `CRC`, `MD5`, `SHA1`, `DevelopmentStatus`, `Attributes`, `RomType`, `RomTypeMedia`, `MediaLabel`, `MetadataSource`, `IngestorVersion`, `Countries`, `Languages`) VALUES (@gameid, @name, @size, @crc, @md5, @sha1, @developmentstatus, @attributes, @romtype, @romtypemedia, @medialabel, @metadatasource, @ingestorversion, @countries, @languages); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
+                                                sql = "INSERT INTO Signatures_Roms (`GameId`, `Name`, `Size`, `CRC`, `MD5`, `SHA1`, `SHA256`, `DevelopmentStatus`, `Attributes`, `RomType`, `RomTypeMedia`, `MediaLabel`, `MetadataSource`, `IngestorVersion`, `Countries`, `Languages`) VALUES (@gameid, @name, @size, @crc, @md5, @sha1, @sha256, @developmentstatus, @attributes, @romtype, @romtypemedia, @medialabel, @metadatasource, @ingestorversion, @countries, @languages); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
                                                 sigDB = db.ExecuteCMD(sql, dbDict);
 
                                                 romId = Convert.ToInt32(sigDB.Rows[0][0]);

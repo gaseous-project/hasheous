@@ -16,6 +16,11 @@ namespace hasheous_server.Models
         public string? SHA1 { get; set; }
 
         /// <summary>
+        /// SHA256 hash of the content
+        /// </summary>
+        public string? SHA256 { get; set; }
+
+        /// <summary>
         /// CRC32 hash of the content
         /// </summary>
         public string? CRC { get; set; }
