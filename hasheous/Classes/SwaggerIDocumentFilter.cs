@@ -80,31 +80,29 @@ public class IGDBMetadataDocumentFilter : IDocumentFilter
                 {
                     if (Metadata.Endpoints[type.Name].FieldNames != null && Metadata.Endpoints[type.Name].FieldNames.Count > 0)
                     {
-                        string example = "";
+                        List<string> example = new List<string>();
                         foreach (var field in Metadata.Endpoints[type.Name].FieldNames)
                         {
                             // get the endpoint from the target type
                             string targetType = field.Value.TargetType;
                             if (targetType != null)
                             {
-                                targetType = type.Name;
-
                                 if (Metadata.Endpoints.ContainsKey(targetType))
                                 {
-                                    example += $"{Metadata.Endpoints[targetType].Endpoint},";
+                                    string value = Metadata.Endpoints[targetType].Endpoint;
+                                    if (example.Contains(value) == false)
+                                    {
+                                        example.Add(value);
+                                    }
                                 }
                             }
-                        }
-                        if (example.Length > 0)
-                        {
-                            example = "*, " + example.TrimEnd(',');
                         }
 
                         operation.Parameters.Add(new OpenApiParameter
                         {
                             Name = "expandColumns",
                             In = ParameterLocation.Query,
-                            Description = "A comma-separated list of columns to expand in the response. If not provided, only a list of object id's will be returned. Allowed values: " + example,
+                            Description = "A comma-separated list of columns to expand in the response. If not provided, only a list of object id's will be returned. Allowed values: " + String.Join(", ", example),
                             Required = false,
                             Schema = new OpenApiSchema
                             {
