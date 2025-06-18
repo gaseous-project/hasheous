@@ -173,7 +173,10 @@ namespace hasheous_server.Controllers.v1_0
 
             // convert returnValue to a Dictionary<string, object>
             Dictionary<string, object> returnValueDict = new Dictionary<string, object>();
-            string[] expandColumnsArray = expandColumns.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            string[] expandColumnsArray = expandColumns
+                .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => s.Trim())
+                .ToArray();
             foreach (var property in returnValue.GetType().GetProperties())
             {
                 if (property.CanRead)

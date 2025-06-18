@@ -777,6 +777,34 @@ namespace hasheous_server.Classes.Metadata.IGDB
                                     property.SetValue(item, longList);
                                 }
                             }
+                            else if (property.PropertyType == typeof(double[]))
+                            {
+                                // if the property is an array of doubles, we need to convert the value to an array of doubles
+                                if (value is string strValue)
+                                {
+                                    // try to deserialize the string as an array of doubles
+                                    double[] doubleArray = Newtonsoft.Json.JsonConvert.DeserializeObject<double[]>(strValue);
+                                    property.SetValue(item, doubleArray);
+                                }
+                                else if (value is double[] doubleArray)
+                                {
+                                    property.SetValue(item, doubleArray);
+                                }
+                            }
+                            else if (property.PropertyType == typeof(List<double>))
+                            {
+                                // if the property is a list of doubles, we need to convert the value to a list of doubles
+                                if (value is string strValue)
+                                {
+                                    // try to deserialize the string as a list of doubles
+                                    List<double> doubleList = Newtonsoft.Json.JsonConvert.DeserializeObject<List<double>>(strValue);
+                                    property.SetValue(item, doubleList);
+                                }
+                                else if (value is List<double> doubleList)
+                                {
+                                    property.SetValue(item, doubleList);
+                                }
+                            }
                             else
                             {
                                 // set the property value directly
