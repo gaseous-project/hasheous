@@ -14,11 +14,35 @@ namespace Classes
     /// </summary>
     public class Logging
     {
-        private static DateTime lastDiskRetentionSweep = DateTime.UtcNow;
         /// <summary>
         /// Gets or sets a value indicating whether logs should be written only to disk.
         /// </summary>
-        public static bool WriteToDiskOnly { get; set; } = false;
+        public static bool WriteToDiskOnly
+        {
+            get
+            {
+                if (Config.LoggingConfiguration.OnlyLogToDisk == true)
+                {
+                    return true;
+                }
+                else
+                {
+                    return _WriteToDiskOnly;
+                }
+            }
+            set
+            {
+                if (Config.LoggingConfiguration.OnlyLogToDisk == true)
+                {
+                    // do nothing, this value overrides the setting
+                }
+                else
+                {
+                    _WriteToDiskOnly = value;
+                }
+            }
+        }
+        private static bool _WriteToDiskOnly = false;
 
         /// <summary>
         /// Logs an event with the specified type, process, message, and optional exception, and writes to disk or database as configured.
@@ -173,22 +197,6 @@ namespace Classes
                 else
                 {
                     LogToDisk(logItem, TraceOutput, null);
-                }
-            }
-
-            if (lastDiskRetentionSweep.AddMinutes(60) < DateTime.UtcNow)
-            {
-                // time to delete any old logs
-                lastDiskRetentionSweep = DateTime.UtcNow;
-                string[] files = Directory.GetFiles(Config.LogPath);
-
-                foreach (string file in files)
-                {
-                    FileInfo fi = new FileInfo(file);
-                    if (fi.LastAccessTime < DateTime.Now.AddDays(Config.LoggingConfiguration.LogRetention * -1))
-                    {
-                        fi.Delete();
-                    }
                 }
             }
         }
@@ -377,6 +385,18 @@ namespace Classes
                 }
             }
             Logging.Log(Logging.LogType.Information, "Maintenance", "Deleted " + deletedEventCount + " log entries");
+
+            // time to delete any old log files from disk
+            string[] files = Directory.GetFiles(Config.LogPath);
+
+            foreach (string file in files)
+            {
+                FileInfo fi = new FileInfo(file);
+                if (fi.LastWriteTime < DateTime.Now.AddDays(Config.LoggingConfiguration.LogRetention * -1))
+                {
+                    fi.Delete();
+                }
+            }
         }
 
         /// <summary>
