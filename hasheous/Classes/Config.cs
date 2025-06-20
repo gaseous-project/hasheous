@@ -765,6 +765,7 @@ namespace Classes
                 public int LogRetention = 7;
 
                 public bool AlwaysLogToDisk = false;
+                public bool OnlyLogToDisk = false;
             }
 
             public class EmailSMTP

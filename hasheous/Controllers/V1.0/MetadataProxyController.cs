@@ -35,6 +35,10 @@ namespace hasheous_server.Controllers.v1_0
         /// <param name="slug">
         /// The slug of the metadata object to fetch - note that this is optional and not all metadata types have slugs.
         /// </param>
+        /// <param name="expandColumns">
+        /// A comma-separated list of columns to expand in the metadata object.
+        /// This is optional and can be used to fetch additional data related to the metadata object.
+        /// </param>
         /// <param name="MetadataType">
         /// The type of metadata to fetch, e.g. "Game", "Artwork", etc.
         /// This should match the class name in IGDB.Models namespace.
@@ -54,13 +58,13 @@ namespace hasheous_server.Controllers.v1_0
         [MapToApiVersion("1.0")]
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(Dictionary<string, string>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(Dictionary<string, object>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [Route("IGDB/{MetadataType}")]
         [ResponseCache(CacheProfileName = "7Days")]
         [ApiExplorerSettings(IgnoreApi = true)]
-        public async Task<IActionResult> GetMetadata(string MetadataType, long Id, string slug = "")
+        public async Task<IActionResult> GetMetadata(string MetadataType, long Id, string slug = "", string expandColumns = "")
         {
             // check that MetadataType is a valid class in IGDB.Models
             var igdbAssembly = typeof(IGDB.Models.Game).Assembly;
@@ -71,10 +75,10 @@ namespace hasheous_server.Controllers.v1_0
             }
 
             // If valid, continue with your logic (e.g., call _GetMetadata)
-            return await _GetMetadata(MetadataType, Id, slug);
+            return await _GetMetadata(MetadataType, Id, slug, expandColumns);
         }
 
-        private async Task<IActionResult> _GetMetadata(string routeName, long Id, string slug = "")
+        private async Task<IActionResult> _GetMetadata(string routeName, long Id, string slug = "", string expandColumns = "")
         {
             // reject invalid id or slug
             if (Id == 0 && slug == "")
@@ -162,9 +166,122 @@ namespace hasheous_server.Controllers.v1_0
             var genericConvertMethod = convertMethod?.MakeGenericMethod(targetMetadataType);
             returnValue = genericConvertMethod?.Invoke(null, new object[] { metadataInstance, Activator.CreateInstance(targetMetadataType) });
 
-            if (returnValue != null)
+            if (returnValue == null)
             {
-                return Ok(returnValue);
+                return NotFound(new Dictionary<string, string> { { "Error", $"Metadata object '{routeName}' with Id '{Id}' or slug '{slug}' not found." } });
+            }
+
+            // convert returnValue to a Dictionary<string, object>
+            Dictionary<string, object> returnValueDict = new Dictionary<string, object>();
+            string[] expandColumnsArray = expandColumns
+                .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => s.Trim())
+                .ToArray();
+            foreach (var property in returnValue.GetType().GetProperties())
+            {
+                if (property.CanRead)
+                {
+                    if (property.Name == "Checksum")
+                    {
+                        Console.WriteLine("Testing");
+                    }
+
+                    var value = property.GetValue(returnValue);
+                    if (value != null)
+                    {
+                        // get the JsonProperty attribute if it exists
+                        var jsonPropertyAttribute = property.GetCustomAttributes(typeof(Newtonsoft.Json.JsonPropertyAttribute), false)
+                            .Cast<Newtonsoft.Json.JsonPropertyAttribute>()
+                            .FirstOrDefault();
+
+                        if (jsonPropertyAttribute != null)
+                        {
+                            // use the json property name as the key
+                            string propertyName = jsonPropertyAttribute.PropertyName;
+
+                            // process expand columns
+                            if (expandColumnsArray.Length > 0 && (expandColumnsArray.Contains(propertyName, StringComparer.OrdinalIgnoreCase) || expandColumnsArray.Contains("*") || expandColumnsArray.Contains("all", StringComparer.OrdinalIgnoreCase)))
+                            {
+                                // check if the value is an array or a list
+                                if (value is Array || value is System.Collections.IList)
+                                {
+                                    Dictionary<string, object> expandedValues = new Dictionary<string, object>();
+                                    string expandedEndpoint = Metadata.GetEndpointFromSourceTypeAndFieldName(routeName, property.Name);
+                                    if (string.IsNullOrEmpty(expandedEndpoint))
+                                    {
+                                        // if no endpoint is found, just add the value as is
+                                        returnValueDict.Add(propertyName, value);
+                                    }
+                                    else
+                                    {
+                                        foreach (var item in (System.Collections.IEnumerable)value)
+                                        {
+                                            // recursively call _GetMetadata for each item, using the propertyName as the routeName, and the item as the Id
+                                            long itemId = 0;
+                                            if (item is long l)
+                                            {
+                                                itemId = l;
+                                            }
+                                            else if (item is int i)
+                                            {
+                                                itemId = i;
+                                            }
+                                            else
+                                            {
+                                                continue;
+                                            }
+
+                                            var itemMetadata = await _GetMetadata(expandedEndpoint, itemId);
+                                            if (itemMetadata is OkObjectResult okResult && okResult.Value is Dictionary<string, object> itemDict)
+                                            {
+                                                expandedValues.Add(itemId.ToString(), itemDict);
+                                            }
+                                        }
+                                        returnValueDict.Add(propertyName, expandedValues);
+                                    }
+                                }
+                                else
+                                {
+                                    // recursively call _GetMetadata for the item, using the propertyName as the routeName, and the value as the Id
+                                    if (value is long itemId)
+                                    {
+                                        string expandedEndpoint = Metadata.GetEndpointFromSourceTypeAndFieldName(routeName, property.Name);
+                                        if (!string.IsNullOrEmpty(expandedEndpoint))
+                                        {
+                                            var itemMetadata = await _GetMetadata(expandedEndpoint, itemId);
+                                            if (itemMetadata is OkObjectResult okResult && okResult.Value is Dictionary<string, object> itemDict)
+                                            {
+                                                returnValueDict.Add(propertyName, itemDict);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            returnValueDict.Add(propertyName, value);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        returnValueDict.Add(propertyName, value);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                returnValueDict.Add(propertyName, value);
+                            }
+                        }
+                        else
+                        {
+                            returnValueDict.Add(property.Name, value);
+                        }
+                    }
+                }
+            }
+
+
+            if (returnValueDict != null)
+            {
+                return Ok(returnValueDict);
             }
             else
             {
