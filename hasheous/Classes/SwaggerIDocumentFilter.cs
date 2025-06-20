@@ -76,41 +76,9 @@ public class IGDBMetadataDocumentFilter : IDocumentFilter
                         }
                     });
                 }
-                if (Metadata.Endpoints.ContainsKey(type.Name))
-                {
-                    if (Metadata.Endpoints[type.Name].FieldNames != null && Metadata.Endpoints[type.Name].FieldNames.Count > 0)
-                    {
-                        List<string> example = new List<string>();
-                        foreach (var field in Metadata.Endpoints[type.Name].FieldNames)
-                        {
-                            // get the endpoint from the target type
-                            string targetType = field.Value.TargetType;
-                            if (targetType != null)
-                            {
-                                if (Metadata.Endpoints.ContainsKey(targetType))
-                                {
-                                    string value = Metadata.Endpoints[targetType].Endpoint;
-                                    if (example.Contains(value) == false)
-                                    {
-                                        example.Add(value);
-                                    }
-                                }
-                            }
-                        }
 
-                        operation.Parameters.Add(new OpenApiParameter
-                        {
-                            Name = "expandColumns",
-                            In = ParameterLocation.Query,
-                            Description = "A comma-separated list of columns to expand in the response. If not provided, only a list of object id's will be returned. Allowed values: " + String.Join(", ", example),
-                            Required = false,
-                            Schema = new OpenApiSchema
-                            {
-                                Type = "string"
-                            }
-                        });
-                    }
-                }
+                // look for expandColumns parameter
+                bool hasExpandColumns = false;
 
                 // create response properties
                 var properties = new Dictionary<string, OpenApiSchema>
@@ -125,6 +93,7 @@ public class IGDBMetadataDocumentFilter : IDocumentFilter
                     hasheousType = type;
                 }
                 var instance = Activator.CreateInstance(hasheousType);
+                List<string> example = new List<string>();
                 if (instance != null)
                 {
                     foreach (var property in instance.GetType().GetProperties())
@@ -139,6 +108,37 @@ public class IGDBMetadataDocumentFilter : IDocumentFilter
                             Description = propertyType,
                             AdditionalPropertiesAllowed = true
                         };
+
+                        // if the property is a collection, set the type to array
+                        if (property.PropertyType.IsGenericType && (property.PropertyType.GetGenericTypeDefinition() == typeof(List<>) || property.PropertyType.GetGenericTypeDefinition() == typeof(IList<>) || property.PropertyType.GetGenericTypeDefinition() == typeof(IEnumerable<>) || property.PropertyType.GetGenericTypeDefinition() == typeof(Array)))
+                        {
+                            properties[property.Name].Type = "array";
+                            properties[property.Name].Items = new OpenApiSchema
+                            {
+                                Type = property.PropertyType.GetGenericArguments()[0].Name
+                            };
+
+                            // get the JsonPropertyName attribute if it exists
+                            var jsonPropertyName = property.GetCustomAttributes(typeof(System.Text.Json.Serialization.JsonPropertyNameAttribute), false)
+                                .FirstOrDefault() as System.Text.Json.Serialization.JsonPropertyNameAttribute;
+
+                            if (jsonPropertyName != null)
+                            {
+                                if (!example.Contains(jsonPropertyName.Name))
+                                {
+                                    example.Add(jsonPropertyName.Name);
+                                }
+                            }
+
+                            hasExpandColumns = true;
+                        }
+
+                        // if the property is a dictionary, set the type to object
+                        if (property.PropertyType.IsGenericType && property.PropertyType.GetGenericTypeDefinition() == typeof(Dictionary<,>))
+                        {
+                            properties[property.Name].Type = "object";
+                            properties[property.Name].AdditionalPropertiesAllowed = true;
+                        }
                     }
                 }
                 else
@@ -149,6 +149,25 @@ public class IGDBMetadataDocumentFilter : IDocumentFilter
                         Type = type.Name,
                         Description = $"An instance of {type.Name}."
                     };
+                }
+
+                if (hasExpandColumns)
+                {
+                    // sort the example list
+                    example.Sort();
+
+                    // add expandColumns parameter
+                    operation.Parameters.Add(new OpenApiParameter
+                    {
+                        Name = "expandColumns",
+                        In = ParameterLocation.Query,
+                        Description = "A comma-separated list of columns to expand in the response. If not provided, only a list of object id's will be returned. Allowed values: " + String.Join(", ", example),
+                        Required = false,
+                        Schema = new OpenApiSchema
+                        {
+                            Type = "string"
+                        }
+                    });
                 }
 
                 // create 200 response

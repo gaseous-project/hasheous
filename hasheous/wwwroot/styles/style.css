@@ -429,6 +429,7 @@ td {
     border-bottom-style: solid;
     border-bottom-width: 1px;
     border-bottom-color: var(--element-border-color);
+    vertical-align: top;
 }
 
 .tablerowhighlight:hover {
@@ -459,13 +460,9 @@ td {
     width: 100%;
 }
 
-#homepageintro {
-    
-}
+#homepageintro {}
 
-#homepagefunding {
-
-}
+#homepagefunding {}
 
 .okcanceldiv {
     text-align: right;
