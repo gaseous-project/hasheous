@@ -8,7 +8,7 @@ namespace GiantBomb
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
 
-            string sql = "SELECT `Id` FROM `giantbomb`.`Platforms` WHERE LOWER(`name`) = @name;";
+            string sql = "SELECT `Id` FROM `giantbomb`.`Platform` WHERE LOWER(`name`) = @name;";
             var parameters = new Dictionary<string, object>
             {
                 { "@name", platformName.ToLower() }
