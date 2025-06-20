@@ -31,7 +31,7 @@ namespace GiantBomb
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
 
-            string sql = "SELECT `Id` FROM `giantbomb`.`Game` WHERE LOWER(`name`) = @name AND `platformId` = @platformId";
+            string sql = "SELECT `Id` FROM `giantbomb`.`Game` JOIN `giantbomb`.`Relation_Game_platforms` ON `giantbomb`.`Game`.`Id` = `giantbomb`.`Relation_Game_platforms`.`Game_id` WHERE LOWER(`name`) = @name AND `giantbomb`.`Relation_Game_platforms`.`platforms_id` = @platformId";
             var parameters = new Dictionary<string, object>
             {
                 { "@name", gameName.ToLower() },

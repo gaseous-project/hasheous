@@ -307,16 +307,16 @@ function renderContent() {
                                     let hashes = "";
 
                                     if (rom.sha256) {
-                                        hashes += "<tr><td>" + lang.getLang('SHA256') + ":</td><td style=\"word-break: break-word;\">" + rom.sha256 + "</td></tr>";
+                                        hashes += "<tr><td style=\"width: 50px; padding: 1px;\">" + lang.getLang('SHA256') + ":</td><td style=\"word-break: break-word; padding: 1px;\">" + rom.sha256 + "</td></tr>";
                                     }
                                     if (rom.sha1) {
-                                        hashes += "<tr><td>" + lang.getLang('sha1') + ":</td><td>" + rom.sha1 + "</td></tr>";
+                                        hashes += "<tr><td style=\"width: 50px; padding: 1px;\">" + lang.getLang('sha1') + ":</td><td style=\"word-break: break-word; padding: 1px;\">" + rom.sha1 + "</td></tr>";
                                     }
                                     if (rom.md5) {
-                                        hashes += "<tr><td>" + lang.getLang('md5') + ":</td><td>" + rom.md5 + "</td></tr>";
+                                        hashes += "<tr><td style=\"width: 50px; padding: 1px;\">" + lang.getLang('md5') + ":</td><td style=\"word-break: break-word; padding: 1px;\">" + rom.md5 + "</td></tr>";
                                     }
                                     if (rom.crc) {
-                                        hashes += "<tr><td>" + lang.getLang('crc') + ":</td><td>" + rom.crc + "</td></tr>";
+                                        hashes += "<tr><td style=\"width: 50px; padding: 1px;\">" + lang.getLang('crc') + ":</td><td style=\"word-break: break-word; padding: 1px;\">" + rom.crc + "</td></tr>";
                                     }
                                     hashes = "<table cellspacing=\"0\">" + hashes + "</table>";
 
