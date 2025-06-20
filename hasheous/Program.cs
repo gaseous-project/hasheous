@@ -44,8 +44,6 @@ db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.Conn
 db.InitDB();
 Classes.Metadata.Utility.TableBuilder.BuildTables();
 
-// load app settings
-Config.InitSettings();
 // write updated settings back to the config file
 Config.UpdateConfig();
 
@@ -411,6 +409,20 @@ if (Config.RetroAchievements.APIKey != null)
         fetchRetroAchievementsMetadata.ForceExecute();
         ProcessQueue.QueueItems.Add(
             fetchRetroAchievementsMetadata
+        );
+    }
+}
+
+if (Config.GiantBomb.APIKey != null)
+{
+    if (Config.GiantBomb.APIKey != "")
+    {
+        ProcessQueue.QueueItem fetchGiantBombMetadata = new ProcessQueue.QueueItem(ProcessQueue.QueueItemType.FetchGiantBombMetadata, 120, new List<ProcessQueue.QueueItemType> {
+    ProcessQueue.QueueItemType.GetMissingArtwork, ProcessQueue.QueueItemType.MetadataMatchSearch, ProcessQueue.QueueItemType.AutoMapper, ProcessQueue.QueueItemType.TallyVotes, ProcessQueue.QueueItemType.FetchVIMMMetadata, ProcessQueue.QueueItemType.FetchTheGamesDbMetadata, ProcessQueue.QueueItemType.FetchIGDBMetadata
+});
+        fetchGiantBombMetadata.ForceExecute();
+        ProcessQueue.QueueItems.Add(
+            fetchGiantBombMetadata
         );
     }
 }

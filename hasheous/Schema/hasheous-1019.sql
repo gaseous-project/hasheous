@@ -1,0 +1,10 @@
+ALTER TABLE `Signatures_Roms`
+ADD COLUMN `SHA256` varchar(100) AFTER `SHA1`,
+ADD COLUMN `Status` varchar(20) AFTER `SHA256`,
+ADD INDEX `sha256_Idx` (`SHA256`) USING BTREE VISIBLE;
+
+ALTER TABLE `Settings`
+ADD COLUMN `ValueType` INT DEFAULT 0 AFTER `Setting`,
+ADD COLUMN `ValueDate` DATETIME DEFAULT NULL AFTER `Value`;
+
+DELETE FROM `Settings` WHERE `Setting` LIKE 'LastRun_%';

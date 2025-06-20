@@ -496,6 +496,136 @@ namespace Classes
 				}
 			}
 		}
+
+		public void BuildTableFromType(string databaseName, string prefix, Type type)
+		{
+			// Get the table name from the class name
+			string tableName = type.Name;
+			if (!string.IsNullOrEmpty(prefix))
+			{
+				tableName = prefix + "_" + tableName;
+			}
+
+			// Ensure the table name is valid for MySQL
+			tableName = tableName.Replace(" ", "_").Replace("-", "_").Replace(".", "_");
+
+			// create the database if it does not exist
+			string createDatabaseQuery = $"CREATE DATABASE IF NOT EXISTS `{databaseName}`";
+			Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+			db.ExecuteNonQuery(createDatabaseQuery);
+
+			// Get the properties of the class
+			PropertyInfo[] properties = type.GetProperties();
+
+			// Create the table with the basic structure if it does not exist
+			string createTableQuery = $"CREATE TABLE IF NOT EXISTS `{databaseName}`.`{tableName}` (`Id` BIGINT PRIMARY KEY, `dateAdded` DATETIME DEFAULT CURRENT_TIMESTAMP, `lastUpdated` DATETIME DEFAULT CURRENT_TIMESTAMP )";
+			db.ExecuteNonQuery(createTableQuery);
+
+			// Loop through each property to add it as a column in the table
+			foreach (PropertyInfo property in properties)
+			{
+				// Get the property name and type
+				string columnName = property.Name;
+				string columnType = "VARCHAR(255)"; // Default type, can be changed based on property type
+
+				// Convert the property type name to a string
+				string propertyTypeName = property.PropertyType.Name;
+				if (propertyTypeName == "Nullable`1")
+				{
+					// If the property is nullable, get the underlying type
+					propertyTypeName = property.PropertyType.GetGenericArguments()[0].Name;
+				}
+
+				// if property is a class, check if that class a property named "Id". If it does, this column will be a foreign key. If it does not, this column will be a longtext.
+				if (property.PropertyType.IsClass && property.PropertyType != typeof(string))
+				{
+					PropertyInfo? idProperty = property.PropertyType
+						.GetProperties()
+						.FirstOrDefault(p => string.Equals(p.Name, "Id", StringComparison.OrdinalIgnoreCase));
+					if (idProperty != null)
+					{
+						// This is a foreign key reference
+						columnType = "BIGINT"; // Assuming Id is of type long
+					}
+					else
+					{
+						// This is a longtext column
+						columnType = "LONGTEXT";
+					}
+				}
+				else
+				{
+
+					// Determine the SQL type based on the property type
+					switch (propertyTypeName)
+					{
+						case "String":
+							if (columnName.ToLower() == "description" || columnName.ToLower() == "notes" || columnName.ToLower() == "comments" || columnName.ToLower() == "details" || columnName.ToLower() == "summary" || columnName.ToLower() == "content" || columnName.ToLower() == "text" || columnName.ToLower() == "body" || columnName.ToLower() == "message" || columnName.ToLower() == "info" || columnName.ToLower() == "data" || columnName.ToLower() == "deck" || columnName.ToLower() == "aliases")
+							{
+								columnType = "LONGTEXT"; // Use TEXT for longer strings
+							}
+							else
+							{
+								columnType = "VARCHAR(255)";
+							}
+							break;
+						case "Int32":
+							columnType = "INT";
+							break;
+						case "Int64":
+							columnType = "BIGINT";
+							break;
+						case "Boolean":
+							columnType = "BOOLEAN";
+							break;
+						case "DateTime":
+						case "DateTimeOffset":
+							columnType = "DATETIME";
+							break;
+						case "Double":
+							columnType = "DOUBLE";
+							break;
+						case "IdentityOrValue`1":
+							columnType = "BIGINT";
+							break;
+						case "IdentitiesOrValues`1":
+							columnType = "LONGTEXT";
+							break;
+					}
+				}
+
+				// check if there is a column with the name of the property
+				string checkColumnQuery = $"SHOW COLUMNS FROM `{databaseName}`.`{tableName}` LIKE '{columnName}'";
+				var result = db.ExecuteCMD(checkColumnQuery);
+				if (result.Rows.Count > 0)
+				{
+					// Column already exists, check if the type matches
+					string existingType = result.Rows[0]["Type"].ToString();
+					if (existingType.ToLower().Split("(")[0] != columnType.ToLower().Split("(")[0] && existingType != "text" && existingType != "longtext")
+					{
+						// If the type does not match, we cannot change the column type in MySQL without dropping it first
+						Console.WriteLine($"Column '{columnName}' in table '{tableName}' already exists with type '{existingType}', but expected type is '{columnType}'.");
+						string alterColumnQuery = $"ALTER TABLE `{databaseName}`.`{tableName}` MODIFY COLUMN `{columnName}` {columnType}";
+						Console.WriteLine($"Executing query: {alterColumnQuery}");
+						try
+						{
+							db.ExecuteNonQuery(alterColumnQuery);
+						}
+						catch (Exception ex)
+						{
+							Console.WriteLine($"Error altering column '{columnName}' in table '{tableName}': {ex.Message}");
+						}
+						continue; // Skip this column as we cannot change its type
+					}
+					continue; // Skip this column as it already exists
+				}
+
+				// Add the column to the table if it does not already exist
+				string addColumnQuery = $"ALTER TABLE `{databaseName}`.`{tableName}` ADD COLUMN IF NOT EXISTS `{columnName}` {columnType}";
+				Console.WriteLine($"Executing query: {addColumnQuery}");
+				db.ExecuteNonQuery(addColumnQuery);
+			}
+		}
 	}
 }
 

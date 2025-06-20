@@ -89,95 +89,9 @@ namespace Classes.Metadata.Utility
         /// <param name="type">The type definition of the class for which the table should be built.</param>
         public static void BuildTableFromType(Type type)
         {
-            // Get the table name from the class name
-            string tableName = Storage.TablePrefix.IGDB.ToString() + "_" + type.Name;
-
-            // Get the properties of the class
-            PropertyInfo[] properties = type.GetProperties();
-
-            // Start building the SQL command
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
 
-            // Create the table with the basic structure if it does not exist
-            string createTableQuery = $"CREATE TABLE IF NOT EXISTS `{tableName}` (`Id` BIGINT PRIMARY KEY, `dateAdded` DATETIME DEFAULT CURRENT_TIMESTAMP, `lastUpdated` DATETIME DEFAULT CURRENT_TIMESTAMP )";
-            db.ExecuteNonQuery(createTableQuery);
-
-            // Loop through each property to add it as a column in the table
-            foreach (PropertyInfo property in properties)
-            {
-                // Get the property name and type
-                string columnName = property.Name;
-                string columnType = "VARCHAR(255)"; // Default type, can be changed based on property type
-
-                // Convert the property type name to a string
-                string propertyTypeName = property.PropertyType.Name;
-                if (propertyTypeName == "Nullable`1")
-                {
-                    // If the property is nullable, get the underlying type
-                    propertyTypeName = property.PropertyType.GetGenericArguments()[0].Name;
-                }
-
-                // Determine the SQL type based on the property type
-                switch (propertyTypeName)
-                {
-                    case "String":
-                        columnType = "VARCHAR(255)";
-                        break;
-                    case "Int32":
-                        columnType = "INT";
-                        break;
-                    case "Int64":
-                        columnType = "BIGINT";
-                        break;
-                    case "Boolean":
-                        columnType = "BOOLEAN";
-                        break;
-                    case "DateTime":
-                    case "DateTimeOffset":
-                        columnType = "DATETIME";
-                        break;
-                    case "Double":
-                        columnType = "DOUBLE";
-                        break;
-                    case "IdentityOrValue`1":
-                        columnType = "BIGINT";
-                        break;
-                    case "IdentitiesOrValues`1":
-                        columnType = "LONGTEXT";
-                        break;
-                }
-
-                // check if there is a column with the name of the property
-                string checkColumnQuery = $"SHOW COLUMNS FROM `{tableName}` LIKE '{columnName}'";
-                var result = db.ExecuteCMD(checkColumnQuery);
-                if (result.Rows.Count > 0)
-                {
-                    // Column already exists, check if the type matches
-                    string existingType = result.Rows[0]["Type"].ToString();
-                    if (existingType.ToLower().Split("(")[0] != columnType.ToLower().Split("(")[0] && existingType != "text" && existingType != "longtext")
-                    {
-                        // If the type does not match, we cannot change the column type in MySQL without dropping it first
-                        Console.WriteLine($"Column '{columnName}' in table '{tableName}' already exists with type '{existingType}', but expected type is '{columnType}'.");
-                        string alterColumnQuery = $"ALTER TABLE `{tableName}` MODIFY COLUMN `{columnName}` {columnType}";
-                        Console.WriteLine($"Executing query: {alterColumnQuery}");
-                        try
-                        {
-                            db.ExecuteNonQuery(alterColumnQuery);
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"Error altering column '{columnName}' in table '{tableName}': {ex.Message}");
-                        }
-                        continue; // Skip this column as we cannot change its type
-                    }
-                    continue; // Skip this column as it already exists
-                }
-
-                // Add the column to the table if it does not already exist
-                string addColumnQuery = $"ALTER TABLE `{tableName}` ADD COLUMN IF NOT EXISTS `{columnName}` {columnType}";
-                Console.WriteLine($"Executing query: {addColumnQuery}");
-                db.ExecuteNonQuery(addColumnQuery);
-            }
+            db.BuildTableFromType("hasheous", Storage.TablePrefix.IGDB.ToString(), type);
         }
     }
 }

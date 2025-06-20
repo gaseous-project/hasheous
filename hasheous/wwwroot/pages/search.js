@@ -113,6 +113,11 @@ function createDataObjectsTableFromMD5Search(hashType) {
 
     let searchModel;
     switch (hashType) {
+        case 'sha256':
+            searchModel = {
+                'sha256': pageSearchBox.value
+            };
+            break;
         case 'md5':
             searchModel = {
                 'md5': pageSearchBox.value
@@ -185,9 +190,14 @@ function createDataObjectsTableFromMD5Search(hashType) {
 
 function performSearch() {
     const regexExp_md5 = /^[a-f0-9]{32}$/gi;
+    const regexExp_sha256 = /\b([a-f0-9]{64})\b/;
+    const regexExp_sha256_alt = /\b([a-f0-9]{64})\b/; // Some SHA256 hashes may be in uppercase
     const regexExp_sha1 = /\b([a-f0-9]{40})\b/;
     const regexExp_crc32 = /\b([a-f0-9]{8})\b/;
-    if (regexExp_md5.test(pageSearchBox.value)) {
+    if (regexExp_sha256.test(pageSearchBox.value) || regexExp_sha256_alt.test(pageSearchBox.value)) {
+        // is a SHA256
+        createDataObjectsTableFromMD5Search('sha256');
+    } else if (regexExp_md5.test(pageSearchBox.value)) {
         // is an MD5
         createDataObjectsTableFromMD5Search('md5');
     } else if (regexExp_sha1.test(pageSearchBox.value)) {
