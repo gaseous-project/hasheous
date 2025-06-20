@@ -181,11 +181,6 @@ namespace hasheous_server.Controllers.v1_0
             {
                 if (property.CanRead)
                 {
-                    if (property.Name == "Checksum")
-                    {
-                        Console.WriteLine("Testing");
-                    }
-
                     var value = property.GetValue(returnValue);
                     if (value != null)
                     {
