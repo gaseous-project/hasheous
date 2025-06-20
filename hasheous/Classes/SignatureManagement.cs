@@ -28,12 +28,13 @@ namespace Classes
         {
             Dictionary<string, object> dbDict = new Dictionary<string, object>();
             List<string> whereClauses = new List<string>();
-            if (model.MD5 != null)
+
+            if (model.SHA256 != null)
             {
-                if (model.MD5.Length == 32)
+                if (model.SHA256.Length == 32)
                 {
-                    whereClauses.Add("Signatures_Roms.MD5 = @md5");
-                    dbDict.Add("md5", model.MD5);
+                    whereClauses.Add("Signatures_Roms.SHA256 = @sha256");
+                    dbDict.Add("sha256", model.SHA256);
                 }
             }
             if (model.SHA1 != null)
@@ -44,7 +45,14 @@ namespace Classes
                     dbDict.Add("sha1", model.SHA1);
                 }
             }
-
+            if (model.MD5 != null)
+            {
+                if (model.MD5.Length == 32)
+                {
+                    whereClauses.Add("Signatures_Roms.MD5 = @md5");
+                    dbDict.Add("md5", model.MD5);
+                }
+            }
             if (model.CRC != null)
             {
                 if (model.CRC.Length == 8)
@@ -58,7 +66,7 @@ namespace Classes
             {
                 // lookup the provided hashes
                 Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-                string sql = "SELECT view_Signatures_Games.*, Signatures_Roms.Id AS romid, Signatures_Roms.Name AS romname, Signatures_Roms.Size, Signatures_Roms.CRC, Signatures_Roms.MD5, Signatures_Roms.SHA1, Signatures_Roms.DevelopmentStatus, Signatures_Roms.Attributes, Signatures_Roms.RomType, Signatures_Roms.RomTypeMedia, Signatures_Roms.MediaLabel, Signatures_Roms.MetadataSource, Signatures_Roms.Countries, Signatures_Roms.Languages FROM Signatures_Roms INNER JOIN view_Signatures_Games ON Signatures_Roms.GameId = view_Signatures_Games.Id WHERE " + string.Join(" OR ", whereClauses);
+                string sql = "SELECT view_Signatures_Games.*, Signatures_Roms.Id AS romid, Signatures_Roms.Name AS romname, Signatures_Roms.Size, Signatures_Roms.CRC, Signatures_Roms.MD5, Signatures_Roms.SHA1, Signatures_Roms.SHA256, Signatures_Roms.Status, Signatures_Roms.DevelopmentStatus, Signatures_Roms.Attributes, Signatures_Roms.RomType, Signatures_Roms.RomTypeMedia, Signatures_Roms.MediaLabel, Signatures_Roms.MetadataSource, Signatures_Roms.Countries, Signatures_Roms.Languages FROM Signatures_Roms INNER JOIN view_Signatures_Games ON Signatures_Roms.GameId = view_Signatures_Games.Id WHERE " + string.Join(" OR ", whereClauses);
 
                 DataTable sigDb = await db.ExecuteCMDAsync(sql, dbDict);
 
@@ -272,14 +280,16 @@ namespace Classes
                 Id = ((long)sigDbRow["romid"]).ToString(),
                 Name = (string)sigDbRow["romname"],
                 Size = (ulong)(long)sigDbRow["Size"],
-                Crc = (string)sigDbRow["CRC"],
-                Md5 = ((string)sigDbRow["MD5"]).ToLower(),
-                Sha1 = ((string)sigDbRow["SHA1"]).ToLower(),
-                DevelopmentStatus = (string)sigDbRow["DevelopmentStatus"],
+                Crc = (string)Common.ReturnValueIfNull((string)sigDbRow["CRC"], ""),
+                Md5 = (string)Common.ReturnValueIfNull(((string)sigDbRow["MD5"]).ToLower(), ""),
+                Sha1 = (string)Common.ReturnValueIfNull(((string)sigDbRow["SHA1"]).ToLower(), ""),
+                Sha256 = ((string)Common.ReturnValueIfNull(sigDbRow["SHA256"], "")).ToLower(),
+                Status = ((string)Common.ReturnValueIfNull(sigDbRow["Status"], "")).ToLower(),
+                DevelopmentStatus = (string)Common.ReturnValueIfNull((string)sigDbRow["DevelopmentStatus"], ""),
                 Attributes = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>((string)Common.ReturnValueIfNull(sigDbRow["Attributes"], "")),
                 RomType = (Signatures_Games_2.RomItem.RomTypes)(int)sigDbRow["RomType"],
-                RomTypeMedia = (string)sigDbRow["RomTypeMedia"],
-                MediaLabel = (string)sigDbRow["MediaLabel"],
+                RomTypeMedia = (string)Common.ReturnValueIfNull((string)sigDbRow["RomTypeMedia"], ""),
+                MediaLabel = (string)Common.ReturnValueIfNull((string)sigDbRow["MediaLabel"], ""),
                 SignatureSource = (Signatures_Games_2.RomItem.SignatureSourceType)(Int32)sigDbRow["MetadataSource"],
                 Country = romCountries,
                 Language = romLanguages
@@ -351,12 +361,13 @@ namespace Classes
         public hasheous_server.Models.Signatures_Games_2.RomItem GetRomItemByHash(hasheous_server.Models.HashLookupModel model)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql = "SELECT `Id` AS romid, `Name` AS romname, Signatures_Roms.* FROM Signatures_Roms WHERE MD5 = @md5 OR SHA1 = @sha1 OR CRC = @crc;";
+            string sql = "SELECT `Id` AS romid, `Name` AS romname, Signatures_Roms.* FROM Signatures_Roms WHERE MD5 = @md5 OR SHA1 = @sha1 OR SHA256 = @sha256 OR CRC = @crc;";
 
             return BuildRomItem(db.ExecuteCMD(sql, new Dictionary<string, object>{
                 { "md5", model.MD5 },
                 { "sha1", model.SHA1 },
-                { "crc", model.CRC }
+                { "crc", model.CRC },
+                { "sha256", model.SHA256 }
             }).Rows[0]);
         }
 

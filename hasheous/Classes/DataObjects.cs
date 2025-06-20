@@ -121,6 +121,11 @@ namespace hasheous_server.Classes
                         attributeName = AttributeItem.AttributeName.VIMMManualId,
                         attributeType = AttributeItem.AttributeType.ShortString,
                         attributeRelationType = DataObjectType.None
+                    },
+                    new AttributeItem{
+                        attributeName = AttributeItem.AttributeName.Wikipedia,
+                        attributeType = AttributeItem.AttributeType.Link,
+                        attributeRelationType = DataObjectType.None
                     }
                 }
             } },
@@ -770,6 +775,8 @@ namespace hasheous_server.Classes
                         `CRC`,
                         `MD5`,
                         `SHA1`,
+                        `SHA256`,
+                        `Status`,
                         `DevelopmentStatus`,
                         `Attributes`,
                         `RomType`,
@@ -1568,6 +1575,157 @@ namespace hasheous_server.Classes
 
                                             break;
                                     }
+                                    break;
+
+                                case MetadataSources.GiantBomb:
+                                    switch (objectType)
+                                    {
+                                        case DataObjectType.Platform:
+                                            // get the platform id from the name
+                                            long platformId = GiantBomb.MetadataQuery.PlatformLookup(item.Name);
+                                            if (platformId > 0)
+                                            {
+                                                dbDict["metadataid"] = platformId.ToString();
+                                                dbDict["method"] = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic;
+                                            }
+                                            break;
+
+                                        case DataObjectType.Game:
+                                            // check if the IGDB dataset has an entry for this game - get the IGDB metadata slug if available
+                                            string? igdbId = item.Metadata.Find(x => x.Source == MetadataSources.IGDB)?.ImmutableId;
+                                            if (igdbId != null && igdbId != "")
+                                            {
+                                                // get the game from the IGDB dumps if available
+                                                if (long.TryParse(igdbId, out long igdbIdLong))
+                                                {
+                                                    igdbId = igdbIdLong.ToString();
+                                                }
+                                                HasheousClient.Models.Metadata.IGDB.Game? igdbGame = await Metadata.IGDB.Metadata.GetMetadata<HasheousClient.Models.Metadata.IGDB.Game>(igdbIdLong);
+                                                if (igdbGame != null)
+                                                {
+                                                    // get the GiantBomb ID from the IGDB game
+                                                    if (igdbGame.ExternalGames != null && igdbGame.ExternalGames.Count > 0)
+                                                    {
+                                                        foreach (var externalGame in igdbGame.ExternalGames)
+                                                        {
+                                                            HasheousClient.Models.Metadata.IGDB.ExternalGame? exGame = await Metadata.IGDB.Metadata.GetMetadata<HasheousClient.Models.Metadata.IGDB.ExternalGame>(externalGame);
+                                                            if (exGame != null && exGame.ExternalGameSource != null)
+                                                            {
+                                                                if (exGame.ExternalGameSource == 3)
+                                                                {
+                                                                    // we have a GiantBomb ID, use this
+                                                                    dbDict["metadataid"] = exGame.Uid;
+                                                                    dbDict["method"] = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic;
+                                                                    break;
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            else
+                                            {
+                                                // fall back to searching for the game name in the downloaded GiantBomb dumps - if available
+
+                                                // get the platform of this dataobject
+                                                long? gbPlatformId = null;
+                                                AttributeItem platformAttribute = item.Attributes.Find(x => x.attributeName == AttributeItem.AttributeName.Platform && x.attributeType == AttributeItem.AttributeType.ObjectRelationship);
+                                                if (platformAttribute != null)
+                                                {
+                                                    // get the associated platform dataobject
+                                                    DataObjectItem platformDO;
+                                                    if (platformAttribute.Value.GetType() == typeof(DataObjectItem))
+                                                    {
+                                                        platformDO = (DataObjectItem)platformAttribute.Value;
+                                                    }
+                                                    else
+                                                    {
+                                                        RelationItem relationItem = (RelationItem)platformAttribute.Value;
+                                                        platformDO = await GetDataObject(DataObjectType.Platform, relationItem.relationId);
+                                                    }
+                                                    // check if platformDO has a configured metadata value for GiantBomb
+                                                    DataObjectItem.MetadataItem platformMetadata = platformDO.Metadata.Find(x => x.Source == MetadataSources.GiantBomb);
+                                                    if (platformMetadata != null && platformMetadata.Id != "")
+                                                    {
+                                                        // get the platform id
+                                                        gbPlatformId = long.Parse(platformMetadata.Id);
+                                                    }
+                                                }
+
+                                                if (gbPlatformId != null)
+                                                {
+                                                    // search for games
+                                                    bool SearchComplete = false;
+                                                    foreach (string SearchCandidate in SearchCandidates)
+                                                    {
+                                                        // get the game id from the GiantBomb dumps
+                                                        long gameId = GiantBomb.MetadataQuery.GameLookup((long)gbPlatformId, SearchCandidate);
+                                                        if (gameId > 0)
+                                                        {
+                                                            // we have a match, add the GiantBomb game id to the data object
+                                                            dbDict["metadataid"] = gameId.ToString();
+                                                            dbDict["method"] = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic;
+                                                            SearchComplete = true;
+                                                            break;
+                                                        }
+                                                    }
+                                                    if (SearchComplete == true)
+                                                    {
+                                                        break;
+                                                    }
+                                                }
+                                            }
+
+                                            break;
+
+                                    }
+                                    break;
+
+                                case MetadataSources.Wikipedia:
+                                    switch (objectType)
+                                    {
+                                        case DataObjectType.Game:
+                                            // check if the IGDB dataset has an entry for this game - get the IGDB metadata slug if available
+                                            string? igdbId = item.Metadata.Find(x => x.Source == MetadataSources.IGDB)?.ImmutableId;
+                                            if (igdbId != null && igdbId != "")
+                                            {
+                                                // get the game from the IGDB dumps if available
+                                                if (long.TryParse(igdbId, out long igdbIdLong))
+                                                {
+                                                    igdbId = igdbIdLong.ToString();
+                                                }
+                                                HasheousClient.Models.Metadata.IGDB.Game? igdbGame = await Metadata.IGDB.Metadata.GetMetadata<HasheousClient.Models.Metadata.IGDB.Game>(igdbIdLong);
+                                                if (igdbGame != null)
+                                                {
+                                                    // get the wikipedia link from the IGDB game
+                                                    if (igdbGame.Websites != null && igdbGame.Websites.Count > 0)
+                                                    {
+                                                        foreach (var website in igdbGame.Websites)
+                                                        {
+                                                            HasheousClient.Models.Metadata.IGDB.Website? webGame = await Metadata.IGDB.Metadata.GetMetadata<HasheousClient.Models.Metadata.IGDB.Website>(website);
+                                                            if (webGame != null)
+                                                            {
+                                                                if (webGame.Type == 3)
+                                                                {
+                                                                    // we have a GiantBomb ID, use this
+                                                                    dbDict["metadataid"] = webGame.Url;
+                                                                    dbDict["method"] = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic;
+                                                                    break;
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            break;
+
+                                    }
+                                    break;
+
+                                default:
+                                    // no metadata source found, set to no match
+                                    DataObjectSearchResults.MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch;
+                                    DataObjectSearchResults.MetadataId = "";
                                     break;
                             }
 

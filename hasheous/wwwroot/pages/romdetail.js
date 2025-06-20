@@ -55,11 +55,11 @@ ajaxCall(
             }
 
             if (jsonLoaded === false) {
-                if (key === 'md5') {
+                if (key === 'sha256') {
                     if (value.length > 0) {
                         jsonLoaded = true;
                         jsonModel = {
-                            "md5": value
+                            "sha256": value
                         }
                     }
                 }
@@ -68,6 +68,14 @@ ajaxCall(
                         jsonLoaded = true;
                         jsonModel = {
                             "sha1": value
+                        }
+                    }
+                }
+                if (key === 'md5') {
+                    if (value.length > 0) {
+                        jsonLoaded = true;
+                        jsonModel = {
+                            "md5": value
                         }
                     }
                 }

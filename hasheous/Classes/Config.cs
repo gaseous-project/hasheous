@@ -74,6 +74,14 @@ namespace Classes
             }
         }
 
+        public static ConfigFile.GiantBomb GiantBomb
+        {
+            get
+            {
+                return _config.GiantBombConfiguration;
+            }
+        }
+
         public static string LogPath
         {
             get
@@ -174,71 +182,206 @@ namespace Classes
             File.WriteAllText(ConfigurationFilePath, configRaw);
         }
 
-        private static Dictionary<string, string> AppSettings = new Dictionary<string, string>();
+        private static Dictionary<string, object?> AppSettings = new Dictionary<string, object?>();
 
-        public static void InitSettings()
+        public static T ReadSetting<T>(string SettingName, T DefaultValue)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql = "SELECT * FROM Settings";
-
-            DataTable dbResponse = db.ExecuteCMD(sql);
-            foreach (DataRow dataRow in dbResponse.Rows)
+            try
             {
-                if (AppSettings.ContainsKey((string)dataRow["Setting"]))
+                if (AppSettings.ContainsKey(SettingName))
                 {
-                    AppSettings[(string)dataRow["Setting"]] = (string)dataRow["Value"];
+                    return (T)AppSettings[SettingName];
                 }
                 else
                 {
-                    AppSettings.Add((string)dataRow["Setting"], (string)dataRow["Value"]);
+                    string sql;
+                    Dictionary<string, object> dbDict = new Dictionary<string, object>
+                    {
+                        { "SettingName", SettingName }
+                    };
+                    DataTable dbResponse;
+
+                    try
+                    {
+                        Logging.Log(Logging.LogType.Debug, "Database", "Reading setting '" + SettingName + "'");
+
+                        sql = "SELECT ValueType, Value, ValueDate FROM Settings WHERE Setting = @SettingName";
+
+                        dbResponse = db.ExecuteCMD(sql, dbDict);
+                        Type type = typeof(T);
+                        if (dbResponse.Rows.Count == 0)
+                        {
+                            // no value with that name stored - respond with the default value
+                            SetSetting<T>(SettingName, DefaultValue);
+                            return DefaultValue;
+                        }
+                        else
+                        {
+                            if (type.ToString() == "System.DateTime")
+                            {
+                                AppSettings.Add(SettingName, (T)dbResponse.Rows[0]["ValueDate"]);
+                                return (T)dbResponse.Rows[0]["ValueDate"];
+                            }
+                            else
+                            {
+                                // cast the value to the requested type
+                                if (type.ToString() == "System.String")
+                                {
+                                    // string value
+                                    AppSettings.Add(SettingName, (T)dbResponse.Rows[0]["Value"]);
+                                    return (T)dbResponse.Rows[0]["Value"];
+                                }
+                                else if (type.ToString() == "System.Boolean")
+                                {
+                                    // boolean value
+                                    AppSettings.Add(SettingName, (T)(object)Convert.ToBoolean(dbResponse.Rows[0]["Value"]));
+                                    return (T)(object)Convert.ToBoolean(dbResponse.Rows[0]["Value"]);
+                                }
+                                else if (type.ToString() == "System.Int32")
+                                {
+                                    // int value
+                                    AppSettings.Add(SettingName, (T)(object)Convert.ToInt32(dbResponse.Rows[0]["Value"]));
+                                    return (T)(object)Convert.ToInt32(dbResponse.Rows[0]["Value"]);
+                                }
+                                else if (type.ToString() == "System.Int64")
+                                {
+                                    // long value
+                                    AppSettings.Add(SettingName, (T)(object)Convert.ToInt64(dbResponse.Rows[0]["Value"]));
+                                    return (T)(object)Convert.ToInt64(dbResponse.Rows[0]["Value"]);
+                                }
+                                else if (type.ToString() == "System.Single")
+                                {
+                                    // float value
+                                    AppSettings.Add(SettingName, (T)(object)Convert.ToSingle(dbResponse.Rows[0]["Value"]));
+                                    return (T)(object)Convert.ToSingle(dbResponse.Rows[0]["Value"]);
+                                }
+                                else if (type.ToString() == "System.Double")
+                                {
+                                    // double value
+                                    AppSettings.Add(SettingName, (T)(object)Convert.ToDouble(dbResponse.Rows[0]["Value"]));
+                                    return (T)(object)Convert.ToDouble(dbResponse.Rows[0]["Value"]);
+                                }
+                                else if (type.ToString() == "System.Decimal")
+                                {
+                                    // decimal value
+                                    AppSettings.Add(SettingName, (T)(object)Convert.ToDecimal(dbResponse.Rows[0]["Value"]));
+                                    return (T)(object)Convert.ToDecimal(dbResponse.Rows[0]["Value"]);
+                                }
+
+                                // default case - just return the value as is
+                                AppSettings.Add(SettingName, (T)dbResponse.Rows[0]["Value"]);
+                                return (T)dbResponse.Rows[0]["Value"];
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logging.Log(Logging.LogType.Critical, "Database", "Failed reading setting " + SettingName, ex);
+                        throw;
+                    }
                 }
+            }
+            catch (InvalidCastException castEx)
+            {
+                Logging.Log(Logging.LogType.Warning, "Settings", "Exception when reading server setting " + SettingName + ". Resetting to default.", castEx);
+
+                // delete broken setting and return the default
+                // this error is probably generated during an upgrade
+                if (AppSettings.ContainsKey(SettingName))
+                {
+                    AppSettings.Remove(SettingName);
+                }
+
+                string sql = "DELETE FROM Settings WHERE Setting = @SettingName";
+                Dictionary<string, object> dbDict = new Dictionary<string, object>
+                {
+                    { "SettingName", SettingName }
+                };
+
+                return DefaultValue;
+            }
+            catch (Exception ex)
+            {
+                Logging.Log(Logging.LogType.Critical, "Settings", "Exception when reading server setting " + SettingName + ".", ex);
+                throw;
             }
         }
 
-        public static string ReadSetting(string SettingName, string DefaultValue)
-        {
-            if (AppSettings.ContainsKey(SettingName))
-            {
-                return AppSettings[SettingName];
-            }
-            else
-            {
-                Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-                string sql = "SELECT * FROM Settings WHERE Setting = @SettingName";
-                Dictionary<string, object> dbDict = new Dictionary<string, object>();
-                dbDict.Add("SettingName", SettingName);
-                dbDict.Add("Value", DefaultValue);
-
-                try
-                {
-                    DataTable dbResponse = db.ExecuteCMD(sql, dbDict);
-                    if (dbResponse.Rows.Count == 0)
-                    {
-                        // no value with that name stored - respond with the default value
-                        SetSetting(SettingName, DefaultValue);
-                        return DefaultValue;
-                    }
-                    else
-                    {
-                        AppSettings.Add(SettingName, (string)dbResponse.Rows[0][0]);
-                        return (string)dbResponse.Rows[0][0];
-                    }
-                }
-                catch (Exception ex)
-                {
-                    throw;
-                }
-            }
-        }
-
-        public static void SetSetting(string SettingName, string Value)
+        public static void SetSetting<T>(string SettingName, T Value)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql = "REPLACE INTO Settings (Setting, Value) VALUES (@SettingName, @Value)";
-            Dictionary<string, object> dbDict = new Dictionary<string, object>();
-            dbDict.Add("SettingName", SettingName);
-            dbDict.Add("Value", Value);
+            string sql;
+            Dictionary<string, object?> dbDict = new Dictionary<string, object?>
+            {
+                { "SettingName", SettingName }
+            };
 
+            sql = "REPLACE INTO Settings (Setting, ValueType, Value, ValueDate) VALUES (@SettingName, @ValueType, @Value, @ValueDate)";
+            Type type = typeof(T);
+
+            switch (type)
+            {
+                case Type t when t == typeof(DateTime):
+                    // value is a DateTime
+                    dbDict.Add("ValueType", 1);
+                    dbDict.Add("Value", null);
+                    dbDict.Add("ValueDate", Value);
+
+                    break;
+
+                case Type t when t == typeof(int) ||
+                                  t == typeof(long) ||
+                                  t == typeof(float) ||
+                                  t == typeof(double) ||
+                                  t == typeof(decimal):
+                    // value is a number
+                    dbDict.Add("Value", Value);
+                    dbDict.Add("ValueDate", null);
+
+                    switch (type)
+                    {
+                        case Type t2 when t2 == typeof(int):
+                            dbDict.Add("ValueType", 2);
+                            break;
+
+                        case Type t2 when t2 == typeof(long):
+                            dbDict.Add("ValueType", 3);
+                            break;
+
+                        case Type t2 when t2 == typeof(float):
+                            dbDict.Add("ValueType", 4);
+                            break;
+
+                        case Type t2 when t2 == typeof(double):
+                            dbDict.Add("ValueType", 5);
+                            break;
+
+                        case Type t2 when t2 == typeof(decimal):
+                            dbDict.Add("ValueType", 6);
+                            break;
+                    }
+
+                    break;
+
+                case Type t when t == typeof(bool):
+                    // value is a boolean
+                    dbDict.Add("ValueType", 7);
+                    dbDict.Add("Value", Value);
+                    dbDict.Add("ValueDate", null);
+
+                    break;
+
+                default:
+                    /// value is a string
+                    dbDict.Add("ValueType", 0);
+                    dbDict.Add("Value", Value);
+                    dbDict.Add("ValueDate", null);
+
+                    break;
+            }
+
+            Logging.Log(Logging.LogType.Debug, "Database", "Storing setting '" + SettingName + "' to value: '" + Value + "'");
             try
             {
                 db.ExecuteCMD(sql, dbDict);
@@ -254,6 +397,7 @@ namespace Classes
             }
             catch (Exception ex)
             {
+                Logging.Log(Logging.LogType.Critical, "Database", "Failed storing setting" + SettingName, ex);
                 throw;
             }
         }
@@ -270,6 +414,8 @@ namespace Classes
             public IGDB IGDBConfiguration = new IGDB();
 
             public RetroAchievements RetroAchievementsConfiguration = new RetroAchievements();
+
+            public GiantBomb GiantBombConfiguration = new GiantBomb();
 
             public Logging LoggingConfiguration = new Logging();
 
@@ -411,6 +557,14 @@ namespace Classes
                     }
                 }
 
+                public string LibraryMetadataDirectory_GiantBomb
+                {
+                    get
+                    {
+                        return Path.Combine(LibraryMetadataDirectory, "GiantBomb");
+                    }
+                }
+
                 public string LibrarySignaturesDirectory
                 {
                     get
@@ -465,6 +619,7 @@ namespace Classes
                     if (!Directory.Exists(LibraryMetadataDirectory_VIMMSLair)) { Directory.CreateDirectory(LibraryMetadataDirectory_VIMMSLair); }
                     if (!Directory.Exists(LibraryMetadataDirectory_TheGamesDb)) { Directory.CreateDirectory(LibraryMetadataDirectory_TheGamesDb); }
                     if (!Directory.Exists(LibraryMetadataDirectory_RetroAchievements)) { Directory.CreateDirectory(LibraryMetadataDirectory_RetroAchievements); }
+                    if (!Directory.Exists(LibraryMetadataDirectory_GiantBomb)) { Directory.CreateDirectory(LibraryMetadataDirectory_GiantBomb); }
                     if (!Directory.Exists(LibraryTempDirectory)) { Directory.CreateDirectory(LibraryTempDirectory); }
                 }
             }
@@ -578,6 +733,28 @@ namespace Classes
                 }
 
                 public string APIKey = _DefaultAPIKey;
+            }
+
+            public class GiantBomb
+            {
+                private static string _DefaultAPIKey
+                {
+                    get
+                    {
+                        if (!String.IsNullOrEmpty(Environment.GetEnvironmentVariable("gbapikey")))
+                        {
+                            return Environment.GetEnvironmentVariable("gbapikey");
+                        }
+                        else
+                        {
+                            return "";
+                        }
+                    }
+                }
+
+                public string APIKey = _DefaultAPIKey;
+
+                public string BaseURL = "https://www.giantbomb.com/api/";
             }
 
             public class Logging

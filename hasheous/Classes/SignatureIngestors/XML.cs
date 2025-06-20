@@ -365,7 +365,7 @@ namespace XML
                                         if (romObject.Md5 != null || romObject.Sha1 != null || romObject.Sha256 != null || romObject.Crc != null)
                                         {
                                             long romId = 0;
-                                            sql = "SELECT * FROM Signatures_Roms WHERE `GameId`=@gameid AND (`MD5`=@md5 AND `SHA1`=@sha1 AND `SHA256`=@sha256 AND `CRC`=@crc);";
+                                            sql = "SELECT * FROM Signatures_Roms WHERE `GameId`=@gameid AND ((`MD5`=@md5 AND `SHA1`=@sha1 AND `SHA256`=@sha256 AND `CRC`=@crc AND `IngestorVersion`=3) OR (`MD5`=@md5 AND `SHA1`=@sha1 AND `IngestorVersion`<=2));";
                                             dbDict = new Dictionary<string, object>
                                             {
                                                 { "gameid", gameId },
@@ -397,7 +397,8 @@ namespace XML
                                             dbDict.Add("romtypemedia", Common.ReturnValueIfNull(romObject.RomTypeMedia, ""));
                                             dbDict.Add("medialabel", Common.ReturnValueIfNull(romObject.MediaLabel, ""));
                                             dbDict.Add("metadatasource", romObject.SignatureSource);
-                                            dbDict.Add("ingestorversion", 2);
+                                            dbDict.Add("status", Common.ReturnValueIfNull(romObject.Status, ""));
+                                            dbDict.Add("ingestorversion", 3);
 
                                             Dictionary<string, string>? countries = new Dictionary<string, string>();
                                             if (romObject.Country != null)
@@ -417,7 +418,7 @@ namespace XML
                                             if (sigDB.Rows.Count == 0)
                                             {
                                                 // entry not present, insert it
-                                                sql = "INSERT INTO Signatures_Roms (`GameId`, `Name`, `Size`, `CRC`, `MD5`, `SHA1`, `SHA256`, `DevelopmentStatus`, `Attributes`, `RomType`, `RomTypeMedia`, `MediaLabel`, `MetadataSource`, `IngestorVersion`, `Countries`, `Languages`) VALUES (@gameid, @name, @size, @crc, @md5, @sha1, @sha256, @developmentstatus, @attributes, @romtype, @romtypemedia, @medialabel, @metadatasource, @ingestorversion, @countries, @languages); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
+                                                sql = "INSERT INTO Signatures_Roms (`GameId`, `Name`, `Size`, `CRC`, `MD5`, `SHA1`, `SHA256`, `Status`, `DevelopmentStatus`, `Attributes`, `RomType`, `RomTypeMedia`, `MediaLabel`, `MetadataSource`, `IngestorVersion`, `Countries`, `Languages`) VALUES (@gameid, @name, @size, @crc, @md5, @sha1, @sha256, @status, @developmentstatus, @attributes, @romtype, @romtypemedia, @medialabel, @metadatasource, @ingestorversion, @countries, @languages); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
                                                 sigDB = db.ExecuteCMD(sql, dbDict);
 
                                                 romId = Convert.ToInt32(sigDB.Rows[0][0]);
@@ -428,8 +429,18 @@ namespace XML
                                                 romId = (long)sigDB.Rows[0][0];
                                                 dbDict.Add("romid", romId);
 
-                                                // update the rom
-                                                sql = "UPDATE Signatures_Roms SET `GameId`=@gameid, `Name`=@name, `Size`=@size, `CRC`=@crc, `DevelopmentStatus`=@developmentstatus, `Attributes`=@attributes, `RomType`=@romtype, `RomTypeMedia`=@romtypemedia, `MediaLabel`=@medialabel, `MetadataSource`=@metadatasource, `IngestorVersion`=@ingestorversion, `Countries`=@countries, `Languages`=@languages WHERE `Id`=@romid;";
+                                                // check if column IngesterVersion < 3, if so, we need to update the crc and sha256 values before proceeding
+                                                if (sigDB.Rows[0]["IngestorVersion"] == DBNull.Value || Convert.ToInt32(sigDB.Rows[0]["IngestorVersion"]) < 3)
+                                                {
+                                                    dbDict["crc"] = Common.ReturnValueIfNull(romObject.Crc, "").ToString().ToLower();
+                                                    dbDict["sha256"] = Common.ReturnValueIfNull(romObject.Sha256, "").ToString().ToLower();
+
+                                                    sql = "UPDATE Signatures_Roms SET `CRC`=@crc, `SHA256`=@sha256, `IngestorVersion`=3 WHERE `Id`=@romid;";
+                                                    db.ExecuteCMD(sql, dbDict);
+                                                }
+
+                                                // update the rom entry
+                                                sql = "UPDATE Signatures_Roms SET `GameId`=@gameid, `Name`=@name, `Size`=@size, `Status`=@status, `DevelopmentStatus`=@developmentstatus, `Attributes`=@attributes, `RomType`=@romtype, `RomTypeMedia`=@romtypemedia, `MediaLabel`=@medialabel, `MetadataSource`=@metadatasource, `Countries`=@countries, `Languages`=@languages WHERE `Id`=@romid;";
                                                 db.ExecuteCMD(sql, dbDict);
                                             }
 

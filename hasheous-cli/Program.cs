@@ -12,9 +12,6 @@ using Microsoft.Extensions.Logging;
 /* are available.                                    */
 /* ------------------------------------------------- */
 
-// load app settings
-Config.InitSettings();
-
 // set up database connection
 Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
 

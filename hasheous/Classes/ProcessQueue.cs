@@ -21,7 +21,7 @@ namespace Classes
             {
                 _ItemType = ItemType;
                 _ItemState = QueueItemState.NeverStarted;
-                _LastRunTime = DateTime.Parse(Config.ReadSetting("LastRun_" + _ItemType.ToString(), DateTime.UtcNow.ToString("yyyy-MM-ddThh:mm:ssZ")));
+                _LastRunTime = Config.ReadSetting("LastRun_" + _ItemType.ToString(), DateTime.UtcNow);
                 _Interval = ExecutionInterval;
                 _AllowManualStart = AllowManualStart;
                 _RemoveWhenStopped = RemoveWhenStopped;
@@ -31,7 +31,7 @@ namespace Classes
             {
                 _ItemType = ItemType;
                 _ItemState = QueueItemState.NeverStarted;
-                _LastRunTime = DateTime.Parse(Config.ReadSetting("LastRun_" + _ItemType.ToString(), DateTime.UtcNow.ToString("yyyy-MM-ddThh:mm:ssZ")));
+                _LastRunTime = Config.ReadSetting("LastRun_" + _ItemType.ToString(), DateTime.UtcNow);
                 _Interval = ExecutionInterval;
                 _AllowManualStart = AllowManualStart;
                 _RemoveWhenStopped = RemoveWhenStopped;
@@ -45,13 +45,13 @@ namespace Classes
             {
                 get
                 {
-                    return DateTime.Parse(Config.ReadSetting("LastRun_" + _ItemType.ToString(), DateTime.UtcNow.ToString("yyyy-MM-ddThh:mm:ssZ")));
+                    return Config.ReadSetting("LastRun_" + _ItemType.ToString(), DateTime.UtcNow);
                 }
                 set
                 {
                     if (_SaveLastRunTime == true)
                     {
-                        Config.SetSetting("LastRun_" + _ItemType.ToString(), value.ToString("yyyy-MM-ddThh:mm:ssZ"));
+                        Config.SetSetting("LastRun_" + _ItemType.ToString(), value);
                     }
                 }
             }
@@ -208,6 +208,12 @@ namespace Classes
                                     igdbDownloader.Download();
                                     break;
 
+                                case QueueItemType.FetchGiantBombMetadata:
+                                    GiantBomb.MetadataDownload gbDownloader = new GiantBomb.MetadataDownload();
+                                    gbDownloader.DownloadPlatforms();
+                                    gbDownloader.DownloadGames();
+                                    break;
+
                                 case QueueItemType.AutoMapper:
                                     await AutoMapper.RomAutoMapper();
                                     break;
@@ -308,6 +314,11 @@ namespace Classes
             /// Fetch IGDB metadata
             /// </summary>
             FetchIGDBMetadata,
+
+            /// <summary>
+            /// Fetch GiantBomb metadata
+            /// </summary>
+            FetchGiantBombMetadata,
 
             /// <summary>
             /// Loops all ROMs in the database and attempts to match them to a data object - or creates a new datao object if no match is found

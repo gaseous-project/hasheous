@@ -304,23 +304,21 @@ function renderContent() {
                                     }
 
                                     // join hashes into a single string with a <br /> between them
-                                    let hashes = '';
-                                    if (rom.md5) {
-                                        hashes += 'MD5: ' + rom.md5;
+                                    let hashes = "";
+
+                                    if (rom.sha256) {
+                                        hashes += "<tr><td>" + lang.getLang('SHA256') + ":</td><td style=\"word-break: break-word;\">" + rom.sha256 + "</td></tr>";
                                     }
                                     if (rom.sha1) {
-                                        if (hashes != '') {
-                                            hashes += '<br />';
-                                        }
-                                        hashes += 'SHA1: ' + rom.sha1;
+                                        hashes += "<tr><td>" + lang.getLang('sha1') + ":</td><td>" + rom.sha1 + "</td></tr>";
+                                    }
+                                    if (rom.md5) {
+                                        hashes += "<tr><td>" + lang.getLang('md5') + ":</td><td>" + rom.md5 + "</td></tr>";
                                     }
                                     if (rom.crc) {
-                                        if (hashes != '') {
-                                            hashes += '<br />';
-                                        }
-                                        hashes += 'CRC: ' + rom.crc;
+                                        hashes += "<tr><td>" + lang.getLang('crc') + ":</td><td>" + rom.crc + "</td></tr>";
                                     }
-                                    hashes = '<span style="white-space: nowrap;">' + hashes + '</span>';
+                                    hashes = "<table cellspacing=\"0\">" + hashes + "</table>";
 
                                     romData.push({
                                         "id": rom.id,
@@ -452,6 +450,18 @@ function renderContent() {
         )
     ) {
         document.getElementById('dataObjectMetadataSection').style.display = '';
+
+        // sort dataObject.metadata by source
+        dataObject.metadata.sort(function (a, b) {
+            if (lang.getLang(a.source) < lang.getLang(b.source)) {
+                return -1;
+            }
+            if (lang.getLang(a.source) > lang.getLang(b.source)) {
+                return 1;
+            }
+            return 0;
+        });
+
         let newMetadataMapTable = new generateTable(
             dataObject.metadata,
             ['source:lang', 'matchMethod:lang', 'link:link', 'status:lang'],

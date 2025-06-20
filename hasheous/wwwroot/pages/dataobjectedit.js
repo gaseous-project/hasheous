@@ -31,9 +31,23 @@ document.getElementById('dataObjectSave').addEventListener("click", function (e)
 
     // metadata
     let metadata = [];
-    metadata.push(newMetadataObject('IGDB', document.getElementById('metadatamapigdb')));
-    metadata.push(newMetadataObject('thegamesdb', document.getElementById('metadatamapthegamesdb')));
-    metadata.push(newMetadataObject('retroachievements', document.getElementById('metadatamapretroachievements')));
+    let metadataInputs = document.getElementsByName('metadatamap');
+    for (let i = 0; i < metadataInputs.length; i++) {
+        let metadataInput = metadataInputs[i];
+        let metadataId = metadataInput.value;
+        if (metadataId == undefined) {
+            metadataId = '';
+        }
+
+        let source = metadataInput.getAttribute('data-source');
+        if (source == undefined) {
+            source = '';
+        }
+
+        if (metadataId != '' && source != '') {
+            metadata.push(newMetadataObject(source, metadataInput));
+        }
+    }
 
     // get attributes
     let attributes = [];
@@ -210,6 +224,7 @@ function loadData() {
                     case "HomePage":
                     case "IssueTracker":
                     case "Publisher":
+                    case "Wikipedia":
                         document.getElementById('attribute' + dataObject.attributes[i].attributeName.toLowerCase() + 'input').value = dataObject.attributes[i].value;
                         break;
                 }
@@ -419,6 +434,8 @@ function loadData() {
             metadataInput.type = 'text';
             metadataInput.classList.add('attributeeditselect');
             metadataInput.id = 'metadatamap' + dataObject.metadata[i].source.toLowerCase();
+            metadataInput.name = 'metadatamap';
+            metadataInput.setAttribute('data-source', dataObject.metadata[i].source.toLowerCase());
             metadataInput.value = dataObject.metadata[i].id;
             metadataInputCell.appendChild(metadataInput);
 

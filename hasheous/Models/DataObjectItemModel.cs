@@ -40,7 +40,8 @@ namespace hasheous_server.Models
             Screenshot1 = 14,
             Screenshot2 = 15,
             Screenshot3 = 16,
-            Screenshot4 = 17
+            Screenshot4 = 17,
+            Wikipedia = 18
         }
 
         public long? Id { get; set; }

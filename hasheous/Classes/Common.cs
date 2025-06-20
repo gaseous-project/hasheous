@@ -15,21 +15,22 @@ namespace Classes
 		/// <returns></returns>
 		static public object ReturnValueIfNull(object? ObjectToCheck, object IfNullValue)
 		{
-			if (ObjectToCheck == null || ObjectToCheck == System.DBNull.Value)
-			{
-				return IfNullValue;
-			} else
+			if (ObjectToCheck != null && ObjectToCheck != System.DBNull.Value)
 			{
 				return ObjectToCheck;
+			}
+			else
+			{
+				return IfNullValue;
 			}
 		}
 
 		static public DateTime ConvertUnixToDateTime(double UnixTimeStamp)
 		{
-            DateTime dateTime = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
-            dateTime = dateTime.AddSeconds(UnixTimeStamp).ToLocalTime();
-            return dateTime;
-        }
+			DateTime dateTime = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
+			dateTime = dateTime.AddSeconds(UnixTimeStamp).ToLocalTime();
+			return dateTime;
+		}
 
 		public class hashObject
 		{
@@ -40,21 +41,21 @@ namespace Classes
 
 			public hashObject(string FileName)
 			{
-                var xmlStream = File.OpenRead(FileName);
+				var xmlStream = File.OpenRead(FileName);
 
-                var md5 = MD5.Create();
-                byte[] md5HashByte = md5.ComputeHash(xmlStream);
-                string md5Hash = BitConverter.ToString(md5HashByte).Replace("-", "").ToLowerInvariant();
+				var md5 = MD5.Create();
+				byte[] md5HashByte = md5.ComputeHash(xmlStream);
+				string md5Hash = BitConverter.ToString(md5HashByte).Replace("-", "").ToLowerInvariant();
 				_md5hash = md5Hash;
 
-                var sha1 = SHA1.Create();
+				var sha1 = SHA1.Create();
 				xmlStream.Position = 0;
-                byte[] sha1HashByte = sha1.ComputeHash(xmlStream);
-                string sha1Hash = BitConverter.ToString(sha1HashByte).Replace("-", "").ToLowerInvariant();
+				byte[] sha1HashByte = sha1.ComputeHash(xmlStream);
+				string sha1Hash = BitConverter.ToString(sha1HashByte).Replace("-", "").ToLowerInvariant();
 				_sha1hash = sha1Hash;
 
 				xmlStream.Close();
-            }
+			}
 
 			string _md5hash = "";
 			string _sha1hash = "";
@@ -84,23 +85,23 @@ namespace Classes
 			}
 		}
 
-        public static long DirSize(DirectoryInfo d)
-        {
-            long size = 0;
-            // Add file sizes.
-            FileInfo[] fis = d.GetFiles();
-            foreach (FileInfo fi in fis)
-            {
-                size += fi.Length;
-            }
-            // Add subdirectory sizes.
-            DirectoryInfo[] dis = d.GetDirectories();
-            foreach (DirectoryInfo di in dis)
-            {
-                size += DirSize(di);
-            }
-            return size;
-        }
+		public static long DirSize(DirectoryInfo d)
+		{
+			long size = 0;
+			// Add file sizes.
+			FileInfo[] fis = d.GetFiles();
+			foreach (FileInfo fi in fis)
+			{
+				size += fi.Length;
+			}
+			// Add subdirectory sizes.
+			DirectoryInfo[] dis = d.GetDirectories();
+			foreach (DirectoryInfo di in dis)
+			{
+				size += DirSize(di);
+			}
+			return size;
+		}
 
 		public static string[] SkippableFiles = {
 			".DS_STORE",
@@ -175,6 +176,6 @@ namespace Classes
 			public static object GetData(string name) =>
 				state.TryGetValue(name, out AsyncLocal<object> data) ? data.Value : null;
 		}
-    }
+	}
 }
 

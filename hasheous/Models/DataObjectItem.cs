@@ -45,72 +45,14 @@ namespace hasheous_server.Models
             {
                 get
                 {
-                    switch (Source)
+                    Uri? link = LinkBuilder(Source, _ObjectType, Id);
+                    if (link == null)
                     {
-                        case Communications.MetadataSources.None:
-                            return "";
-                        case Communications.MetadataSources.IGDB:
-                            if (Id.Length > 0)
-                            {
-                                switch (_ObjectType)
-                                {
-                                    case DataObjects.DataObjectType.Company:
-                                        return "https://www.igdb.com/companies/" + Id;
-
-                                    case DataObjects.DataObjectType.Platform:
-                                        return "https://www.igdb.com/platforms/" + Id;
-
-                                    case DataObjects.DataObjectType.Game:
-                                        return "https://www.igdb.com/games/" + Id;
-
-                                    default:
-                                        return "";
-                                }
-                            }
-                            else
-                            {
-                                return "";
-                            }
-                        case Communications.MetadataSources.TheGamesDb:
-                            if (Id.Length > 0)
-                            {
-                                switch (_ObjectType)
-                                {
-                                    case DataObjects.DataObjectType.Platform:
-                                        return "https://thegamesdb.net/platform.php?id=" + Id;
-
-                                    case DataObjects.DataObjectType.Game:
-                                        return "https://thegamesdb.net/game.php?id=" + Id;
-
-                                    default:
-                                        return "";
-                                }
-                            }
-                            else
-                            {
-                                return "";
-                            }
-                        case Communications.MetadataSources.RetroAchievements:
-                            if (Id.Length > 0)
-                            {
-                                switch (_ObjectType)
-                                {
-                                    case DataObjects.DataObjectType.Platform:
-                                        return $"https://retroachievements.org/system/{Id}/games";
-
-                                    case DataObjects.DataObjectType.Game:
-                                        return $"https://retroachievements.org/game/{Id}";
-
-                                    default:
-                                        return "";
-                                }
-                            }
-                            else
-                            {
-                                return "";
-                            }
-                        default:
-                            return "";
+                        return string.Empty;
+                    }
+                    else
+                    {
+                        return LinkBuilder(Source, _ObjectType, Id).ToString();
                     }
                 }
             }
@@ -131,6 +73,128 @@ namespace hasheous_server.Models
                         return (uint)Math.Round((decimal)((WinningVoteCount / TotalVoteCount) * 100), 0);
                     }
                 }
+            }
+
+            private static Uri? LinkBuilder(Communications.MetadataSources source, DataObjects.DataObjectType objectType, string id)
+            {
+                // if id is null or empty, return an empty string
+                if (string.IsNullOrEmpty(id))
+                {
+                    return null;
+                }
+
+                // if id is a valid URL, return it
+                if (Uri.TryCreate(id, UriKind.Absolute, out Uri? uriResult) && (uriResult.Scheme == Uri.UriSchemeHttp || uriResult.Scheme == Uri.UriSchemeHttps))
+                {
+                    return uriResult;
+                }
+
+                // otherwise, build the link based on the source and object type
+                if (_LinkTemplates.TryGetValue(source, out List<LinkTemplateItem>? templates))
+                {
+                    var template = templates.FirstOrDefault(t => t.ObjectType == objectType);
+                    if (template != null)
+                    {
+                        return new Uri(string.Format(template.Template, id));
+                    }
+                }
+
+                return null;
+            }
+
+            private static Dictionary<Communications.MetadataSources, List<LinkTemplateItem>>? _LinkTemplates = new Dictionary<Communications.MetadataSources, List<LinkTemplateItem>>
+            {
+                {
+                    Communications.MetadataSources.IGDB,
+                    new List<LinkTemplateItem>
+                    {
+                        new LinkTemplateItem
+                        {
+                            Source = Communications.MetadataSources.IGDB,
+                            ObjectType = DataObjects.DataObjectType.Company,
+                            Template = "https://www.igdb.com/companies/{0}"
+                        },
+                        new LinkTemplateItem
+                        {
+                            Source = Communications.MetadataSources.IGDB,
+                            ObjectType = DataObjects.DataObjectType.Platform,
+                            Template = "https://www.igdb.com/platforms/{0}"
+                        },
+                        new LinkTemplateItem
+                        {
+                            Source = Communications.MetadataSources.IGDB,
+                            ObjectType = DataObjects.DataObjectType.Game,
+                            Template = "https://www.igdb.com/games/{0}"
+                        }
+                    }
+                },
+                {
+                    Communications.MetadataSources.TheGamesDb,
+                    new List<LinkTemplateItem>
+                    {
+                        new LinkTemplateItem
+                        {
+                            Source = Communications.MetadataSources.TheGamesDb,
+                            ObjectType = DataObjects.DataObjectType.Platform,
+                            Template = "https://thegamesdb.net/platform.php?id={0}"
+                        },
+                        new LinkTemplateItem
+                        {
+                            Source = Communications.MetadataSources.TheGamesDb,
+                            ObjectType = DataObjects.DataObjectType.Game,
+                            Template = "https://thegamesdb.net/game.php?id={0}"
+                        }
+                    }
+                },
+                {
+                    Communications.MetadataSources.RetroAchievements,
+                    new List<LinkTemplateItem>
+                    {
+                        new LinkTemplateItem
+                        {
+                            Source = Communications.MetadataSources.RetroAchievements,
+                            ObjectType = DataObjects.DataObjectType.Platform,
+                            Template = "https://retroachievements.org/system/{0}/games"
+                        },
+                        new LinkTemplateItem
+                        {
+                            Source = Communications.MetadataSources.RetroAchievements,
+                            ObjectType = DataObjects.DataObjectType.Game,
+                            Template = "https://retroachievements.org/game/{0}"
+                        }
+                    }
+                },
+                {
+                    Communications.MetadataSources.GiantBomb,
+                    new List<LinkTemplateItem>
+                    {
+                        new LinkTemplateItem
+                        {
+                            Source = Communications.MetadataSources.GiantBomb,
+                            ObjectType = DataObjects.DataObjectType.Company,
+                            Template = "https://www.giantbomb.com/companies/3010-{0}/"
+                        },
+                        new LinkTemplateItem
+                        {
+                            Source = Communications.MetadataSources.GiantBomb,
+                            ObjectType = DataObjects.DataObjectType.Platform,
+                            Template = "https://www.giantbomb.com/platforms/3045-{0}/"
+                        },
+                        new LinkTemplateItem
+                        {
+                            Source = Communications.MetadataSources.GiantBomb,
+                            ObjectType = DataObjects.DataObjectType.Game,
+                            Template = "https://www.giantbomb.com/games/3030-{0}/"
+                        }
+                    }
+                }
+            };
+
+            private class LinkTemplateItem
+            {
+                public Communications.MetadataSources Source { get; set; }
+                public DataObjects.DataObjectType ObjectType { get; set; }
+                public string Template { get; set; }
             }
         }
         public DateTime CreatedDate { get; set; }
