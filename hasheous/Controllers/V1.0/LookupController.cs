@@ -79,8 +79,8 @@ namespace hasheous_server.Controllers.v1_0
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine("An error occurred while looking up a hash: " + model.MD5 + " " + model.SHA1 + ": " + ex.Message);
-                return NotFound();
+                Logging.Log(Logging.LogType.Warning, "Hash Lookup", "An error occurred while looking up a hash: " + model.MD5 + " " + model.SHA1 + ": " + ex.Message, ex);
+                return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while looking up the hash. Please try again later.");
             }
         }
 
