@@ -326,12 +326,18 @@ namespace Classes
                 {
                     if (corrections.ContainsKey((string)row["Code"]))
                     {
-                        returnDict.Add(corrections[(string)row["Code"]].Key, corrections[(string)row["Code"]].Value);
+                        if (!returnDict.ContainsKey(corrections[(string)row["Code"]].Key))
+                        {
+                            returnDict.Add(corrections[(string)row["Code"]].Key, corrections[(string)row["Code"]].Value);
+                        }
                         continue;
                     }
                 }
 
-                returnDict.Add((string)row["Code"], (string)row["Value"]);
+                if (!returnDict.ContainsKey((string)row["Code"]))
+                {
+                    returnDict.Add((string)row["Code"], (string)row["Value"]);
+                }
             }
 
             return returnDict;
