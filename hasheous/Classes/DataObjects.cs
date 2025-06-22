@@ -560,7 +560,15 @@ namespace hasheous_server.Classes
                                 switch (ObjectType)
                                 {
                                     case DataObjects.DataObjectType.Company:
-                                        var company = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Company>(metadataItem.Id);
+                                        IGDB.Models.Company company;
+                                        if (long.TryParse(metadataItem.Id, out long parsedCompanyId))
+                                        {
+                                            company = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Company>(parsedCompanyId);
+                                        }
+                                        else
+                                        {
+                                            company = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Company>(metadataItem.Id);
+                                        }
                                         if (company != null)
                                         {
                                             objectId = company.Id;
@@ -568,7 +576,15 @@ namespace hasheous_server.Classes
                                         break;
 
                                     case DataObjects.DataObjectType.Platform:
-                                        var platform = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Platform>(metadataItem.Id);
+                                        IGDB.Models.Platform platform;
+                                        if (long.TryParse(metadataItem.Id, out long parsedPlatformId))
+                                        {
+                                            platform = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Platform>(parsedPlatformId);
+                                        }
+                                        else
+                                        {
+                                            platform = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Platform>(metadataItem.Id);
+                                        }
                                         if (platform != null)
                                         {
                                             objectId = platform.Id;
@@ -576,7 +592,15 @@ namespace hasheous_server.Classes
                                         break;
 
                                     case DataObjects.DataObjectType.Game:
-                                        var game = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Game>(metadataItem.Id);
+                                        IGDB.Models.Game game;
+                                        if (long.TryParse(metadataItem.Id, out long parsedGameId))
+                                        {
+                                            game = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Game>(parsedGameId);
+                                        }
+                                        else
+                                        {
+                                            game = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Game>(metadataItem.Id);
+                                        }
                                         if (game != null)
                                         {
                                             objectId = game.Id;
@@ -1010,24 +1034,84 @@ namespace hasheous_server.Classes
                 case DataObjectType.Game:
                     foreach (DataObjectItem.MetadataItem newMetadataItem in model.Metadata)
                     {
+                        long newMetadataId = 0;
+
+                        switch (newMetadataItem.Source)
+                        {
+                            case Metadata.Communications.MetadataSources.IGDB:
+                                if (long.TryParse(newMetadataItem.Id, out long parsedId))
+                                {
+                                    newMetadataId = parsedId;
+                                }
+                                else
+                                {
+                                    // IGDB metadata id is not a long, so we need to search for it
+                                    if (objectType == DataObjectType.Game)
+                                    {
+                                        IGDB.Models.Game? newMetadataGame = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Game>(newMetadataItem.Id);
+                                        if (newMetadataGame != null)
+                                        {
+                                            newMetadataId = (long)newMetadataGame.Id;
+                                        }
+                                        else
+                                        {
+                                            // if we can't find the game, skip it
+                                            continue;
+                                        }
+                                    }
+                                    else if (objectType == DataObjectType.Platform)
+                                    {
+                                        IGDB.Models.Platform? newMetadataPlatform = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Platform>(newMetadataItem.Id);
+                                        if (newMetadataPlatform != null)
+                                        {
+                                            newMetadataId = (long)newMetadataPlatform.Id;
+                                        }
+                                        else
+                                        {
+                                            // if we can't find the platform, skip it
+                                            continue;
+                                        }
+                                    }
+                                    else if (objectType == DataObjectType.Company)
+                                    {
+                                        IGDB.Models.Company? newMetadataCompany = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Company>(newMetadataItem.Id);
+                                        if (newMetadataCompany != null)
+                                        {
+                                            newMetadataId = (long)newMetadataCompany.Id;
+                                        }
+                                        else
+                                        {
+                                            // if we can't find the company, skip it
+                                            continue;
+                                        }
+                                    }
+                                }
+                                break;
+
+                            default:
+                                // other sources use the id as is
+                                newMetadataId = long.Parse(newMetadataItem.Id);
+                                break;
+                        }
+
                         bool metadataFound = false;
                         foreach (DataObjectItem.MetadataItem existingMetadataItem in EditedObject.Metadata)
                         {
                             if (newMetadataItem.Source == existingMetadataItem.Source)
                             {
                                 metadataFound = true;
-                                if (newMetadataItem.Id != existingMetadataItem.Id)
+                                if (newMetadataId.ToString() != existingMetadataItem.Id)
                                 {
                                     // change to manually set
                                     sql = "UPDATE DataObject_MetadataMap SET MatchMethod=@match, MetadataId=@metaid, WinningVoteCount=@winningvotecount, TotalVoteCount=@totalvotecount WHERE DataObjectId=@id AND SourceId=@source;";
                                     db.ExecuteNonQuery(sql, new Dictionary<string, object>{
-                                { "id", id },
-                                { "match", BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin },
-                                { "metaid", newMetadataItem.Id },
-                                { "source", existingMetadataItem.Source },
-                                { "winningvotecount", 0 },
-                                { "totalvotecount", 0 }
-                            });
+                                        { "id", id },
+                                        { "match", BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin },
+                                        { "metaid", newMetadataId },
+                                        { "source", existingMetadataItem.Source },
+                                        { "winningvotecount", 0 },
+                                        { "totalvotecount", 0 }
+                                    });
                                 }
                             }
                         }
@@ -1036,13 +1120,13 @@ namespace hasheous_server.Classes
                         {
                             sql = "INSERT INTO DataObject_MetadataMap (DataObjectId, MetadataId, SourceId, MatchMethod, LastSearched, NextSearch) VALUES (@id, @metaid, @source, @match, @last, @next);";
                             db.ExecuteNonQuery(sql, new Dictionary<string, object>{
-                        { "id", id },
-                        { "match", BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin },
-                        { "metaid", newMetadataItem.Id },
-                        { "source", newMetadataItem.Source },
-                        { "last", DateTime.UtcNow },
-                        { "next", DateTime.UtcNow.AddMonths(1) }
-                    });
+                                { "id", id },
+                                { "match", BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin },
+                                { "metaid", newMetadataId },
+                                { "source", newMetadataItem.Source },
+                                { "last", DateTime.UtcNow },
+                                { "next", DateTime.UtcNow.AddMonths(1) }
+                            });
                         }
                     }
                     break;
@@ -1185,7 +1269,7 @@ namespace hasheous_server.Classes
                 ";
                 dbDict = new Dictionary<string, object>{
                     { "objecttype", objectType },
-                    { "lastsearched", DateTime.UtcNow.AddMonths(-1) }
+                    { "lastsearched", DateTime.UtcNow.AddDays(-5) }
                 };
 
                 DataTable data = db.ExecuteCMD(sql, dbDict);
@@ -1252,15 +1336,25 @@ namespace hasheous_server.Classes
                         { "nextsearch", DateTime.UtcNow.AddMonths(1) }
                     };
 
+                    bool superForceSearch = false;
+                    // if source type = IGDB and metadata.id cannot be parsed as a long, set superForceSearch to true
                     if (
-                        (
-                            metadata.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch &&
-                            metadata.NextSearch < DateTime.UtcNow
-                        ) || (
-                            metadata.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch &&
-                            ForceSearch == true
+                        sourceType == Metadata.Communications.MetadataSources.IGDB &&
+                        metadata.MatchMethod != BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin &&
+                        metadata.MatchMethod != BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Manual &&
+                        metadata.MatchMethod != BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Voted &&
+                        !long.TryParse(metadata.Id, out _))
+                    {
+                        superForceSearch = true;
+                    }
+
+                    if (
+                        (metadata.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch &&
+                            metadata.NextSearch < DateTime.UtcNow) ||
+                        (metadata.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch &&
+                            ForceSearch) ||
+                            (superForceSearch == true)
                         )
-                    )
                     {
                         // searching is allowed
                         try
@@ -1281,6 +1375,54 @@ namespace hasheous_server.Classes
 
                                         case DataObjectType.Game:
                                             long? PlatformId = null;
+
+                                            // IGDB has started changing slugs, so we need to update metadata.id if it's a string to the id which is a long
+                                            // we can do this by checking the IGDB dumps to see if we can find the slug for this game and then simply update the metadata.id to the id. Fall back to existing method if the slug cannot be found.
+                                            if (long.TryParse(metadata.Id, out long metadataIdLong))
+                                            {
+                                                // we have a long, nothing to do here, so skip the rest
+                                                continue;
+                                            }
+                                            else
+                                            {
+                                                // value is not a long
+                                                if (metadata.Id.Length > 0)
+                                                {
+                                                    // database look up
+                                                    sql = "SELECT * FROM igdb.games WHERE slug=@slug;";
+                                                    dbDict = new Dictionary<string, object>{
+                                                        { "slug", metadata.Id }
+                                                    };
+                                                    DataTable gameData = db.ExecuteCMD(sql, dbDict);
+                                                    if (gameData.Rows.Count > 0)
+                                                    {
+                                                        // we have a match, update the metadata.id to the id
+                                                        DataObjectSearchResults = new MatchItem
+                                                        {
+                                                            MatchMethod = (BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod)metadata.MatchMethod,
+                                                            MetadataId = gameData.Rows[0]["id"].ToString()
+                                                        };
+
+                                                        sql = "UPDATE DataObject_MetadataMap SET MetadataId=@metadataid WHERE DataObjectId=@id AND SourceId=@srcid;";
+                                                        dbDict = new Dictionary<string, object>{
+                                                            { "metadataid", DataObjectSearchResults.MetadataId },
+                                                            { "id", item.Id },
+                                                            { "srcid", (int)MetadataSources.IGDB }
+                                                        };
+                                                        db.ExecuteNonQuery(sql, dbDict);
+
+                                                        Logging.Log(Logging.LogType.Information, "Metadata Match", "IGDB slug correction: Found match for slug: " + metadata.Id + ", updated metadata.id to: " + DataObjectSearchResults.MetadataId);
+
+                                                        continue;
+                                                    }
+                                                    else
+                                                    {
+                                                        // no match found, continue with the search
+                                                        Logging.Log(Logging.LogType.Information, "Metadata Match", "IGDB slug correction: No match found for slug: " + metadata.Id + ", continuing with search. Note: existing match may be cleared.");
+                                                    }
+                                                }
+                                            }
+
                                             foreach (AttributeItem attribute in item.Attributes)
                                             {
                                                 if (attribute.attributeType == AttributeItem.AttributeType.ObjectRelationship)
@@ -1307,8 +1449,16 @@ namespace hasheous_server.Classes
                                                                 )
                                                             )
                                                             {
-                                                                IGDB.Models.Platform platform = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Platform>((string?)provider.Id);
-                                                                PlatformId = platform.Id;
+                                                                // check if provider.id is a long
+                                                                if (long.TryParse(provider.Id, out long platformIdLong))
+                                                                {
+                                                                    PlatformId = platformIdLong;
+                                                                }
+                                                                else
+                                                                {
+                                                                    IGDB.Models.Platform platform = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Platform>((string?)provider.Id);
+                                                                    PlatformId = platform.Id;
+                                                                }
                                                             }
                                                         }
                                                     }
@@ -1331,7 +1481,7 @@ namespace hasheous_server.Classes
                                                                 DataObjectSearchResults = new MatchItem
                                                                 {
                                                                     MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic,
-                                                                    MetadataId = games[0].Slug
+                                                                    MetadataId = games[0].Id.ToString()
                                                                 };
                                                                 SearchComplete = true;
                                                                 break;
@@ -1347,7 +1497,7 @@ namespace hasheous_server.Classes
                                                                         DataObjectSearchResults = new MatchItem
                                                                         {
                                                                             MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic,
-                                                                            MetadataId = game.Slug
+                                                                            MetadataId = game.Id.ToString()
                                                                         };
                                                                         SearchComplete = true;
                                                                         break;
@@ -1841,6 +1991,13 @@ namespace hasheous_server.Classes
 
             MatchItem matchItem = new MatchItem();
 
+            if (results == null)
+            {
+                // no results - stay in no match, and set next search to next month
+                matchItem.MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch;
+                return matchItem;
+            }
+
             if (results.Length == 0)
             {
                 // no results - stay in no match, and set next search to next month
@@ -1855,7 +2012,7 @@ namespace hasheous_server.Classes
                     switch (Source)
                     {
                         case MetadataSources.IGDB:
-                            var Value = typeof(T).GetProperty("Slug").GetValue(results[0]);
+                            var Value = typeof(T).GetProperty("Id").GetValue(results[0]);
                             matchItem.MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic;
                             matchItem.MetadataId = Value.ToString();
                             break;

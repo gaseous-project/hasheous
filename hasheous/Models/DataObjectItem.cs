@@ -1,3 +1,5 @@
+using System.Threading.Tasks;
+using GiantBomb.Models;
 using hasheous_server.Classes;
 using hasheous_server.Classes.Metadata;
 using hasheous_server.Classes.Metadata.IGDB;
@@ -41,19 +43,16 @@ namespace hasheous_server.Models
             }
             public BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod? MatchMethod { get; set; }
             public Communications.MetadataSources Source { get; set; }
-            public string Link
+            public async Task<string> GetLinkAsync()
             {
-                get
+                Uri? link = await LinkBuilder(Source, _ObjectType, Id);
+                if (link == null)
                 {
-                    Uri? link = LinkBuilder(Source, _ObjectType, Id);
-                    if (link == null)
-                    {
-                        return string.Empty;
-                    }
-                    else
-                    {
-                        return LinkBuilder(Source, _ObjectType, Id).ToString();
-                    }
+                    return string.Empty;
+                }
+                else
+                {
+                    return link.ToString();
                 }
             }
             public DateTime LastSearch { get; set; }
@@ -75,7 +74,7 @@ namespace hasheous_server.Models
                 }
             }
 
-            private static Uri? LinkBuilder(Communications.MetadataSources source, DataObjects.DataObjectType objectType, string id)
+            private static async Task<Uri?> LinkBuilder(Communications.MetadataSources source, DataObjects.DataObjectType objectType, string id)
             {
                 // if id is null or empty, return an empty string
                 if (string.IsNullOrEmpty(id))
@@ -87,6 +86,37 @@ namespace hasheous_server.Models
                 if (Uri.TryCreate(id, UriKind.Absolute, out Uri? uriResult) && (uriResult.Scheme == Uri.UriSchemeHttp || uriResult.Scheme == Uri.UriSchemeHttps))
                 {
                     return uriResult;
+                }
+
+                // check if the source is IGDB and the id is an integer or long. If it is, get the IGDB object and use the slug
+                if (source == Communications.MetadataSources.IGDB && long.TryParse(id, out long igdbId))
+                {
+                    switch (objectType)
+                    {
+                        case DataObjects.DataObjectType.Company:
+                            IGDB.Models.Company company = await hasheous_server.Classes.Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Company>(igdbId);
+                            if (company != null)
+                            {
+                                id = company.Slug;
+                            }
+                            break;
+                        case DataObjects.DataObjectType.Platform:
+                            IGDB.Models.Platform platform = await hasheous_server.Classes.Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Platform>(igdbId);
+                            if (platform != null)
+                            {
+                                id = platform.Slug;
+                            }
+                            break;
+                        case DataObjects.DataObjectType.Game:
+                            IGDB.Models.Game game = await hasheous_server.Classes.Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Game>(igdbId);
+                            if (game != null)
+                            {
+                                id = game.Slug;
+                            }
+                            break;
+                        default:
+                            return null;
+                    }
                 }
 
                 // otherwise, build the link based on the source and object type
