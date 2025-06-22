@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using GiantBomb.Models;
 using hasheous_server.Classes;
 using hasheous_server.Classes.Metadata;
@@ -42,19 +43,16 @@ namespace hasheous_server.Models
             }
             public BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod? MatchMethod { get; set; }
             public Communications.MetadataSources Source { get; set; }
-            public string Link
+            public async Task<string> GetLinkAsync()
             {
-                get
+                Uri? link = await LinkBuilder(Source, _ObjectType, Id);
+                if (link == null)
                 {
-                    Uri? link = LinkBuilder(Source, _ObjectType, Id);
-                    if (link == null)
-                    {
-                        return string.Empty;
-                    }
-                    else
-                    {
-                        return LinkBuilder(Source, _ObjectType, Id).ToString();
-                    }
+                    return string.Empty;
+                }
+                else
+                {
+                    return link.ToString();
                 }
             }
             public DateTime LastSearch { get; set; }
@@ -76,7 +74,7 @@ namespace hasheous_server.Models
                 }
             }
 
-            private static Uri? LinkBuilder(Communications.MetadataSources source, DataObjects.DataObjectType objectType, string id)
+            private static async Task<Uri?> LinkBuilder(Communications.MetadataSources source, DataObjects.DataObjectType objectType, string id)
             {
                 // if id is null or empty, return an empty string
                 if (string.IsNullOrEmpty(id))
@@ -96,21 +94,21 @@ namespace hasheous_server.Models
                     switch (objectType)
                     {
                         case DataObjects.DataObjectType.Company:
-                            IGDB.Models.Company company = hasheous_server.Classes.Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Company>(igdbId).Result;
+                            IGDB.Models.Company company = await hasheous_server.Classes.Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Company>(igdbId);
                             if (company != null)
                             {
                                 id = company.Slug;
                             }
                             break;
                         case DataObjects.DataObjectType.Platform:
-                            IGDB.Models.Platform platform = hasheous_server.Classes.Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Platform>(igdbId).Result;
+                            IGDB.Models.Platform platform = await hasheous_server.Classes.Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Platform>(igdbId);
                             if (platform != null)
                             {
                                 id = platform.Slug;
                             }
                             break;
                         case DataObjects.DataObjectType.Game:
-                            IGDB.Models.Game game = hasheous_server.Classes.Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Game>(igdbId).Result;
+                            IGDB.Models.Game game = await hasheous_server.Classes.Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Game>(igdbId);
                             if (game != null)
                             {
                                 id = game.Slug;
