@@ -43,16 +43,19 @@ namespace hasheous_server.Models
             }
             public BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod? MatchMethod { get; set; }
             public Communications.MetadataSources Source { get; set; }
-            public async Task<string> GetLinkAsync()
+            public string Link
             {
-                Uri? link = await LinkBuilder(Source, _ObjectType, Id);
-                if (link == null)
+                get
                 {
-                    return string.Empty;
-                }
-                else
-                {
-                    return link.ToString();
+                    Uri? link = LinkBuilder(Source, _ObjectType, Id).Result;
+                    if (link == null)
+                    {
+                        return string.Empty;
+                    }
+                    else
+                    {
+                        return LinkBuilder(Source, _ObjectType, Id).Result.ToString();
+                    }
                 }
             }
             public DateTime LastSearch { get; set; }
