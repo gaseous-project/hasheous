@@ -133,7 +133,18 @@ namespace BackgroundMetadataMatcher
                                 {
                                     case Communications.MetadataSources.IGDB:
                                         // get game metadata
-                                        Game game = await hasheous_server.Classes.Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Game>(metadata.Id);
+                                        Game game;
+
+                                        // check if metadata.id is a long
+                                        if (long.TryParse(metadata.Id, out long metadataId))
+                                        {
+                                            game = await hasheous_server.Classes.Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Game>(metadataId);
+                                        }
+                                        else
+                                        {
+                                            // if not, try to get it by name
+                                            game = await hasheous_server.Classes.Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Game>(metadata.Id);
+                                        }
                                         if (game.Cover != null)
                                         {
                                             if (game.Cover.Id != null)

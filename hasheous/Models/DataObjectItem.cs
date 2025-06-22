@@ -1,3 +1,4 @@
+using GiantBomb.Models;
 using hasheous_server.Classes;
 using hasheous_server.Classes.Metadata;
 using hasheous_server.Classes.Metadata.IGDB;
@@ -87,6 +88,37 @@ namespace hasheous_server.Models
                 if (Uri.TryCreate(id, UriKind.Absolute, out Uri? uriResult) && (uriResult.Scheme == Uri.UriSchemeHttp || uriResult.Scheme == Uri.UriSchemeHttps))
                 {
                     return uriResult;
+                }
+
+                // check if the source is IGDB and the id is an integer or long. If it is, get the IGDB object and use the slug
+                if (source == Communications.MetadataSources.IGDB && long.TryParse(id, out long igdbId))
+                {
+                    switch (objectType)
+                    {
+                        case DataObjects.DataObjectType.Company:
+                            IGDB.Models.Company company = hasheous_server.Classes.Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Company>(igdbId).Result;
+                            if (company != null)
+                            {
+                                id = company.Slug;
+                            }
+                            break;
+                        case DataObjects.DataObjectType.Platform:
+                            IGDB.Models.Platform platform = hasheous_server.Classes.Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Platform>(igdbId).Result;
+                            if (platform != null)
+                            {
+                                id = platform.Slug;
+                            }
+                            break;
+                        case DataObjects.DataObjectType.Game:
+                            IGDB.Models.Game game = hasheous_server.Classes.Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Game>(igdbId).Result;
+                            if (game != null)
+                            {
+                                id = game.Slug;
+                            }
+                            break;
+                        default:
+                            return null;
+                    }
                 }
 
                 // otherwise, build the link based on the source and object type

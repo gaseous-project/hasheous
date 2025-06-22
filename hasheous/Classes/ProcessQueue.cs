@@ -156,6 +156,7 @@ namespace Classes
                                 case QueueItemType.MetadataMatchSearch:
                                     DataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Platform);
                                     DataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game);
+                                    DataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Company);
                                     break;
 
                                 case QueueItemType.GetMissingArtwork:
