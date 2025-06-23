@@ -31,7 +31,7 @@ namespace Classes
 
             if (model.SHA256 != null)
             {
-                if (model.SHA256.Length == 32)
+                if (model.SHA256.Length == 64)
                 {
                     whereClauses.Add("Signatures_Roms.SHA256 = @sha256");
                     dbDict.Add("sha256", model.SHA256);
