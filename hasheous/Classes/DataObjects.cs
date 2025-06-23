@@ -1034,14 +1034,14 @@ namespace hasheous_server.Classes
                 case DataObjectType.Game:
                     foreach (DataObjectItem.MetadataItem newMetadataItem in model.Metadata)
                     {
-                        long newMetadataId = 0;
+                        string newMetadataId = "";
 
                         switch (newMetadataItem.Source)
                         {
                             case Metadata.Communications.MetadataSources.IGDB:
                                 if (long.TryParse(newMetadataItem.Id, out long parsedId))
                                 {
-                                    newMetadataId = parsedId;
+                                    newMetadataId = parsedId.ToString();
                                 }
                                 else
                                 {
@@ -1051,7 +1051,7 @@ namespace hasheous_server.Classes
                                         IGDB.Models.Game? newMetadataGame = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Game>(newMetadataItem.Id);
                                         if (newMetadataGame != null)
                                         {
-                                            newMetadataId = (long)newMetadataGame.Id;
+                                            newMetadataId = newMetadataGame.Id.ToString();
                                         }
                                         else
                                         {
@@ -1064,7 +1064,7 @@ namespace hasheous_server.Classes
                                         IGDB.Models.Platform? newMetadataPlatform = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Platform>(newMetadataItem.Id);
                                         if (newMetadataPlatform != null)
                                         {
-                                            newMetadataId = (long)newMetadataPlatform.Id;
+                                            newMetadataId = newMetadataPlatform.Id.ToString();
                                         }
                                         else
                                         {
@@ -1077,7 +1077,7 @@ namespace hasheous_server.Classes
                                         IGDB.Models.Company? newMetadataCompany = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Company>(newMetadataItem.Id);
                                         if (newMetadataCompany != null)
                                         {
-                                            newMetadataId = (long)newMetadataCompany.Id;
+                                            newMetadataId = newMetadataCompany.Id.ToString();
                                         }
                                         else
                                         {
@@ -1090,7 +1090,7 @@ namespace hasheous_server.Classes
 
                             default:
                                 // other sources use the id as is
-                                newMetadataId = long.Parse(newMetadataItem.Id);
+                                newMetadataId = newMetadataItem.Id;
                                 break;
                         }
 
