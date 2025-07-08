@@ -2,6 +2,7 @@ using System.Data;
 using Authentication;
 using Classes;
 using gaseous_signature_parser.models.RomSignatureObject;
+using hasheous.Classes;
 using hasheous_server.Classes;
 using hasheous_server.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -60,11 +61,77 @@ namespace hasheous_server.Controllers.v1_0
         [ProducesResponseType(StatusCodes.Status200OK)]
         [AllowAnonymous]
         [Route("{ObjectType}")]
-        public async Task<IActionResult> DataObjectsList(Classes.DataObjects.DataObjectType ObjectType, string? search, int pageNumber = 0, int pageSize = 0, bool getchildrelations = false, AttributeItem.AttributeName? filterAttribute = null, string? filterValue = null)
+        public async Task<IActionResult> DataObjectsList(Classes.DataObjects.DataObjectType ObjectType, string? search, int pageNumber = 0, int pageSize = 0, bool getchildrelations = false, AttributeItem.AttributeName? filterAttribute = null, string? filterValue = null, bool getMetadata = true, bool cacheAhead = true, bool cacheBehind = true)
         {
             hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
-            return Ok(await DataObjects.GetDataObjects(ObjectType, pageNumber, pageSize, search, getchildrelations, true, filterAttribute, filterValue));
+            hasheous_server.Models.DataObjectsList? objectsList;
+
+            // check the redis cache for the data
+            // build a cache key from the url including the query parameters
+            string unencodedCacheKey = Request.Path + "?";
+            foreach (var query in Request.Query)
+            {
+                string? value = query.Value.ToString();
+                if (query.Key == "pageNumber")
+                {
+                    value = pageNumber.ToString();
+                }
+                unencodedCacheKey += $"{query.Key}={value}&";
+            }
+
+            // remove the trailing '&' if it exists
+            if (unencodedCacheKey.EndsWith("&"))
+            {
+                unencodedCacheKey = unencodedCacheKey.TrimEnd('&');
+            }
+            // generate a cache key for the data object
+            string cacheKey = RedisConnection.GenerateKey("DataObjectList/" + ObjectType.ToString(), unencodedCacheKey);
+
+            if (Config.RedisConfiguration.Enabled)
+            {
+                string? cachedData = hasheous.Classes.RedisConnection.GetDatabase(0).StringGet(cacheKey);
+                if (cachedData != null)
+                {
+                    // if cached data is found, deserialize it and return
+                    DataObjectsList? dataObjectsList = Newtonsoft.Json.JsonConvert.DeserializeObject<DataObjectsList>(cachedData);
+
+                    if (dataObjectsList != null)
+                    {
+                        return Ok(dataObjectsList);
+                    }
+                }
+            }
+
+            objectsList = await DataObjects.GetDataObjects(ObjectType, pageNumber, pageSize, search, getchildrelations, getMetadata, filterAttribute, filterValue);
+
+            if (objectsList != null && Config.RedisConfiguration.Enabled)
+            {
+                // store the data in the cache
+                hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(cacheKey, Newtonsoft.Json.JsonConvert.SerializeObject(objectsList), TimeSpan.FromMinutes(5));
+
+                if (cacheBehind)
+                {
+                    // cache the previous page if it exists
+                    if (pageNumber > 1)
+                    {
+                        // call the same method with the previous page number
+                        _ = DataObjectsList(ObjectType, search, pageNumber - 1, pageSize, getchildrelations, filterAttribute, filterValue, getMetadata, false, false);
+                    }
+                }
+
+                if (cacheAhead)
+                {
+                    // cache the next page if it exists
+                    if (pageNumber < objectsList.TotalPages)
+                    {
+                        // call the same method with the next page number
+                        _ = DataObjectsList(ObjectType, search, pageNumber + 1, pageSize, getchildrelations, filterAttribute, filterValue, getMetadata, false, false);
+                    }
+                }
+            }
+
+            return Ok(objectsList);
         }
 
         [MapToApiVersion("1.0")]

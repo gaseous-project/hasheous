@@ -14,6 +14,9 @@ services:
       - igdbclientid=${IGDBCLIENTID}
       - igdbclientsecret=${IGDBCLIENTSECRET}
       - igdbusedumps=${IGDBUSEDUMPS}
+      - redisenabled=true
+      - redishost=valkey
+      - redisport=6379
   mariadb:
     hostname: mariadb
     image: mariadb:latest
@@ -24,3 +27,10 @@ services:
       - MARIADB_DATABASE=hasheous
       - MARIADB_USER=root
       - MARIADB_PASSWORD=hasheous
+  valkey:
+    hostname: valkey
+    image: valkey/valkey:latest
+    ports:
+      - 6379:6379
+    environment:
+      - VALKEY_EXTRA_FLAGS=--save 60 1 --loglevel warning

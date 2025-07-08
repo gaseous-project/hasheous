@@ -17,6 +17,7 @@ using static Authentication.ClientApiKey;
 using hasheous_server.Classes.Metadata.IGDB;
 using HasheousClient.Models.Metadata.IGDB;
 using System.Diagnostics;
+using StackExchange.Redis;
 
 Logging.WriteToDiskOnly = true;
 Logging.Log(Logging.LogType.Information, "Startup", "Starting Hasheous Server " + Assembly.GetExecutingAssembly().GetName().Version);
@@ -224,6 +225,13 @@ builder.Services.AddSwaggerGen(options =>
     }
 );
 builder.Services.AddHostedService<TimedHostedService>();
+
+// caching
+if (Config.RedisConfiguration.Enabled)
+{
+    builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(Config.RedisConfiguration.HostName + ":" + Config.RedisConfiguration.Port));
+    builder.Services.AddHttpClient();
+}
 
 // identity
 builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
