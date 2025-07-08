@@ -3,6 +3,8 @@ using System.Data;
 using Newtonsoft.Json;
 using IGDB.Models;
 using hasheous_server.Classes.Metadata;
+using StackExchange.Redis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Classes
 {
@@ -39,6 +41,14 @@ namespace Classes
             get
             {
                 return _config.DatabaseConfiguration;
+            }
+        }
+
+        public static ConfigFile.Redis RedisConfiguration
+        {
+            get
+            {
+                return _config.RedisConfiguration;
             }
         }
 
@@ -406,6 +416,8 @@ namespace Classes
         {
             public Database DatabaseConfiguration = new Database();
 
+            public Redis RedisConfiguration = new Redis();
+
             [JsonIgnore]
             public Library LibraryConfiguration = new Library();
 
@@ -491,6 +503,55 @@ namespace Classes
                     {
                         string dbConnString = "server=" + HostName + ";port=" + Port + ";userid=" + UserName + ";password=" + Password + ";";
                         return dbConnString;
+                    }
+                }
+            }
+
+            public class Redis
+            {
+                public bool Enabled
+                {
+                    get
+                    {
+                        string? envVar = Environment.GetEnvironmentVariable("redisenabled");
+                        if (!String.IsNullOrEmpty(envVar))
+                        {
+                            return bool.Parse(envVar);
+                        }
+                        else
+                        {
+                            return false;
+                        }
+                    }
+                }
+
+                public string HostName
+                {
+                    get
+                    {
+                        if (!String.IsNullOrEmpty(Environment.GetEnvironmentVariable("redishost")))
+                        {
+                            return Environment.GetEnvironmentVariable("redishost");
+                        }
+                        else
+                        {
+                            return "localhost";
+                        }
+                    }
+                }
+
+                public int Port
+                {
+                    get
+                    {
+                        if (!String.IsNullOrEmpty(Environment.GetEnvironmentVariable("redisport")))
+                        {
+                            return int.Parse(Environment.GetEnvironmentVariable("redisport"));
+                        }
+                        else
+                        {
+                            return 6379;
+                        }
                     }
                 }
             }

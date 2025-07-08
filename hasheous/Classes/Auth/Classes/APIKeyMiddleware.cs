@@ -52,9 +52,25 @@ namespace Authentication
                     return false;
                 }
 
-                if (LookupCache.Get("APIKeyCache", apiKey) == "true")
+                var keyName = "APIKeyCache:" + apiKey;
+
+                // Check if the API key is cached - use redis if available
+                // Otherwise, use a simple in-memory cache
+                if (Config.RedisConfiguration.Enabled)
                 {
-                    return true;
+                    string? cachedValue = hasheous.Classes.RedisConnection.GetDatabase(0).StringGet(keyName);
+                    if (cachedValue == "true")
+                    {
+                        return true;
+                    }
+                }
+                else
+                {
+                    // In-memory cache
+                    if (LookupCache.Get("APIKeyCache", keyName) == "true")
+                    {
+                        return true;
+                    }
                 }
 
                 Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
@@ -84,7 +100,16 @@ namespace Authentication
                         context.HttpContext.User = new ClaimsPrincipal(identity);
                     }
 
-                    LookupCache.Add("APIKeyCache", apiKey, "true");
+                    // Cache the API key as valid
+                    if (Config.RedisConfiguration.Enabled)
+                    {
+                        hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(keyName, "true", new TimeSpan(0, 60, 0)); // Cache for 60 minutes
+                    }
+                    else
+                    {
+                        // In-memory cache
+                        LookupCache.Add("APIKeyCache", keyName, "true");
+                    }
 
                     return true;
                 }

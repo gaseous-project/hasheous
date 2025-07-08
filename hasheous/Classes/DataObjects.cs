@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Classes;
+using hasheous.Classes;
 using hasheous_server.Classes.Metadata;
 using hasheous_server.Classes.Metadata.IGDB;
 using hasheous_server.Models;
@@ -11,6 +12,7 @@ using IGDB.Models;
 using Microsoft.AspNetCore.Razor.Language.Intermediate;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Newtonsoft.Json;
 using NuGet.Common;
 using static hasheous_server.Classes.Metadata.Communications;
 using static hasheous_server.Models.DataObjectItem;
@@ -233,6 +235,7 @@ namespace hasheous_server.Classes
                         break;
                 }
             }
+
             DataTable data = db.ExecuteCMD(sql, dbDict);
 
             List<Models.DataObjectItem> DataObjects = new List<Models.DataObjectItem>();
@@ -374,6 +377,12 @@ namespace hasheous_server.Classes
                 { "id", DataObjectId },
                 { "updateddate", DateTime.UtcNow }
             });
+
+            // purge redis cache of all keys for this object type
+            if (Config.RedisConfiguration.Enabled)
+            {
+                RedisConnection.PurgeCache("DataObject");
+            }
         }
 
         private async Task<Models.DataObjectItem> BuildDataObject(DataObjectType ObjectType, long id, DataRow row, bool GetChildRelations = false, bool GetMetadata = true)
@@ -879,6 +888,12 @@ namespace hasheous_server.Classes
                     break;
             }
 
+            // purge redis cache of all keys for this object type
+            if (Config.RedisConfiguration.Enabled)
+            {
+                RedisConnection.PurgeCache("DataObject");
+            }
+
             return await GetDataObject(objectType, (long)(ulong)data.Rows[0][0]);
         }
 
@@ -897,6 +912,12 @@ namespace hasheous_server.Classes
 
             DataObjectMetadataSearch(objectType, id);
 
+            // purge redis cache of all keys for this object type
+            if (Config.RedisConfiguration.Enabled)
+            {
+                RedisConnection.PurgeCache("DataObject");
+            }
+
             return await GetDataObject(objectType, id);
         }
 
@@ -911,6 +932,12 @@ namespace hasheous_server.Classes
             };
 
             db.ExecuteNonQuery(sql, dbDict);
+
+            // purge redis cache of all keys for this object type
+            if (Config.RedisConfiguration.Enabled)
+            {
+                RedisConnection.PurgeCache("DataObject");
+            }
         }
 
         public async Task<Models.DataObjectItem> EditDataObject(DataObjectType objectType, long id, Models.DataObjectItem model)
@@ -1196,6 +1223,12 @@ namespace hasheous_server.Classes
                         db.ExecuteNonQuery(sql, dbDict);
                     }
                 }
+            }
+
+            // purge redis cache of all keys for this object type
+            if (Config.RedisConfiguration.Enabled)
+            {
+                RedisConnection.PurgeCache("DataObject");
             }
 
             return await GetDataObject(objectType, id);

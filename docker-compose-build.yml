@@ -32,6 +32,18 @@ services:
       - MARIADB_ROOT_PASSWORD=hasheous
       - MARIADB_USER=hasheous
       - MARIADB_PASSWORD=hasheous
+  valkey:
+    hostname: valkey
+    image: valkey/valkey:latest
+    restart: unless-stopped
+    networks:
+      - hasheous
+    volumes:
+      - hs:/root/.valkey
+    ports:
+      - 6379:6379
+    environment:
+      - VALKEY_EXTRA_FLAGS=--save 60 1 --loglevel warning
 networks:
   hasheous:
     driver: bridge

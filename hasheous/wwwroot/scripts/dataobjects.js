@@ -286,7 +286,7 @@ function createDataObjectsTable(pageNumber, pageSize, objectType, filterByPlatfo
     }
 
     ajaxCall(
-        '/api/v1/DataObjects/' + objectType + '?pageSize=' + pageSize + '&pageNumber=' + pageNumber + '&getchildrelations=true' + filterString,
+        '/api/v1/DataObjects/' + objectType + '?pageSize=' + pageSize + '&pageNumber=' + pageNumber + '&getchildrelations=true' + filterString + '&getMetadata=false',
         'GET',
         function (success) {
             switch (objectType) {
@@ -305,11 +305,11 @@ function createDataObjectsTable(pageNumber, pageSize, objectType, filterByPlatfo
                         {
                             column: 'attributes[attributeName=Publisher].value.name',
                             name: 'publisher'
-                        },
-                        {
-                            column: 'metadata[source=IGDB].id',
-                            name: 'igdb'
-                        }
+                        }//,
+                        // {
+                        //     column: 'metadata[source=IGDB].id',
+                        //     name: 'igdb'
+                        // }
                     ];
                     break;
 
@@ -324,11 +324,11 @@ function createDataObjectsTable(pageNumber, pageSize, objectType, filterByPlatfo
                         {
                             column: 'attributes[attributeName=Manufacturer].value.name',
                             name: 'manufacturer'
-                        },
-                        {
-                            column: 'metadata[source=IGDB].id',
-                            name: 'igdb'
-                        }
+                        }//,
+                        // {
+                        //     column: 'metadata[source=IGDB].id',
+                        //     name: 'igdb'
+                        // }
                     ];
                     break;
 
@@ -339,11 +339,11 @@ function createDataObjectsTable(pageNumber, pageSize, objectType, filterByPlatfo
                             column: 'attributes[attributeName=Logo].value:image',
                             name: 'logo'
                         },
-                        'name',
-                        {
-                            column: 'metadata[source=IGDB].id',
-                            name: 'igdb'
-                        }
+                        'name'//,
+                        // {
+                        //     column: 'metadata[source=IGDB].id',
+                        //     name: 'igdb'
+                        // }
                     ];
                     break;
 

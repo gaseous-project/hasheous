@@ -1,5 +1,6 @@
 using System.Data;
 using System.Threading.Tasks;
+using hasheous.Classes;
 using hasheous_server.Models;
 using static Classes.Common;
 
@@ -26,6 +27,18 @@ namespace Classes
 
         public async Task<List<Signatures_Games_2>> GetRawSignatures(HashLookupModel model)
         {
+            string cacheKey = RedisConnection.GenerateKey("Signature", model);
+            // check if the query is cached
+            if (Config.RedisConfiguration.Enabled)
+            {
+                string? cachedData = hasheous.Classes.RedisConnection.GetDatabase(0).StringGet(cacheKey);
+                if (cachedData != null)
+                {
+                    // if cached data is found, deserialize it and return
+                    return Newtonsoft.Json.JsonConvert.DeserializeObject<List<Signatures_Games_2>>(cachedData);
+                }
+            }
+
             Dictionary<string, object> dbDict = new Dictionary<string, object>();
             List<string> whereClauses = new List<string>();
 
@@ -85,6 +98,13 @@ namespace Classes
                     };
                     GamesList.Add(gameItem);
                 }
+
+                // cache the result
+                if (Config.RedisConfiguration.Enabled)
+                {
+                    hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(cacheKey, Newtonsoft.Json.JsonConvert.SerializeObject(GamesList), TimeSpan.FromDays(5));
+                }
+
                 return GamesList;
             }
             else

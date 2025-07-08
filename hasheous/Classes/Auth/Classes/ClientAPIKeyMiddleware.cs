@@ -58,9 +58,37 @@ namespace Authentication
                     return false;
                 }
 
-                if (LookupCache.Get("ClientAPIKeyCache", apiKey) == "true")
+                var keyName = "ClientAPIKeyCache:" + apiKey;
+
+                // Check if the API key is cached - use redis if available
+                // Otherwise, use a simple in-memory cache
+                if (Config.RedisConfiguration.Enabled)
                 {
-                    return true;
+                    string? cachedValue = hasheous.Classes.RedisConnection.GetDatabase(0).StringGet(keyName);
+                    if (cachedValue == "true")
+                    {
+                        return true;
+                    }
+                    else if (cachedValue == "false")
+                    {
+                        return false;
+                    }
+                }
+                else
+                {
+                    // In-memory cache
+                    string? cachedValue = LookupCache.Get("ClientAPIKeyCache", keyName);
+                    if (cachedValue == null)
+                    {
+                        if (cachedValue == "true")
+                        {
+                            return true;
+                        }
+                        else if (cachedValue == "false")
+                        {
+                            return false;
+                        }
+                    }
                 }
 
                 Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
@@ -69,18 +97,25 @@ namespace Authentication
                     { "apikey", apiKey },
                     { "currenttime", DateTime.UtcNow }
                 });
-                if (data.Rows.Count == 0)
-                {
-                    LookupCache.Add("ClientAPIKeyCache", apiKey, "false");
 
-                    return false;
+                bool isValid = data.Rows.Count > 0;
+                if (Config.RedisConfiguration.Enabled)
+                {
+                    hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(keyName, isValid ? "false" : "true", TimeSpan.FromMinutes(5));
                 }
                 else
                 {
-                    LookupCache.Add("ClientAPIKeyCache", apiKey, "true", 300);
-
-                    return true;
+                    if (isValid)
+                    {
+                        LookupCache.Add("ClientAPIKeyCache", apiKey, "false");
+                    }
+                    else
+                    {
+                        LookupCache.Add("ClientAPIKeyCache", apiKey, "true", 300);
+                    }
                 }
+
+                return isValid;
             }
         }
 
