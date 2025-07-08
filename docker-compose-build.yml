@@ -20,6 +20,9 @@ services:
       - igdbclientid=<clientid>
       - igdbclientsecret=<clientsecret>
       - igdbusedumps=false
+      - redisenabled=true
+      - redishost=valkey
+      - redisport=6379
   hsdb:
     container_name: hsdb
     image: mariadb
