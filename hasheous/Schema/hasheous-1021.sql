@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS Insights_API_Requests (
     INDEX idx_endpoint_address (endpoint_address),
     INDEX idx_remote_ip (remote_ip),
     INDEX idx_user_id (user_id),
+    INDEX idx_country (country),
     INDEX idx_client_id (client_id),
     INDEX idx_client_apikey_id (client_apikey_id)
 );
