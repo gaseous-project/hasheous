@@ -12,6 +12,10 @@ namespace Authentication
 {
     public class ApiKey
     {
+        public static string ApiKeyHeaderName = "X-API-Key";
+        private const string ApiKeyCacheNamePrefix = "ApiKeys";
+        private const int CacheDuration = 7200; // 2 hours in seconds
+
         [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)]
         public class ApiKeyAttribute : ServiceFilterAttribute
         {
@@ -23,8 +27,6 @@ namespace Authentication
 
         public class ApiKeyAuthorizationFilter : IAuthorizationFilter
         {
-            public const string ApiKeyHeaderName = "X-API-Key";
-
             private readonly IApiKeyValidator _apiKeyValidator;
 
             public ApiKeyAuthorizationFilter(IApiKeyValidator apiKeyValidator)
@@ -52,66 +54,23 @@ namespace Authentication
                     return false;
                 }
 
-                var keyName = "APIKeyCache:" + apiKey;
-
-                // Check if the API key is cached - use redis if available
-                // Otherwise, use a simple in-memory cache
-                if (Config.RedisConfiguration.Enabled)
+                ApplicationUser? user = new ApiKey().GetUserFromApiKey(apiKey);
+                if (user != null)
                 {
-                    string? cachedValue = hasheous.Classes.RedisConnection.GetDatabase(0).StringGet(keyName);
-                    if (cachedValue == "true")
+                    // If the user is found, we set the ClaimsPrincipal for the context
+                    var identity = new ClaimsIdentity(new List<Claim>
                     {
-                        return true;
-                    }
-                }
-                else
-                {
-                    // In-memory cache
-                    if (LookupCache.Get("APIKeyCache", keyName) == "true")
-                    {
-                        return true;
-                    }
-                }
+                        { new Claim(ClaimTypes.NameIdentifier, user.Id, ClaimValueTypes.String) },
+                        { new Claim(ClaimTypes.Email, user.Email, ClaimValueTypes.String) },
+                        { new Claim(ClaimTypes.Name, user.UserName, ClaimValueTypes.String) }
+                    }, "Custom");
 
-                Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-                string sql = "SELECT * FROM UserAPIKeys WHERE `Key` = @apikey";
-                DataTable data = db.ExecuteCMD(sql, new Dictionary<string, object>{
-                    { "apikey", apiKey }
-                });
-                if (data.Rows.Count == 0)
-                {
-                    LookupCache.Add("APIKeyCache", apiKey, "false");
-
-                    return false;
-                }
-                else
-                {
-                    UserStore userStore = new UserStore(db);
-                    var userAccount = userStore.FindByIdAsync(data.Rows[0]["UserID"].ToString(), default);
-                    if (userAccount.Result != null)
-                    {
-                        var identity = new ClaimsIdentity(new List<Claim>
-                        {
-                            { new Claim(ClaimTypes.NameIdentifier, userAccount.Result.Id, ClaimValueTypes.String) },
-                            { new Claim(ClaimTypes.Email, userAccount.Result.Email, ClaimValueTypes.String) },
-                            { new Claim(ClaimTypes.Name, userAccount.Result.UserName, ClaimValueTypes.String) }
-                        }, "Custom");
-
-                        context.HttpContext.User = new ClaimsPrincipal(identity);
-                    }
-
-                    // Cache the API key as valid
-                    if (Config.RedisConfiguration.Enabled)
-                    {
-                        hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(keyName, "true", new TimeSpan(0, 60, 0)); // Cache for 60 minutes
-                    }
-                    else
-                    {
-                        // In-memory cache
-                        LookupCache.Add("APIKeyCache", keyName, "true");
-                    }
-
+                    context.HttpContext.User = new ClaimsPrincipal(identity);
                     return true;
+                }
+                else
+                {
+                    return false;
                 }
             }
         }
@@ -163,6 +122,56 @@ namespace Authentication
             });
 
             return newKey;
+        }
+
+        public ApplicationUser? GetUserFromApiKey(string apiKey)
+        {
+            string cacheKey = ApiKeyCacheNamePrefix + ":" + apiKey;
+            if (Config.RedisConfiguration.Enabled)
+            {
+                string? cachedUser = hasheous.Classes.RedisConnection.GetDatabase(0).StringGet(cacheKey);
+                if (cachedUser != null)
+                {
+                    return Newtonsoft.Json.JsonConvert.DeserializeObject<ApplicationUser>(cachedUser);
+                }
+            }
+            else
+            {
+                // In-memory cache lookup
+                string? cachedUser = LookupCache.Get(ApiKeyCacheNamePrefix, cacheKey);
+                if (cachedUser != null)
+                {
+                    return Newtonsoft.Json.JsonConvert.DeserializeObject<ApplicationUser>(cachedUser);
+                }
+            }
+
+            // If not cached, fetch from database
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql = "SELECT * FROM UserAPIKeys WHERE `Key` = @apikey";
+            DataTable data = db.ExecuteCMD(sql, new Dictionary<string, object>{
+                { "apikey", apiKey }
+            });
+
+            ApplicationUser? user = null;
+            if (data.Rows.Count > 0)
+            {
+                string userId = data.Rows[0]["UserId"].ToString();
+                UserStore userStore = new UserStore(db);
+                user = userStore.FindByIdAsync(userId, default).Result;
+            }
+
+            // Cache the user
+            string serializedUser = Newtonsoft.Json.JsonConvert.SerializeObject(user);
+            if (Config.RedisConfiguration.Enabled)
+            {
+                hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(cacheKey, serializedUser, TimeSpan.FromSeconds(CacheDuration));
+            }
+            else
+            {
+                LookupCache.Add(ApiKeyCacheNamePrefix, cacheKey, serializedUser, CacheDuration);
+            }
+
+            return user;
         }
 
         private string GenerateApiKey()

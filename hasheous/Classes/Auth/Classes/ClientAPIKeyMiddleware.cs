@@ -13,6 +13,10 @@ namespace Authentication
 {
     public class ClientApiKey
     {
+        public static string APIKeyHeaderName = "X-Client-API-Key";
+        private const string APIKeyCacheNamePrefix = "ClientApiKeys";
+        private const int CacheDuration = 86400; // 24 hours in seconds
+
         [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)]
         public class ClientApiKeyAttribute : ServiceFilterAttribute
         {
@@ -24,8 +28,6 @@ namespace Authentication
 
         public class ClientApiKeyAuthorizationFilter : IAuthorizationFilter
         {
-            public const string ClientApiKeyHeaderName = "X-Client-API-Key";
-
             private readonly IClientApiKeyValidator _clientApiKeyValidator;
 
             public ClientApiKeyAuthorizationFilter(IClientApiKeyValidator clientApiKeyValidator)
@@ -35,7 +37,7 @@ namespace Authentication
 
             public void OnAuthorization(AuthorizationFilterContext context)
             {
-                string apiKey = context.HttpContext.Request.Headers[ClientApiKeyHeaderName];
+                string apiKey = context.HttpContext.Request.Headers[APIKeyHeaderName];
 
                 if (!_clientApiKeyValidator.IsValid(apiKey, ref context))
                 {
@@ -58,64 +60,14 @@ namespace Authentication
                     return false;
                 }
 
-                var keyName = "ClientAPIKeyCache:" + apiKey;
+                ClientApiKeyItem? apiKeyItem = new ClientApiKey().GetAppFromApiKey(apiKey);
 
-                // Check if the API key is cached - use redis if available
-                // Otherwise, use a simple in-memory cache
-                if (Config.RedisConfiguration.Enabled)
+                if (apiKeyItem == null || apiKeyItem.Revoked || (apiKeyItem.Expires != null && apiKeyItem.Expires < DateTime.UtcNow))
                 {
-                    string? cachedValue = hasheous.Classes.RedisConnection.GetDatabase(0).StringGet(keyName);
-                    if (cachedValue == "true")
-                    {
-                        return true;
-                    }
-                    else if (cachedValue == "false")
-                    {
-                        return false;
-                    }
-                }
-                else
-                {
-                    // In-memory cache
-                    string? cachedValue = LookupCache.Get("ClientAPIKeyCache", keyName);
-                    if (cachedValue == null)
-                    {
-                        if (cachedValue == "true")
-                        {
-                            return true;
-                        }
-                        else if (cachedValue == "false")
-                        {
-                            return false;
-                        }
-                    }
+                    return false;
                 }
 
-                Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-                string sql = "SELECT * FROM ClientAPIKeys WHERE `APIKey` = @apikey AND `Revoked` = 0 AND (Expires IS NULL OR Expires > @currenttime);";
-                DataTable data = db.ExecuteCMD(sql, new Dictionary<string, object>{
-                    { "apikey", apiKey },
-                    { "currenttime", DateTime.UtcNow }
-                });
-
-                bool isValid = data.Rows.Count > 0;
-                if (Config.RedisConfiguration.Enabled)
-                {
-                    hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(keyName, isValid ? "false" : "true", TimeSpan.FromMinutes(5));
-                }
-                else
-                {
-                    if (isValid)
-                    {
-                        LookupCache.Add("ClientAPIKeyCache", apiKey, "false");
-                    }
-                    else
-                    {
-                        LookupCache.Add("ClientAPIKeyCache", apiKey, "true", 300);
-                    }
-                }
-
-                return isValid;
+                return true;
             }
         }
 
@@ -137,7 +89,7 @@ namespace Authentication
             {
                 keys.Add(new ClientApiKeyItem
                 {
-                    ClientId = (long)row["ClientIdIndex"],
+                    KeyId = (long)row["ClientIdIndex"],
                     Name = row["Name"].ToString(),
                     Created = (DateTime)row["Created"],
                     Expires = row["Expires"] == DBNull.Value ? null : (DateTime?)row["Expires"],
@@ -168,6 +120,86 @@ namespace Authentication
                 Created = DateTime.Now,
                 Expires = Expires,
             };
+        }
+
+        /// <summary>
+        /// Retrieves an API key by its value.
+        /// This method first checks the cache (Redis or in-memory) for the API key.
+        /// If not found, it queries the database and caches the result for future requests.
+        /// </summary>
+        /// <param name="apiKey"></param>
+        /// <returns>
+        /// Returns a ClientApiKeyItem if the API key is found, otherwise null.
+        /// The ClientApiKeyItem contains details such as KeyId, ClientAppId, Name, Key, Created, Expires, and Revoked status.
+        /// If the API key is cached, it will return the cached item; otherwise, it will fetch from the database and cache it.
+        /// </returns>
+        public ClientApiKeyItem? GetAppFromApiKey(string apiKey)
+        {
+            var keyName = APIKeyCacheNamePrefix + ":" + apiKey;
+
+            // Check if the API key is cached - use redis if available
+            // Otherwise, use a simple in-memory cache
+            if (Config.RedisConfiguration.Enabled)
+            {
+                string? cachedValue = hasheous.Classes.RedisConnection.GetDatabase(0).StringGet(keyName);
+                if (cachedValue != null)
+                {
+                    ClientApiKeyItem? cachedItem = Newtonsoft.Json.JsonConvert.DeserializeObject<ClientApiKeyItem>(cachedValue);
+
+                    return cachedItem;
+                }
+            }
+            else
+            {
+                // In-memory cache
+                string? cachedValue = LookupCache.Get(APIKeyCacheNamePrefix, keyName);
+                if (cachedValue != null)
+                {
+                    ClientApiKeyItem? cachedItem = Newtonsoft.Json.JsonConvert.DeserializeObject<ClientApiKeyItem>(cachedValue);
+
+                    return cachedItem;
+                }
+            }
+
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql = "SELECT * FROM ClientAPIKeys WHERE `APIKey` = @apikey;";
+            DataTable data = db.ExecuteCMD(sql, new Dictionary<string, object>{
+                { "apikey", apiKey }
+            });
+
+            ClientApiKeyItem? cachedApiKey = null;
+
+            if (data.Rows.Count > 0)
+            {
+                DataRow row = data.Rows[0];
+                cachedApiKey = new ClientApiKeyItem
+                {
+                    KeyId = (long)row["ClientIdIndex"],
+                    ClientAppId = (long)row["DataObjectId"],
+                    Name = row["Name"].ToString(),
+                    Key = row["APIKey"].ToString(),
+                    Created = (DateTime)row["Created"],
+                    Expires = row["Expires"] == DBNull.Value ? null : (DateTime?)row["Expires"],
+                    Revoked = (bool)row["Revoked"]
+                };
+            }
+
+            // Cache the API key for 5 minutes
+            if (cachedApiKey != null)
+            {
+                string serializedApiKey = Newtonsoft.Json.JsonConvert.SerializeObject(cachedApiKey);
+
+                if (Config.RedisConfiguration.Enabled)
+                {
+                    hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(keyName, serializedApiKey, TimeSpan.FromSeconds(CacheDuration));
+                }
+                else
+                {
+                    LookupCache.Add(APIKeyCacheNamePrefix, keyName, serializedApiKey, CacheDuration);
+                }
+            }
+
+            return cachedApiKey;
         }
 
         public void RevokeApiKey(long DataObjectId, long ClientId)

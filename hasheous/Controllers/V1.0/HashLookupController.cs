@@ -1,5 +1,6 @@
 using System.Data;
 using Classes;
+using Classes.Insights;
 using gaseous_signature_parser.models.RomSignatureObject;
 using hasheous_server.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -15,6 +16,7 @@ namespace hasheous_server.Controllers.v1_0
     [Route("api/v{version:apiVersion}/[controller]/")]
     [Obsolete("This controller is deprecated and will be removed in a future version of the API. Please use the new LookupController instead.")]
     [ApiVersion("1.0")]
+    [Insight(InsightAttribute.InsightSourceType.HashLookupDeprecated)]
     public class HashLookupController : ControllerBase
     {
         /// <summary>

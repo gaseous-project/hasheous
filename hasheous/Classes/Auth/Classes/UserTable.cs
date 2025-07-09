@@ -10,7 +10,7 @@ namespace Authentication
     /// Class that represents the Users table in the MySQL Database
     /// </summary>
     public class UserTable<TUser>
-        where TUser :ApplicationUser
+        where TUser : ApplicationUser
     {
         private Database _database;
 
@@ -34,7 +34,7 @@ namespace Authentication
             Dictionary<string, object> parameters = new Dictionary<string, object>() { { "@id", userId } };
 
             DataTable table = _database.ExecuteCMD(commandText, parameters);
-            
+
             if (table.Rows.Count == 0)
             {
                 return null;
@@ -116,7 +116,7 @@ namespace Authentication
             Dictionary<string, object> parameters = new Dictionary<string, object>() { { "@name", normalizedUserName } };
 
             var rows = _database.ExecuteCMDDict(commandText, parameters);
-            foreach(Dictionary<string, object> row in rows)
+            foreach (Dictionary<string, object> row in rows)
             {
                 TUser user = (TUser)Activator.CreateInstance(typeof(TUser));
                 user.Id = (string)row["Id"];
@@ -145,9 +145,9 @@ namespace Authentication
         {
             List<TUser> users = new List<TUser>();
             string commandText = "Select * from Users order by NormalizedUserName";
-            
+
             var rows = _database.ExecuteCMDDict(commandText);
-            foreach(Dictionary<string, object> row in rows)
+            foreach (Dictionary<string, object> row in rows)
             {
                 TUser user = (TUser)Activator.CreateInstance(typeof(TUser));
                 user.Id = (string)row["Id"];
@@ -364,7 +364,7 @@ namespace Authentication
             Dictionary<string, object> parameters = new Dictionary<string, object>();
             parameters.Add("Id", user.Id);
             parameters.Add("SecurityProfile", Newtonsoft.Json.JsonConvert.SerializeObject(securityProfile));
-            
+
             return _database.ExecuteCMD(commandText, parameters).Rows.Count;
         }
     }

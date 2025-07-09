@@ -2,7 +2,8 @@ namespace hasheous_server.Models
 {
     public class ClientApiKeyItem
     {
-        public long? ClientId { get; set; }
+        public long? KeyId { get; set; }
+        public long? ClientAppId { get; set; }
         public string Name { get; set; }
         public string Key { get; set; }
         public DateTime Created { get; set; }

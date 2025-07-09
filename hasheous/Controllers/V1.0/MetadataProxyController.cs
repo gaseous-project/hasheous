@@ -5,6 +5,7 @@ using System.Drawing.Imaging;
 using System.Net;
 using System.Web;
 using Classes;
+using Classes.Insights;
 using Classes.Metadata;
 using hasheous_server.Classes.Metadata;
 using hasheous_server.Classes.Metadata.IGDB;
@@ -18,12 +19,13 @@ using static Authentication.ClientApiKey;
 namespace hasheous_server.Controllers.v1_0
 {
     /// <summary>
-    /// Endpoints used for proxying metadata from IGDB
+    /// Endpoints used for proxying metadata from metadata sources like IGDB and TheGamesDB.
     /// </summary>
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]/")]
     [ApiVersion("1.0")]
     [ClientApiKey()]
+    [Insight(InsightAttribute.InsightSourceType.MetadataProxy)]
     public class MetadataProxyController : ControllerBase
     {
         /// <summary>

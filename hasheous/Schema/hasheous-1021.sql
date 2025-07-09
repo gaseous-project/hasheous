@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS Insights_API_Requests (
+    event_datetime TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    insightType INT DEFAULT 0,
+    remote_ip VARCHAR(45) NOT NULL,
+    `method` VARCHAR(10) NOT NULL,
+    endpoint_address VARCHAR(255) NOT NULL,
+    execution_time_ms INT,
+    response_status_code INT,
+    user_id VARCHAR(255),
+    user_agent VARCHAR(255),
+    client_id BIGINT UNSIGNED,
+    client_apikey_id BIGINT UNSIGNED,
+    PRIMARY KEY (event_datetime),
+    INDEX idx_insight_type (insightType),
+    INDEX idx_endpoint_address (endpoint_address),
+    INDEX idx_remote_ip (remote_ip),
+    INDEX idx_user_id (user_id),
+    INDEX idx_client_id (client_id),
+    INDEX idx_client_apikey_id (client_apikey_id)
+);

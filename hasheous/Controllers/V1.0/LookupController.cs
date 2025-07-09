@@ -1,4 +1,5 @@
 using Classes;
+using Classes.Insights;
 using hasheous_server.Classes;
 using hasheous_server.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -12,6 +13,7 @@ namespace hasheous_server.Controllers.v1_0
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]/")]
     [ApiVersion("1.0")]
+    [Insight(InsightAttribute.InsightSourceType.HashLookup)]
     public class LookupController : ControllerBase
     {
         /// <summary>
