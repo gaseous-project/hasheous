@@ -277,6 +277,7 @@ namespace Classes.Insights
                             response_status_code,
                             user_id,
                             user_agent,
+                            country,
                             client_id,
                             client_apikey_id
                         )
@@ -291,6 +292,7 @@ namespace Classes.Insights
                             @responseStatusCode,
                             @user_id,
                             @user_agent,
+                            @country,
                             @client_id,
                             @client_apikey_id
                         );";
@@ -304,6 +306,7 @@ namespace Classes.Insights
                         { "@responseStatusCode", httpContext.Response.StatusCode },
                         { "@user_id", userId },
                         { "@user_agent", httpContext.Request.Headers["User-Agent"].ToString() ?? "unknown" },
+                        { "@country", country },
                         { "@client_id", clientId },
                         { "@client_apikey_id", clientAPIKeyId }
                     };
