@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS Insights_API_Requests (
     response_status_code INT,
     user_id VARCHAR(255),
     user_agent VARCHAR(255),
+    country VARCHAR(4),
     client_id BIGINT UNSIGNED,
     client_apikey_id BIGINT UNSIGNED,
     PRIMARY KEY (event_datetime),

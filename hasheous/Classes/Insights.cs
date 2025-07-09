@@ -85,7 +85,12 @@ namespace Classes.Insights
             /// <summary>
             /// Opt out of storing user information in insights
             /// </summary>
-            BlockUser
+            BlockUser,
+
+            /// <summary>
+            /// Opt out of storing location information in insights
+            /// </summary>
+            BlockLocation
         }
 
         public InsightAttribute(InsightSourceType insightSource = InsightSourceType.Undefined)
@@ -163,6 +168,17 @@ namespace Classes.Insights
             if (string.IsNullOrEmpty(remoteIp) && !optOutTypes.Contains(OptOutType.BlockIP))
                 // If the user has not opted out of storing IP addresses, set it to "unknown"
                 remoteIp = "unknown";
+
+            // If the user has opted out of storing location information, skip the location lookup
+            string country = "";
+            if (!optOutTypes.Contains(OptOutType.BlockLocation))
+            {
+                if (httpContext.Request.Headers.TryGetValue("cf-ipcountry", out var countryHeader))
+                {
+                    // If the request contains a cf-ipcountry header, use it
+                    country = countryHeader.ToString();
+                }
+            }
 
             // Get endpoint address (path)
             string endpoint = httpContext.Request.Path;
