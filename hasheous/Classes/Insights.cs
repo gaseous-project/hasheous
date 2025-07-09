@@ -134,11 +134,6 @@ namespace Classes.Insights
                 // If the user has opted out of storing IP addresses, set it to "unknown"
                 remoteIp = "unknown";
             }
-            else if (httpContext.Request.Headers.ContainsKey("X-Forwarded-For"))
-            {
-                // If behind a proxy, use the X-Forwarded-For header
-                remoteIp = httpContext.Request.Headers["X-Forwarded-For"].ToString();
-            }
             else if (httpContext.Connection.RemoteIpAddress != null)
             {
                 // Otherwise, use the RemoteIpAddress from the connection
