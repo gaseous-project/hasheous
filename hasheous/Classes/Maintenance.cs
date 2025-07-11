@@ -7,6 +7,11 @@ namespace Classes
         public async Task RunDailyMaintenance()
         {
             await Logging.PurgeLogsAsync();
+
+            // delete insights older than 30 days
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql = "DELETE FROM Insights_API_Requests WHERE event_datetime < NOW() - INTERVAL 31 DAY;";
+            await db.ExecuteCMDAsync(sql);
         }
 
         public async Task RunWeeklyMaintenance()

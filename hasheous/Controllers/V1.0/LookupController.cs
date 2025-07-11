@@ -1,4 +1,5 @@
 using Classes;
+using Classes.Insights;
 using hasheous_server.Classes;
 using hasheous_server.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -12,6 +13,7 @@ namespace hasheous_server.Controllers.v1_0
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]/")]
     [ApiVersion("1.0")]
+    [Insight(Insights.InsightSourceType.HashLookup)]
     public class LookupController : ControllerBase
     {
         /// <summary>
@@ -97,8 +99,9 @@ namespace hasheous_server.Controllers.v1_0
         [ResponseCache(CacheProfileName = "5Minute")]
         [Route("ByHash/md5/{md5}")]
         [Route("ByHash/sha1/{sha1}")]
+        [Route("ByHash/sha256/{sha256}")]
         [Route("ByHash/crc/{crc}")]
-        public async Task<IActionResult> LookupGet(string? md5, string? sha1, string? crc)
+        public async Task<IActionResult> LookupGet(string? md5, string? sha1, string? sha256, string? crc)
         {
             try
             {
@@ -106,6 +109,7 @@ namespace hasheous_server.Controllers.v1_0
                 {
                     MD5 = md5,
                     SHA1 = sha1,
+                    SHA256 = sha256,
                     CRC = crc
                 });
                 await hashLookup.PerformLookup();

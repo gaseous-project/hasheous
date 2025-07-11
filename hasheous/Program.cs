@@ -167,7 +167,7 @@ builder.Services.AddSwaggerGen(options =>
     {
         options.AddSecurityDefinition("API Key", new OpenApiSecurityScheme
         {
-            Name = ApiKey.ApiKeyAuthorizationFilter.ApiKeyHeaderName,
+            Name = ApiKey.ApiKeyHeaderName,
             In = ParameterLocation.Header,
             Type = SecuritySchemeType.ApiKey,
             Description = "API Key Authentication",
@@ -176,7 +176,7 @@ builder.Services.AddSwaggerGen(options =>
 
         options.AddSecurityDefinition("Client API Key", new OpenApiSecurityScheme
         {
-            Name = ClientApiKey.ClientApiKeyAuthorizationFilter.ClientApiKeyHeaderName,
+            Name = ClientApiKey.APIKeyHeaderName,
             In = ParameterLocation.Header,
             Type = SecuritySchemeType.ApiKey,
             Description = "Client API Key",
