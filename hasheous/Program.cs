@@ -280,6 +280,14 @@ builder.Services.AddSingleton<IApiKeyValidator, ApiKeyValidator>();
 builder.Services.AddSingleton<ClientApiKeyAuthorizationFilter>();
 builder.Services.AddSingleton<IClientApiKeyValidator, ClientApiKeyValidator>();
 
+// add social authentication
+builder.Services.AddAuthentication()
+    .AddGoogle(options =>
+    {
+        options.ClientId = Config.SocialAuthConfiguration.GoogleClientId;
+        options.ClientSecret = Config.SocialAuthConfiguration.GoogleClientSecret;
+    });
+
 var app = builder.Build();
 
 // configure the server for use in development

@@ -92,6 +92,14 @@ namespace Classes
             }
         }
 
+        public static ConfigFile.SocialAuth SocialAuthConfiguration
+        {
+            get
+            {
+                return _config.SocialAuthConfiguration;
+            }
+        }
+
         public static string LogPath
         {
             get
@@ -428,6 +436,8 @@ namespace Classes
             public RetroAchievements RetroAchievementsConfiguration = new RetroAchievements();
 
             public GiantBomb GiantBombConfiguration = new GiantBomb();
+
+            public SocialAuth SocialAuthConfiguration = new SocialAuth();
 
             public Logging LoggingConfiguration = new Logging();
 
@@ -816,6 +826,51 @@ namespace Classes
                 public string APIKey = _DefaultAPIKey;
 
                 public string BaseURL = "https://www.giantbomb.com/api/";
+            }
+
+            public class SocialAuth
+            {
+                private static string _GoogleClientId
+                {
+                    get
+                    {
+                        if (!String.IsNullOrEmpty(Environment.GetEnvironmentVariable("googleclientid")))
+                        {
+                            return Environment.GetEnvironmentVariable("googleclientid");
+                        }
+                        else
+                        {
+                            return "";
+                        }
+                    }
+                }
+
+                private static string _GoogleClientSecret
+                {
+                    get
+                    {
+                        if (!String.IsNullOrEmpty(Environment.GetEnvironmentVariable("googleclientsecret")))
+                        {
+                            return Environment.GetEnvironmentVariable("googleclientsecret");
+                        }
+                        else
+                        {
+                            return "";
+                        }
+                    }
+                }
+
+                public string GoogleClientId = _GoogleClientId;
+                public string GoogleClientSecret = _GoogleClientSecret;
+
+                [JsonIgnore]
+                public bool GoogleAuthEnabled
+                {
+                    get
+                    {
+                        return !String.IsNullOrEmpty(GoogleClientId) && !String.IsNullOrEmpty(GoogleClientSecret);
+                    }
+                }
             }
 
             public class Logging
