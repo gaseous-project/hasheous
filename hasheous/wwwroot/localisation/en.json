@@ -207,5 +207,11 @@
     "mappedwitherrors": "Mapped with errors",
     "notmapped": "Not mapped",
     "rescanmetadata": "Rescan Metadata",
-    "wikipedia": "Wikipedia"
+    "wikipedia": "Wikipedia",
+    "insights": "Insights",
+    "unique_visitors": "Unique Visitors",
+    "unique_visitors_per_country": "Unique Visitors per Country",
+    "total_requests": "Total Requests",
+    "average_response_time": "Average Response Time (ms)",
+    "unique_visitors_per_api_key": "Unique Visitors per API Key"
 }

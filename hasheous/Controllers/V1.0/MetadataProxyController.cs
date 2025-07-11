@@ -25,7 +25,7 @@ namespace hasheous_server.Controllers.v1_0
     [Route("api/v{version:apiVersion}/[controller]/")]
     [ApiVersion("1.0")]
     [ClientApiKey()]
-    [Insight(InsightAttribute.InsightSourceType.MetadataProxy)]
+    [Insight(Insights.InsightSourceType.MetadataProxy)]
     public class MetadataProxyController : ControllerBase
     {
         /// <summary>

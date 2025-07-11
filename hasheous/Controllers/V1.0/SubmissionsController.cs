@@ -16,7 +16,7 @@ namespace hasheous_server.Controllers.v1_0
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]/")]
     [ApiVersion("1.0")]
-    [Insight(InsightAttribute.InsightSourceType.HashSubmission)]
+    [Insight(Insights.InsightSourceType.HashSubmission)]
     public class SubmissionsController : ControllerBase
     {
         private readonly UserManager<ApplicationUser> _userManager;

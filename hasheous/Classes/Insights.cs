@@ -9,13 +9,12 @@ using Authentication;
 using hasheous_server.Models;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.Identity;
+using static Classes.Insights.Insights;
 
 namespace Classes.Insights
 {
-    [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class)]
-    public class InsightAttribute : Attribute, IAsyncActionFilter
+    public class Insights
     {
-
         public enum InsightSourceType
         {
             /// <summary>
@@ -61,8 +60,6 @@ namespace Classes.Insights
             HashLookupDeprecated = 10
         }
 
-        public InsightSourceType InsightSource { get; }
-
         public const string OptOutHeaderName = "X-Insight-Opt-Out";
 
         public enum OptOutType
@@ -92,6 +89,148 @@ namespace Classes.Insights
             /// </summary>
             BlockLocation
         }
+
+        /// <summary>
+        /// Generates an insight report for the specified application ID.
+        /// The report includes unique visitors, total requests, average response time, and more.
+        /// </summary>
+        /// <param name="appId">The application ID for which to generate the report.</param>
+        /// <returns>A dictionary containing the insight report data.</returns>
+        /// <remarks>
+        /// This method retrieves data from the Insights_API_Requests table and aggregates it to provide insights
+        /// such as unique visitors, requests per country, total requests, average response time, and unique visitors per API key.
+        /// The report is generated for the last 30 days.
+        /// </remarks>
+        public async static Task<Dictionary<string, object>> GenerateInsightReport(long appId)
+        {
+            Dictionary<string, object> report = new Dictionary<string, object>();
+
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql;
+            Dictionary<string, object> dbDict = new Dictionary<string, object>
+            {
+                { "@appId", appId }
+            };
+
+            // get unique visitors for the last 30 days
+            sql = @"
+                SELECT 
+                    COUNT(DISTINCT remote_ip) AS unique_visitors
+                FROM
+                    Insights_API_Requests
+                WHERE
+                    event_datetime >= NOW() - INTERVAL 30 DAY
+                        AND client_id = @appId;";
+            DataTable uniqueVisitorsTable = await db.ExecuteCMDAsync(sql, dbDict);
+            if (uniqueVisitorsTable.Rows.Count > 0)
+            {
+                report["unique_visitors"] = uniqueVisitorsTable.Rows[0]["unique_visitors"];
+            }
+            else
+            {
+                report["unique_visitors"] = 0;
+            }
+
+            // get unique visitors per country for the last 30 days
+            sql = @"
+                SELECT 
+                    CASE
+                        WHEN Country.Value IS NULL THEN Insights_API_Requests.country
+                        ELSE Country.Value
+                    END AS Country,
+                    COUNT(DISTINCT remote_ip) AS unique_visitors
+                FROM
+                    Insights_API_Requests
+                        LEFT JOIN
+                    Country ON Insights_API_Requests.country = Country.Code
+                WHERE
+                    event_datetime >= NOW() - INTERVAL 30 DAY
+                        AND client_id = @appId
+                GROUP BY country;";
+            DataTable uniqueVisitorsPerCountryTable = await db.ExecuteCMDAsync(sql, dbDict);
+            List<Dictionary<string, object>> uniqueVisitorsPerCountry = new List<Dictionary<string, object>>();
+            foreach (DataRow row in uniqueVisitorsPerCountryTable.Rows)
+            {
+                uniqueVisitorsPerCountry.Add(new Dictionary<string, object>
+                {
+                    { "country", row["country"] },
+                    { "unique_visitors", row["unique_visitors"] }
+                });
+            }
+            report["unique_visitors_per_country"] = uniqueVisitorsPerCountry;
+
+            // get total requests for the last 30 days
+            sql = @"
+                SELECT 
+                    COUNT(*) AS total_requests
+                FROM
+                    Insights_API_Requests
+                WHERE
+                    event_datetime >= NOW() - INTERVAL 30 DAY
+                        AND client_id = @appId;";
+            DataTable totalRequestsTable = await db.ExecuteCMDAsync(sql, dbDict);
+            if (totalRequestsTable.Rows.Count > 0)
+            {
+                report["total_requests"] = totalRequestsTable.Rows[0]["total_requests"];
+            }
+            else
+            {
+                report["total_requests"] = 0;
+            }
+
+            // get average response time
+            sql = @"
+                SELECT 
+                    AVG(execution_time_ms) AS average_response_time
+                FROM
+                    Insights_API_Requests
+                WHERE
+                    event_datetime >= NOW() - INTERVAL 30 DAY
+                        AND client_id = @appId;";
+            DataTable averageResponseTimeTable = await db.ExecuteCMDAsync(sql, dbDict);
+            if (averageResponseTimeTable.Rows.Count > 0)
+            {
+                report["average_response_time"] = averageResponseTimeTable.Rows[0]["average_response_time"];
+            }
+            else
+            {
+                report["average_response_time"] = 0;
+            }
+
+            // get unique visitors of each client api key for the last 30 days
+            sql = @"
+                SELECT 
+                    ClientAPIKeys.Name AS Country,
+                    COUNT(DISTINCT remote_ip) AS unique_visitors
+                FROM
+                    Insights_API_Requests
+                JOIN
+                    ClientAPIKeys ON Insights_API_Requests.client_apikey_id = ClientAPIKeys.ClientIdIndex AND ClientAPIKeys.DataObjectId = @appId
+                WHERE
+                    event_datetime >= NOW() - INTERVAL 30 DAY
+                        AND client_id = @appId
+                GROUP BY ClientAPIKeys.Name
+                ORDER BY ClientAPIKeys.Name;";
+            DataTable uniqueVisitorsPerApiKeyTable = await db.ExecuteCMDAsync(sql, dbDict);
+            List<Dictionary<string, object>> uniqueVisitorsPerApiKey = new List<Dictionary<string, object>>();
+            foreach (DataRow row in uniqueVisitorsPerApiKeyTable.Rows)
+            {
+                uniqueVisitorsPerApiKey.Add(new Dictionary<string, object>
+                {
+                    { "client_apikey_id", row["Country"] },
+                    { "unique_visitors", row["unique_visitors"] }
+                });
+            }
+            report["unique_visitors_per_api_key"] = uniqueVisitorsPerApiKey;
+
+            return report;
+        }
+    }
+
+    [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class)]
+    public class InsightAttribute : Attribute, IAsyncActionFilter
+    {
+        public InsightSourceType InsightSource { get; }
 
         public InsightAttribute(InsightSourceType insightSource = InsightSourceType.Undefined)
         {

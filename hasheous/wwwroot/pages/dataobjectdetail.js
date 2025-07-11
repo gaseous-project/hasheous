@@ -539,6 +539,82 @@ function renderContent() {
 
                 GetApiKeys();
             }
+
+            // insights handling
+            fetch('/api/v1/Insights/' + pageType + '/' + getQueryString('id', 'int') + '/Insights', {
+                method: 'GET'
+            }).then(async function (response) {
+                if (response.ok) {
+                    let insights = await response.json();
+                    console.log(insights);
+
+                    if (insights != null && Object.keys(insights).length > 0) {
+                        document.getElementById('dataObjectInsightsSection').style.display = '';
+
+                        for (const [key, value] of Object.entries(insights)) {
+                            let insightElement = document.createElement('div');
+                            insightElement.classList.add('dataObjectInsight');
+
+                            let insightTitle = document.createElement('h3');
+                            insightTitle.innerHTML = lang.getLang(key);
+                            insightElement.appendChild(insightTitle);
+
+                            let insightContent = document.createElement('div');
+
+                            if (typeof value === 'object') {
+                                // value is a hashtable, create a table with the keys and values
+                                let insightList = document.createElement('table');
+                                insightList.classList.add('tablerowhighlight');
+
+                                for (const subKey of Object.keys(value)) {
+                                    let row = document.createElement('tr');
+                                    let keyCell = true;
+                                    for (const [subSubKey, subSubValue] of Object.entries(value[subKey])) {
+                                        let valueCell = document.createElement('td');
+                                        valueCell.classList.add('tablecell');
+                                        valueCell.style.width = '50%';
+                                        if (keyCell && subSubValue == null || subSubValue == "") {
+                                            valueCell.innerHTML = lang.getLang('unknown');
+                                        } else {
+                                            valueCell.innerHTML = subSubValue;
+                                        }
+                                        row.appendChild(valueCell);
+
+                                        keyCell = false;
+                                    }
+                                    insightList.appendChild(row);
+                                }
+
+                                insightContent.appendChild(insightList);
+                            } else {
+                                // otherwise, create a single row table with the value
+                                let insightValue = document.createElement('table');
+
+                                let valueRow = document.createElement('tr');
+                                valueRow.classList.add('tablerowhighlight');
+
+                                let valueCell = document.createElement('td');
+                                valueCell.classList.add('tablecell');
+                                valueCell.innerHTML = value;
+                                valueRow.appendChild(valueCell);
+                                insightValue.appendChild(valueRow);
+
+                                insightContent.appendChild(insightValue);
+                            }
+
+                            insightElement.appendChild(insightContent);
+                            insightElement.setAttribute('data-insight', key);
+
+                            document.getElementById('dataObjectInsights').appendChild(insightElement);
+
+                        }
+                    }
+                } else {
+                    throw new Error('Failed to fetch insights');
+                }
+            });
+
+            break;
     }
 }
 

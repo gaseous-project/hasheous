@@ -873,3 +873,15 @@ pre {
     left: 0px;
     right: 0px;
 }
+
+.dataObjectInsight {
+    width: 200px;
+    display: inline-block;
+    border-color: var(--element-border-color);
+    border-width: 1px;
+    border-style: solid;
+    border-radius: var(--element-border-radius);
+    background-color: var(--element-background-color-translucent);
+    margin: 5px;
+    padding: 10px;
+}
