@@ -308,6 +308,17 @@ namespace Classes.Insights
                 // If the user has not opted out of storing IP addresses, set it to "unknown"
                 remoteIp = "unknown";
 
+            // hash the remote IP address for privacy
+            if (!optOutTypes.Contains(OptOutType.BlockIP) && remoteIp != "unknown")
+            {
+                // Hash the remote IP address using SHA1
+                using (var sha1 = System.Security.Cryptography.SHA1.Create())
+                {
+                    byte[] bytes = sha1.ComputeHash(System.Text.Encoding.UTF8.GetBytes(remoteIp));
+                    remoteIp = BitConverter.ToString(bytes).Replace("-", "").ToLowerInvariant();
+                }
+            }
+
             // If the user has opted out of storing location information, skip the location lookup
             string country = "";
             if (!optOutTypes.Contains(OptOutType.BlockLocation))

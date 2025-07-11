@@ -209,6 +209,7 @@
     "rescanmetadata": "Rescan Metadata",
     "wikipedia": "Wikipedia",
     "insights": "Insights",
+    "insightsdescription": "Insights are generated from the data collected by Hasheous, and provide a view of the usage of the service. Data is retained for 30 days.",
     "unique_visitors": "Unique Visitors",
     "unique_visitors_per_country": "Unique Visitors per Country",
     "total_requests": "Total Requests",

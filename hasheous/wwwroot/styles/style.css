@@ -885,3 +885,9 @@ pre {
     margin: 5px;
     padding: 10px;
 }
+
+.insightHeading {
+    font-weight: bold;
+    display: block;
+    margin-bottom: 5px;
+}

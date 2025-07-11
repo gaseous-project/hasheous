@@ -546,16 +546,22 @@ function renderContent() {
             }).then(async function (response) {
                 if (response.ok) {
                     let insights = await response.json();
-                    console.log(insights);
 
+                    let displayInsights = false;
                     if (insights != null && Object.keys(insights).length > 0) {
-                        document.getElementById('dataObjectInsightsSection').style.display = '';
-
                         for (const [key, value] of Object.entries(insights)) {
+                            if (value == null || value == "") {
+                                continue; // skip empty insights
+                            }
+
+                            displayInsights = true;
+
+                            // create insight element
                             let insightElement = document.createElement('div');
                             insightElement.classList.add('dataObjectInsight');
 
-                            let insightTitle = document.createElement('h3');
+                            let insightTitle = document.createElement('span');
+                            insightTitle.classList.add('insightHeading');
                             insightTitle.innerHTML = lang.getLang(key);
                             insightElement.appendChild(insightTitle);
 
@@ -576,6 +582,9 @@ function renderContent() {
                                         if (keyCell && subSubValue == null || subSubValue == "") {
                                             valueCell.innerHTML = lang.getLang('unknown');
                                         } else {
+                                            if (Number(subSubValue)) {
+                                                valueCell.style.textAlign = 'right';
+                                            }
                                             valueCell.innerHTML = subSubValue;
                                         }
                                         row.appendChild(valueCell);
@@ -587,19 +596,26 @@ function renderContent() {
 
                                 insightContent.appendChild(insightList);
                             } else {
-                                // otherwise, create a single row table with the value
-                                let insightValue = document.createElement('table');
+                                if (value != null && value != "") {
+                                    displayInsights = true;
 
-                                let valueRow = document.createElement('tr');
-                                valueRow.classList.add('tablerowhighlight');
+                                    // otherwise, create a single row table with the value
+                                    let insightValue = document.createElement('table');
 
-                                let valueCell = document.createElement('td');
-                                valueCell.classList.add('tablecell');
-                                valueCell.innerHTML = value;
-                                valueRow.appendChild(valueCell);
-                                insightValue.appendChild(valueRow);
+                                    let valueRow = document.createElement('tr');
+                                    valueRow.classList.add('tablerowhighlight');
 
-                                insightContent.appendChild(insightValue);
+                                    let valueCell = document.createElement('td');
+                                    valueCell.classList.add('tablecell');
+                                    if (Number(value)) {
+                                        valueCell.style.textAlign = 'right';
+                                    }
+                                    valueCell.innerHTML = value;
+                                    valueRow.appendChild(valueCell);
+                                    insightValue.appendChild(valueRow);
+
+                                    insightContent.appendChild(insightValue);
+                                }
                             }
 
                             insightElement.appendChild(insightContent);
@@ -608,6 +624,10 @@ function renderContent() {
                             document.getElementById('dataObjectInsights').appendChild(insightElement);
 
                         }
+                    }
+
+                    if (displayInsights) {
+                        document.getElementById('dataObjectInsightsSection').style.display = '';
                     }
                 } else {
                     throw new Error('Failed to fetch insights');
@@ -624,15 +644,14 @@ function GetApiKeys() {
         '/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int') + '/ClientAPIKeys',
         'GET',
         function (success) {
-            console.log(success);
             let clientAPIKeysTable = new generateTable(
                 success,
-                ['clientId', 'name', 'created:date', 'expires:date', 'expired', 'revoked'],
-                'clientId',
+                ['keyId', 'name', 'created:date', 'expires:date', 'expired', 'revoked'],
+                'keyId',
                 true,
                 function (key, rows) {
                     for (let i = 0; i < rows.length; i++) {
-                        if (rows[i].clientId == key) {
+                        if (rows[i].keyId == key) {
                             let row = rows[i];
                             if (row.revoked == false) {
                                 let revokePrompt = prompt(lang.getLang('clientapirevokeprompt'));
