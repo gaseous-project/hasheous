@@ -48,7 +48,7 @@
     /* applies when the viewport is < 750px */
     #banner_icon {
         top: unset;
-        bottom: 0px;
+        bottom: 20px;
     }
 
     #banner_header {
@@ -60,6 +60,7 @@
         border-top-color: var(--element-border-color);
         border-top-width: 1px;
         border-top-style: solid;
+        padding-bottom: 20px;
     }
 
     #banner_search {
@@ -83,6 +84,7 @@
     #pagefooter {
         padding-left: 50px;
         padding-right: 50px;
+        padding-bottom: 50px;
     }
 
     #dataObjectLogoImageAttributionLogo {
