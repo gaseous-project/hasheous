@@ -19,6 +19,8 @@ services:
       - redisport=6379
       - googleclientid=${GOOGLECLIENTID}
       - googleclientsecret=${GOOGLECLIENTSECRET}
+      - microsoftclientid=${MICROSOFTCLIENTID}
+      - microsoftclientsecret=${MICROSOFTCLIENTSECRET}
   mariadb:
     hostname: mariadb
     image: mariadb:latest

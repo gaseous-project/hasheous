@@ -47,6 +47,9 @@ fetch('/api/v1/Account/social-login', {
         if (data.includes('Google')) {
             document.getElementById('social_login_button_google').style.display = 'table-row';
         }
+        if (data.includes('Microsoft')) {
+            document.getElementById('social_login_button_microsoft').style.display = 'table-row';
+        }
     })
     .catch(error => {
         console.error('Error fetching social login options:', error);
@@ -57,7 +60,9 @@ function SocialLogin(provider) {
         case 'google':
             window.location.href = '/api/v1.0/Account/signin-google';
             break;
-        // Add more providers as needed
+        case 'microsoft':
+            window.location.href = '/api/v1.0/Account/signin-microsoft';
+            break;
         default:
             console.error('Unsupported social login provider:', provider);
             break;

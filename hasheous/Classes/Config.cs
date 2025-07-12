@@ -860,8 +860,41 @@ namespace Classes
                     }
                 }
 
+                private static string _MicrosoftClientId
+                {
+                    get
+                    {
+                        if (!String.IsNullOrEmpty(Environment.GetEnvironmentVariable("microsoftclientid")))
+                        {
+                            return Environment.GetEnvironmentVariable("microsoftclientid");
+                        }
+                        else
+                        {
+                            return "";
+                        }
+                    }
+                }
+
+                private static string _MicrosoftClientSecret
+                {
+                    get
+                    {
+                        if (!String.IsNullOrEmpty(Environment.GetEnvironmentVariable("microsoftclientsecret")))
+                        {
+                            return Environment.GetEnvironmentVariable("microsoftclientsecret");
+                        }
+                        else
+                        {
+                            return "";
+                        }
+                    }
+                }
+
                 public string GoogleClientId = _GoogleClientId;
                 public string GoogleClientSecret = _GoogleClientSecret;
+
+                public string MicrosoftClientId = _MicrosoftClientId;
+                public string MicrosoftClientSecret = _MicrosoftClientSecret;
 
                 [JsonIgnore]
                 public bool GoogleAuthEnabled
@@ -869,6 +902,15 @@ namespace Classes
                     get
                     {
                         return !String.IsNullOrEmpty(GoogleClientId) && !String.IsNullOrEmpty(GoogleClientSecret);
+                    }
+                }
+
+                [JsonIgnore]
+                public bool MicrosoftAuthEnabled
+                {
+                    get
+                    {
+                        return !String.IsNullOrEmpty(MicrosoftClientId) && !String.IsNullOrEmpty(MicrosoftClientSecret);
                     }
                 }
             }

@@ -18,6 +18,7 @@ using hasheous_server.Classes.Metadata.IGDB;
 using HasheousClient.Models.Metadata.IGDB;
 using System.Diagnostics;
 using StackExchange.Redis;
+using Microsoft.AspNetCore.Authentication.Cookies;
 
 Logging.WriteToDiskOnly = true;
 Logging.Log(Logging.LogType.Information, "Startup", "Starting Hasheous Server " + Assembly.GetExecutingAssembly().GetName().Version);
@@ -281,11 +282,23 @@ builder.Services.AddSingleton<ClientApiKeyAuthorizationFilter>();
 builder.Services.AddSingleton<IClientApiKeyValidator, ClientApiKeyValidator>();
 
 // add social authentication
-builder.Services.AddAuthentication()
+builder.Services.AddAuthentication(o =>
+    {
+        o.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+    })
+    .AddCookie()
     .AddGoogle(options =>
     {
         options.ClientId = Config.SocialAuthConfiguration.GoogleClientId;
         options.ClientSecret = Config.SocialAuthConfiguration.GoogleClientSecret;
+    })
+    .AddMicrosoftAccount(options =>
+    {
+        options.ClientId = Config.SocialAuthConfiguration.MicrosoftClientId;
+        options.ClientSecret = Config.SocialAuthConfiguration.MicrosoftClientSecret;
+        options.SaveTokens = true;
+        options.AuthorizationEndpoint = "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize";
+        options.TokenEndpoint = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
     });
 
 var app = builder.Build();
