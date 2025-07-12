@@ -384,5 +384,166 @@ namespace hasheous_server.Controllers.v1_0
                 return Ok(userKey);
             }
         }
+
+        [HttpGet]
+        [AllowAnonymous]
+        [Route("social-login")]
+        public IActionResult SocialLoginAvailable()
+        {
+            // This endpoint is used to check if social login is available
+            List<string> availableLogins = new List<string>();
+
+            // Check if Google login is configured
+            if (Config.SocialAuthConfiguration.GoogleAuthEnabled)
+            {
+                availableLogins.Add("Google");
+            }
+            if (Config.SocialAuthConfiguration.MicrosoftAuthEnabled)
+            {
+                availableLogins.Add("Microsoft");
+            }
+
+            return Ok(availableLogins);
+        }
+
+        [HttpGet]
+        [AllowAnonymous]
+        [Route("signin-google")]
+        public IActionResult SignInGoogle(string returnUrl = "/")
+        {
+            var redirectUrl = Url.Action("GoogleResponse", "Account", new { ReturnUrl = returnUrl });
+            var properties = _signInManager.ConfigureExternalAuthenticationProperties("Google", redirectUrl);
+            return Challenge(properties, "Google");
+        }
+
+        [HttpGet]
+        [AllowAnonymous]
+        [Route("signin-microsoft")]
+        public IActionResult SignInMicrosoft(string returnUrl = "/")
+        {
+            var redirectUrl = Url.Action("MicrosoftResponse", "Account", new { ReturnUrl = returnUrl });
+            var properties = _signInManager.ConfigureExternalAuthenticationProperties("Microsoft", redirectUrl);
+            return Challenge(properties, "Microsoft");
+        }
+
+        [HttpGet]
+        [AllowAnonymous]
+        [Route("GoogleResponse")]
+        public async Task<IActionResult> GoogleResponse(string returnUrl = "/")
+        {
+            var info = await _signInManager.GetExternalLoginInfoAsync();
+            if (info == null)
+                return RedirectToAction(nameof(Login));
+
+            var result = await _signInManager.ExternalLoginSignInAsync(info.LoginProvider, info.ProviderKey, isPersistent: true);
+            if (result.Succeeded)
+            {
+                return LocalRedirect(returnUrl);
+            }
+            else
+            {
+                // Get the email from the external provider
+                var email = info.Principal.FindFirstValue(ClaimTypes.Email);
+                if (email == null)
+                {
+                    return Unauthorized();
+                }
+
+                // Try to find an existing user with this email
+                var user = await _userManager.FindByEmailAsync(email);
+                if (user != null)
+                {
+                    // Link the Google login to the existing user
+                    var addLoginResult = await _userManager.AddLoginAsync(user, info);
+                    if (addLoginResult.Succeeded)
+                    {
+                        await _signInManager.SignInAsync(user, isPersistent: false);
+                        return LocalRedirect(returnUrl);
+                    }
+                    else
+                    {
+                        return Unauthorized(addLoginResult.Errors);
+                    }
+                }
+                else
+                {
+                    // No user exists, create a new one
+                    user = new ApplicationUser { UserName = email, Email = email };
+                    var identityResult = await _userManager.CreateAsync(user);
+                    if (identityResult.Succeeded)
+                    {
+                        await _userManager.AddLoginAsync(user, info);
+                        var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+                        var callbackUrl = Url.Action("ConfirmEmail", "Account", new { userId = user.Id, code = code }, protocol: HttpContext.Request.Scheme);
+                        await _emailSender.SendEmailAsync(user.Email, "Confirm your account",
+                           "Please confirm your account by clicking this link: <a href=\"" + callbackUrl + "\">link</a>");
+                        await _userManager.AddToRoleAsync(user, "Member");
+                        await _signInManager.SignInAsync(user, isPersistent: false);
+                        return LocalRedirect(returnUrl);
+                    }
+                    return Unauthorized(identityResult.Errors);
+                }
+            }
+        }
+
+        [HttpGet]
+        [AllowAnonymous]
+        [Route("MicrosoftResponse")]
+        public async Task<IActionResult> MicrosoftResponse(string returnUrl = "/")
+        {
+            var info = await _signInManager.GetExternalLoginInfoAsync();
+            if (info == null)
+                return RedirectToAction(nameof(Login));
+
+            var result = await _signInManager.ExternalLoginSignInAsync(info.LoginProvider, info.ProviderKey, isPersistent: true);
+            if (result.Succeeded)
+            {
+                return LocalRedirect(returnUrl);
+            }
+            else
+            {
+                // Get the email from the external provider
+                var email = info.Principal.FindFirstValue(ClaimTypes.Email);
+                if (email == null)
+                {
+                    return Unauthorized();
+                }
+
+                // Try to find an existing user with this email
+                var user = await _userManager.FindByEmailAsync(email);
+                if (user != null)
+                {
+                    // Link the Microsoft login to the existing user
+                    var addLoginResult = await _userManager.AddLoginAsync(user, info);
+                    if (addLoginResult.Succeeded)
+                    {
+                        await _signInManager.SignInAsync(user, isPersistent: false);
+                        return LocalRedirect(returnUrl);
+                    }
+                    else
+                    {
+                        return Unauthorized(addLoginResult.Errors);
+                    }
+                }
+                else
+                {
+                    // No user exists, create a new one
+                    user = new ApplicationUser { UserName = email, Email = email };
+                    var identityResult = await _userManager.CreateAsync(user);
+                    if (identityResult.Succeeded)
+                    {
+                        await _userManager.AddLoginAsync(user, info);
+                        await _userManager.AddToRoleAsync(user, "Member");
+                        var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+                        var callbackUrl = Url.Action("ConfirmEmail", "Account", new { userId = user.Id, code = code }, protocol: HttpContext.Request.Scheme);
+                        await _emailSender.SendEmailAsync(user.Email, "Confirm your account",
+                           "Please confirm your account by clicking this link: <a href=\"" + callbackUrl + "\">link</a>");
+                        await _signInManager.SignInAsync(user, isPersistent: false);
+                        return LocalRedirect(returnUrl);
+                    }
+                    return Unauthorized(identityResult.Errors);
+                }
+            }
+        }
     }
 }

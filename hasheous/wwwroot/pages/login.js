@@ -13,17 +13,17 @@ function UserLogin() {
     ajaxCall(
         '/api/v1/Account/Login',
         'POST',
-        function(result) {
+        function (result) {
             loginCallback(result);
         },
-        function(error) {
+        function (error) {
             loginCallback(error);
         },
         JSON.stringify(loginObj)
     );
 
     function loginCallback(result) {
-        switch(result.status) {
+        switch (result.status) {
             case 200:
                 window.location.replace('/index.html');
                 break;
@@ -34,3 +34,38 @@ function UserLogin() {
         }
     }
 }
+
+// check if social login buttons should be displayed
+fetch('/api/v1/Account/social-login', {
+    method: 'GET',
+    headers: {
+        'Content-Type': 'application/json'
+    }
+})
+    .then(response => response.json())
+    .then(data => {
+        if (data.includes('Google')) {
+            document.getElementById('social_login_button_google').style.display = 'table-row';
+        }
+        if (data.includes('Microsoft')) {
+            document.getElementById('social_login_button_microsoft').style.display = 'table-row';
+        }
+    })
+    .catch(error => {
+        console.error('Error fetching social login options:', error);
+    });
+
+function SocialLogin(provider) {
+    switch (provider) {
+        case 'google':
+            window.location.href = '/api/v1.0/Account/signin-google';
+            break;
+        case 'microsoft':
+            window.location.href = '/api/v1.0/Account/signin-microsoft';
+            break;
+        default:
+            console.error('Unsupported social login provider:', provider);
+            break;
+    }
+}
+// end of social login functionality
