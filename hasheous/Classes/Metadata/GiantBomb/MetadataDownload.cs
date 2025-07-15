@@ -26,10 +26,10 @@ namespace GiantBomb
         public static int RateLimitSleepTime = 10; // time in seconds to sleep when rate limit is hit
         private static int requestCount = 0;
         private static DateTime lastResetTime = DateTime.UtcNow;
-        private bool checkRequestLimit()
+        private async Task<bool> checkRequestLimit()
         {
             // Enforce a slow down mechanism to avoid hitting the API rate limit
-            System.Threading.Thread.Sleep(1000); // Sleep for 1 second between requests
+            await Task.Delay(1000); // Sleep for 1 second between requests
 
             // Reset the request count every minute
             if ((DateTime.UtcNow - lastResetTime).TotalMinutes >= 1)
