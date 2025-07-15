@@ -39,22 +39,21 @@ document.getElementById('dataObjectDelete').addEventListener("click", function (
 
 document.getElementById('dataObjectMerge').addEventListener("click", function (e) {
     let mergeIntoId = Number($('#dataObjectMergeSelect').val());
-    fetch('/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int') + '/MergeObject?TargetId=' + mergeIntoId, {
+    fetch('/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int') + '/MergeObject?TargetId=' + mergeIntoId + '&commit=true', {
         method: 'GET'
     }).then(async function (response) {
         if (!response.ok) {
             throw new Error('Failed to merge data objects');
         }
         return response.json();
-    }).then(function (success) {
+    }).then((success) => {
         console.log(success);
-        if (success.success) {
+        if (success) {
             location.replace('index.html?page=dataobjectdetail&type=' + pageType + '&id=' + mergeIntoId);
         } else {
-            console.warn(success.message);
-            alert('Merge failed: ' + success.message);
+            alert('An error occurred while merging data objects. Please try again.');
         }
-    }).catch(function (error) {
+    }).catch((error) => {
         console.warn(error);
         alert('An error occurred while merging data objects: ' + error.message);
     });

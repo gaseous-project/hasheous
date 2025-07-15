@@ -1176,9 +1176,14 @@ namespace hasheous_server.Classes
             db.ExecuteNonQuery(sql, new Dictionary<string, object>{
                 { "id", id }
             });
+            List<long> signatureIds = new List<long>();
             foreach (Dictionary<string, object>? signature in model.SignatureDataObjects)
             {
-                AddSignature(id, objectType, long.Parse(signature["SignatureId"].ToString()));
+                if (!signatureIds.Contains(long.Parse(signature["SignatureId"].ToString())))
+                {
+                    AddSignature(id, objectType, long.Parse(signature["SignatureId"].ToString()));
+                    signatureIds.Add(long.Parse(signature["SignatureId"].ToString()));
+                }
             }
 
             // access control
@@ -1187,7 +1192,7 @@ namespace hasheous_server.Classes
                 // update access control
                 sql = "DELETE FROM DataObject_ACL WHERE DataObject_ID=@id";
                 db.ExecuteNonQuery(sql, new Dictionary<string, object>{
-                    { "id", id }
+                    { "id", id}
                 });
 
                 foreach (KeyValuePair<string, List<DataObjectPermission.PermissionType>> acl in model.UserPermissions)

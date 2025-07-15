@@ -116,4 +116,14 @@
     #apiResponse {
         height: 400px;
     }
+
+    .dropdown-content {
+        top: unset;
+        bottom: 50px;
+    }
+
+    .pageitem {
+        padding: 6px 10px 6px 10px;
+        margin-right: 4px;
+    }
 }

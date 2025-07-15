@@ -232,9 +232,8 @@ button:disabled {
 }
 
 .footer_social_table {
-    align-items: center;
-    justify-content: center;
-    display: flex;
+    text-align: center;
+    margin-bottom: 10px;
 }
 
 .footer_button_image {
@@ -244,6 +243,8 @@ button:disabled {
     float: left;
     margin-top: -3px;
 }
+
+.footer_buttons {}
 
 .footer_button {
     background-color: var(--footer-button-background-color);
@@ -256,7 +257,7 @@ button:disabled {
     padding-right: 10px;
     padding-top: 0px;
     padding-bottom: 0px;
-    margin: 0px 0px 0px 0px;
+    margin: 0px 0px 10px 0px;
     display: inline-block;
     color: var(--footer-button-text-color);
     clear: left;
@@ -265,19 +266,20 @@ button:disabled {
 .footer_button:hover {
     cursor: pointer;
     text-decoration: underline;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
 }
 
-.footer_links {
-    text-align: center;
-}
+.footer_links {}
 
 .footer_link {
-    display: inline;
     margin-left: 10px;
     margin-right: 10px;
     margin-top: 5px;
     margin-bottom: 5px;
     white-space: nowrap;
+    display: inline-block;
 }
 
 .footer_link:hover {
@@ -668,7 +670,8 @@ td {
 
 .pageitem {
     display: inline;
-    padding: 2px 4px 2px 4px;
+    /* padding: 2px 4px 2px 4px; */
+    padding: 6px 10px 6px 10px;
     border-color: var(--page-background);
     border-width: 1px;
     border-style: solid;

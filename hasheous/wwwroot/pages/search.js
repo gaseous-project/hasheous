@@ -48,7 +48,7 @@ function createDataObjectsTable(targetDiv, pageType, pageNumber, pageSize) {
                             },
                             'name',
                             {
-                                column: 'attributes[attributeName=Platform].value.name',
+                                column: 'attributes[attributeName=Platform].value.Name',
                                 name: 'platform'
                             }
                         ];
@@ -63,7 +63,7 @@ function createDataObjectsTable(targetDiv, pageType, pageNumber, pageSize) {
                             },
                             'name',
                             {
-                                column: 'attributes[attributeName=Manufacturer].value.name',
+                                column: 'attributes[attributeName=Manufacturer].value.Name',
                                 name: 'manufacturer'
                             }
                         ];

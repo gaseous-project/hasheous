@@ -579,7 +579,8 @@ namespace hasheous_server.Controllers.v1_0
                 }
                 else
                 {
-                    return Ok(DataObjects.MergeObjects(DataObject, TargetDataObject, Commit));
+                    var result = DataObjects.MergeObjects(DataObject, TargetDataObject, Commit);
+                    return Ok(result);
                 }
             }
         }
