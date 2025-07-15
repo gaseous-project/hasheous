@@ -213,6 +213,7 @@ namespace Classes
                                     GiantBomb.MetadataDownload gbDownloader = new GiantBomb.MetadataDownload();
 
                                     Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+                                    db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Platform));
                                     db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Game));
                                     db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Rating));
                                     db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Image));
