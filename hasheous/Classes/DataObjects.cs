@@ -1075,41 +1075,50 @@ namespace hasheous_server.Classes
                                     // IGDB metadata id is not a long, so we need to search for it
                                     if (objectType == DataObjectType.Game)
                                     {
-                                        IGDB.Models.Game? newMetadataGame = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Game>(newMetadataItem.Id);
-                                        if (newMetadataGame != null)
+                                        if (!string.IsNullOrEmpty(newMetadataItem.Id))
                                         {
-                                            newMetadataId = newMetadataGame.Id.ToString();
-                                        }
-                                        else
-                                        {
-                                            // if we can't find the game, skip it
-                                            continue;
+                                            IGDB.Models.Game? newMetadataGame = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Game>(newMetadataItem.Id);
+                                            if (newMetadataGame != null)
+                                            {
+                                                newMetadataId = newMetadataGame.Id.ToString();
+                                            }
+                                            else
+                                            {
+                                                // if we can't find the game, skip it
+                                                continue;
+                                            }
                                         }
                                     }
                                     else if (objectType == DataObjectType.Platform)
                                     {
-                                        IGDB.Models.Platform? newMetadataPlatform = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Platform>(newMetadataItem.Id);
-                                        if (newMetadataPlatform != null)
+                                        if (!string.IsNullOrEmpty(newMetadataItem.Id))
                                         {
-                                            newMetadataId = newMetadataPlatform.Id.ToString();
-                                        }
-                                        else
-                                        {
-                                            // if we can't find the platform, skip it
-                                            continue;
+                                            IGDB.Models.Platform? newMetadataPlatform = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Platform>(newMetadataItem.Id);
+                                            if (newMetadataPlatform != null)
+                                            {
+                                                newMetadataId = newMetadataPlatform.Id.ToString();
+                                            }
+                                            else
+                                            {
+                                                // if we can't find the platform, skip it
+                                                continue;
+                                            }
                                         }
                                     }
                                     else if (objectType == DataObjectType.Company)
                                     {
-                                        IGDB.Models.Company? newMetadataCompany = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Company>(newMetadataItem.Id);
-                                        if (newMetadataCompany != null)
+                                        if (!string.IsNullOrEmpty(newMetadataItem.Id))
                                         {
-                                            newMetadataId = newMetadataCompany.Id.ToString();
-                                        }
-                                        else
-                                        {
-                                            // if we can't find the company, skip it
-                                            continue;
+                                            IGDB.Models.Company? newMetadataCompany = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Company>(newMetadataItem.Id);
+                                            if (newMetadataCompany != null)
+                                            {
+                                                newMetadataId = newMetadataCompany.Id.ToString();
+                                            }
+                                            else
+                                            {
+                                                // if we can't find the company, skip it
+                                                continue;
+                                            }
                                         }
                                     }
                                 }

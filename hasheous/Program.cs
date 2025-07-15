@@ -234,6 +234,17 @@ if (Config.RedisConfiguration.Enabled)
     builder.Services.AddHttpClient();
 }
 
+// CSRF protection
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-XSRF-TOKEN"; // Angular/SPA convention, can be any name
+});
+
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute());
+});
+
 // identity
 builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
         {
@@ -260,7 +271,7 @@ builder.Services.ConfigureApplicationCookie(options =>
             options.SlidingExpiration = true;
             options.Cookie.HttpOnly = true;
             options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
-            options.Cookie.SameSite = SameSiteMode.Strict;
+            options.Cookie.SameSite = SameSiteMode.None;
         });
 builder.Services.AddScoped<UserStore>();
 builder.Services.AddScoped<RoleStore>();
@@ -285,21 +296,27 @@ builder.Services.AddSingleton<IClientApiKeyValidator, ClientApiKeyValidator>();
 builder.Services.AddAuthentication(o =>
     {
         o.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-    })
-    .AddCookie()
-    .AddGoogle(options =>
-    {
-        options.ClientId = Config.SocialAuthConfiguration.GoogleClientId;
-        options.ClientSecret = Config.SocialAuthConfiguration.GoogleClientSecret;
-    })
-    .AddMicrosoftAccount(options =>
-    {
-        options.ClientId = Config.SocialAuthConfiguration.MicrosoftClientId;
-        options.ClientSecret = Config.SocialAuthConfiguration.MicrosoftClientSecret;
-        options.SaveTokens = true;
-        options.AuthorizationEndpoint = "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize";
-        options.TokenEndpoint = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
     });
+builder.Services.AddAuthentication().AddCookie();
+if (Config.SocialAuthConfiguration.GoogleAuthEnabled == true)
+{
+    builder.Services.AddAuthentication().AddGoogle(options =>
+        {
+            options.ClientId = Config.SocialAuthConfiguration.GoogleClientId;
+            options.ClientSecret = Config.SocialAuthConfiguration.GoogleClientSecret;
+        });
+}
+if (Config.SocialAuthConfiguration.MicrosoftAuthEnabled == true)
+{
+    builder.Services.AddAuthentication().AddMicrosoftAccount(options =>
+        {
+            options.ClientId = Config.SocialAuthConfiguration.MicrosoftClientId;
+            options.ClientSecret = Config.SocialAuthConfiguration.MicrosoftClientSecret;
+            options.SaveTokens = true;
+            options.AuthorizationEndpoint = "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize";
+            options.TokenEndpoint = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
+        });
+}
 
 var app = builder.Build();
 
@@ -357,7 +374,8 @@ app.Use(async (context, next) =>
     string userIdentity;
     try
     {
-        userIdentity = context.User.Claims.Where(x => x.Type == System.Security.Claims.ClaimTypes.NameIdentifier).FirstOrDefault().Value;
+        var nameIdentifierClaim = context.User.Claims.Where(x => x.Type == System.Security.Claims.ClaimTypes.NameIdentifier).FirstOrDefault();
+        userIdentity = nameIdentifierClaim != null ? nameIdentifierClaim.Value : "";
     }
     catch
     {

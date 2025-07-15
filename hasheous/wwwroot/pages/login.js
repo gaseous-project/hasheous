@@ -10,17 +10,19 @@ function UserLogin() {
         "rememberMe": document.getElementById('login_rememberme').checked
     }
 
-    ajaxCall(
+    postData(
         '/api/v1/Account/Login',
         'POST',
-        function (result) {
+        loginObj,
+        true // return result to handle response
+    )
+        .then(result => {
             loginCallback(result);
-        },
-        function (error) {
-            loginCallback(error);
-        },
-        JSON.stringify(loginObj)
-    );
+        })
+        .catch(error => {
+            console.error('Error during login:', error);
+            document.getElementById('login_errorlabel').innerHTML = lang.getLang('incorrectpassword');
+        });
 
     function loginCallback(result) {
         switch (result.status) {

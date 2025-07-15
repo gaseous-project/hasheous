@@ -6,6 +6,7 @@ using System.Web;
 using Authentication;
 using Classes;
 using hasheous_server.Classes;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
@@ -17,7 +18,7 @@ namespace hasheous_server.Controllers.v1_0
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]")]
     [ApiVersion("1.0")]
-    [ApiExplorerSettings(IgnoreApi = false)]
+    [ApiExplorerSettings(IgnoreApi = true)]
     [Authorize]
     public class AccountController : Controller
     {
@@ -209,8 +210,17 @@ namespace hasheous_server.Controllers.v1_0
                     // Send an email with this link
                     var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
                     var callbackUrl = Url.Action("ConfirmEmail", "Account", new { userId = user.Id, code = code }, protocol: HttpContext.Request.Scheme);
-                    await _emailSender.SendEmailAsync(model.Email, "Confirm your account",
-                       "Please confirm your account by clicking this link: <a href=\"" + callbackUrl + "\">link</a>");
+                    try
+                    {
+                        await _emailSender.SendEmailAsync(model.Email, "Confirm your account",
+                           "Please confirm your account by clicking this link: <a href=\"" + callbackUrl + "\">link</a>");
+                    }
+                    catch (Exception ex)
+                    {
+                        Logging.Log(Logging.LogType.Warning, "Email", "Error sending confirmation email to " + model.Email + ": " + ex.Message);
+                        // If email sending fails, we can still create the user but they won't be able to confirm their email
+                        // You might want to handle this differently in production
+                    }
 
                     // add all users to the member role
                     await _userManager.AddToRoleAsync(user, "Member");
@@ -223,15 +233,8 @@ namespace hasheous_server.Controllers.v1_0
                     {
                         return Ok(returnUrl);
                     }
-                    else
-                    {
-                        return Ok(result);
-                    }
                 }
-                else
-                {
-                    return Ok(result);
-                }
+                return Ok(result);
             }
             else
             {
@@ -387,6 +390,15 @@ namespace hasheous_server.Controllers.v1_0
 
         [HttpGet]
         [AllowAnonymous]
+        [Route("antiforgery-token")]
+        public IActionResult GetAntiforgeryToken([FromServices] IAntiforgery antiforgery)
+        {
+            var tokens = antiforgery.GetAndStoreTokens(HttpContext);
+            return Ok(new { token = tokens.RequestToken });
+        }
+
+        [HttpGet]
+        [AllowAnonymous]
         [Route("social-login")]
         public IActionResult SocialLoginAvailable()
         {
@@ -411,7 +423,7 @@ namespace hasheous_server.Controllers.v1_0
         [Route("signin-google")]
         public IActionResult SignInGoogle(string returnUrl = "/")
         {
-            var redirectUrl = Url.Action("GoogleResponse", "Account", new { ReturnUrl = returnUrl });
+            var redirectUrl = Url.Action("GoogleResponse", "Account", new { ReturnUrl = returnUrl }, protocol: "https");
             var properties = _signInManager.ConfigureExternalAuthenticationProperties("Google", redirectUrl);
             return Challenge(properties, "Google");
         }
@@ -421,7 +433,7 @@ namespace hasheous_server.Controllers.v1_0
         [Route("signin-microsoft")]
         public IActionResult SignInMicrosoft(string returnUrl = "/")
         {
-            var redirectUrl = Url.Action("MicrosoftResponse", "Account", new { ReturnUrl = returnUrl });
+            var redirectUrl = Url.Action("MicrosoftResponse", "Account", new { ReturnUrl = returnUrl }, protocol: "https");
             var properties = _signInManager.ConfigureExternalAuthenticationProperties("Microsoft", redirectUrl);
             return Challenge(properties, "Microsoft");
         }
@@ -457,7 +469,7 @@ namespace hasheous_server.Controllers.v1_0
                     var addLoginResult = await _userManager.AddLoginAsync(user, info);
                     if (addLoginResult.Succeeded)
                     {
-                        await _signInManager.SignInAsync(user, isPersistent: false);
+                        await _signInManager.SignInAsync(user, isPersistent: true);
                         return LocalRedirect(returnUrl);
                     }
                     else
@@ -478,7 +490,7 @@ namespace hasheous_server.Controllers.v1_0
                         await _emailSender.SendEmailAsync(user.Email, "Confirm your account",
                            "Please confirm your account by clicking this link: <a href=\"" + callbackUrl + "\">link</a>");
                         await _userManager.AddToRoleAsync(user, "Member");
-                        await _signInManager.SignInAsync(user, isPersistent: false);
+                        await _signInManager.SignInAsync(user, isPersistent: true);
                         return LocalRedirect(returnUrl);
                     }
                     return Unauthorized(identityResult.Errors);
@@ -517,7 +529,7 @@ namespace hasheous_server.Controllers.v1_0
                     var addLoginResult = await _userManager.AddLoginAsync(user, info);
                     if (addLoginResult.Succeeded)
                     {
-                        await _signInManager.SignInAsync(user, isPersistent: false);
+                        await _signInManager.SignInAsync(user, isPersistent: true);
                         return LocalRedirect(returnUrl);
                     }
                     else
@@ -538,12 +550,88 @@ namespace hasheous_server.Controllers.v1_0
                         var callbackUrl = Url.Action("ConfirmEmail", "Account", new { userId = user.Id, code = code }, protocol: HttpContext.Request.Scheme);
                         await _emailSender.SendEmailAsync(user.Email, "Confirm your account",
                            "Please confirm your account by clicking this link: <a href=\"" + callbackUrl + "\">link</a>");
-                        await _signInManager.SignInAsync(user, isPersistent: false);
+                        await _signInManager.SignInAsync(user, isPersistent: true);
                         return LocalRedirect(returnUrl);
                     }
                     return Unauthorized(identityResult.Errors);
                 }
             }
+        }
+
+        [HttpGet]
+        [Authorize]
+        [Route("link-login/{provider}")]
+        public IActionResult LinkLogin(string provider, string returnUrl = "/")
+        {
+            var redirectUrl = Url.Action("LinkLoginCallback", "Account", new { ReturnUrl = returnUrl }, protocol: "https");
+            var properties = _signInManager.ConfigureExternalAuthenticationProperties(provider, redirectUrl, _userManager.GetUserId(User));
+            return Challenge(properties, provider);
+        }
+
+        [HttpGet]
+        [Authorize]
+        [Route("LinkLoginCallback")]
+        public async Task<IActionResult> LinkLoginCallback(string returnUrl = "/")
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+                return Unauthorized();
+
+            var info = await _signInManager.GetExternalLoginInfoAsync(await _userManager.GetUserIdAsync(user));
+            if (info == null)
+                return Unauthorized("External login info not found");
+
+            var result = await _userManager.AddLoginAsync(user, info);
+            if (result.Succeeded)
+            {
+                await _signInManager.RefreshSignInAsync(user);
+                return LocalRedirect(returnUrl);
+            }
+            else
+            {
+                return Unauthorized(result.Errors);
+            }
+        }
+
+        [HttpGet]
+        [Authorize]
+        [Route("unlink-login/{provider}")]
+        public async Task<IActionResult> UnlinkLogin(string provider, string returnUrl = "/")
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+                return RedirectToAction(nameof(Login));
+
+            var login = (await _userManager.GetLoginsAsync(user)).FirstOrDefault(x => x.LoginProvider == provider);
+            if (login == null)
+                return NotFound("Login not found");
+
+            var result = await _userManager.RemoveLoginAsync(user, login.LoginProvider, login.ProviderKey);
+            if (result.Succeeded)
+            {
+                // Optionally: sign in the user again
+                await _signInManager.RefreshSignInAsync(user);
+                return LocalRedirect(returnUrl);
+            }
+            else
+            {
+                return Unauthorized(result.Errors);
+            }
+        }
+
+        [HttpGet]
+        [Authorize]
+        [Route("linked-logins")]
+        public async Task<IActionResult> GetLinkedLogins()
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+                return Unauthorized("User not found");
+
+            var logins = await _userManager.GetLoginsAsync(user);
+            var linkedLogins = logins.Select(x => new { x.LoginProvider, x.ProviderKey }).ToList();
+
+            return Ok(linkedLogins);
         }
     }
 }

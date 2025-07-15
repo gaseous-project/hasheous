@@ -38,7 +38,7 @@ function handleErrors() {
                 passwordError.classList.add('errorlabel-error');
                 errorlabel.appendChild(passwordError);
                 break;
-            
+
             default:
                 // no error
                 break;
@@ -58,7 +58,7 @@ resetPasswordEmailField.pattern = login.emailRegex;
 resetPasswordEmailField.addEventListener("keyup", function (e) {
     this.classList.remove('valid-border-color');
     this.classList.remove('invalid-border-color');
-    
+
     if (login.isValidEmail(this.value) == true) {
         this.classList.add('valid-border-color');
         emailValidated = true;
@@ -112,17 +112,21 @@ if (user && code) {
             "ConfirmPassword": newPasswordConfirmField.value
         };
 
-        ajaxCall(
-            '/api/v1/Account/ResetPassword',
-            'POST',
-            function(result) {
+        postData('/api/v1.0/account/resetpassword', 'POST', ajaxData, true)
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(error => {
+                        throw error;
+                    });
+                }
+                return response.json();
+            })
+            .then(result => {
                 resetPasswordCallback(result);
-            },
-            function(error) {
+            })
+            .catch(error => {
                 resetPasswordCallback(error);
-            },
-            JSON.stringify(ajaxData)
-        );
+            });
     });
 } else {
     window.location.replace('/');

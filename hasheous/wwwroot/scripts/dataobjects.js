@@ -123,7 +123,7 @@ class dataObjectAttributes {
                 this.inputElement.appendChild(imageRef);
 
                 // setup events
-                inputElement_ImageFile.addEventListener("change", function (e) {
+                inputElement_ImageFile.addEventListener("change", async function (e) {
                     let ofile = inputElement_ImageFile.files[0];
                     let formdata = new FormData();
                     formdata.append("file", ofile);
@@ -131,22 +131,29 @@ class dataObjectAttributes {
                     let uploadLabel = inputCell3_image;
                     uploadLabel.innerHTML = lang.getLang('uploadinglogo');
 
-                    $.ajax({
-                        url: '/api/v1/Images/',
-                        type: 'POST',
-                        data: formdata,
-                        processData: false,
-                        contentType: false,
-                        success: function (data) {
-                            uploadLabel.innerHTML = lang.getLang('uploadlogocomplete');
-                            inputElement_ImageRef.value = data;
-                            inputElement_Image.checked = 'checked';
-                            console.log(data);
-                        },
-                        error: function (error) {
-                            console.warn("Error: " + error);
+                    try {
+                        const token = await fetchAntiforgeryToken();
+                        const response = await fetch('/api/v1/Images/', {
+                            method: 'POST',
+                            body: formdata,
+                            credentials: 'include',
+                            headers: {
+                                'X-XSRF-TOKEN': token
+                            }
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
                         }
-                    });
+
+                        const data = await response.text();
+                        uploadLabel.innerHTML = lang.getLang('uploadlogocomplete');
+                        inputElement_ImageRef.value = data;
+                        inputElement_Image.checked = 'checked';
+                        console.log(data);
+                    } catch (error) {
+                        console.warn("Error: " + error);
+                    }
                 });
 
                 break;
@@ -285,114 +292,120 @@ function createDataObjectsTable(pageNumber, pageSize, objectType, filterByPlatfo
         filterString = '&filterAttribute=Platform&filterValue=' + filterByPlatformId;
     }
 
-    ajaxCall(
-        '/api/v1/DataObjects/' + objectType + '?pageSize=' + pageSize + '&pageNumber=' + pageNumber + '&getchildrelations=true' + filterString + '&getMetadata=false',
-        'GET',
-        function (success) {
-            switch (objectType) {
-                case "game":
-                    columns = [
-                        'id',
-                        {
-                            column: 'attributes[attributeName=Logo].value:image',
-                            name: 'logo'
-                        },
-                        'name',
-                        {
-                            column: 'attributes[attributeName=Platform].value.name',
-                            name: 'platform'
-                        },
-                        {
-                            column: 'attributes[attributeName=Publisher].value.name',
-                            name: 'publisher'
-                        }//,
-                        // {
-                        //     column: 'metadata[source=IGDB].id',
-                        //     name: 'igdb'
-                        // }
-                    ];
-                    break;
-
-                case "platform":
-                    columns = [
-                        'id',
-                        {
-                            column: 'attributes[attributeName=Logo].value:image',
-                            name: 'logo'
-                        },
-                        'name',
-                        {
-                            column: 'attributes[attributeName=Manufacturer].value.name',
-                            name: 'manufacturer'
-                        }//,
-                        // {
-                        //     column: 'metadata[source=IGDB].id',
-                        //     name: 'igdb'
-                        // }
-                    ];
-                    break;
-
-                case "company":
-                    columns = [
-                        'id',
-                        {
-                            column: 'attributes[attributeName=Logo].value:image',
-                            name: 'logo'
-                        },
-                        'name'//,
-                        // {
-                        //     column: 'metadata[source=IGDB].id',
-                        //     name: 'igdb'
-                        // }
-                    ];
-                    break;
-
-                case "app":
-                    columns = [
-                        'id',
-                        {
-                            column: 'attributes[attributeName=Logo].value:image',
-                            name: 'logo'
-                        },
-                        'name',
-                        {
-                            column: 'attributes[attributeName=Publisher].value',
-                            name: 'publisher'
-                        },
-                        {
-                            column: 'attributes[attributeName=HomePage].value:link',
-                            name: 'link'
-                        }
-                    ];
-                    break;
-
-                default:
-                    columns = [
-                        'id',
-                        'name'
-                    ];
-                    break;
-
-            }
-
-            let newTable = new generateTable(
-                success.objects,
-                columns,
-                'id',
-                true,
-                function (id) {
-                    window.location = '/index.html?page=dataobjectdetail&type=' + objectType + '&id=' + id;
-                },
-                success.count,
-                success.pageNumber,
-                success.totalPages,
-                function (p) {
-                    createDataObjectsTable(p, pageSize, objectType, filterByPlatformId);
-                }
-            );
-            let tableTarget = document.getElementById('dataObjectTable');
-            tableTarget.innerHTML = '';
-            tableTarget.appendChild(newTable);
+    fetch('/api/v1/DataObjects/' + objectType + '?pageSize=' + pageSize + '&pageNumber=' + pageNumber + '&getchildrelations=true' + filterString + '&getMetadata=true', {
+        method: 'GET'
+    }).then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
         }
-    );
+        return response.json();
+    }).then(success => {
+        console.log(success);
+        let columns = [];
+
+        switch (objectType) {
+            case "game":
+                columns = [
+                    'id',
+                    {
+                        column: 'attributes[attributeName=Logo].value:image',
+                        name: 'logo'
+                    },
+                    'name',
+                    {
+                        column: 'attributes[attributeName=Platform].value.Name',
+                        name: 'platform'
+                    },
+                    {
+                        column: 'attributes[attributeName=Publisher].value.Name',
+                        name: 'publisher'
+                    }//,
+                    // {
+                    //     column: 'metadata[source=IGDB].id',
+                    //     name: 'igdb'
+                    // }
+                ];
+                break;
+
+            case "platform":
+                columns = [
+                    'id',
+                    {
+                        column: 'attributes[attributeName=Logo].value:image',
+                        name: 'logo'
+                    },
+                    'name',
+                    {
+                        column: 'attributes[attributeName=Manufacturer].value.Name',
+                        name: 'manufacturer'
+                    }//,
+                    // {
+                    //     column: 'metadata[source=IGDB].id',
+                    //     name: 'igdb'
+                    // }
+                ];
+                break;
+
+            case "company":
+                columns = [
+                    'id',
+                    {
+                        column: 'attributes[attributeName=Logo].value:image',
+                        name: 'logo'
+                    },
+                    'name'//,
+                    // {
+                    //     column: 'metadata[source=IGDB].id',
+                    //     name: 'igdb'
+                    // }
+                ];
+                break;
+
+            case "app":
+                columns = [
+                    'id',
+                    {
+                        column: 'attributes[attributeName=Logo].value:image',
+                        name: 'logo'
+                    },
+                    'name',
+                    {
+                        column: 'attributes[attributeName=Publisher].value',
+                        name: 'publisher'
+                    },
+                    {
+                        column: 'attributes[attributeName=HomePage].value:link',
+                        name: 'link'
+                    }
+                ];
+                break;
+
+            default:
+                columns = [
+                    'id',
+                    'name'
+                ];
+                break;
+
+        }
+
+        let newTable = new generateTable(
+            success.objects,
+            columns,
+            'id',
+            true,
+            function (id) {
+                window.location = '/index.html?page=dataobjectdetail&type=' + objectType + '&id=' + id;
+            },
+            success.count,
+            success.pageNumber,
+            success.totalPages,
+            function (p) {
+                createDataObjectsTable(p, pageSize, objectType, filterByPlatformId);
+            }
+        );
+        let tableTarget = document.getElementById('dataObjectTable');
+        tableTarget.innerHTML = '';
+        tableTarget.appendChild(newTable);
+    });
 }

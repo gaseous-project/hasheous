@@ -41,7 +41,7 @@ function handleErrors() {
                 passwordError.classList.add('errorlabel-error');
                 errorlabel.appendChild(passwordError);
                 break;
-            
+
             default:
                 // no error
                 break;
@@ -61,7 +61,7 @@ registerEmailField.pattern = login.emailRegex;
 registerEmailField.addEventListener("keyup", function (e) {
     this.classList.remove('valid-border-color');
     this.classList.remove('invalid-border-color');
-    
+
     if (login.isValidEmail(this.value) == true) {
         this.classList.add('valid-border-color');
         emailValidated = true;
@@ -118,17 +118,19 @@ registerButton.addEventListener("click", function (e) {
         // email good - check password
         if (login.isPasswordValid(loginModel.password, loginModel.confirmPassword)) {
             // password is good too - submit
-            ajaxCall(
+
+            postData(
                 '/api/v1/Account/Register',
                 'POST',
-                function(success) {
-                    processRegistration(success);
-                },
-                function(error) {
+                loginModel,
+                false // return result
+            )
+                .then(data => {
+                    processRegistration(data);
+                })
+                .catch(error => {
                     processRegistration(error);
-                },
-                JSON.stringify(loginModel)
-            );
+                });
         } else {
             handleErrors();
             return false;
@@ -142,6 +144,6 @@ function processRegistration(message) {
         document.getElementById('registerpanel').style.display = 'none';
         document.getElementById('registrationcomplete').style.display = '';
     } else {
-        
+
     }
 }

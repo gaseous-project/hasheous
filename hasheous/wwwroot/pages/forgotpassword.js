@@ -6,7 +6,7 @@ forgottenEmailField.pattern = login.emailRegex;
 forgottenEmailField.addEventListener("keyup", function (e) {
     this.classList.remove('valid-border-color');
     this.classList.remove('invalid-border-color');
-    
+
     let sendLinkButton = document.getElementById('forgottenpasswordsendlink');
 
     if (login.isValidEmail(this.value) == true) {
@@ -25,17 +25,23 @@ document.getElementById('forgottenpasswordsendlink').addEventListener('click', f
     let model = {
         "email": forgottenEmailField.value
     };
-    ajaxCall(
+
+    postData(
         '/api/v1/Account/ForgotPassword',
         'POST',
-        function (success) {
+        model
+    ).then(async response => {
+        if (response.ok) {
             forgottenPasswordPanel.style.display = 'none';
             forgottenPasswordSentLinkPanel.style.display = '';
-        },
-        function (error) {
-            forgottenPasswordPanel.style.display = 'none';
-            forgottenPasswordSentLinkPanel.style.display = '';
-        },
-        JSON.stringify(model)
-    );
+        } else {
+            response.json().then(error => {
+                console.error('Error:', error);
+                alert('Failed to send password reset link: ' + error.message);
+            });
+        }
+    }).catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while sending the password reset link.');
+    });
 });

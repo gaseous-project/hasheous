@@ -1,5 +1,5 @@
 let pageType = getQueryString('type', 'string');
-document.getElementById('dataObject_cancel').addEventListener("click", function(e) {
+document.getElementById('dataObject_cancel').addEventListener("click", function (e) {
     window.location = '/index.html?page=dataobjects&type=' + pageType;
 });
 setPageTitle("newcompany");
@@ -20,15 +20,24 @@ function saveDataObject() {
         "name": document.getElementById('dataObject_object_name').value
     }
 
-    ajaxCall(
+    postData(
         '/api/v1/DataObjects/' + pageType,
         'POST',
-        function (success) {
-            window.location = '/index.html?page=dataobjects&type=' + pageType;
-        },
-        function (error) {
-            window.location = '/index.html?page=dataobjects&type=' + pageType;
-        },
-        JSON.stringify(model)
-    );
+        model,
+        true
+    ).then(async response => {
+        if (response.ok) {
+            console.log(response);
+            let jsonResponse = await response.json();
+            window.location = '/index.html?page=dataobjectdetail&type=' + pageType + '&id=' + jsonResponse.id;
+        } else {
+            response.json().then(error => {
+                console.error('Error:', error);
+                alert('Failed to save data object: ' + error.message);
+            });
+        }
+    }).catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while saving the data object.');
+    });
 }

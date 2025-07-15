@@ -16,6 +16,7 @@ namespace hasheous_server.Controllers.v1_0
     [Route("api/v{version:apiVersion}/[controller]/")]
     [ApiVersion("1.0")]
     [Authorize]
+    [ApiExplorerSettings(IgnoreApi = true)]
     public class SignaturesController : ControllerBase
     {
         /// <summary>

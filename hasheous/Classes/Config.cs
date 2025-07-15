@@ -825,7 +825,7 @@ namespace Classes
 
                 public string APIKey = _DefaultAPIKey;
 
-                public string BaseURL = "https://www.giantbomb.com/api/";
+                public string BaseURL = "https://www.giantbomb.com/";
             }
 
             public class SocialAuth

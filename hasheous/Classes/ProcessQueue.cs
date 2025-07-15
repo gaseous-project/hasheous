@@ -213,6 +213,7 @@ namespace Classes
                                     GiantBomb.MetadataDownload gbDownloader = new GiantBomb.MetadataDownload();
                                     gbDownloader.DownloadPlatforms();
                                     gbDownloader.DownloadGames();
+                                    // gbDownloader.DownloadSubTypes<GiantBomb.Models.GiantBombReviewResponse, GiantBomb.Models.Review>("reviews");
                                     break;
 
                                 case QueueItemType.AutoMapper:

@@ -116,16 +116,21 @@ if (userProfile == null) {
 }
 
 function userLogoff() {
-    ajaxCall(
+    postData(
         '/api/v1/Account/LogOff',
         'POST',
-        function (result) {
+        {}
+    ).then(async response => {
+        if (response.ok) {
             location.replace("/index.html");
-        },
-        function (error) {
+        } else {
+            console.error('Error:', response);
             location.replace("/index.html");
         }
-    );
+    }).catch(error => {
+        console.error('Error:', error);
+        location.replace("/index.html");
+    });
 }
 
 function setPageTitle(targetPage, overrideLanguageLookup) {

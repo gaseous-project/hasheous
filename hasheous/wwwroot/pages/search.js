@@ -27,10 +27,16 @@ function createDataObjectsTable(targetDiv, pageType, pageNumber, pageSize) {
         let progressObj = document.createElement('progress');
         resultDiv.appendChild(progressObj);
 
-        ajaxCall(
-            '/api/v1/DataObjects/' + pageType + '?search=' + encodeURIComponent(pageSearchBox.value) + '&pageSize=' + pageSize + '&pageNumber=' + pageNumber + '&getchildrelations=true',
-            'GET',
-            function (success) {
+        fetch('/api/v1/DataObjects/' + pageType + '?search=' + encodeURIComponent(pageSearchBox.value) + '&pageSize=' + pageSize + '&pageNumber=' + pageNumber + '&getchildrelations=true', {
+            method: 'GET'
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(success => {
                 let columns;
                 switch (pageType) {
                     case "game":
@@ -98,7 +104,7 @@ function createDataObjectsTable(targetDiv, pageType, pageNumber, pageSize) {
                 resultDiv.innerHTML = '';
                 resultDiv.appendChild(newTable);
             }
-        );
+            );
     } else {
         ShowError(targetDiv);
     }
@@ -145,47 +151,58 @@ function createDataObjectsTableFromMD5Search(hashType) {
     let resultsPanel = document.getElementById('searchresultspanel');
     resultsPanel.style.display = '';
 
-    ajaxCall(
-        '/api/v1/Lookup/ByHash/?getchildrelations=true',
-        'POST',
-        function (success) {
-            let resultDiv = document.getElementById('gamesearchresults');
-
-            if (success) {
-                let arr = [success];
-
-                let newTable = new generateTable(
-                    arr,
-                    [
-                        'id',
-                        'name',
-                        {
-                            column: 'platform.name',
-                            name: 'platform'
-                        }
-                    ],
-                    'id',
-                    true,
-                    function (id) {
-                        window.location = '/index.html?page=dataobjectdetail&type=game&id=' + id;
-                    }
-                );
-                resultDiv.innerHTML = '';
-                resultDiv.appendChild(newTable);
-            } else {
-                ShowError('gamesearchresults');
+    postData('/api/v1/Lookup/ByHash/?getchildrelations=true', 'POST', searchModel, true)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
             }
+            return response.json();
+        })
+        .then(success => {
+            console.log(success);
+            // if (success && success.length > 0) {
+            let arr = [success];
+
+            let newTable = new generateTable(
+                arr,
+                [
+                    // 'id',
+                    // 'name',
+                    // {
+                    //     column: 'platform.name',
+                    //     name: 'platform'
+                    // }
+                    'id',
+                    {
+                        column: 'attributes[attributeName=Logo].value:image',
+                        name: 'logo'
+                    },
+                    'name',
+                    {
+                        column: 'platform.name',
+                        name: 'platform'
+                    }
+                ],
+                'id',
+                true,
+                function (id) {
+                    window.location = '/index.html?page=dataobjectdetail&type=game&id=' + id;
+                }
+            );
+            resultDiv.innerHTML = '';
+            resultDiv.appendChild(newTable);
+            // } else {
+            //     ShowError('gamesearchresults');
+            // }
             ShowError('platformsearchresults');
             ShowError('companysearchresults');
-        },
-        function (error) {
+        })
+        .catch(function (error) {
             console.error(error);
             ShowError('gamesearchresults');
             ShowError('platformsearchresults');
             ShowError('companysearchresults');
-        },
-        JSON.stringify(searchModel)
-    );
+        });
 }
 
 function performSearch() {

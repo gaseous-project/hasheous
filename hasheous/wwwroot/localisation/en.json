@@ -30,6 +30,11 @@
     "changepasswordconfirmationcomplete": "Your password has been reset. You will be redirected in {0} seconds, or go {1}.",
     "createanaccount": "Create an account",
     "invalidemail": "The email address is invalid",
+    "linkedaccounts": "Linked Accounts",
+    "linkedaccountsdescription": "You can link your account to other services to allow you to sign in with those services.",
+    "google": "Google",
+    "microsoft": "Microsoft",
+    "unlink": "Unlink",
     "sources": "Data Sources",
     "source": "Source",
     "apps": "Apps",
@@ -214,5 +219,6 @@
     "unique_visitors_per_country": "Unique Visitors per Country",
     "total_requests": "Total Requests",
     "average_response_time": "Average Response Time (ms)",
-    "unique_visitors_per_api_key": "Unique Visitors per API Key"
+    "unique_visitors_per_api_key": "Unique Visitors per API Key",
+    "dataobjectdetailerror": "An error occurred while fetching the data object details. Please try again later."
 }

@@ -16,6 +16,7 @@ namespace hasheous_server.Controllers.v1_0
     [Route("api/v{version:apiVersion}/[controller]/")]
     [Obsolete("This controller is deprecated and will be removed in a future version of the API. Please use the new LookupController instead.")]
     [ApiVersion("1.0")]
+    [IgnoreAntiforgeryToken]
     [Insight(Insights.InsightSourceType.HashLookupDeprecated)]
     public class HashLookupController : ControllerBase
     {

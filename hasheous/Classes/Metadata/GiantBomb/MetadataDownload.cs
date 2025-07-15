@@ -22,6 +22,35 @@ namespace GiantBomb
 
         public int TimeToExpire { get; set; } = 30; // Default expiration time for cached data
 
+        public static int MaximumRequestsPerMinute = 30;
+        public static int RateLimitSleepTime = 10; // time in seconds to sleep when rate limit is hit
+        private static int requestCount = 0;
+        private static DateTime lastResetTime = DateTime.UtcNow;
+        private bool checkRequestLimit()
+        {
+            // Enforce a slow down mechanism to avoid hitting the API rate limit
+            System.Threading.Thread.Sleep(1000); // Sleep for 1 second between requests
+
+            // Reset the request count every minute
+            if ((DateTime.UtcNow - lastResetTime).TotalMinutes >= 1)
+            {
+                requestCount = 0;
+                lastResetTime = DateTime.UtcNow;
+            }
+            // Check if the request count exceeds the maximum allowed requests per minute
+            if (requestCount >= MaximumRequestsPerMinute)
+            {
+                Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Rate limit exceeded. Sleeping for {RateLimitSleepTime} seconds.");
+                System.Threading.Thread.Sleep(RateLimitSleepTime * 1000);
+                requestCount = 0;
+                lastResetTime = DateTime.UtcNow;
+                return false; // Indicate that the request limit was hit
+            }
+            requestCount++;
+            return true; // Indicate that the request limit was not hit
+        }
+
+
         public void DownloadPlatforms()
         {
             // ensure that the local file path exists
@@ -170,6 +199,11 @@ namespace GiantBomb
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             db.BuildTableFromType(dbName, "", typeof(GiantBomb.Models.Game));
             db.BuildTableFromType(dbName, "", typeof(GiantBomb.Models.Rating));
+            db.BuildTableFromType(dbName, "", typeof(GiantBomb.Models.Image));
+            db.BuildTableFromType(dbName, "", typeof(GiantBomb.Models.ImageTag));
+            db.BuildTableFromType(dbName, "", typeof(GiantBomb.Models.Release));
+            db.BuildTableFromType(dbName, "", typeof(GiantBomb.Models.Review));
+            db.BuildTableFromType(dbName, "", typeof(GiantBomb.Models.UserReview));
 
             // add indexes to the Game table
             // Add an index to the Name column
@@ -270,8 +304,102 @@ namespace GiantBomb
             Logging.Log(Logging.LogType.Information, "GiantBomb", $"Finished downloading games for platform ID {platformId} from GiantBomb.");
         }
 
+        public void DownloadSubTypes<TResponse, TObject>(string endpoint, string? query = "")
+            where TResponse : class
+        {
+            // get the name of TObject
+            string typeName = typeof(TObject).Name;
+
+            // ensure that the local file path exists
+            if (!Directory.Exists(LocalFilePath))
+            {
+                Directory.CreateDirectory(LocalFilePath);
+            }
+
+            // get the last fetch date and time from settings
+            string settingName = $"GiantBomb_{typeName}Fetch{"_" + query}";
+            DateTime lastFetchDateTime = Config.ReadSetting(settingName, DateTime.UtcNow.AddDays(-31));
+
+            // check if the last fetch date and time is older than the expiration time
+            if (DateTime.UtcNow - lastFetchDateTime < TimeSpan.FromDays(TimeToExpire))
+            {
+                Logging.Log(Logging.LogType.Information, "GiantBomb", $"Data for {typeName} up to date. No need to download.");
+                return;
+            }
+
+            // setup database if it doesn't exist
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            db.BuildTableFromType(dbName, "", typeof(TObject));
+
+            Logging.Log(Logging.LogType.Information, "GiantBomb", $"Downloading {typeName} from GiantBomb.");
+
+            // check if API key is set, otherwise exit
+            if (!String.IsNullOrEmpty(Config.GiantBomb.APIKey))
+            {
+                int offset = 0;
+
+                // get the current offset from settings, default to 0 if not set
+                offset = int.Parse(Config.ReadSetting($"{settingName}Offset", 0).ToString());
+
+                // repeat until we get no more objects, incrementing offset by 100 each time
+                while (true)
+                {
+                    // Fetch objects from GiantBomb API
+                    string url = $"/api/{endpoint}/?api_key={Config.GiantBomb.APIKey}&format=json&limit=100&offset={offset}{(query != null && query != "" ? $"&filter={query}" : "")}";
+                    var json = GetJson<TResponse>(url);
+
+                    // Use reflection to get the 'results' property
+                    var resultsProp = typeof(TResponse).GetProperty("results");
+                    var results = resultsProp?.GetValue(json) as IEnumerable<object>;
+
+                    if (results == null || !results.Cast<object>().Any())
+                    {
+                        // No more objects to fetch, exit the loop
+                        break;
+                    }
+
+                    // Process each object
+                    foreach (var apiObject in results)
+                    {
+                        // Here you can process the object as needed
+                        // For example, you can log the object id or store it in a list
+                        var idProp = apiObject.GetType().GetProperty("id") ?? apiObject.GetType().GetProperty("Id");
+                        var idValue = idProp?.GetValue(apiObject);
+                        Logging.Log(Logging.LogType.Information, "GiantBomb", $"Found {typeName}: {idValue}");
+                        StoreObjectWithSubclasses(apiObject, db, dbName, idValue as long?);
+                    }
+
+                    // Store the offset in settings for the next batch
+                    Config.SetSetting($"{settingName}Offset", offset);
+
+                    // Check if there are more objects to fetch
+                    if (results.Count() < 100)
+                    {
+                        // If the count is less than 100, we have fetched all objects
+                        break;
+                    }
+
+                    // Increment offset for the next batch
+                    offset += 100;
+
+                    // To avoid hitting API rate limits, delay the next request
+                    System.Threading.Thread.Sleep(10000); // Sleep for 10 seconds
+                }
+
+                // reset the offset to 0 for the next fetch
+                Config.SetSetting($"{settingName}Offset", 0);
+            }
+
+            // Update the last fetch date and time in settings
+            Config.SetSetting(settingName, DateTime.UtcNow);
+
+            Logging.Log(Logging.LogType.Information, "GiantBomb", $"Finished downloading {typeName} from GiantBomb.");
+        }
+
         private T GetJson<T>(string url)
         {
+            checkRequestLimit();
+
             int maxRetries = 5;
             int retryCount = 0;
 
@@ -316,9 +444,9 @@ namespace GiantBomb
                 client.DefaultRequestHeaders.ConnectionClose = false; // Keep the connection alive
 
                 // make the request
-                Logging.Log(Logging.LogType.Information, "GiantBomb", $"Fetching JSON from {url}");
                 url = url.StartsWith("/") ? url : "/" + url; // Ensure the URL starts with a slash
                 url = BaseUrl.TrimEnd('/') + url; // Ensure the base URL is properly formatted
+                Logging.Log(Logging.LogType.Information, "GiantBomb", $"Fetching JSON from {url}");
 
                 var response = client.GetAsync(new Uri(new Uri(BaseUrl), new Uri(url))).Result;
                 if (response.IsSuccessStatusCode)
