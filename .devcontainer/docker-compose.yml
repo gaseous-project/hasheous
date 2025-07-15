@@ -21,6 +21,7 @@ services:
       - googleclientsecret=${GOOGLECLIENTSECRET}
       - microsoftclientid=${MICROSOFTCLIENTID}
       - microsoftclientsecret=${MICROSOFTCLIENTSECRET}
+      - gbapikey=${GBAPIKEY}
   mariadb:
     hostname: mariadb
     image: mariadb:latest

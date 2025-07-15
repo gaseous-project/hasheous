@@ -15,7 +15,7 @@ namespace hasheous_server.Controllers.v1_0
 {
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]/")]
-    [ApiExplorerSettings(IgnoreApi = false)]
+    [ApiExplorerSettings(IgnoreApi = true)]
     [ApiVersion("1.0")]
     [Authorize]
     public class InsightsController : ControllerBase

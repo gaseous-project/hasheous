@@ -44,9 +44,12 @@ document.getElementById('dataObjectSave').addEventListener("click", function (e)
             source = '';
         }
 
-        if (metadataId != '' && source != '') {
-            metadata.push(newMetadataObject(source, metadataInput));
+        let matchMethod = metadataInput.getAttribute('data-matchmethod');
+        if (matchMethod == undefined) {
+            matchMethod = '';
         }
+
+        metadata.push(newMetadataObject(source, matchMethod, metadataInput));
     }
 
     // get attributes
@@ -90,17 +93,26 @@ document.getElementById('dataObjectSave').addEventListener("click", function (e)
 
     console.log(model);
 
-    ajaxCall(
+    postData(
         '/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int') + '/FullObject',
         'PUT',
-        function (success) {
-            window.location.replace("/index.html?page=dataobjectdetail&type=" + pageType + "&id=" + getQueryString('id', 'int'));
-        },
-        function (error) {
-
-        },
-        JSON.stringify(model)
-    )
+        model,
+        true
+    ).then(response => {
+        if (response.ok) {
+            return response.json();
+        } else {
+            throw new Error('Network response was not ok');
+        }
+    }).then(success => {
+        console.log(success);
+        // redirect to detail page
+        window.location.replace("/index.html?page=dataobjectdetail&type=" + pageType + "&id=" + getQueryString('id', 'int'));
+    }).catch(error => {
+        console.error('There was a problem with the fetch operation:', error);
+        // handle error
+        alert('An error occurred while saving the data object. Please try again.');
+    });
 });
 
 // cancel button
@@ -108,16 +120,23 @@ document.getElementById('dataObjectCancel').addEventListener("click", function (
     window.location.replace("/index.html?page=dataobjectdetail&type=" + pageType + "&id=" + getQueryString('id', 'int'));
 });
 
-ajaxCall(
-    '/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int'),
-    'GET',
-    function (success) {
-        console.log(success);
-        dataObject = success;
-        renderContent();
-        loadData();
+// load data object
+fetch('/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int'), {
+    method: 'GET'
+}).then(response => {
+    if (response.ok) {
+        return response.json();
+    } else {
+        throw new Error('Network response was not ok');
     }
-);
+}).then(success => {
+    console.log(success);
+    dataObject = success;
+    renderContent();
+    loadData();
+}).catch(error => {
+    console.error('There was a problem with the fetch operation:', error);
+});
 
 let renderedAttributes = [];
 function renderContent() {
@@ -180,7 +199,7 @@ function renderContent() {
     }
 }
 
-function loadData() {
+async function loadData() {
     if (dataObjectDefinition.hasSignatures == true) {
         GetSuggestedSignatures();
     }
@@ -360,6 +379,7 @@ function loadData() {
             },
             headers: {
                 "Content-Type": "application/json",
+                'X-XSRF-TOKEN': await fetchAntiforgeryToken()
             },
             params: {
                 contentType: "application/json"
@@ -427,6 +447,11 @@ function loadData() {
             metadataCell.classList.add('tablecell');
             metadataRow.appendChild(metadataCell);
 
+            let metadataValueCell = document.createElement('td');
+            metadataValueCell.classList.add('tablecell');
+            metadataValueCell.innerHTML = dataObject.metadata[i].id;
+            metadataRow.appendChild(metadataValueCell);
+
             let metadataInputCell = document.createElement('td');
             metadataInputCell.classList.add('tablecell');
 
@@ -436,6 +461,7 @@ function loadData() {
             metadataInput.id = 'metadatamap' + dataObject.metadata[i].source.toLowerCase();
             metadataInput.name = 'metadatamap';
             metadataInput.setAttribute('data-source', dataObject.metadata[i].source.toLowerCase());
+            metadataInput.setAttribute('data-matchmethod', dataObject.metadata[i].matchMethod);
             metadataInput.value = dataObject.metadata[i].id;
             metadataInputCell.appendChild(metadataInput);
 
@@ -520,7 +546,7 @@ function signatureSelectionFormatter(state) {
     return labelBox;
 }
 
-function newMetadataObject(type, inputObject) {
+function newMetadataObject(type, matchMethod, inputObject) {
     let metadataId = inputObject.value;
     if (metadataId == undefined) {
         metadataId = '';
@@ -528,7 +554,8 @@ function newMetadataObject(type, inputObject) {
 
     let metadataObj = {
         id: metadataId,
-        source: type
+        source: type,
+        matchMethod: matchMethod
     };
 
     return metadataObj;
@@ -569,117 +596,123 @@ function GetSuggestedSignatures() {
 
     if (searchName.value.length > 3) {
         // get search results
-        ajaxCall(
+        postData(
             url,
             'POST',
-            function (success) {
-                if (success.length > 0) {
-                    let signatureElement = document.getElementById('dataObjectSuggestedSignatures');
-                    signatureElement.innerHTML = '';
+            searchModel,
+            true
+        ).then(response => {
+            if (response.ok) {
+                return response.json();
+            } else {
+                throw new Error('Network response was not ok');
+            }
+        }).then(success => {
+            console.log(success);
+            if (success.length > 0) {
+                let signatureElement = document.getElementById('dataObjectSuggestedSignatures');
+                signatureElement.innerHTML = '';
 
-                    let selectedSignatures = [];
-                    let selectedSignaturesObj = $('#signaturesselect').select2('data');
-                    for (let i = 0; i < selectedSignaturesObj.length; i++) {
-                        let selectedValue = selectedSignaturesObj[i].id;
-                        selectedSignatures.push(selectedValue);
+                let selectedSignatures = [];
+                let selectedSignaturesObj = $('#signaturesselect').select2('data');
+                for (let i = 0; i < selectedSignaturesObj.length; i++) {
+                    let selectedValue = selectedSignaturesObj[i].id;
+                    selectedSignatures.push(selectedValue);
+                }
+
+                for (let i = 0; i < success.length; i++) {
+                    let resultid;
+                    switch (pageType) {
+                        case "game":
+                            resultid = success[i].id;
+                            break;
+                        default:
+                            resultid = success[i].Id;
+                            break;
                     }
 
-                    for (let i = 0; i < success.length; i++) {
-                        let resultid;
+                    if (!selectedSignatures.includes(resultid)) {
+                        let sigItem = document.createElement('span');
+                        sigItem.classList.add('signatureitem');
+                        sigItem.classList.add('selectable');
+
+                        let useSig = true;
                         switch (pageType) {
+                            case "company":
+                                sigItem.setAttribute('data-id', success[i].Id);
+                                sigItem.innerHTML = success[i].Publisher;
+                                break;
+
+                            case "platform":
+                                sigItem.setAttribute('data-id', success[i].Id);
+                                sigItem.innerHTML = success[i].Platform;
+                                break;
+
                             case "game":
-                                resultid = success[i].id;
-                                break;
-                            default:
-                                resultid = success[i].Id;
-                                break;
-                        }
-
-                        if (!selectedSignatures.includes(resultid)) {
-                            let sigItem = document.createElement('span');
-                            sigItem.classList.add('signatureitem');
-                            sigItem.classList.add('selectable');
-
-                            let useSig = true;
-                            switch (pageType) {
-                                case "company":
-                                    sigItem.setAttribute('data-id', success[i].Id);
-                                    sigItem.innerHTML = success[i].Publisher;
-                                    break;
-
-                                case "platform":
-                                    sigItem.setAttribute('data-id', success[i].Id);
-                                    sigItem.innerHTML = success[i].Platform;
-                                    break;
-
-                                case "game":
-                                    // check the selected platform, and filter accordingly
-                                    useSig = false;
-                                    if (selectedPlatform) {
-                                        if (selectedPlatform.id != "") {
-                                            if (selectedPlatform.signatureDataObjects) {
-                                                for (let s = 0; s < selectedPlatform.signatureDataObjects.length; s++) {
-                                                    if (
-                                                        selectedPlatform.signatureDataObjects[s].SignatureId == success[i].systemId
-                                                    ) {
-                                                        useSig = true;
-                                                    }
+                                // check the selected platform, and filter accordingly
+                                useSig = false;
+                                if (selectedPlatform) {
+                                    if (selectedPlatform.id != "") {
+                                        if (selectedPlatform.signatureDataObjects) {
+                                            for (let s = 0; s < selectedPlatform.signatureDataObjects.length; s++) {
+                                                if (
+                                                    selectedPlatform.signatureDataObjects[s].SignatureId == success[i].systemId
+                                                ) {
+                                                    useSig = true;
                                                 }
                                             }
                                         }
                                     }
+                                }
 
-                                    if (useSig == true) {
-                                        sigItem.setAttribute('data-id', success[i].id);
+                                if (useSig == true) {
+                                    sigItem.setAttribute('data-id', success[i].id);
 
-                                        let year = "";
-                                        if (success[i].year) {
-                                            if (success[i].year != "") {
-                                                year = " (" + success[i].year + ")";
-                                            }
+                                    let year = "";
+                                    if (success[i].year) {
+                                        if (success[i].year != "") {
+                                            year = " (" + success[i].year + ")";
                                         }
-
-                                        let system = "";
-                                        if (success[i].system) {
-                                            if (success[i].system != "") {
-                                                system = " - " + success[i].system;
-                                            }
-                                        }
-
-                                        sigItem.innerHTML = success[i].name + year + system;
                                     }
 
-                                    break;
-
-                            }
-
-                            if (useSig == true) {
-                                sigItem.addEventListener('click', function (e) {
-                                    let signatureId = this.getAttribute('data-id');
-                                    let signatureLabel = this.innerText;
-
-                                    if ($('#signaturesselect').find("option[value='" + signatureId + "']").length) {
-                                        $('#signaturesselect').val(signatureId).trigger('change');
-                                    } else {
-                                        // Create a DOM Option and pre-select by default
-                                        var newOption = new Option(signatureLabel, signatureId, true, true);
-                                        // Append it to the select
-                                        $('#signaturesselect').append(newOption).trigger('change');
+                                    let system = "";
+                                    if (success[i].system) {
+                                        if (success[i].system != "") {
+                                            system = " - " + success[i].system;
+                                        }
                                     }
 
-                                    GetSuggestedSignatures();
-                                });
+                                    sigItem.innerHTML = success[i].name + year + system;
+                                }
 
-                                signatureElement.appendChild(sigItem);
-                            }
+                                break;
+
+                        }
+
+                        if (useSig == true) {
+                            sigItem.addEventListener('click', function (e) {
+                                let signatureId = this.getAttribute('data-id');
+                                let signatureLabel = this.innerText;
+
+                                if ($('#signaturesselect').find("option[value='" + signatureId + "']").length) {
+                                    $('#signaturesselect').val(signatureId).trigger('change');
+                                } else {
+                                    // Create a DOM Option and pre-select by default
+                                    var newOption = new Option(signatureLabel, signatureId, true, true);
+                                    // Append it to the select
+                                    $('#signaturesselect').append(newOption).trigger('change');
+                                }
+
+                                GetSuggestedSignatures();
+                            });
+
+                            signatureElement.appendChild(sigItem);
                         }
                     }
                 }
-            },
-            function (error) {
-                console.log(error);
-            },
-            JSON.stringify(searchModel)
-        );
+            }
+        }).catch(error => {
+            console.error('There was a problem with the fetch operation:', error);
+        });
     }
 }

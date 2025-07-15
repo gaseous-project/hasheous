@@ -1,4 +1,4 @@
-function ajaxCall(endpoint, method, successFunction, errorFunction, body) {
+async function ajaxCall(endpoint, method, successFunction, errorFunction, body) {
     $.ajax({
 
         // Our sample url to make request
@@ -29,6 +29,31 @@ function ajaxCall(endpoint, method, successFunction, errorFunction, body) {
             }
         }
     });
+}
+
+async function postData(url, method, body, returnResult = false) {
+    const token = await fetchAntiforgeryToken();
+    const response = await fetch(url, {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json',
+            'X-XSRF-TOKEN': token // header name must match your backend config
+        },
+        credentials: 'include',
+        body: JSON.stringify(body)
+    });
+    if (returnResult) {
+        return response;
+    }
+    return response.json();
+}
+
+async function fetchAntiforgeryToken() {
+    const response = await fetch('/api/v1.0/account/antiforgery-token', {
+        credentials: 'include' // ensures cookies are sent/received
+    });
+    const data = await response.json();
+    return data.token;
 }
 
 function getQueryString(stringName, type) {

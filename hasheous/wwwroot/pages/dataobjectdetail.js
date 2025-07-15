@@ -27,30 +27,36 @@ document.getElementById('dataObjectEdit').addEventListener("click", function (e)
 });
 
 document.getElementById('dataObjectDelete').addEventListener("click", function (e) {
-    ajaxCall(
-        '/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int'),
-        'DELETE',
-        function (success) {
+    postData('/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int'), 'DELETE', {})
+        .then(function (success) {
             window.location.replace("/index.html?page=dataobjects&type=" + pageType);
-        },
-        function (error) {
+        })
+        .catch(function (error) {
+            console.warn(error);
             window.location.replace("/index.html?page=dataobjects&type=" + pageType);
-        }
-    );
+        });
 });
 
 document.getElementById('dataObjectMerge').addEventListener("click", function (e) {
     let mergeIntoId = Number($('#dataObjectMergeSelect').val());
-    ajaxCall(
-        '/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int') + '/MergeObject?TargetId=' + mergeIntoId + '&commit=true',
-        'GET',
-        function (success) {
-            location.replace('index.html?page=dataobjectdetail&type=' + pageType + '&id=' + mergeIntoId);
-        },
-        function (error) {
-            console.warn(error);
+    fetch('/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int') + '/MergeObject?TargetId=' + mergeIntoId + '&commit=true', {
+        method: 'GET'
+    }).then(async function (response) {
+        if (!response.ok) {
+            throw new Error('Failed to merge data objects');
         }
-    );
+        return response.json();
+    }).then((success) => {
+        console.log(success);
+        if (success) {
+            location.replace('index.html?page=dataobjectdetail&type=' + pageType + '&id=' + mergeIntoId);
+        } else {
+            alert('An error occurred while merging data objects. Please try again.');
+        }
+    }).catch((error) => {
+        console.warn(error);
+        alert('An error occurred while merging data objects: ' + error.message);
+    });
 });
 
 let rescanButton = document.getElementById('metadatarescan');
@@ -67,41 +73,49 @@ rescanButton.addEventListener("click", (e) => {
     });
 });
 
-ajaxCall(
-    '/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int'),
-    'GET',
-    function (success) {
-        console.log(success);
-        dataObject = success;
-
-        // hide buttons if user is not an admin
-        if (userProfile != null) {
-            if (userProfile.Roles != null) {
-                if (!userProfile.Roles.includes('Admin')) {
-                    // check if dataObject.permissions has a value
-                    if (dataObject.permissions != null) {
-                        if (dataObject.permissions.includes('Update')) {
-                            document.getElementById('dataObjectEdit').style.display = '';
-                        } else {
-                            document.getElementById('dataObjectEdit').style.display = 'none';
-                        }
-                        if (dataObject.permissions.includes('Delete')) {
-                            document.getElementById('dataObjectDelete').style.display = '';
-                        } else {
-                            document.getElementById('dataObjectDelete').style.display = 'none';
-                        }
-                    } else {
-                        document.getElementById('dataObjectAdminControls').style.display = 'none';
-                    }
-                }
-            } else {
-                document.getElementById('dataObjectAdminControls').style.display = 'none';
-            }
-        }
-
-        renderContent();
+// Fetch the data object details
+fetch('/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int'), {
+    method: 'GET'
+}).then(async function (response) {
+    if (!response.ok) {
+        throw new Error('Failed to fetch data object details');
     }
-);
+    return response.json();
+}).then(function (success) {
+    console.log(success);
+    dataObject = success;
+
+    // hide buttons if user is not an admin
+    if (userProfile != null) {
+        if (userProfile.Roles != null) {
+            if (!userProfile.Roles.includes('Admin')) {
+                // check if dataObject.permissions has a value
+                if (dataObject.permissions != null) {
+                    if (dataObject.permissions.includes('Update')) {
+                        document.getElementById('dataObjectEdit').style.display = '';
+                    } else {
+                        document.getElementById('dataObjectEdit').style.display = 'none';
+                    }
+                    if (dataObject.permissions.includes('Delete')) {
+                        document.getElementById('dataObjectDelete').style.display = '';
+                    } else {
+                        document.getElementById('dataObjectDelete').style.display = 'none';
+                    }
+                } else {
+                    document.getElementById('dataObjectAdminControls').style.display = 'none';
+                }
+            }
+        } else {
+            document.getElementById('dataObjectAdminControls').style.display = 'none';
+        }
+    }
+
+    renderContent();
+}).catch(function (error) {
+    console.warn(error);
+    document.getElementById('content').innerHTML = '<div class="alert alert-danger" role="alert">' + lang.getLang('dataobjectdetailerror') + '</div>';
+    console.error('Error fetching data object details:', error);
+});
 
 function renderContent() {
     setPageTitle(dataObject.name, true);
@@ -473,10 +487,10 @@ function renderContent() {
 
     switch (pageType) {
         case "platform":
-            // let linkedGamesSection = document.getElementById('dataObjectLinkedGames');
-            // linkedGamesSection.style.display = '';
+            let linkedGamesSection = document.getElementById('dataObjectLinkedGames');
+            linkedGamesSection.style.display = '';
 
-            // createDataObjectsTable(1, 20, 'game', dataObject.id);
+            createDataObjectsTable(1, 20, 'game', dataObject.id);
 
             break;
 
@@ -517,24 +531,24 @@ function renderContent() {
                         clientAPIKeyUrl += '&expires=' + document.getElementById('dataObjectClientAPIKeyExpires').value;
                     }
 
-                    fetch(clientAPIKeyUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        }
-                    }).then(async function (response) {
-                        if (response.ok) {
-                            let value = await response.json();
-                            console.log(response.json());
-                            document.getElementById('dataObjectClientAPIKeysResponseSection').style.display = '';
+                    postData(
+                        clientAPIKeyUrl,
+                        'POST',
+                        {},
+                        true)
+                        .then(async function (response) {
+                            if (response.ok) {
+                                let value = await response.json();
+                                console.log(response.json());
+                                document.getElementById('dataObjectClientAPIKeysResponseSection').style.display = '';
 
-                            document.getElementById('dataObjectClientAPIKeysResponse').innerHTML = lang.getLang('clientapikeyresponse', [value.key]);
+                                document.getElementById('dataObjectClientAPIKeysResponse').innerHTML = lang.getLang('clientapikeyresponse', [value.key]);
 
-                            GetApiKeys();
-                        } else {
-                            throw new Error('Failed to create client API key');
-                        }
-                    });
+                                GetApiKeys();
+                            } else {
+                                throw new Error('Failed to create client API key');
+                            }
+                        });
                 });
 
                 GetApiKeys();
@@ -640,43 +654,47 @@ function renderContent() {
 
 function GetApiKeys() {
     // get client api keys
-    ajaxCall(
-        '/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int') + '/ClientAPIKeys',
-        'GET',
-        function (success) {
-            let clientAPIKeysTable = new generateTable(
-                success,
-                ['keyId', 'name', 'created:date', 'expires:date', 'expired', 'revoked'],
-                'keyId',
-                true,
-                function (key, rows) {
-                    for (let i = 0; i < rows.length; i++) {
-                        if (rows[i].keyId == key) {
-                            let row = rows[i];
-                            if (row.revoked == false) {
-                                let revokePrompt = prompt(lang.getLang('clientapirevokeprompt'));
-                                if (revokePrompt == 'REVOKE') {
-                                    ajaxCall(
-                                        '/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int') + '/ClientAPIKeys/' + key,
-                                        'DELETE',
-                                        function (success) {
-                                            GetApiKeys();
-                                        },
-                                        function (error) {
-                                            GetApiKeys();
-                                        }
-                                    );
-                                }
+    fetch('/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int') + '/ClientAPIKeys', {
+        method: 'GET'
+    }).then(async function (response) {
+        if (!response.ok) {
+            throw new Error('Failed to fetch client API keys');
+        }
+        return response.json();
+    }).then(function (success) {
+        let clientAPIKeysTable = new generateTable(
+            success,
+            ['keyId', 'name', 'created:date', 'expires:date', 'expired', 'revoked'],
+            'keyId',
+            true,
+            function (key, rows) {
+                for (let i = 0; i < rows.length; i++) {
+                    if (rows[i].keyId == key) {
+                        let row = rows[i];
+                        if (row.revoked == false) {
+                            let revokePrompt = prompt(lang.getLang('clientapirevokeprompt'));
+                            if (revokePrompt == 'REVOKE') {
+                                postData(
+                                    '/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int') + '/ClientAPIKeys/' + key,
+                                    'DELETE',
+                                    {}
+                                ).then(function (success) {
+                                    GetApiKeys();
+                                }).catch(function (error) {
+                                    console.warn(error);
+                                    GetApiKeys();
+                                });
                             }
                         }
                     }
                 }
-            );
+            }
+        );
 
-            let clientAPIKeysTableElement = document.getElementById('dataObjectClientAPIKeys');
-            clientAPIKeysTableElement.innerHTML = '';
-            clientAPIKeysTableElement.appendChild(clientAPIKeysTable);
-        },
+        let clientAPIKeysTableElement = document.getElementById('dataObjectClientAPIKeys');
+        clientAPIKeysTableElement.innerHTML = '';
+        clientAPIKeysTableElement.appendChild(clientAPIKeysTable);
+    },
         function (error) {
             console.warn(error);
         }

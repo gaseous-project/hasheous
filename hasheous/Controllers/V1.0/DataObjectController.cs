@@ -15,7 +15,7 @@ namespace hasheous_server.Controllers.v1_0
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]/")]
     [ApiVersion("1.0")]
-    [ApiExplorerSettings(IgnoreApi = false)]
+    [ApiExplorerSettings(IgnoreApi = true)]
     [Authorize]
     public class DataObjectsController : ControllerBase
     {
@@ -579,7 +579,8 @@ namespace hasheous_server.Controllers.v1_0
                 }
                 else
                 {
-                    return Ok(DataObjects.MergeObjects(DataObject, TargetDataObject, Commit));
+                    var result = DataObjects.MergeObjects(DataObject, TargetDataObject, Commit);
+                    return Ok(result);
                 }
             }
         }

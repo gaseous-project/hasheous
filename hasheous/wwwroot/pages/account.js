@@ -14,31 +14,38 @@ for (let i = 0; i < userProfile.Roles.length; i++) {
 // setup submission api key
 let submissionApiKeyField = document.getElementById('submissionapikey');
 function GetApiKey() {
-    ajaxCall(
-        '/api/v1/Account/APIKey',
-        'GET',
-        function (success) {
-            submissionApiKeyField.value = success;
-        },
-        function (error) {
-            submissionApiKeyField.value = error.responseText;
+    fetch('/api/v1/Account/APIKey', {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json'
         }
-    );
+    }).then(response => {
+        if (response.ok) {
+            return response.text();
+        } else {
+            throw new Error('Failed to fetch API key');
+        }
+    }).then(apiKey => {
+        submissionApiKeyField.value = apiKey;
+    }).catch(error => {
+        submissionApiKeyField.value = error.message;
+    });
 }
 GetApiKey();
 
 // setup submission api key reset
 document.getElementById('submissionapikeyresetbutton').addEventListener('click', function (e) {
-    ajaxCall(
-        '/api/v1/Account/APIKey',
-        'POST',
-        function (success) {
+    postData('/api/v1/Account/APIKey', 'POST', {}, true)
+        .then(data => {
+            // Handle success
+            console.log('API Key reset successfully:', data);
             GetApiKey();
-        },
-        function (error) {
+        })
+        .catch(error => {
+            // Handle error
+            console.error('Error resetting API Key:', error);
             GetApiKey();
-        }
-    );
+        });
 });
 
 // setup password change
@@ -115,17 +122,13 @@ resetPasswordButton.addEventListener("click", function (e) {
         "ConfirmPassword": newPasswordConfirmField.value
     };
 
-    ajaxCall(
-        '/api/v1/Account/ChangePassword',
-        'POST',
-        function (result) {
+    postData('/api/v1/Account/ChangePassword', 'POST', ajaxData, true)
+        .then(result => {
             resetPasswordCallback(result, '/?page=changepasswordconfirmed');
-        },
-        function (error) {
+        })
+        .catch(error => {
             resetPasswordCallback(error, '/?page=changepasswordconfirmed');
-        },
-        JSON.stringify(ajaxData)
-    );
+        });
 });
 
 function resetPasswordCallback(result, redirectPath) {
@@ -152,6 +155,80 @@ function resetPasswordCallback(result, redirectPath) {
     }
 }
 
+// setup linked account buttons
+fetch('/api/v1/Account/social-login', {
+    method: 'GET',
+    headers: {
+        'Content-Type': 'application/json'
+    }
+})
+    .then(response => response.json())
+    .then(async data => {
+        if (data.length > 0) {
+            document.getElementById('linkedaccounts').style.display = 'block';
+
+            let linkedAccounts = await fetch('/api/v1/Account/linked-logins', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            linkedAccounts = await linkedAccounts.json();
+
+            let linkedAccountsList = document.getElementById('linkedaccountslist');
+            linkedAccountsList.innerHTML = ''; // clear existing entries
+            data.forEach(account => {
+                let accountRow = document.createElement('tr');
+
+                let accountCellIcon = document.createElement('td');
+                accountCellIcon.style.width = '30px';
+                let accountIcon = document.createElement('img');
+                switch (account) {
+                    case "Google":
+                        accountIcon.src = '/images/google-signin-logo.svg';
+                        break;
+                    case "Microsoft":
+                        accountIcon.src = '/images/ms-signin-logo.svg';
+                        break;
+                    default:
+                        accountIcon.src = '/images/social-signin-logo.svg';
+                        break;
+                }
+                accountIcon.alt = account;
+                accountIcon.style.width = '24px';
+                accountIcon.style.height = '24px';
+                accountCellIcon.appendChild(accountIcon);
+                accountRow.appendChild(accountCellIcon);
+
+                let accountCellName = document.createElement('td');
+                accountCellName.innerHTML = lang.getLang(account.toLowerCase());
+                accountRow.appendChild(accountCellName);
+
+                let accountCellButton = document.createElement('td');
+                let accountButton = document.createElement('button');
+                accountButton.setAttribute('type', 'button');
+                let linkedAccount = linkedAccounts.find(a => a.loginProvider === account);
+                if (linkedAccount) {
+                    accountButton.innerHTML = lang.getLang('unlink');
+                    accountButton.classList.add('redbutton');
+                    accountButton.addEventListener('click', () => {
+                        window.location.href = `/api/v1/Account/unlink-login/${account}?returnUrl=/index.html?page=account`;
+                    });
+                } else {
+                    accountButton.innerHTML = lang.getLang('link');
+                    accountButton.addEventListener('click', () => {
+                        startExternalLogin(account);
+                        // window.location.href = `/api/v1/Account/link-login/${account}?returnUrl=/index.html?page=account`;
+                    });
+                }
+                accountCellButton.appendChild(accountButton);
+                accountRow.appendChild(accountCellButton);
+
+                linkedAccountsList.appendChild(accountRow);
+            });
+        }
+    });
+
 // setup delete account confirmation checkbox
 let deleteAccountButton = document.getElementById('deleteaccount');
 document.getElementById('deleteaccountconfirm').addEventListener("change", function (e) {
@@ -164,14 +241,16 @@ document.getElementById('deleteaccountconfirm').addEventListener("change", funct
 
 // setup delete button
 deleteAccountButton.addEventListener("click", function (e) {
-    ajaxCall(
-        '/api/v1/Account/Delete',
-        'POST',
-        function (success) {
+    postData('/api/v1/Account/Delete', 'POST', {}, true)
+        .then(success => {
             resetPasswordCallback(success, '/');
-        },
-        function (error) {
+        })
+        .catch(error => {
             resetPasswordCallback(error, '/');
-        }
-    );
-})
+        });
+});
+
+async function startExternalLogin(provider) {
+    // Replace with your API base URL and version as needed
+    window.location.href = `/api/v1.0/Account/link-login/${provider}`;
+}

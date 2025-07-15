@@ -1075,41 +1075,50 @@ namespace hasheous_server.Classes
                                     // IGDB metadata id is not a long, so we need to search for it
                                     if (objectType == DataObjectType.Game)
                                     {
-                                        IGDB.Models.Game? newMetadataGame = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Game>(newMetadataItem.Id);
-                                        if (newMetadataGame != null)
+                                        if (!string.IsNullOrEmpty(newMetadataItem.Id))
                                         {
-                                            newMetadataId = newMetadataGame.Id.ToString();
-                                        }
-                                        else
-                                        {
-                                            // if we can't find the game, skip it
-                                            continue;
+                                            IGDB.Models.Game? newMetadataGame = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Game>(newMetadataItem.Id);
+                                            if (newMetadataGame != null)
+                                            {
+                                                newMetadataId = newMetadataGame.Id.ToString();
+                                            }
+                                            else
+                                            {
+                                                // if we can't find the game, skip it
+                                                continue;
+                                            }
                                         }
                                     }
                                     else if (objectType == DataObjectType.Platform)
                                     {
-                                        IGDB.Models.Platform? newMetadataPlatform = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Platform>(newMetadataItem.Id);
-                                        if (newMetadataPlatform != null)
+                                        if (!string.IsNullOrEmpty(newMetadataItem.Id))
                                         {
-                                            newMetadataId = newMetadataPlatform.Id.ToString();
-                                        }
-                                        else
-                                        {
-                                            // if we can't find the platform, skip it
-                                            continue;
+                                            IGDB.Models.Platform? newMetadataPlatform = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Platform>(newMetadataItem.Id);
+                                            if (newMetadataPlatform != null)
+                                            {
+                                                newMetadataId = newMetadataPlatform.Id.ToString();
+                                            }
+                                            else
+                                            {
+                                                // if we can't find the platform, skip it
+                                                continue;
+                                            }
                                         }
                                     }
                                     else if (objectType == DataObjectType.Company)
                                     {
-                                        IGDB.Models.Company? newMetadataCompany = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Company>(newMetadataItem.Id);
-                                        if (newMetadataCompany != null)
+                                        if (!string.IsNullOrEmpty(newMetadataItem.Id))
                                         {
-                                            newMetadataId = newMetadataCompany.Id.ToString();
-                                        }
-                                        else
-                                        {
-                                            // if we can't find the company, skip it
-                                            continue;
+                                            IGDB.Models.Company? newMetadataCompany = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Company>(newMetadataItem.Id);
+                                            if (newMetadataCompany != null)
+                                            {
+                                                newMetadataId = newMetadataCompany.Id.ToString();
+                                            }
+                                            else
+                                            {
+                                                // if we can't find the company, skip it
+                                                continue;
+                                            }
                                         }
                                     }
                                 }
@@ -1167,9 +1176,14 @@ namespace hasheous_server.Classes
             db.ExecuteNonQuery(sql, new Dictionary<string, object>{
                 { "id", id }
             });
+            List<long> signatureIds = new List<long>();
             foreach (Dictionary<string, object>? signature in model.SignatureDataObjects)
             {
-                AddSignature(id, objectType, long.Parse(signature["SignatureId"].ToString()));
+                if (!signatureIds.Contains(long.Parse(signature["SignatureId"].ToString())))
+                {
+                    AddSignature(id, objectType, long.Parse(signature["SignatureId"].ToString()));
+                    signatureIds.Add(long.Parse(signature["SignatureId"].ToString()));
+                }
             }
 
             // access control
@@ -1178,7 +1192,7 @@ namespace hasheous_server.Classes
                 // update access control
                 sql = "DELETE FROM DataObject_ACL WHERE DataObject_ID=@id";
                 db.ExecuteNonQuery(sql, new Dictionary<string, object>{
-                    { "id", id }
+                    { "id", id}
                 });
 
                 foreach (KeyValuePair<string, List<DataObjectPermission.PermissionType>> acl in model.UserPermissions)
