@@ -13,12 +13,12 @@ namespace GiantBomb.Models
         public string? deck { get; set; }
         public string? description { get; set; }
         public Game game { get; set; }
-        public string? release { get; set; }
-        public string? dlc { get; set; }
+        public Release? release { get; set; }
+        public Dlc? dlc { get; set; }
         public string? guid { get; set; }
         public long id { get; set; }
         public string? reviewer { get; set; }
-        public int? score { get; set; }
+        public float? score { get; set; }
         public string? site_detail_url { get; set; }
     }
 }

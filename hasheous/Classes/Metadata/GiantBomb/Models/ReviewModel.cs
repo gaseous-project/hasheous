@@ -18,7 +18,7 @@ namespace GiantBomb.Models
         public DateTime? publish_date { get; set; }
         public Release? release { get; set; }
         public string? reviewer { get; set; }
-        public int? score { get; set; }
+        public float? score { get; set; }
         public string? site_detail_url { get; set; }
     }
 }

@@ -585,6 +585,10 @@ namespace Classes
 						case "Double":
 							columnType = "DOUBLE";
 							break;
+						case "Float":
+						case "Single":
+							columnType = "FLOAT";
+							break;
 						case "IdentityOrValue`1":
 							columnType = "BIGINT";
 							break;

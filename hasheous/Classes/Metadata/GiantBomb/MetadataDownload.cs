@@ -61,8 +61,6 @@ namespace GiantBomb
 
             // setup database if it doesn't exist
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            db.BuildTableFromType(dbName, "", typeof(GiantBomb.Models.Platform));
-            db.BuildTableFromType(dbName, "", typeof(GiantBomb.Models.Company));
 
             // add indexes to the Platform table
             // Add an index to the Name column
@@ -197,13 +195,6 @@ namespace GiantBomb
 
             // setup database if it doesn't exist
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            db.BuildTableFromType(dbName, "", typeof(GiantBomb.Models.Game));
-            db.BuildTableFromType(dbName, "", typeof(GiantBomb.Models.Rating));
-            db.BuildTableFromType(dbName, "", typeof(GiantBomb.Models.Image));
-            db.BuildTableFromType(dbName, "", typeof(GiantBomb.Models.ImageTag));
-            db.BuildTableFromType(dbName, "", typeof(GiantBomb.Models.Release));
-            db.BuildTableFromType(dbName, "", typeof(GiantBomb.Models.Review));
-            db.BuildTableFromType(dbName, "", typeof(GiantBomb.Models.UserReview));
 
             // add indexes to the Game table
             // Add an index to the Name column
@@ -329,7 +320,6 @@ namespace GiantBomb
 
             // setup database if it doesn't exist
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            db.BuildTableFromType(dbName, "", typeof(TObject));
 
             Logging.Log(Logging.LogType.Information, "GiantBomb", $"Downloading {typeName} from GiantBomb.");
 

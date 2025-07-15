@@ -211,9 +211,21 @@ namespace Classes
 
                                 case QueueItemType.FetchGiantBombMetadata:
                                     GiantBomb.MetadataDownload gbDownloader = new GiantBomb.MetadataDownload();
+
+                                    Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+                                    db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Game));
+                                    db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Rating));
+                                    db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Image));
+                                    db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.ImageTag));
+                                    db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Release));
+                                    db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Review));
+                                    db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.UserReview));
+                                    db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Dlc));
+
                                     gbDownloader.DownloadPlatforms();
                                     gbDownloader.DownloadGames();
                                     // gbDownloader.DownloadSubTypes<GiantBomb.Models.GiantBombReviewResponse, GiantBomb.Models.Review>("reviews");
+                                    gbDownloader.DownloadSubTypes<GiantBomb.Models.GiantBombUserReviewResponse, GiantBomb.Models.UserReview>("user_reviews");
                                     break;
 
                                 case QueueItemType.AutoMapper:
