@@ -395,6 +395,17 @@ class generateTable {
             patternName = patternParts[0];
         }
 
+        // Normalize object keys to lowercase to ensure case-insensitive property access
+        if (value && typeof value === 'object') {
+            let newValue = {};
+            Object.keys(value).forEach(key => {
+                newValue[key.toLowerCase()] = value[key];
+            });
+            value = newValue;
+        }
+
+        patternName = patternName.toLowerCase();
+
         if (value[patternName]) {
             if (Array.isArray(value[patternName])) {
                 let returnValue = '';
