@@ -485,10 +485,20 @@ namespace hasheous_server.Controllers.v1_0
                     if (identityResult.Succeeded)
                     {
                         await _userManager.AddLoginAsync(user, info);
-                        var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-                        var callbackUrl = Url.Action("ConfirmEmail", "Account", new { userId = user.Id, code = code }, protocol: HttpContext.Request.Scheme);
-                        await _emailSender.SendEmailAsync(user.Email, "Confirm your account",
-                           "Please confirm your account by clicking this link: <a href=\"" + callbackUrl + "\">link</a>");
+                        // var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+                        // var callbackUrl = Url.Action("ConfirmEmail", "Account", new { userId = user.Id, code = code }, protocol: HttpContext.Request.Scheme);
+                        // await _emailSender.SendEmailAsync(user.Email, "Confirm your account",
+                        //    "Please confirm your account by clicking this link: <a href=\"" + callbackUrl + "\">link</a>");
+
+                        // mark email address as confirmed
+                        user.EmailConfirmed = true;
+                        var updateResult = await _userManager.UpdateAsync(user);
+                        if (!updateResult.Succeeded)
+                        {
+                            return Unauthorized(updateResult.Errors);
+                        }
+
+                        // add all users to the member role
                         await _userManager.AddToRoleAsync(user, "Member");
                         await _signInManager.SignInAsync(user, isPersistent: true);
                         return LocalRedirect(returnUrl);
@@ -545,11 +555,23 @@ namespace hasheous_server.Controllers.v1_0
                     if (identityResult.Succeeded)
                     {
                         await _userManager.AddLoginAsync(user, info);
+
+                        // add all users to the member role
                         await _userManager.AddToRoleAsync(user, "Member");
-                        var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-                        var callbackUrl = Url.Action("ConfirmEmail", "Account", new { userId = user.Id, code = code }, protocol: HttpContext.Request.Scheme);
-                        await _emailSender.SendEmailAsync(user.Email, "Confirm your account",
-                           "Please confirm your account by clicking this link: <a href=\"" + callbackUrl + "\">link</a>");
+
+                        // var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+                        // var callbackUrl = Url.Action("ConfirmEmail", "Account", new { userId = user.Id, code = code }, protocol: HttpContext.Request.Scheme);
+                        // await _emailSender.SendEmailAsync(user.Email, "Confirm your account",
+                        //    "Please confirm your account by clicking this link: <a href=\"" + callbackUrl + "\">link</a>");
+
+                        // mark email address as confirmed
+                        user.EmailConfirmed = true;
+                        var updateResult = await _userManager.UpdateAsync(user);
+                        if (!updateResult.Succeeded)
+                        {
+                            return Unauthorized(updateResult.Errors);
+                        }
+
                         await _signInManager.SignInAsync(user, isPersistent: true);
                         return LocalRedirect(returnUrl);
                     }
