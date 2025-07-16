@@ -19,6 +19,7 @@ using HasheousClient.Models.Metadata.IGDB;
 using System.Diagnostics;
 using StackExchange.Redis;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.HttpOverrides;
 
 Logging.WriteToDiskOnly = true;
 Logging.Log(Logging.LogType.Information, "Startup", "Starting Hasheous Server " + Assembly.GetExecutingAssembly().GetName().Version);
@@ -163,8 +164,10 @@ builder.Services.Configure<FormOptions>(options =>
 });
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
+    options.RequireHeaderSymmetry = false;
     options.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto;
     options.KnownProxies.Clear();
+    options.KnownNetworks.Clear();
 });
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -329,6 +332,12 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     Config.RequireClientAPIKey = false;
+    app.UseHttpsRedirection();
+    app.UseDeveloperExceptionPage();
+}
+else
+{
+    app.UseHsts();
 }
 
 app.UseSwagger();
@@ -338,7 +347,6 @@ app.UseSwaggerUI(options =>
     }
 );
 
-app.UseHttpsRedirection();
 app.UseResponseCaching();
 app.UseForwardedHeaders();
 
