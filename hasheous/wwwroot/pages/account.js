@@ -252,5 +252,5 @@ deleteAccountButton.addEventListener("click", function (e) {
 
 async function startExternalLogin(provider) {
     // Replace with your API base URL and version as needed
-    window.location.href = `/api/v1.0/Account/link-login/${provider}`;
+    window.location.href = `/api/v1.0/Account/link-login/${encodeURIComponent(provider)}?returnUrl=${encodeURIComponent('/index.html?page=account')}`;
 }
