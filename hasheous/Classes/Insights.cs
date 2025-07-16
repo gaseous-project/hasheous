@@ -108,11 +108,12 @@ namespace Classes.Insights
             // check if the query is cached
             if (Config.RedisConfiguration.Enabled)
             {
-                string? cachedData = hasheous.Classes.RedisConnection.GetDatabase(0).StringGet(cacheKey);
+                string? cachedData = RedisConnection.GetDatabase(0).StringGet(cacheKey);
                 if (cachedData != null)
                 {
                     // if cached data is found, deserialize it and return
-                    return Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(cachedData);
+                    var deserializedData = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(cachedData);
+                    return deserializedData ?? new Dictionary<string, object>();
                 }
             }
 
