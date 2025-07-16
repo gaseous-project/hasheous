@@ -203,6 +203,7 @@ class dataObjectAttributes {
         // $('body').on('DOMContentLoaded', 'select', function () {
         $(dropdown).select2({
             minimumInputLength: 3,
+            width: '95%',
             ajax: {
                 allowClear: true,
                 placeholder: {

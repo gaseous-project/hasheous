@@ -25,6 +25,9 @@ function LoadStatusPage() {
                 statusTable.appendChild(headRow);
 
                 const tableGroups = {
+                    "signatures": [
+                        "SignatureIngestor"
+                    ],
                     "metadataproxy": [
                         "FetchIGDBMetadata",
                         "FetchTheGamesDbMetadata",

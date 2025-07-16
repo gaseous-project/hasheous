@@ -11,13 +11,14 @@ namespace hasheous_server.Controllers.v1_0
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]")]
     [ApiVersion("1.0")]
-    [Authorize(Roles = "Admin")]
+    [Authorize]
     [ApiExplorerSettings(IgnoreApi = true)]
     public class BackgroundTasksController : Controller
     {
         [HttpGet]
         [MapToApiVersion("1.0")]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [AllowAnonymous]
         public List<ProcessQueue.QueueItem> GetQueue()
         {
             return ProcessQueue.QueueItems;
@@ -26,6 +27,7 @@ namespace hasheous_server.Controllers.v1_0
         [HttpGet]
         [MapToApiVersion("1.0")]
         [Route("{TaskType}")]
+        [Authorize(Roles = "Admin")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public ActionResult<ProcessQueue.QueueItem> ForceRun(ProcessQueue.QueueItemType TaskType, Boolean ForceRun)
