@@ -2402,7 +2402,8 @@ namespace hasheous_server.Classes
                 }
             }
 
-            // update all dataobject references to the source object to point to the target object
+            // Update all attribute relations that reference the source object to point to the target object.
+            // This ensures that any dependencies on the source object are redirected to the target object during the merge operation.
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "UPDATE DataObject_Attributes SET AttributeRelation=@targetid WHERE AttributeRelation=@sourceid AND AttributeRelationType=@typeid;";
             db.ExecuteNonQuery(sql, new Dictionary<string, object>{
