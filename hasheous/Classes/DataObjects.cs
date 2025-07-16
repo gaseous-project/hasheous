@@ -2402,6 +2402,15 @@ namespace hasheous_server.Classes
                 }
             }
 
+            // update all dataobject references to the source object to point to the target object
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql = "UPDATE DataObject_Attributes SET AttributeRelation=@targetid WHERE AttributeRelation=@sourceid AND AttributeRelationType=@typeid;";
+            db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                { "targetid", targetObject.Id },
+                { "sourceid", sourceObject.Id },
+                { "typeid", sourceObject.ObjectType }
+            }, 180);
+
             // apply changes if commit = true
             if (commit == true)
             {
