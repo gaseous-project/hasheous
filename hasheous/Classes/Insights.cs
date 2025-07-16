@@ -146,7 +146,8 @@ namespace Classes.Insights
                 WHERE
                     event_datetime >= NOW() - INTERVAL 30 DAY
                         AND client_id = @appId
-                GROUP BY country;";
+                GROUP BY country
+                ORDER BY unique_visitors DESC;";
             DataTable uniqueVisitorsPerCountryTable = await db.ExecuteCMDAsync(sql, dbDict);
             List<Dictionary<string, object>> uniqueVisitorsPerCountry = new List<Dictionary<string, object>>();
             foreach (DataRow row in uniqueVisitorsPerCountryTable.Rows)
@@ -222,30 +223,6 @@ namespace Classes.Insights
                 });
             }
             report["unique_visitors_per_api_key"] = uniqueVisitorsPerApiKey;
-
-            // // get events per minute for the last day
-            // sql = @"
-            //     SELECT 
-            //         DATE_FORMAT(event_datetime, '%Y-%m-%d %H:%i') AS time,
-            //         COUNT(*) AS events
-            //     FROM
-            //         Insights_API_Requests
-            //     WHERE
-            //         event_datetime >= NOW() - INTERVAL 1 DAY
-            //             AND client_id = @appId
-            //     GROUP BY time
-            //     ORDER BY time DESC;";
-            // DataTable eventsPerMinuteTable = await db.ExecuteCMDAsync(sql, dbDict);
-            // List<Dictionary<string, object>> eventsPerMinute = new List<Dictionary<string, object>>();
-            // foreach (DataRow row in eventsPerMinuteTable.Rows)
-            // {
-            //     eventsPerMinute.Add(new Dictionary<string, object>
-            //     {
-            //         { "time", row["time"] },
-            //         { "events", row["events"] }
-            //     });
-            // }
-            // report["events_per_minute"] = eventsPerMinute;
 
             return report;
         }
