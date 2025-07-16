@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS Insights_API_Requests (
     country VARCHAR(4),
     client_id BIGINT UNSIGNED,
     client_apikey_id BIGINT UNSIGNED,
-    PRIMARY KEY (event_datetime),
+    INDEX idx_event_datetime (event_datetime),
     INDEX idx_insight_type (insightType),
     INDEX idx_endpoint_address (endpoint_address),
     INDEX idx_remote_ip (remote_ip),

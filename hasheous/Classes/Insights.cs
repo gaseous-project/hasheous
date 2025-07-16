@@ -10,6 +10,7 @@ using hasheous_server.Models;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.Identity;
 using static Classes.Insights.Insights;
+using hasheous.Classes;
 
 namespace Classes.Insights
 {
@@ -103,6 +104,19 @@ namespace Classes.Insights
         /// </remarks>
         public async static Task<Dictionary<string, object>> GenerateInsightReport(long appId)
         {
+            string cacheKey = RedisConnection.GenerateKey("InsightsReport", appId);
+            // check if the query is cached
+            if (Config.RedisConfiguration.Enabled)
+            {
+                string? cachedData = RedisConnection.GetDatabase(0).StringGet(cacheKey);
+                if (cachedData != null)
+                {
+                    // if cached data is found, deserialize it and return
+                    var deserializedData = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(cachedData);
+                    return deserializedData ?? new Dictionary<string, object>();
+                }
+            }
+
             Dictionary<string, object> report = new Dictionary<string, object>();
 
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
@@ -112,6 +126,12 @@ namespace Classes.Insights
                 { "@appId", appId }
             };
 
+            string appWhereClause = "";
+            if (appId > 0)
+            {
+                appWhereClause = " AND client_id = @appId";
+            }
+
             // get unique visitors for the last 30 days
             sql = @"
                 SELECT 
@@ -120,7 +140,7 @@ namespace Classes.Insights
                     Insights_API_Requests
                 WHERE
                     event_datetime >= NOW() - INTERVAL 30 DAY
-                        AND client_id = @appId;";
+                        " + appWhereClause + ";";
             DataTable uniqueVisitorsTable = await db.ExecuteCMDAsync(sql, dbDict);
             if (uniqueVisitorsTable.Rows.Count > 0)
             {
@@ -145,8 +165,9 @@ namespace Classes.Insights
                     Country ON Insights_API_Requests.country = Country.Code
                 WHERE
                     event_datetime >= NOW() - INTERVAL 30 DAY
-                        AND client_id = @appId
-                GROUP BY country;";
+                        " + appWhereClause + @"
+                GROUP BY country
+                ORDER BY unique_visitors DESC;";
             DataTable uniqueVisitorsPerCountryTable = await db.ExecuteCMDAsync(sql, dbDict);
             List<Dictionary<string, object>> uniqueVisitorsPerCountry = new List<Dictionary<string, object>>();
             foreach (DataRow row in uniqueVisitorsPerCountryTable.Rows)
@@ -167,7 +188,7 @@ namespace Classes.Insights
                     Insights_API_Requests
                 WHERE
                     event_datetime >= NOW() - INTERVAL 30 DAY
-                        AND client_id = @appId;";
+                        " + appWhereClause + @";";
             DataTable totalRequestsTable = await db.ExecuteCMDAsync(sql, dbDict);
             if (totalRequestsTable.Rows.Count > 0)
             {
@@ -186,7 +207,7 @@ namespace Classes.Insights
                     Insights_API_Requests
                 WHERE
                     event_datetime >= NOW() - INTERVAL 30 DAY
-                        AND client_id = @appId;";
+                        " + appWhereClause + @";";
             DataTable averageResponseTimeTable = await db.ExecuteCMDAsync(sql, dbDict);
             if (averageResponseTimeTable.Rows.Count > 0)
             {
@@ -208,7 +229,7 @@ namespace Classes.Insights
                     ClientAPIKeys ON Insights_API_Requests.client_apikey_id = ClientAPIKeys.ClientIdIndex AND ClientAPIKeys.DataObjectId = @appId
                 WHERE
                     event_datetime >= NOW() - INTERVAL 30 DAY
-                        AND client_id = @appId
+                        " + appWhereClause + @"
                 GROUP BY ClientAPIKeys.Name
                 ORDER BY ClientAPIKeys.Name;";
             DataTable uniqueVisitorsPerApiKeyTable = await db.ExecuteCMDAsync(sql, dbDict);
@@ -223,29 +244,11 @@ namespace Classes.Insights
             }
             report["unique_visitors_per_api_key"] = uniqueVisitorsPerApiKey;
 
-            // // get events per minute for the last day
-            // sql = @"
-            //     SELECT 
-            //         DATE_FORMAT(event_datetime, '%Y-%m-%d %H:%i') AS time,
-            //         COUNT(*) AS events
-            //     FROM
-            //         Insights_API_Requests
-            //     WHERE
-            //         event_datetime >= NOW() - INTERVAL 1 DAY
-            //             AND client_id = @appId
-            //     GROUP BY time
-            //     ORDER BY time DESC;";
-            // DataTable eventsPerMinuteTable = await db.ExecuteCMDAsync(sql, dbDict);
-            // List<Dictionary<string, object>> eventsPerMinute = new List<Dictionary<string, object>>();
-            // foreach (DataRow row in eventsPerMinuteTable.Rows)
-            // {
-            //     eventsPerMinute.Add(new Dictionary<string, object>
-            //     {
-            //         { "time", row["time"] },
-            //         { "events", row["events"] }
-            //     });
-            // }
-            // report["events_per_minute"] = eventsPerMinute;
+            // cache the result
+            if (Config.RedisConfiguration.Enabled)
+            {
+                hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(cacheKey, Newtonsoft.Json.JsonConvert.SerializeObject(report), TimeSpan.FromMinutes(30));
+            }
 
             return report;
         }
