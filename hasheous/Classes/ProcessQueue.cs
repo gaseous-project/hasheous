@@ -2,6 +2,7 @@
 using System.Data.Common;
 using System.Threading.Tasks;
 using Classes;
+using hasheous.Classes;
 using hasheous_server.Classes;
 using hasheous_server.Classes.Metadata;
 using hasheous_server.Models;
@@ -249,6 +250,41 @@ namespace Classes
                                     await wMaintenance.RunWeeklyMaintenance();
 
                                     break;
+
+                                case QueueItemType.CacheWarmer:
+                                    if (Config.RedisConfiguration.Enabled)
+                                    {
+                                        // warm all app reports
+                                        string cacheKey = RedisConnection.GenerateKey("InsightsReport", 0);
+
+                                        // delete existing cache entry if it exists
+                                        if (RedisConnection.GetDatabase(0).KeyExists(cacheKey))
+                                        {
+                                            RedisConnection.GetDatabase(0).KeyDelete(cacheKey);
+                                        }
+
+                                        // generate the report and cache it
+                                        _ = await Insights.Insights.GenerateInsightReport(0);
+
+                                        // warm per app reports
+                                        DataObjectsList dataObjectsList = await DataObjects.GetDataObjects(DataObjects.DataObjectType.App);
+
+                                        foreach (DataObjectItem item in dataObjectsList.Objects)
+                                        {
+                                            cacheKey = RedisConnection.GenerateKey("InsightsReport", item.Id);
+
+                                            // delete existing cache entry if it exists
+                                            if (RedisConnection.GetDatabase(0).KeyExists(cacheKey))
+                                            {
+                                                RedisConnection.GetDatabase(0).KeyDelete(cacheKey);
+                                            }
+
+                                            // generate the report and cache it
+                                            _ = await Insights.Insights.GenerateInsightReport(item.Id);
+                                        }
+                                    }
+
+                                    break;
                             }
                         }
                         catch (Exception ex)
@@ -355,6 +391,11 @@ namespace Classes
             /// Runs weekly maintenance tasks
             /// </summary>
             WeeklyMaintenance,
+
+            /// <summary>
+            /// Reserved for cache warming tasks - no actual background service is tied to this type
+            /// </summary>
+            CacheWarmer
         }
 
         public enum QueueItemState

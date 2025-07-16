@@ -36,7 +36,8 @@ function LoadStatusPage() {
                     ],
                     "maintenance": [
                         "DailyMaintenance",
-                        "WeeklyMaintenance"
+                        "WeeklyMaintenance",
+                        "CacheWarmer"
                     ],
                     "servicemanagement": [
                         "TallyVotes",
@@ -51,7 +52,7 @@ function LoadStatusPage() {
 
                     const groupBody = document.createElement('tbody');
                     const groupHeader = document.createElement('tr');
-                    groupHeader.innerHTML = `<td colspan="4"><strong>${lang.getLang('service' + group)}</strong></td>`;
+                    groupHeader.innerHTML = `<td colspan="4"><h3>${lang.getLang('service' + group)}</h3></td>`;
                     groupBody.appendChild(groupHeader);
 
                     let groupFound = false;

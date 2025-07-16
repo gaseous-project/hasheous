@@ -125,6 +125,12 @@ namespace Classes.Insights
                 { "@appId", appId }
             };
 
+            string appWhereClause = "";
+            if (appId > 0)
+            {
+                appWhereClause = " AND client_id = @appId";
+            }
+
             // get unique visitors for the last 30 days
             sql = @"
                 SELECT 
@@ -133,7 +139,7 @@ namespace Classes.Insights
                     Insights_API_Requests
                 WHERE
                     event_datetime >= NOW() - INTERVAL 30 DAY
-                        AND client_id = @appId;";
+                        " + appWhereClause + ";";
             DataTable uniqueVisitorsTable = await db.ExecuteCMDAsync(sql, dbDict);
             if (uniqueVisitorsTable.Rows.Count > 0)
             {
@@ -158,7 +164,7 @@ namespace Classes.Insights
                     Country ON Insights_API_Requests.country = Country.Code
                 WHERE
                     event_datetime >= NOW() - INTERVAL 30 DAY
-                        AND client_id = @appId
+                        " + appWhereClause + @"
                 GROUP BY country
                 ORDER BY unique_visitors DESC;";
             DataTable uniqueVisitorsPerCountryTable = await db.ExecuteCMDAsync(sql, dbDict);
@@ -181,7 +187,7 @@ namespace Classes.Insights
                     Insights_API_Requests
                 WHERE
                     event_datetime >= NOW() - INTERVAL 30 DAY
-                        AND client_id = @appId;";
+                        " + appWhereClause + @";";
             DataTable totalRequestsTable = await db.ExecuteCMDAsync(sql, dbDict);
             if (totalRequestsTable.Rows.Count > 0)
             {
@@ -200,7 +206,7 @@ namespace Classes.Insights
                     Insights_API_Requests
                 WHERE
                     event_datetime >= NOW() - INTERVAL 30 DAY
-                        AND client_id = @appId;";
+                        " + appWhereClause + @";";
             DataTable averageResponseTimeTable = await db.ExecuteCMDAsync(sql, dbDict);
             if (averageResponseTimeTable.Rows.Count > 0)
             {
@@ -222,7 +228,7 @@ namespace Classes.Insights
                     ClientAPIKeys ON Insights_API_Requests.client_apikey_id = ClientAPIKeys.ClientIdIndex AND ClientAPIKeys.DataObjectId = @appId
                 WHERE
                     event_datetime >= NOW() - INTERVAL 30 DAY
-                        AND client_id = @appId
+                        " + appWhereClause + @"
                 GROUP BY ClientAPIKeys.Name
                 ORDER BY ClientAPIKeys.Name;";
             DataTable uniqueVisitorsPerApiKeyTable = await db.ExecuteCMDAsync(sql, dbDict);
@@ -240,7 +246,7 @@ namespace Classes.Insights
             // cache the result
             if (Config.RedisConfiguration.Enabled)
             {
-                hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(cacheKey, Newtonsoft.Json.JsonConvert.SerializeObject(report), TimeSpan.FromHours(1));
+                hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(cacheKey, Newtonsoft.Json.JsonConvert.SerializeObject(report), TimeSpan.FromMinutes(30));
             }
 
             return report;

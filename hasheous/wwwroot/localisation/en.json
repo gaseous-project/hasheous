@@ -237,6 +237,7 @@
     "servicefetchvimmmetadata": "Fetch VIMM Metadata",
     "servicedailymaintenance": "Daily Maintenance",
     "serviceweeklymaintenance": "Weekly Maintenance",
+    "servicecachewarmer": "Cache Warmer",
     "servicetallyvotes": "Tally Votes",
     "servicemetadatamatchsearch": "Metadata Match Search",
     "servicegetmissingartwork": "Get Missing Artwork",
