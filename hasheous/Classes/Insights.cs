@@ -10,6 +10,7 @@ using hasheous_server.Models;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.Identity;
 using static Classes.Insights.Insights;
+using hasheous.Classes;
 
 namespace Classes.Insights
 {
@@ -103,6 +104,18 @@ namespace Classes.Insights
         /// </remarks>
         public async static Task<Dictionary<string, object>> GenerateInsightReport(long appId)
         {
+            string cacheKey = RedisConnection.GenerateKey("InsightsReport", appId);
+            // check if the query is cached
+            if (Config.RedisConfiguration.Enabled)
+            {
+                string? cachedData = hasheous.Classes.RedisConnection.GetDatabase(0).StringGet(cacheKey);
+                if (cachedData != null)
+                {
+                    // if cached data is found, deserialize it and return
+                    return Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(cachedData);
+                }
+            }
+
             Dictionary<string, object> report = new Dictionary<string, object>();
 
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
@@ -223,6 +236,12 @@ namespace Classes.Insights
                 });
             }
             report["unique_visitors_per_api_key"] = uniqueVisitorsPerApiKey;
+
+            // cache the result
+            if (Config.RedisConfiguration.Enabled)
+            {
+                hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(cacheKey, Newtonsoft.Json.JsonConvert.SerializeObject(report), TimeSpan.FromHours(1));
+            }
 
             return report;
         }
