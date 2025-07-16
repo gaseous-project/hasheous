@@ -338,6 +338,7 @@ app.UseSwaggerUI(options =>
     }
 );
 
+app.UseHttpsRedirection();
 app.UseResponseCaching();
 app.UseForwardedHeaders();
 
