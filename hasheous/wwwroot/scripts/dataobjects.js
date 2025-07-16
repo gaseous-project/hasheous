@@ -314,11 +314,11 @@ function createDataObjectsTable(pageNumber, pageSize, objectType, filterByPlatfo
                     },
                     'name',
                     {
-                        column: 'attributes[attributeName=Platform].value.Name',
+                        column: 'attributes[attributeName=Platform].value.name',
                         name: 'platform'
                     },
                     {
-                        column: 'attributes[attributeName=Publisher].value.Name',
+                        column: 'attributes[attributeName=Publisher].value.name',
                         name: 'publisher'
                     }//,
                     // {
@@ -337,7 +337,7 @@ function createDataObjectsTable(pageNumber, pageSize, objectType, filterByPlatfo
                     },
                     'name',
                     {
-                        column: 'attributes[attributeName=Manufacturer].value.Name',
+                        column: 'attributes[attributeName=Manufacturer].value.name',
                         name: 'manufacturer'
                     }//,
                     // {
