@@ -36,7 +36,14 @@ namespace Authentication
 
             public void OnAuthorization(AuthorizationFilterContext context)
             {
-                string apiKey = context.HttpContext.Request.Headers[ApiKeyHeaderName];
+                // Check if the user is authenticated
+                // Escape early if the user is already authenticated
+                if (context.HttpContext.User?.Identity?.IsAuthenticated == true)
+                {
+                    return; // Authorized
+                }
+
+                string? apiKey = context.HttpContext.Request.Headers.TryGetValue(ApiKeyHeaderName, out var headerValue) ? headerValue.FirstOrDefault() : null;
 
                 if (!_apiKeyValidator.IsValid(apiKey, ref context))
                 {

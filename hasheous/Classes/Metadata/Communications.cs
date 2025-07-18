@@ -201,7 +201,12 @@ namespace hasheous_server.Classes.Metadata
             /// <summary>
             /// Wikipedia - queries Wikipedia service for metadata
             /// </summary>
-            Wikipedia
+            Wikipedia,
+
+            /// <summary>
+            /// SteamGridDb - queries SteamGridDb service for metadata
+            /// </summary>
+            SteamGridDb
         }
 
         /// <summary>

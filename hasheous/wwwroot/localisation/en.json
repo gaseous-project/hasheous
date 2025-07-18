@@ -98,6 +98,7 @@
     "steam": "Steam",
     "epicgamestore": "Epic Games",
     "gog": "GOG.com",
+    "steamgriddb": "SteamGridDB",
     "nomatch": "Unmatched",
     "manual": "Manual",
     "automatic": "Automatic Match",
@@ -244,5 +245,6 @@
     "servicestopped": "Stopped",
     "servicerunning": "Running",
     "serviceneverstarted": "Stopped",
-    "servicedisabled": "Disabled"
+    "servicedisabled": "Disabled",
+    "servicestart": "Start"
 }

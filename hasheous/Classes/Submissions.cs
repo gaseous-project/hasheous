@@ -47,6 +47,20 @@ namespace hasheous_server.Classes
                                 }
                             }
                             break;
+
+                        case Communications.MetadataSources.TheGamesDb:
+                            break; // TheGamesDb is not implemented yet
+
+                        case Communications.MetadataSources.GiantBomb:
+                            break; // GiantBomb is not implemented yet
+
+                        case Communications.MetadataSources.RetroAchievements:
+                            break;
+
+                        default:
+                            // other sources can be added here
+                            AllowInsert = true; // default to true for other sources
+                            break;
                     }
 
                     if (AllowInsert == true)
@@ -133,69 +147,83 @@ namespace hasheous_server.Classes
                         }
 
                         // update metadata
-                        SetMetadataValue(dataObject, true, metadataSource, data.Rows[0]["MetadataPlatformId"].ToString(), data.Rows[0]["MetadataGameId"].ToString(), (uint)(long)data.Rows[0]["Votes"], (uint)totalVoteCount);
+                        await SetMetadataValue(dataObject, true, metadataSource, data.Rows[0]["MetadataPlatformId"].ToString(), data.Rows[0]["MetadataGameId"].ToString(), (uint)(long)data.Rows[0]["Votes"], (uint)totalVoteCount);
                     }
                 }
             }
         }
 
-        private void SetMetadataValue(DataObjectItem dataObject, bool Update, Communications.MetadataSources metadataSource, string MetadataPlatformId, string MetadataGameId, uint WinningVoteCount, uint TotalVoteCount)
+        private async Task SetMetadataValue(DataObjectItem dataObject, bool Update, Communications.MetadataSources metadataSource, string MetadataPlatformId, string MetadataGameId, uint WinningVoteCount, uint TotalVoteCount)
         {
             // can we update the value?
             // rules:
             // 1. do not update metadata if the value is already correct
             // 2. do not update metadata set manually, or manually by admin
-            // 3. do not update metadata set automatically unless we have a winningvotecount of at least 3 (meaning at least three people agree it's correct)
+            // 3. do not update metadata set automatically unless we have a winningvotecount of at least 3 (meaning at least three people agree it's correct) unless the metadata source match method is set to NoMatch
 
-            // Rule 3. do not update metadata set automatically unless we have a winningvotecount of at least 3 (meaning at least three people agree it's correct)
-            if (WinningVoteCount >= 3)
+            MetadataItem? metadataItem = dataObject.Metadata.FirstOrDefault(m => m.Source == metadataSource);
+            if (metadataItem == null)
             {
-                foreach (MetadataItem metadata in dataObject.Metadata)
-                {
-                    if (metadata.Source == metadataSource)
-                    {
-                        // Rule 1. do not update metadata if the value is already correct
-                        if (metadata.Id == MetadataGameId)
-                        {
-                            // no update required
-                            return;
-                        }
-
-                        // Rule 2. do not update metadata set manually, or manually by admin
-                        if (metadata.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Manual || metadata.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin)
-                        {
-                            // no update required
-                            return;
-                        }
-
-                        // if we've gotten here, then an update is allowed
-                        Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-                        string sql;
-                        if (Update == true)
-                        {
-                            // TODO: rewrite this
-                            sql = "UPDATE DataObject_MetadataMap SET MatchMethod=@matchmethod, MetadataId=@metadataId, WinningVoteCount=@winningvotecount, TotalVoteCount=@totalvotecount WHERE DataObjectId = @dataobjectid AND SourceId = @SourceId;";
-                        }
-                        else
-                        {
-                            // TODO: rewrite this
-                            sql = "INSERT INTO DataObject_MetadataMap (DataObjectId, MetadataId, SourceId, MatchMethod, WinningVoteCount, TotalVoteCount) VALUES (@dataobjectid, @metadataId, @sourceId, @matchmethod, @winningvotecount, @totalvotecount);";
-                        }
-                        db.ExecuteNonQuery(sql, new Dictionary<string, object>{
-                            { "dataobjectid", dataObject.Id },
-                            { "metadataId", MetadataGameId },
-                            { "matchmethod", BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Voted },
-                            { "sourceid", metadataSource},
-                            { "winningvotecount", WinningVoteCount },
-                            { "totalvotecount", TotalVoteCount }
-                        });
-                    }
-                }
-            }
-            else
-            {
-                // no update allowed
+                // no existing metadata item - insert a new one
+                // this satisfies rule 3 with a NoMatch match method
+                Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+                string sql = "INSERT INTO DataObject_MetadataMap (DataObjectId, MetadataId, SourceId, MatchMethod, WinningVoteCount, TotalVoteCount) VALUES (@dataobjectid, @metadataId, @sourceId, @matchmethod, @winningvotecount, @totalvotecount);";
+                db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                    { "dataobjectid", dataObject.Id },
+                    { "metadataId", MetadataGameId },
+                    { "sourceId", metadataSource },
+                    { "matchmethod", BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Voted },
+                    { "winningvotecount", WinningVoteCount },
+                    { "totalvotecount", TotalVoteCount }
+                });
                 return;
+            }
+
+            // if we've gotten here, then we have an existing metadata item
+            // check the match method - this satisfies rule 2
+            if (metadataItem.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Manual || metadataItem.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin)
+            {
+                // no update required
+                return;
+            }
+
+            // if we've gotten here, then we can update the metadata item
+            // check the winning vote count
+            // if the winning vote count is less than 3, then we do not update the metadata item
+            // unless the match method is set to NoMatch, in which case we allow the update
+            if (metadataItem.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch || WinningVoteCount >= 3)
+            {
+                // update the metadata item
+                // if Update is true, then we update the existing record
+                // if Update is false, then we insert a new record
+                // this allows us to keep track of the history of metadata matches
+                // Rule 1. do not update metadata if the value is already correct
+                if (metadataItem.Id == MetadataGameId && metadataItem.Source == metadataSource)
+                {
+                    // no update required - values are the same
+                    // this satisfies rule 1
+                    return;
+                }
+
+                // all rules satisfied, we can update the metadata item
+                Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+                string sql = "UPDATE DataObject_MetadataMap SET MetadataId = @metadataId, MatchMethod = @matchmethod, WinningVoteCount = @winningvotecount, TotalVoteCount = @totalVoteCount WHERE DataObjectId = @dataobjectid AND SourceId = @sourceId;";
+                db.ExecuteNonQuery(sql, new Dictionary<string, object>
+                {
+                    { "dataobjectid", dataObject.Id },
+                    { "metadataId", MetadataGameId },
+                    { "sourceId", metadataSource },
+                    { "matchmethod", BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Voted },
+                    { "winningvotecount", WinningVoteCount },
+                    { "totalVoteCount", TotalVoteCount }
+                });
+
+                if (metadataSource == Communications.MetadataSources.IGDB)
+                {
+                    // update the artwork
+                    BackgroundMetadataMatcher.BackgroundMetadataMatcher backgroundMetadataMatcher = new BackgroundMetadataMatcher.BackgroundMetadataMatcher();
+                    await backgroundMetadataMatcher.GetGameArtwork(dataObject.Id, true);
+                }
             }
         }
     }

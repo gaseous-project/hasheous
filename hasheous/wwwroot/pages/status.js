@@ -52,7 +52,7 @@ function LoadStatusPage() {
 
                     const groupBody = document.createElement('tbody');
                     const groupHeader = document.createElement('tr');
-                    groupHeader.innerHTML = `<td colspan="4"><h3>${lang.getLang('service' + group)}</h3></td>`;
+                    groupHeader.innerHTML = `<td colspan="5"><h3>${lang.getLang('service' + group)}</h3></td>`;
                     groupBody.appendChild(groupHeader);
 
                     let groupFound = false;
@@ -66,6 +66,17 @@ function LoadStatusPage() {
                                 <td class="tablecell">${task.lastRunTime ? new Date(task.lastRunTime).toLocaleString() : '-'}</td>
                                 <td class="tablecell">${task.nextRunTime ? new Date(task.nextRunTime).toLocaleString() : '-'}</td>
                             `;
+
+                            if (userProfile != null) {
+                                if (userProfile.Roles != null) {
+                                    if (userProfile.Roles.includes('Admin') && ['Stopped', 'NeverStarted'].includes(task.itemState)) {
+                                        row.innerHTML += `
+                                            <td class="tablecell"><button class="btn btn-primary" onclick="StartTask('${task.itemType}');">${lang.getLang('servicestart')}</button></td>
+                                        `;
+                                    }
+                                }
+                            }
+
                             groupBody.appendChild(row);
                             groupFound = true;
                         }
@@ -94,3 +105,20 @@ let statusRefresh = setInterval(() => {
 window.addEventListener('beforeunload', () => {
     clearInterval(statusRefresh);
 });
+
+function StartTask(itemType) {
+    fetch(`/api/v1.0/BackgroundTasks/${itemType}?ForceRun=true`, {
+        method: 'GET'
+    })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            LoadStatusPage(); // Reload the status page after starting the task
+            return response.json();
+        })
+        .catch(error => {
+            console.error('Error starting task:', error);
+            alert(lang.getLang('servicestarterror') + ': ' + error.message);
+        });
+}

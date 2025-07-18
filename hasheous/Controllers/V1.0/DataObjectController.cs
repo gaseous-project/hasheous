@@ -555,12 +555,47 @@ namespace hasheous_server.Controllers.v1_0
         [Route("{ObjectType}/{Id}/MergeObject/")]
         public async Task<IActionResult> MergeObjects(Classes.DataObjects.DataObjectType ObjectType, long Id, long TargetId, bool Commit = false)
         {
-            // merging isn't valid for apps
-            if (ObjectType == Classes.DataObjects.DataObjectType.App)
+            // merging is only valid for games, platforms, and companies
+            Classes.DataObjects.DataObjectType[] validTypes = [
+                Classes.DataObjects.DataObjectType.Game,
+                Classes.DataObjects.DataObjectType.Platform,
+                Classes.DataObjects.DataObjectType.Company
+            ];
+            if (!validTypes.Contains(ObjectType))
             {
                 return NotFound();
             }
 
+            // check permission
+            // admins can merge any objects
+            // moderators can only merge game and company objects
+            var user = await _userManager.GetUserAsync(User);
+
+            if (user == null)
+            {
+                return Unauthorized();
+            }
+
+            // get user roles
+            var roles = await _userManager.GetRolesAsync(user);
+            string[] validRoles = ["Admin", "Moderator"];
+            // check if the user has the required role
+            // admins can merge any objects, moderators can only merge game and company objects
+            if (!roles.Any(role => validRoles.Contains(role)))
+            {
+                return Unauthorized();
+            }
+
+            Classes.DataObjects.DataObjectType[] moderatorValidTypes = [
+                Classes.DataObjects.DataObjectType.Game,
+                Classes.DataObjects.DataObjectType.Company
+            ];
+            if (!roles.Contains("Admin") && roles.Contains("Moderator") && !moderatorValidTypes.Contains(ObjectType))
+            {
+                return Unauthorized();
+            }
+
+            // check if the target object is of the same type
             hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
             Models.DataObjectItem? DataObject = await DataObjects.GetDataObject(ObjectType, Id);
@@ -579,6 +614,12 @@ namespace hasheous_server.Controllers.v1_0
                 }
                 else
                 {
+                    // check if the target object is of the same type
+                    if (DataObject.ObjectType != TargetDataObject.ObjectType)
+                    {
+                        return BadRequest("The target object must be of the same type as the source object.");
+                    }
+
                     var result = DataObjects.MergeObjects(DataObject, TargetDataObject, Commit);
                     return Ok(result);
                 }

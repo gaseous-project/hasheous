@@ -151,7 +151,7 @@ namespace Classes
 
                                 case QueueItemType.TallyVotes:
                                     Submissions submissions = new Submissions();
-                                    submissions.TallyVotes();
+                                    await submissions.TallyVotes();
                                     break;
 
                                 case QueueItemType.MetadataMatchSearch:
