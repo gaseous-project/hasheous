@@ -39,25 +39,36 @@ namespace hasheous_server.Controllers.v1_0
 
         [MapToApiVersion("1.0")]
         [HttpGet]
-        [Authorize]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [Route("app/{Id}/Insights")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetInsights(long Id)
         {
-            var user = await _userManager.GetUserAsync(User);
-
-            DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
-
-            if (dataObjectPermission.CheckAsync(user, DataObjects.DataObjectType.App, DataObjectPermission.PermissionType.Read, Id).Result)
+            if (Id > 0)
             {
-                Dictionary<string, object> report = await Insights.GenerateInsightReport(Id);
+                // get insights for app - requires read permission
+                var user = await _userManager.GetUserAsync(User);
 
-                return Ok(report);
+                DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
+
+                if (dataObjectPermission.CheckAsync(user, DataObjects.DataObjectType.App, DataObjectPermission.PermissionType.Read, Id).Result)
+                {
+                    Dictionary<string, object> report = await Insights.GenerateInsightReport(Id);
+
+                    return Ok(report);
+                }
+                else
+                {
+                    return NotFound();
+                }
             }
             else
             {
-                return NotFound();
+                // get insights for the whole site - no permission required
+                Dictionary<string, object> report = await Insights.GenerateInsightReport(0);
+
+                return Ok(report);
             }
         }
     }

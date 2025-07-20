@@ -2,6 +2,7 @@ using System.Data;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Authentication;
 using Classes;
 using hasheous.Classes;
 using hasheous_server.Classes.Metadata;
@@ -165,6 +166,12 @@ namespace hasheous_server.Classes
                         },
                         new AttributeItem
                         {
+                            attributeName = AttributeItem.AttributeName.Public,
+                            attributeType = AttributeItem.AttributeType.Boolean,
+                            attributeRelationType = DataObjectType.None
+                        },
+                        new AttributeItem
+                        {
                             attributeName = AttributeItem.AttributeName.IssueTracker,
                             attributeType = AttributeItem.AttributeType.Link,
                             attributeRelationType = DataObjectType.None
@@ -197,7 +204,7 @@ namespace hasheous_server.Classes
                 } }
         };
 
-        public async Task<DataObjectsList> GetDataObjects(DataObjectType objectType, int pageNumber = 0, int pageSize = 0, string? search = null, bool GetChildRelations = false, bool GetMetadataMap = true, AttributeItem.AttributeName? filterAttribute = null, string? filterValue = null)
+        public async Task<DataObjectsList> GetDataObjects(DataObjectType objectType, int pageNumber = 0, int pageSize = 0, string? search = null, bool GetChildRelations = false, bool GetMetadataMap = true, AttributeItem.AttributeName? filterAttribute = null, string? filterValue = null, ApplicationUser? user = null)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql;
@@ -209,7 +216,24 @@ namespace hasheous_server.Classes
             {
                 if (search == null)
                 {
-                    sql = "SELECT * FROM DataObject WHERE ObjectType = @objecttype ORDER BY `Name`;";
+                    switch (objectType)
+                    {
+                        case DataObjectType.App:
+                            if (user != null)
+                            {
+                                sql = "SELECT * FROM DataObject LEFT JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId AND DataObject_Attributes.AttributeType = 6 LEFT JOIN DataObject_ACL ON DataObject.Id = DataObject_ACL.DataObject_ID WHERE ObjectType = @objecttype AND (DataObject_Attributes.AttributeValue = 1 OR (DataObject_ACL.UserId = @userid AND DataObject_ACL.Read = 1)) ORDER BY `Name`;";
+                                dbDict.Add("userid", user.Id);
+                            }
+                            else
+                            {
+                                sql = "SELECT * FROM DataObject LEFT JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId AND DataObject_Attributes.AttributeType = 6 LEFT JOIN DataObject_ACL ON DataObject.Id = DataObject_ACL.DataObject_ID WHERE ObjectType = @objecttype AND DataObject_Attributes.AttributeValue = 1 ORDER BY `Name`;";
+                            }
+                            break;
+
+                        default:
+                            sql = "SELECT * FROM DataObject WHERE ObjectType = @objecttype ORDER BY `Name`;";
+                            break;
+                    }
                 }
                 else
                 {
@@ -845,7 +869,7 @@ namespace hasheous_server.Classes
             return attribute;
         }
 
-        public async Task<Models.DataObjectItem> NewDataObject(DataObjectType objectType, Models.DataObjectItemModel model)
+        public async Task<Models.DataObjectItem> NewDataObject(DataObjectType objectType, Models.DataObjectItemModel model, ApplicationUser? user = null)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "INSERT INTO DataObject (`Name`, `ObjectType`, `CreatedDate`, `UpdatedDate`) VALUES (@name, @objecttype, @createddate, @updateddate); SELECT LAST_INSERT_ID();";
@@ -858,7 +882,7 @@ namespace hasheous_server.Classes
 
             DataTable data = db.ExecuteCMD(sql, dbDict);
 
-            // set up metadata searching
+            // configure the new object
             switch (objectType)
             {
                 case DataObjectType.Company:
@@ -882,6 +906,18 @@ namespace hasheous_server.Classes
                     }
 
                     DataObjectMetadataSearch(objectType, (long)(ulong)data.Rows[0][0]);
+                    break;
+
+                case DataObjectType.App:
+                    sql = "INSERT INTO DataObject_ACL (`DataObject_ID`, `UserId`, `Read`, `Write`, `Delete`) VALUES (@id, @userid, @read, @write, @delete);";
+                    dbDict = new Dictionary<string, object>{
+                            { "id", (long)(ulong)data.Rows[0][0] },
+                            { "userid", user.Id },
+                            { "read", true },
+                            { "write", true },
+                            { "delete", true }
+                        };
+                    db.ExecuteNonQuery(sql, dbDict);
                     break;
 
                 default:

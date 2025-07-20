@@ -1,5 +1,6 @@
 ALTER TABLE `MatchUserVotes`
-CHANGE `MetadataGameId` `MetadataGameId` varchar(128) NOT NULL;
+CHANGE `MetadataGameId` `MetadataGameId` varchar(128) NOT NULL,
+DROP COLUMN `MetadataPlatformId`;
 
 CREATE INDEX idx_event_client_ip ON Insights_API_Requests (
     client_id,

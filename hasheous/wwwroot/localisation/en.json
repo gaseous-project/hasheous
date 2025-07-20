@@ -213,6 +213,7 @@
     "mappedwitherrors": "Mapped with errors",
     "notmapped": "Not mapped",
     "rescanmetadata": "Rescan Metadata",
+    "submitmetadataupdate": "Submit Metadata Update",
     "wikipedia": "Wikipedia",
     "insights": "Insights",
     "insightsdescription": "Insights are generated from the data collected by Hasheous, and provide a view of the usage of the service. Data is retained for 30 days.",
@@ -246,5 +247,12 @@
     "servicerunning": "Running",
     "serviceneverstarted": "Stopped",
     "servicedisabled": "Disabled",
-    "servicestart": "Start"
+    "servicestart": "Start",
+    "public": "Public",
+    "yes": "Yes",
+    "currentvalue": "Current Value",
+    "newvalue": "New Value",
+    "locked": "Locked",
+    "fieldlocked": "This field is locked and cannot be edited.",
+    "nometadatachanges": "No metadata changes have been made."
 }

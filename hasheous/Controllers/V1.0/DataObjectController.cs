@@ -67,6 +67,8 @@ namespace hasheous_server.Controllers.v1_0
 
             hasheous_server.Models.DataObjectsList? objectsList;
 
+            var user = await _userManager.GetUserAsync(User);
+
             // check the redis cache for the data
             // build a cache key from the url including the query parameters
             string unencodedCacheKey = Request.Path + "?";
@@ -86,47 +88,58 @@ namespace hasheous_server.Controllers.v1_0
                 unencodedCacheKey = unencodedCacheKey.TrimEnd('&');
             }
             // generate a cache key for the data object
-            string cacheKey = RedisConnection.GenerateKey("DataObjectList/" + ObjectType.ToString(), unencodedCacheKey);
+            string userId = "Anonymous";
+            if (user != null)
+            {
+                userId = user.Id;
+            }
+            string cacheKey = RedisConnection.GenerateKey($"{userId}DataObjectList", ObjectType.ToString() + unencodedCacheKey);
 
             if (Config.RedisConfiguration.Enabled)
             {
-                string? cachedData = hasheous.Classes.RedisConnection.GetDatabase(0).StringGet(cacheKey);
-                if (cachedData != null)
+                if (ObjectType != Classes.DataObjects.DataObjectType.App)
                 {
-                    // if cached data is found, deserialize it and return
-                    DataObjectsList? dataObjectsList = Newtonsoft.Json.JsonConvert.DeserializeObject<DataObjectsList>(cachedData);
-
-                    if (dataObjectsList != null)
+                    string? cachedData = hasheous.Classes.RedisConnection.GetDatabase(0).StringGet(cacheKey);
+                    if (cachedData != null)
                     {
-                        return Ok(dataObjectsList);
+                        // if cached data is found, deserialize it and return
+                        DataObjectsList? dataObjectsList = Newtonsoft.Json.JsonConvert.DeserializeObject<DataObjectsList>(cachedData);
+
+                        if (dataObjectsList != null)
+                        {
+                            return Ok(dataObjectsList);
+                        }
                     }
                 }
             }
 
-            objectsList = await DataObjects.GetDataObjects(ObjectType, pageNumber, pageSize, search, getchildrelations, getMetadata, filterAttribute, filterValue);
+            objectsList = await DataObjects.GetDataObjects(ObjectType, pageNumber, pageSize, search, getchildrelations, getMetadata, filterAttribute, filterValue, user);
 
             if (objectsList != null && Config.RedisConfiguration.Enabled)
             {
-                // store the data in the cache
-                hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(cacheKey, Newtonsoft.Json.JsonConvert.SerializeObject(objectsList), TimeSpan.FromMinutes(5));
-
-                if (cacheBehind)
+                if (ObjectType != Classes.DataObjects.DataObjectType.App)
                 {
-                    // cache the previous page if it exists
-                    if (pageNumber > 1)
+                    // store the data in the cache
+                    hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(cacheKey, Newtonsoft.Json.JsonConvert.SerializeObject(objectsList), TimeSpan.FromMinutes(5));
+
+                    if (cacheBehind)
                     {
-                        // call the same method with the previous page number
-                        _ = DataObjectsList(ObjectType, search, pageNumber - 1, pageSize, getchildrelations, filterAttribute, filterValue, getMetadata, false, false);
+                        // cache the previous page if it exists
+                        if (pageNumber > 1)
+                        {
+                            // call the same method with the previous page number
+                            _ = DataObjectsList(ObjectType, search, pageNumber - 1, pageSize, getchildrelations, filterAttribute, filterValue, getMetadata, false, false);
+                        }
                     }
-                }
 
-                if (cacheAhead)
-                {
-                    // cache the next page if it exists
-                    if (pageNumber < objectsList.TotalPages)
+                    if (cacheAhead)
                     {
-                        // call the same method with the next page number
-                        _ = DataObjectsList(ObjectType, search, pageNumber + 1, pageSize, getchildrelations, filterAttribute, filterValue, getMetadata, false, false);
+                        // cache the next page if it exists
+                        if (pageNumber < objectsList.TotalPages)
+                        {
+                            // call the same method with the next page number
+                            _ = DataObjectsList(ObjectType, search, pageNumber + 1, pageSize, getchildrelations, filterAttribute, filterValue, getMetadata, false, false);
+                        }
                     }
                 }
             }
@@ -156,6 +169,24 @@ namespace hasheous_server.Controllers.v1_0
                 {
                     var user = await _userManager.GetUserAsync(User);
 
+                    if (user == null)
+                    {
+                        // no logged in user, check that the app is public
+                        DataObject.Permissions = new List<DataObjectPermission.PermissionType>
+                        {
+                            DataObjectPermission.PermissionType.Read
+                        };
+
+                        if (DataObject.Attributes.Any(a => a.attributeName == AttributeItem.AttributeName.Public && a.Value.ToString() == "1"))
+                        {
+                            return Ok(DataObject);
+                        }
+                        else
+                        {
+                            return Unauthorized();
+                        }
+                    }
+
                     DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
                     DataObject.Permissions = dataObjectPermission.GetObjectPermission(user, ObjectType, DataObject.Id);
                     if (DataObject.Permissions.Contains(DataObjectPermission.PermissionType.Update))
@@ -183,7 +214,7 @@ namespace hasheous_server.Controllers.v1_0
             {
                 hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
-                Models.DataObjectItem? DataObject = await DataObjects.NewDataObject(ObjectType, model);
+                Models.DataObjectItem? DataObject = await DataObjects.NewDataObject(ObjectType, model, user);
 
                 if (DataObject == null)
                 {

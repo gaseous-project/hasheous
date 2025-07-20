@@ -20,13 +20,35 @@ namespace hasheous_server.Classes
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
 
-            HashLookup hashLookup = new HashLookup(db, new Models.HashLookupModel
+            long? dataObjectId = null;
+            if (model.DataObjectId.HasValue)
             {
-                MD5 = model.MD5,
-                SHA1 = model.SHA1
-            });
-            await hashLookup.PerformLookup();
-            if (hashLookup != null)
+                // if DataObjectId is provided, use it
+                dataObjectId = model.DataObjectId.Value;
+            }
+            else
+            {
+                // if DataObjectId is not provided, look it up based on the hashes
+                HashLookup hashLookup = new HashLookup(db, new Models.HashLookupModel
+                {
+                    MD5 = model.MD5,
+                    SHA1 = model.SHA1,
+                    SHA256 = model.SHA256,
+                    CRC = model.CRC
+                });
+                await hashLookup.PerformLookup();
+
+                if (hashLookup != null)
+                {
+                    dataObjectId = hashLookup.Id;
+                    if (dataObjectId == null)
+                    {
+                        throw new HashLookup.HashNotFoundException("The provided hashes did not match any records in the database.");
+                    }
+                }
+            }
+
+            if (dataObjectId != null)
             {
                 // rom hash was found - store vote
                 // all votes for valid hashes are stored
@@ -37,24 +59,83 @@ namespace hasheous_server.Classes
                     switch (metadataMatch.Source)
                     {
                         case Communications.MetadataSources.IGDB:
-                            IGDB.Models.Platform platform = await hasheous_server.Classes.Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Platform>(metadataMatch.PlatformId);
                             IGDB.Models.Game game = await hasheous_server.Classes.Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Game>(metadataMatch.GameId);
-                            if (platform != null && game != null)
+                            if (game != null)
                             {
-                                if (game.Platforms.Ids.ToList<long>().Contains((long)platform.Id))
-                                {
-                                    AllowInsert = true;
-                                }
+                                AllowInsert = true;
                             }
                             break;
 
                         case Communications.MetadataSources.TheGamesDb:
-                            break; // TheGamesDb is not implemented yet
+                            TheGamesDB.SQL.QueryModel queryModel = new TheGamesDB.SQL.QueryModel
+                            {
+                                query = metadataMatch.GameId,
+                                queryField = TheGamesDB.SQL.QueryModel.QueryFieldName.id,
+                                fieldList = "*",
+                                includeList = "",
+                                page = 1,
+                                pageSize = 10
+                            };
+
+                            TheGamesDB.SQL.MetadataQuery query = new TheGamesDB.SQL.MetadataQuery();
+                            HasheousClient.Models.Metadata.TheGamesDb.GamesByGameID? games = query.GetMetadata<HasheousClient.Models.Metadata.TheGamesDb.GamesByGameID>(queryModel);
+                            if (games != null && games.data != null && games.data.count > 0)
+                            {
+                                AllowInsert = true;
+                            }
+                            break;
 
                         case Communications.MetadataSources.GiantBomb:
-                            break; // GiantBomb is not implemented yet
-
                         case Communications.MetadataSources.RetroAchievements:
+                            // only requirement is the id is a number
+                            if (int.TryParse(metadataMatch.GameId, out _))
+                            {
+                                AllowInsert = true;
+                            }
+                            break;
+
+                        case Communications.MetadataSources.EpicGameStore:
+                            // url must be in the domain store.epicgames.com
+                            string url = metadataMatch.GameId;
+                            if (Uri.TryCreate(url, UriKind.Absolute, out Uri? uri) && uri.Host.Contains("store.epicgames.com"))
+                            {
+                                AllowInsert = true;
+                            }
+                            break;
+
+                        case Communications.MetadataSources.Steam:
+                            // url must be in the domain store.steampowered.com
+                            url = metadataMatch.GameId;
+                            if (Uri.TryCreate(url, UriKind.Absolute, out uri) && uri.Host.Contains("store.steampowered.com"))
+                            {
+                                AllowInsert = true;
+                            }
+                            break;
+
+                        case Communications.MetadataSources.GOG:
+                            // url must be in the domain gog.com
+                            url = metadataMatch.GameId;
+                            if (Uri.TryCreate(url, UriKind.Absolute, out uri) && uri.Host.Contains("www.gog.com"))
+                            {
+                                AllowInsert = true;
+                            }
+                            break;
+
+                        case Communications.MetadataSources.SteamGridDb:
+                            // id must be a long number
+                            if (long.TryParse(metadataMatch.GameId, out _))
+                            {
+                                AllowInsert = true;
+                            }
+                            break;
+
+                        case Communications.MetadataSources.Wikipedia:
+                            // url must be a valid Wikipedia URL
+                            url = metadataMatch.GameId;
+                            if (Uri.TryCreate(url, UriKind.Absolute, out uri) && uri.Host.Contains("wikipedia.org"))
+                            {
+                                AllowInsert = true;
+                            }
                             break;
 
                         default:
@@ -70,33 +151,31 @@ namespace hasheous_server.Classes
                         string sql = "SELECT * FROM MatchUserVotes WHERE UserId = @userId AND DataObjectId = @dataObjectId AND MetadataSourceId = @metadataSourceId";
                         DataTable data = db.ExecuteCMD(sql, new Dictionary<string, object>{
                             { "userId", UserId },
-                            { "dataObjectId", hashLookup.Id },
+                            { "dataObjectId", dataObjectId },
                             { "metadataSourceId", metadataMatch.Source }
                         });
 
                         if (data.Rows.Count == 0)
                         {
                             // no existing vote - insert a new record
-                            sql = "INSERT INTO MatchUserVotes (DataObjectId, UserId, MetadataSourceId, MetadataPlatformId, MetadataGameId) VALUES (@dataObjectId, @userId, @metadataSourceId, @metadataPlatformId, @metadataGameId)";
+                            sql = "INSERT INTO MatchUserVotes (DataObjectId, UserId, MetadataSourceId, MetadataGameId) VALUES (@dataObjectId, @userId, @metadataSourceId, @metadataGameId)";
                             db.ExecuteNonQuery(sql, new Dictionary<string, object>{
-                                { "dataObjectId", hashLookup.Id },
+                                { "dataObjectId", dataObjectId },
                                 { "userId", UserId },
                                 { "metadataSourceId", metadataMatch.Source },
-                                { "metadataPlatformId", metadataMatch.PlatformId },
                                 { "metadataGameId", metadataMatch.GameId }
                             });
                         }
                         else
                         {
                             // update existing vote if different
-                            if (data.Rows[0]["MetadataPlatformId"].ToString() != metadataMatch.PlatformId || data.Rows[0]["MetadataGameId"].ToString() != metadataMatch.GameId)
+                            if (data.Rows[0]["MetadataGameId"].ToString() != metadataMatch.GameId)
                             {
-                                sql = "UPDATE MatchUserVotes SET MetadataPlatformId = @metadataPlatformId, MetadataGameId = @metadataGameId WHERE UserId = @userId AND DataObjectId = @dataObjectId AND MetadataSourceId = @metadataSourceId";
+                                sql = "UPDATE MatchUserVotes SET MetadataGameId = @metadataGameId WHERE UserId = @userId AND DataObjectId = @dataObjectId AND MetadataSourceId = @metadataSourceId";
                                 db.ExecuteNonQuery(sql, new Dictionary<string, object>{
-                                    { "dataObjectId", hashLookup.Id },
+                                    { "dataObjectId", dataObjectId },
                                     { "userId", UserId },
                                     { "metadataSourceId", metadataMatch.Source },
-                                    { "metadataPlatformId", metadataMatch.PlatformId },
                                     { "metadataGameId", metadataMatch.GameId }
                                 });
                             }
@@ -130,7 +209,7 @@ namespace hasheous_server.Classes
                 foreach (Communications.MetadataSources metadataSource in Enum.GetValues(typeof(Communications.MetadataSources)))
                 {
                     // calculate votes
-                    string sql = "SELECT DataObjectId, MetadataSourceId, MetadataPlatformId, MetadataGameId, COUNT(*) AS `Votes` FROM MatchUserVotes WHERE DataObjectId = @dataObjectId AND MetadataSourceId = @metadataSourceId GROUP BY MetadataSourceId, MetadataGameId, MetadataPlatformId ORDER BY DataObjectId, MetadataSourceId, `Votes` DESC;";
+                    string sql = "SELECT DataObjectId, MetadataSourceId, MetadataGameId, COUNT(*) AS `Votes` FROM MatchUserVotes WHERE DataObjectId = @dataObjectId AND MetadataSourceId = @metadataSourceId GROUP BY MetadataSourceId, MetadataGameId ORDER BY DataObjectId, MetadataSourceId, `Votes` DESC;";
                     DataTable data = db.ExecuteCMD(sql, new Dictionary<string, object>{
                         { "dataObjectId", dataObject.Id },
                         { "metadataSourceId", metadataSource }
@@ -147,13 +226,13 @@ namespace hasheous_server.Classes
                         }
 
                         // update metadata
-                        await SetMetadataValue(dataObject, true, metadataSource, data.Rows[0]["MetadataPlatformId"].ToString(), data.Rows[0]["MetadataGameId"].ToString(), (uint)(long)data.Rows[0]["Votes"], (uint)totalVoteCount);
+                        await SetMetadataValue(dataObject, true, metadataSource, data.Rows[0]["MetadataGameId"].ToString(), (uint)(long)data.Rows[0]["Votes"], (uint)totalVoteCount);
                     }
                 }
             }
         }
 
-        private async Task SetMetadataValue(DataObjectItem dataObject, bool Update, Communications.MetadataSources metadataSource, string MetadataPlatformId, string MetadataGameId, uint WinningVoteCount, uint TotalVoteCount)
+        private async Task SetMetadataValue(DataObjectItem dataObject, bool Update, Communications.MetadataSources metadataSource, string MetadataGameId, uint WinningVoteCount, uint TotalVoteCount)
         {
             // can we update the value?
             // rules:

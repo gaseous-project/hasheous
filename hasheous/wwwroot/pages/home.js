@@ -1,5 +1,5 @@
 // insights handling
-fetch('/api/v1/Insights/app/0/Insights', {
+fetch('/api/v1.0/Insights/app/0/Insights', {
     method: 'GET'
 }).then(async function (response) {
     if (response.ok) {

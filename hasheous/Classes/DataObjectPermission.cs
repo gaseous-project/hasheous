@@ -58,6 +58,12 @@ namespace hasheous_server.Classes
                         return true;
                     }
 
+                    // all users are allowed to create apps
+                    if (RequestedPermission == PermissionType.Create)
+                    {
+                        return true;
+                    }
+
                     // if an ObjectId is provided, get the users permission to modify the object
                     if (ObjectId == null)
                     {
@@ -96,6 +102,14 @@ namespace hasheous_server.Classes
                         return true;
                     }
 
+                    break;
+
+                case Classes.DataObjects.DataObjectType.Platform:
+                    // only admins are allowed to created and edit platforms
+                    if (roles.Contains("Admin"))
+                    {
+                        return true;
+                    }
                     break;
 
                 default:
