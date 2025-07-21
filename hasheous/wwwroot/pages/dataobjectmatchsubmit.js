@@ -2,7 +2,7 @@ let pageType = getQueryString('type', 'string').toLowerCase();
 let dataObject = undefined;
 
 // Fetch the data object details
-fetch('/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int'), {
+fetch('/api/v1.0/DataObjects/' + pageType + '/' + getQueryString('id', 'int'), {
     method: 'GET'
 }).then(async function (response) {
     if (!response.ok) {
@@ -112,7 +112,7 @@ function renderContent() {
 
         // Submit the data
         postData(
-            '/api/v1/Submissions/FixMatch',
+            '/api/v1.0/Submissions/FixMatch',
             'POST',
             submissionData,
             true

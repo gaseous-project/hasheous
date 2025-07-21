@@ -592,7 +592,7 @@ function renderContent() {
 
             // insights handling
             if (userProfile) {
-                fetch('/api/v1/Insights/' + pageType + '/' + getQueryString('id', 'int') + '/Insights', {
+                fetch('/api/v1.0/Insights/' + pageType + '/' + getQueryString('id', 'int') + '/Insights', {
                     method: 'GET'
                 }).then(async function (response) {
                     if (response.ok) {

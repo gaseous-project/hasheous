@@ -2,6 +2,8 @@ function LoadStatusPage() {
     const statusTable = document.getElementById('status-table');
     statusTable.innerHTML = ''; // Clear previous content
 
+    let columnCount = 5; // Default column count
+
     fetch('/api/v1.0/BackgroundTasks', {
         method: 'GET'
     })
@@ -21,6 +23,7 @@ function LoadStatusPage() {
                     <th>${lang.getLang('serviceitemstate')}</th>
                     <th>${lang.getLang('serviceitemlastruntime')}</th>
                     <th>${lang.getLang('serviceitemnextruntime')}</th>
+                    <th></th>
                 `;
                 statusTable.appendChild(headRow);
 
@@ -53,7 +56,7 @@ function LoadStatusPage() {
 
                     const groupBody = document.createElement('tbody');
                     const groupHeader = document.createElement('tr');
-                    groupHeader.innerHTML = `<td colspan="5"><h3>${lang.getLang('service' + group)}</h3></td>`;
+                    groupHeader.innerHTML = `<td colspan="${columnCount}"><h3>${lang.getLang('service' + group)}</h3></td>`;
                     groupBody.appendChild(groupHeader);
 
                     let groupFound = false;
@@ -88,12 +91,12 @@ function LoadStatusPage() {
                     }
                 });
             } else {
-                statusTable.innerHTML = '<tr><td colspan="4">No background tasks found.</td></tr>';
+                statusTable.innerHTML = `<tr><td colspan="${columnCount}">No background tasks found.</td></tr>`;
             }
         })
         .catch(error => {
             console.error('Error fetching background tasks:', error);
-            statusTable.innerHTML = '<tr><td colspan="4">Error loading status. Please try again later.</td></tr>';
+            statusTable.innerHTML = `<tr><td colspan="${columnCount}">Error loading status. Please try again later.</td></tr>`;
         });
 }
 
