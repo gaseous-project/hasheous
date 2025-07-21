@@ -17,6 +17,7 @@ namespace hasheous_server.Models
             ImageId = 3,
             ImageAttribution = 4,
             Link = 5,
+            Boolean = 6,
             ObjectRelationship = 10,
             EmbeddedList = 11
         }
@@ -41,7 +42,8 @@ namespace hasheous_server.Models
             Screenshot2 = 15,
             Screenshot3 = 16,
             Screenshot4 = 17,
-            Wikipedia = 18
+            Wikipedia = 18,
+            Public = 19
         }
 
         public long? Id { get; set; }

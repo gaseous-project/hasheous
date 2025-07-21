@@ -1,13 +1,20 @@
 const login = new loginTools();
 
+// display username
+let usernameField = document.getElementById('account_username');
+usernameField.innerHTML = userProfile.UserName;
+
 // setup roles
 let roleBadgeDiv = document.getElementById('account_roles');
 for (let i = 0; i < userProfile.Roles.length; i++) {
     let roleName = userProfile.Roles[i].toLowerCase();
-    console.log(roleName);
     let roleBadge = document.createElement('div');
     roleBadge.innerHTML = lang.getLang(roleName);
     roleBadge.classList.add('badge');
+    let roleColourHash = hashCode(roleName);
+    let roleColour = intToRGB(roleColourHash);
+    roleBadge.style.backgroundColor = `#${roleColour}`;
+    roleBadge.style.color = '#ffffff';
     roleBadgeDiv.appendChild(roleBadge);
 }
 

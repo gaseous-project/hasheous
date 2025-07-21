@@ -2,24 +2,64 @@ let pageType = getQueryString('type', 'string').toLowerCase();
 let dataObject = undefined;
 let editMode = false;
 
-if (userProfile != null) {
-    if (userProfile.Roles != null) {
-        if (userProfile.Roles.includes('Moderator') || userProfile.Roles.includes('Admin')) {
-            document.getElementById('metadatarescan').style.display = '';
-            document.getElementById('dataObjectAdminControls').style.display = '';
-            if (dataObjectDefinition.allowMerge == true) {
-                document.getElementById('dataObjectMergeButtons').style.display = '';
-            } else {
-                document.getElementById('dataObjectMergeButtons').style.display = 'none';
+// determine which buttons should be displayed based on page and user roles
+let showEditControls = false;
+let showMergeControls = false;
+let showRescanButton = false;
+let showMetadataSubmitButton = false;
+
+if (userProfile != null && userProfile.Roles != null) {
+    switch (pageType) {
+        case "company":
+        case "game":
+            if (userProfile.Roles.includes('Moderator') || userProfile.Roles.includes('Admin')) {
+                showEditControls = true;
+                showMergeControls = true;
+                showRescanButton = true;
             }
-        } else {
-            document.getElementById('dataObjectAdminControls').style.display = 'none';
-        }
-    } else {
-        document.getElementById('dataObjectAdminControls').style.display = 'none';
+
+            // show metadata submit button to all signed in users
+            showMetadataSubmitButton = true;
+            break;
+
+        case "platform":
+        case "app":
+            if (userProfile.Roles.includes('Admin')) {
+                showEditControls = true;
+                showMergeControls = true;
+                showRescanButton = true;
+            }
+            break;
     }
+}
+
+if (showEditControls) {
+    document.getElementById('dataObjectAdminControls').style.display = '';
 } else {
     document.getElementById('dataObjectAdminControls').style.display = 'none';
+}
+
+if (showMergeControls) {
+    document.getElementById('dataObjectMergeButtons').style.display = '';
+} else {
+    document.getElementById('dataObjectMergeButtons').style.display = 'none';
+}
+
+if (showRescanButton) {
+    document.getElementById('metadatarescan').style.display = '';
+} else {
+    document.getElementById('metadatarescan').style.display = 'none';
+}
+
+if (showMetadataSubmitButton) {
+    let metadataSubmitButton = document.getElementById('metadatasubmit');
+    metadataSubmitButton.style.display = '';
+    metadataSubmitButton.addEventListener("click", function (e) {
+        // navigate to the metadata submit page
+        window.location.replace("/index.html?page=dataobjectmatchsubmit&type=" + pageType + "&id=" + getQueryString('id', 'int'));
+    });
+} else {
+    document.getElementById('metadatasubmit').style.display = 'none';
 }
 
 document.getElementById('dataObjectEdit').addEventListener("click", function (e) {
@@ -84,31 +124,6 @@ fetch('/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int'), {
 }).then(function (success) {
     console.log(success);
     dataObject = success;
-
-    // hide buttons if user is not an admin
-    if (userProfile != null) {
-        if (userProfile.Roles != null) {
-            if (!userProfile.Roles.includes('Admin')) {
-                // check if dataObject.permissions has a value
-                if (dataObject.permissions != null) {
-                    if (dataObject.permissions.includes('Update')) {
-                        document.getElementById('dataObjectEdit').style.display = '';
-                    } else {
-                        document.getElementById('dataObjectEdit').style.display = 'none';
-                    }
-                    if (dataObject.permissions.includes('Delete')) {
-                        document.getElementById('dataObjectDelete').style.display = '';
-                    } else {
-                        document.getElementById('dataObjectDelete').style.display = 'none';
-                    }
-                } else {
-                    document.getElementById('dataObjectAdminControls').style.display = 'none';
-                }
-            }
-        } else {
-            document.getElementById('dataObjectAdminControls').style.display = 'none';
-        }
-    }
 
     renderContent();
 }).catch(function (error) {
@@ -381,6 +396,15 @@ function renderContent() {
                         )
                         break;
 
+                    case "Boolean":
+                        attributeValues.push(
+                            {
+                                "attribute": dataObject.attributes[i].attributeName,
+                                "value": lang.getLang(dataObject.attributes[i].value ? 'yes' : 'no')
+                            }
+                        );
+                        break;
+
                     default:
                         attributeValues.push(
                             {
@@ -476,6 +500,13 @@ function renderContent() {
             return 0;
         });
 
+        // if the user is a moderator or admin, show all metadata sources, otherwise, filter out sources with the matchMethod 'nomatch'
+        if (userProfile != null && (userProfile.Roles.includes('Moderator') || userProfile.Roles.includes('Admin'))) {
+            dataObject.metadata = dataObject.metadata.filter(m => m.source != 'NoMatch');
+        } else {
+            dataObject.metadata = dataObject.metadata.filter(m => m.matchMethod != 'NoMatch' && m.id != null && m.id != '');
+        }
+
         let newMetadataMapTable = new generateTable(
             dataObject.metadata,
             ['source:lang', 'matchMethod:lang', 'link:link', 'status:lang'],
@@ -507,11 +538,16 @@ function renderContent() {
                 for (let key in dataObject.userPermissions) {
                     if (dataObject.userPermissions[key].includes('Update')) {
                         let userName = document.createElement('span');
-                        userName.classList.add('signatureitem');
+                        userName.classList.add('badge');
                         userName.innerHTML = key;
                         userListTarget.appendChild(userName);
                     }
                 }
+            }
+
+            // show edit buttons if the user has edit permissions
+            if (dataObject.permissions.includes('Update')) {
+                document.getElementById('dataObjectAdminControls').style.display = '';
             }
 
             // client api key handling
@@ -555,98 +591,100 @@ function renderContent() {
             }
 
             // insights handling
-            fetch('/api/v1/Insights/' + pageType + '/' + getQueryString('id', 'int') + '/Insights', {
-                method: 'GET'
-            }).then(async function (response) {
-                if (response.ok) {
-                    let insights = await response.json();
+            if (userProfile) {
+                fetch('/api/v1.0/Insights/' + pageType + '/' + getQueryString('id', 'int') + '/Insights', {
+                    method: 'GET'
+                }).then(async function (response) {
+                    if (response.ok) {
+                        let insights = await response.json();
 
-                    let displayInsights = false;
-                    if (insights != null && Object.keys(insights).length > 0) {
-                        for (const [key, value] of Object.entries(insights)) {
-                            if (value == null || value == "") {
-                                continue; // skip empty insights
-                            }
+                        let displayInsights = false;
+                        if (insights != null && Object.keys(insights).length > 0) {
+                            for (const [key, value] of Object.entries(insights)) {
+                                if (value == null || value == "") {
+                                    continue; // skip empty insights
+                                }
 
-                            displayInsights = true;
+                                displayInsights = true;
 
-                            // create insight element
-                            let insightElement = document.createElement('div');
-                            insightElement.classList.add('dataObjectInsight');
+                                // create insight element
+                                let insightElement = document.createElement('div');
+                                insightElement.classList.add('dataObjectInsight');
 
-                            let insightTitle = document.createElement('span');
-                            insightTitle.classList.add('insightHeading');
-                            insightTitle.innerHTML = lang.getLang(key);
-                            insightElement.appendChild(insightTitle);
+                                let insightTitle = document.createElement('span');
+                                insightTitle.classList.add('insightHeading');
+                                insightTitle.innerHTML = lang.getLang(key);
+                                insightElement.appendChild(insightTitle);
 
-                            let insightContent = document.createElement('div');
+                                let insightContent = document.createElement('div');
 
-                            if (typeof value === 'object') {
-                                // value is a hashtable, create a table with the keys and values
-                                let insightList = document.createElement('table');
-                                insightList.classList.add('tablerowhighlight');
+                                if (typeof value === 'object') {
+                                    // value is a hashtable, create a table with the keys and values
+                                    let insightList = document.createElement('table');
+                                    insightList.classList.add('tablerowhighlight');
 
-                                for (const subKey of Object.keys(value)) {
-                                    let row = document.createElement('tr');
-                                    let keyCell = true;
-                                    for (const [subSubKey, subSubValue] of Object.entries(value[subKey])) {
+                                    for (const subKey of Object.keys(value)) {
+                                        let row = document.createElement('tr');
+                                        let keyCell = true;
+                                        for (const [subSubKey, subSubValue] of Object.entries(value[subKey])) {
+                                            let valueCell = document.createElement('td');
+                                            valueCell.classList.add('tablecell');
+                                            valueCell.style.width = '50%';
+                                            if (keyCell && subSubValue == null || subSubValue == "") {
+                                                valueCell.innerHTML = lang.getLang('unknown');
+                                            } else {
+                                                if (Number(subSubValue)) {
+                                                    valueCell.style.textAlign = 'right';
+                                                }
+                                                valueCell.innerHTML = subSubValue;
+                                            }
+                                            row.appendChild(valueCell);
+
+                                            keyCell = false;
+                                        }
+                                        insightList.appendChild(row);
+                                    }
+
+                                    insightContent.appendChild(insightList);
+                                } else {
+                                    if (value != null && value != "") {
+                                        displayInsights = true;
+
+                                        // otherwise, create a single row table with the value
+                                        let insightValue = document.createElement('table');
+
+                                        let valueRow = document.createElement('tr');
+                                        valueRow.classList.add('tablerowhighlight');
+
                                         let valueCell = document.createElement('td');
                                         valueCell.classList.add('tablecell');
-                                        valueCell.style.width = '50%';
-                                        if (keyCell && subSubValue == null || subSubValue == "") {
-                                            valueCell.innerHTML = lang.getLang('unknown');
-                                        } else {
-                                            if (Number(subSubValue)) {
-                                                valueCell.style.textAlign = 'right';
-                                            }
-                                            valueCell.innerHTML = subSubValue;
+                                        if (Number(value)) {
+                                            valueCell.style.textAlign = 'right';
                                         }
-                                        row.appendChild(valueCell);
+                                        valueCell.innerHTML = value;
+                                        valueRow.appendChild(valueCell);
+                                        insightValue.appendChild(valueRow);
 
-                                        keyCell = false;
+                                        insightContent.appendChild(insightValue);
                                     }
-                                    insightList.appendChild(row);
                                 }
 
-                                insightContent.appendChild(insightList);
-                            } else {
-                                if (value != null && value != "") {
-                                    displayInsights = true;
+                                insightElement.appendChild(insightContent);
+                                insightElement.setAttribute('data-insight', key);
 
-                                    // otherwise, create a single row table with the value
-                                    let insightValue = document.createElement('table');
+                                document.getElementById('dataObjectInsights').appendChild(insightElement);
 
-                                    let valueRow = document.createElement('tr');
-                                    valueRow.classList.add('tablerowhighlight');
-
-                                    let valueCell = document.createElement('td');
-                                    valueCell.classList.add('tablecell');
-                                    if (Number(value)) {
-                                        valueCell.style.textAlign = 'right';
-                                    }
-                                    valueCell.innerHTML = value;
-                                    valueRow.appendChild(valueCell);
-                                    insightValue.appendChild(valueRow);
-
-                                    insightContent.appendChild(insightValue);
-                                }
                             }
-
-                            insightElement.appendChild(insightContent);
-                            insightElement.setAttribute('data-insight', key);
-
-                            document.getElementById('dataObjectInsights').appendChild(insightElement);
-
                         }
-                    }
 
-                    if (displayInsights) {
-                        document.getElementById('dataObjectInsightsSection').style.display = '';
+                        if (displayInsights) {
+                            document.getElementById('dataObjectInsightsSection').style.display = '';
+                        }
+                    } else {
+                        throw new Error('Failed to fetch insights');
                     }
-                } else {
-                    throw new Error('Failed to fetch insights');
-                }
-            });
+                });
+            }
 
             break;
     }

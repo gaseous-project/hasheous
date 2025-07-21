@@ -16,7 +16,6 @@ namespace hasheous_server.Controllers.v1_0
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]/")]
     [ApiVersion("1.0")]
-    [IgnoreAntiforgeryToken]
     [Insight(Insights.InsightSourceType.HashSubmission)]
     public class SubmissionsController : ControllerBase
     {
@@ -50,12 +49,13 @@ namespace hasheous_server.Controllers.v1_0
         [HttpPost]
         [Route("FixMatch")]
         [ApiKey()]
+        [IgnoreAntiforgeryToken]
         public async Task<IActionResult> FixMatch(SubmissionsMatchFixModel model)
         {
             Submissions submissions = new Submissions();
             try
             {
-                return Ok(submissions.AddVote(_userManager.GetUserId(HttpContext.User), model));
+                return Ok(await submissions.AddVote(_userManager.GetUserId(HttpContext.User), model));
             }
             catch (HashLookup.HashNotFoundException hnfEx)
             {

@@ -220,6 +220,24 @@ namespace hasheous_server.Models
                             Template = "https://www.giantbomb.com/games/3030-{0}/"
                         }
                     }
+                },
+                {
+                    Communications.MetadataSources.SteamGridDb,
+                    new List<LinkTemplateItem>
+                    {
+                        new LinkTemplateItem
+                        {
+                            Source = Communications.MetadataSources.SteamGridDb,
+                            ObjectType = DataObjects.DataObjectType.Platform,
+                            Template = "https://www.steamgriddb.com/game/{0}"
+                        },
+                        new LinkTemplateItem
+                        {
+                            Source = Communications.MetadataSources.SteamGridDb,
+                            ObjectType = DataObjects.DataObjectType.Game,
+                            Template = "https://www.steamgriddb.com/game/{0}"
+                        }
+                    }
                 }
             };
 

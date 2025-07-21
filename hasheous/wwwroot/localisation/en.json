@@ -98,6 +98,7 @@
     "steam": "Steam",
     "epicgamestore": "Epic Games",
     "gog": "GOG.com",
+    "steamgriddb": "SteamGridDB",
     "nomatch": "Unmatched",
     "manual": "Manual",
     "automatic": "Automatic Match",
@@ -212,6 +213,7 @@
     "mappedwitherrors": "Mapped with errors",
     "notmapped": "Not mapped",
     "rescanmetadata": "Rescan Metadata",
+    "submitmetadataupdate": "Submit Metadata Update",
     "wikipedia": "Wikipedia",
     "insights": "Insights",
     "insightsdescription": "Insights are generated from the data collected by Hasheous, and provide a view of the usage of the service. Data is retained for 30 days.",
@@ -235,6 +237,7 @@
     "servicefetchthegamesdbmetadata": "Fetch TheGamesDB Metadata",
     "servicefetchgiantbombmetadata": "Fetch Giant Bomb Metadata",
     "servicefetchvimmmetadata": "Fetch VIMM Metadata",
+    "servicefetchretroachievementsmetadata": "Fetch RetroAchievements Metadata",
     "servicedailymaintenance": "Daily Maintenance",
     "serviceweeklymaintenance": "Weekly Maintenance",
     "servicecachewarmer": "Cache Warmer",
@@ -244,5 +247,13 @@
     "servicestopped": "Stopped",
     "servicerunning": "Running",
     "serviceneverstarted": "Stopped",
-    "servicedisabled": "Disabled"
+    "servicedisabled": "Disabled",
+    "servicestart": "Start",
+    "public": "Public",
+    "yes": "Yes",
+    "currentvalue": "Current Value",
+    "newvalue": "New Value",
+    "locked": "Locked",
+    "fieldlocked": "This field is locked and cannot be edited.",
+    "nometadatachanges": "No metadata changes have been made."
 }

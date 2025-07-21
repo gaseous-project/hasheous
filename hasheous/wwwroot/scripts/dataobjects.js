@@ -20,6 +20,12 @@ class dataObjectAttributes {
                 this.inputElement.classList.add('inputwide');
                 break;
 
+            case "Boolean":
+                this.inputElement = document.createElement('input');
+                this.inputElement.id = 'attribute' + attribute.attributeName.toLowerCase() + 'checkbox';
+                this.inputElement.type = 'checkbox';
+                break;
+
             case "DateTime":
                 this.inputElement = document.createElement('input');
                 this.inputElement.id = 'attribute' + attribute.attributeName.toLowerCase() + 'input';
@@ -268,11 +274,12 @@ class dataObjectAttributes {
 
             case "ObjectRelationship":
                 return this.inputElement.value;
-                break;
+
+            case "Boolean":
+                return this.inputElement.checked;
 
             default:
                 return this.inputElement.value;
-                break;
         }
     }
 }
