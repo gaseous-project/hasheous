@@ -155,6 +155,12 @@ namespace hasheous_server.Controllers.v1_0
         [Route("{ObjectType}/{Id}")]
         public async Task<IActionResult> GetDataObject(Classes.DataObjects.DataObjectType ObjectType, long Id)
         {
+            // Validate ObjectType
+            if (!Enum.IsDefined(typeof(Classes.DataObjects.DataObjectType), ObjectType))
+            {
+                return BadRequest("Invalid ObjectType provided.");
+            }
+
             hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
             Models.DataObjectItem? DataObject = await DataObjects.GetDataObject(ObjectType, Id);
