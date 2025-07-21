@@ -199,17 +199,41 @@ namespace hasheous_server.Classes
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
 
-            // loop all game dataobjects, then fetch all votes for each game
-            DataObjects dataObjects = new DataObjects();
-            DataObjectsList dataObjectsList = await dataObjects.GetDataObjects(DataObjects.DataObjectType.Game, 0, 0, null, false);
+            // select all dataobjects that have votes
+            string sql = "SELECT DISTINCT DataObjectId FROM MatchUserVotes;";
+            DataTable dataObjectsWithVotes = db.ExecuteCMD(sql);
 
-            foreach (DataObjectItem dataObject in dataObjectsList.Objects)
+            DataObjects dataObjects = new DataObjects();
+
+            foreach (DataRow objectsRow in dataObjectsWithVotes.Rows)
             {
+                long dataObjectId = (long)objectsRow["DataObjectId"];
+
+                // get the dataobject
+                DataObjectItem? dataObject = await dataObjects.GetDataObject(dataObjectId);
+
+                // only process dataobjects that are not null
+                if (dataObject == null)
+                {
+                    continue;
+                }
+
+                // only process dataobjects that are of type Game, or Company
+                DataObjects.DataObjectType[] validTypes = new DataObjects.DataObjectType[] {
+                    DataObjects.DataObjectType.Game,
+                    DataObjects.DataObjectType.Company
+                };
+
+                if (!validTypes.Contains(dataObject.ObjectType))
+                {
+                    continue;
+                }
+
                 // get votes for each metadata source for this dataobject
                 foreach (Communications.MetadataSources metadataSource in Enum.GetValues(typeof(Communications.MetadataSources)))
                 {
                     // calculate votes
-                    string sql = "SELECT DataObjectId, MetadataSourceId, MetadataGameId, COUNT(*) AS `Votes` FROM MatchUserVotes WHERE DataObjectId = @dataObjectId AND MetadataSourceId = @metadataSourceId GROUP BY MetadataSourceId, MetadataGameId ORDER BY DataObjectId, MetadataSourceId, `Votes` DESC;";
+                    sql = "SELECT DataObjectId, MetadataSourceId, MetadataGameId, COUNT(*) AS `Votes` FROM MatchUserVotes WHERE DataObjectId = @dataObjectId AND MetadataSourceId = @metadataSourceId GROUP BY MetadataSourceId, MetadataGameId ORDER BY DataObjectId, MetadataSourceId, `Votes` DESC;";
                     DataTable data = db.ExecuteCMD(sql, new Dictionary<string, object>{
                         { "dataObjectId", dataObject.Id },
                         { "metadataSourceId", metadataSource }

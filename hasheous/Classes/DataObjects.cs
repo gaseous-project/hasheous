@@ -300,6 +300,28 @@ namespace hasheous_server.Classes
             return objectsList;
         }
 
+        public async Task<Models.DataObjectItem?> GetDataObject(long id)
+        {
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql = "SELECT * FROM DataObject WHERE Id=@id;";
+            Dictionary<string, object> dbDict = new Dictionary<string, object>{
+                { "id", id }
+            };
+
+            DataTable data = db.ExecuteCMD(sql, dbDict);
+
+            if (data.Rows.Count > 0)
+            {
+                DataObjectItem item = await BuildDataObject((DataObjectType)data.Rows[0]["ObjectType"], id, data.Rows[0], true);
+
+                return item;
+            }
+            else
+            {
+                return null;
+            }
+        }
+
         public async Task<Models.DataObjectItem?> GetDataObject(DataObjectType objectType, long id)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
