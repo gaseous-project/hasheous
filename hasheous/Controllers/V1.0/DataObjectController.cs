@@ -161,6 +161,9 @@ namespace hasheous_server.Controllers.v1_0
                 return BadRequest("Invalid ObjectType provided.");
             }
 
+            // check if the user is logged in
+            var user = await _userManager.GetUserAsync(User);
+
             hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
             Models.DataObjectItem? DataObject = await DataObjects.GetDataObject(ObjectType, Id);
@@ -171,10 +174,8 @@ namespace hasheous_server.Controllers.v1_0
             }
             else
             {
-                if (ObjectType == Classes.DataObjects.DataObjectType.App)
+                if (DataObject.ObjectType == Classes.DataObjects.DataObjectType.App)
                 {
-                    var user = await _userManager.GetUserAsync(User);
-
                     if (user == null)
                     {
                         // no logged in user, check that the app is public
