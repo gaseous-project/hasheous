@@ -182,9 +182,9 @@ class MetadataRow {
             this.input.disabled = true; // Disable input for non-manual match methods
         } else {
             this.input.setAttribute('name', 'metadatasourcevalues');
-            this.input.addEventListener('input', function () {
+            this.input.addEventListener('input', () => {
                 this.changed.checked = true; // Check the changed checkbox when input is modified
-            }.bind(this));
+            });
             this.changed.addEventListener('change', function () {
                 this.input.value = ''; // Clear input when checkbox is unchecked
             }.bind(this));
