@@ -161,30 +161,35 @@ namespace hasheous_server.Controllers.v1_0
                 return BadRequest("Invalid ObjectType provided.");
             }
 
-            // check if the user is logged in
-            var user = await _userManager.GetUserAsync(User);
+            // ObjectType is already validated above and can be safely assigned
+            var objectType = ObjectType;
 
             hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
-            Models.DataObjectItem? DataObject = await DataObjects.GetDataObject(ObjectType, Id);
+            Models.DataObjectItem? DataObject = await DataObjects.GetDataObject(objectType, Id);
 
-            if (DataObject == null || DataObject.ObjectType != ObjectType)
+            if (DataObject == null || DataObject.ObjectType != objectType)
             {
                 return NotFound();
             }
             else
             {
-                if (DataObject.ObjectType == Classes.DataObjects.DataObjectType.App)
+                // Special permission logic for App objects
+                if (objectType == Classes.DataObjects.DataObjectType.App)
                 {
+                    // check if the user is logged in
+                    var user = await _userManager.GetUserAsync(User);
+
                     if (user == null)
                     {
-                        // no logged in user, check that the app is public
+                        // Anonymous user: allow only if the app is public (has Read permission)
                         DataObject.Permissions = new List<DataObjectPermission.PermissionType>
                         {
                             DataObjectPermission.PermissionType.Read
                         };
 
-                        if (DataObject.Attributes != null && DataObject.Attributes.Any(a => a.attributeName == AttributeItem.AttributeName.Public && a.Value.ToString() == "1"))
+                        if (DataObject.Attributes != null &&
+                            DataObject.Attributes.Any(a => a.attributeName == AttributeItem.AttributeName.Public && a.Value?.ToString() == "1"))
                         {
                             return Ok(DataObject);
                         }
@@ -193,15 +198,17 @@ namespace hasheous_server.Controllers.v1_0
                             return Unauthorized();
                         }
                     }
-
-                    DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
-                    DataObject.Permissions = dataObjectPermission.GetObjectPermission(user, ObjectType, DataObject.Id);
-                    if (DataObject.Permissions.Contains(DataObjectPermission.PermissionType.Update))
+                    else
                     {
-                        DataObject.UserPermissions = dataObjectPermission.GetObjectPermissionList(DataObject.Id);
+                        // Logged-in user: check their permissions
+                        DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
+                        DataObject.Permissions = dataObjectPermission.GetObjectPermission(user, objectType, DataObject.Id);
+                        if (DataObject.Permissions.Contains(DataObjectPermission.PermissionType.Update))
+                        {
+                            DataObject.UserPermissions = dataObjectPermission.GetObjectPermissionList(DataObject.Id);
+                        }
                     }
                 }
-
                 return Ok(DataObject);
             }
         }
