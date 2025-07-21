@@ -90,7 +90,7 @@ namespace BackgroundMetadataMatcher
             }
         }
 
-        public async Task GetGameArtwork(long DataObjectId)
+        public async Task GetGameArtwork(long DataObjectId, bool force = false)
         {
             DataObjects dataObjects = new DataObjects();
             DataObjectItem dataObjectItem = await dataObjects.GetDataObject(DataObjects.DataObjectType.Game, DataObjectId);
@@ -111,8 +111,8 @@ namespace BackgroundMetadataMatcher
                     }
                 }
 
-                // only add a logo if it isn't already present
-                if (logoPresent == false)
+                // only add a logo if it isn't already present or force is true
+                if (logoPresent == false || force)
                 {
                     // check for metadata source
                     foreach (DataObjectItem.MetadataItem metadata in dataObjectItem.Metadata)
@@ -191,8 +191,23 @@ namespace BackgroundMetadataMatcher
                                         break;
                                 }
 
+                                // delete existing logo if it exists
+                                foreach (AttributeItem attribute in dataObjectItem.Attributes)
+                                {
+                                    if (
+                                        (attribute.attributeType == AttributeItem.AttributeType.ImageId &&
+                                        attribute.attributeName == AttributeItem.AttributeName.Logo) ||
+                                        (attribute.attributeType == AttributeItem.AttributeType.ImageAttribution &&
+                                        attribute.attributeName == AttributeItem.AttributeName.LogoAttribution)
+                                    )
+                                    {
+                                        dataObjects.DeleteAttribute(DataObjectId, (long)attribute.Id);
+                                    }
+                                }
+
                                 if (imageRef != null)
                                 {
+                                    // add the new logo
                                     await dataObjects.AddAttribute(DataObjectId, new AttributeItem
                                     {
                                         attributeName = AttributeItem.AttributeName.Logo,

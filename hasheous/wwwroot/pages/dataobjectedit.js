@@ -6,16 +6,16 @@ let selectedPlatform = undefined;
 
 let suggestSignatures = false;
 
-let mustRedirect = true;
-if (userProfile != null) {
-    if (userProfile.Roles != null) {
-        if (userProfile.Roles.includes('Admin') || userProfile.Roles.includes('Moderator')) {
-            mustRedirect = false;
-        }
-    }
-}
+// let mustRedirect = true;
+// if (userProfile != null) {
+//     if (userProfile.Roles != null) {
+//         if (userProfile.Roles.includes('Admin') || userProfile.Roles.includes('Moderator')) {
+//             mustRedirect = false;
+//         }
+//     }
+// }
 
-if (mustRedirect == true) { location.window.replace("/"); }
+// if (mustRedirect == true) { location.window.replace("/"); }
 
 // save button
 document.getElementById('dataObjectSave').addEventListener("click", function (e) {
@@ -75,7 +75,7 @@ document.getElementById('dataObjectSave').addEventListener("click", function (e)
         let accessControlSelect = document.getElementById('dataObjectAccessControlSelect');
         let selectedUsers = $(accessControlSelect).select2('data');
         for (let i = 0; i < selectedUsers.length; i++) {
-            userPermissions[selectedUsers[i].text] = ["Read", "Update"];
+            userPermissions[selectedUsers[i].text] = ["Read", "Update", "Delete"];
         }
     }
 
@@ -245,6 +245,15 @@ async function loadData() {
                     case "Publisher":
                     case "Wikipedia":
                         document.getElementById('attribute' + dataObject.attributes[i].attributeName.toLowerCase() + 'input').value = dataObject.attributes[i].value;
+                        break;
+                }
+                break;
+
+            case "Boolean":
+                switch (dataObject.attributes[i].attributeName) {
+                    case "Public":
+                        let publicCheckbox = document.getElementById('attribute' + dataObject.attributes[i].attributeName.toLowerCase() + 'checkbox');
+                        publicCheckbox.checked = dataObject.attributes[i].value;
                         break;
                 }
                 break;
@@ -437,6 +446,13 @@ async function loadData() {
 
     // metadata
     if (dataObject.metadata.length > 0) {
+        // Sort metadata by source
+        dataObject.metadata.sort((a, b) => {
+            if (a.source < b.source) return -1;
+            if (a.source > b.source) return 1;
+            return 0;
+        });
+
         for (let i = 0; i < dataObject.metadata.length; i++) {
             // append a row for each metadata item
             let metadataRow = document.createElement('tr');

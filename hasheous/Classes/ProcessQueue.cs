@@ -151,13 +151,13 @@ namespace Classes
 
                                 case QueueItemType.TallyVotes:
                                     Submissions submissions = new Submissions();
-                                    submissions.TallyVotes();
+                                    await submissions.TallyVotes();
                                     break;
 
                                 case QueueItemType.MetadataMatchSearch:
                                     DataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Platform);
-                                    DataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game);
-                                    DataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Company);
+                                    DataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, true);
+                                    DataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Company, true);
                                     break;
 
                                 case QueueItemType.GetMissingArtwork:
