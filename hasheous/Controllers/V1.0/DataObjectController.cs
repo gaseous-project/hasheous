@@ -165,7 +165,7 @@ namespace hasheous_server.Controllers.v1_0
 
             Models.DataObjectItem? DataObject = await DataObjects.GetDataObject(ObjectType, Id);
 
-            if (DataObject == null)
+            if (DataObject == null || DataObject.ObjectType != ObjectType)
             {
                 return NotFound();
             }
