@@ -171,7 +171,7 @@ namespace hasheous_server.Controllers.v1_0
             }
             else
             {
-                if (DataObject.ObjectType == Classes.DataObjects.DataObjectType.App)
+                if (ObjectType == Classes.DataObjects.DataObjectType.App)
                 {
                     var user = await _userManager.GetUserAsync(User);
 
