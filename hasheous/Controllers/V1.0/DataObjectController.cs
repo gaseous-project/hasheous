@@ -183,7 +183,7 @@ namespace hasheous_server.Controllers.v1_0
                             DataObjectPermission.PermissionType.Read
                         };
 
-                        if (DataObject.Attributes.Any(a => a.attributeName == AttributeItem.AttributeName.Public && a.Value.ToString() == "1"))
+                        if (DataObject.Attributes != null && DataObject.Attributes.Any(a => a.attributeName == AttributeItem.AttributeName.Public && a.Value.ToString() == "1"))
                         {
                             return Ok(DataObject);
                         }
