@@ -2014,7 +2014,7 @@ namespace hasheous_server.Classes
                 if (objectType == DataObjectType.Game)
                 {
                     BackgroundMetadataMatcher.BackgroundMetadataMatcher metadataMatcher = new BackgroundMetadataMatcher.BackgroundMetadataMatcher();
-                    await metadataMatcher.GetGameArtwork((long)item.Id);
+                    await metadataMatcher.GetGameArtwork((long)item.Id, ForceSearch);
                 }
 
                 // update date

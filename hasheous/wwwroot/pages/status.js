@@ -32,7 +32,8 @@ function LoadStatusPage() {
                         "FetchIGDBMetadata",
                         "FetchTheGamesDbMetadata",
                         "FetchVIMMMetadata",
-                        "FetchGiantBombMetadata"
+                        "FetchGiantBombMetadata",
+                        "FetchRetroAchievementsMetadata"
                     ],
                     "maintenance": [
                         "DailyMaintenance",

@@ -237,6 +237,7 @@
     "servicefetchthegamesdbmetadata": "Fetch TheGamesDB Metadata",
     "servicefetchgiantbombmetadata": "Fetch Giant Bomb Metadata",
     "servicefetchvimmmetadata": "Fetch VIMM Metadata",
+    "servicefetchretroachievementsmetadata": "Fetch RetroAchievements Metadata",
     "servicedailymaintenance": "Daily Maintenance",
     "serviceweeklymaintenance": "Weekly Maintenance",
     "servicecachewarmer": "Cache Warmer",

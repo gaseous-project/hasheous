@@ -191,18 +191,22 @@ namespace BackgroundMetadataMatcher
                                         break;
                                 }
 
+                                // delete existing logo if it exists
+                                foreach (AttributeItem attribute in dataObjectItem.Attributes)
+                                {
+                                    if (
+                                        (attribute.attributeType == AttributeItem.AttributeType.ImageId &&
+                                        attribute.attributeName == AttributeItem.AttributeName.Logo) ||
+                                        (attribute.attributeType == AttributeItem.AttributeType.ImageAttribution &&
+                                        attribute.attributeName == AttributeItem.AttributeName.LogoAttribution)
+                                    )
+                                    {
+                                        dataObjects.DeleteAttribute(DataObjectId, (long)attribute.Id);
+                                    }
+                                }
+
                                 if (imageRef != null)
                                 {
-                                    // delete existing logo if it exists
-                                    foreach (AttributeItem attribute in dataObjectItem.Attributes)
-                                    {
-                                        if (attribute.attributeType == AttributeItem.AttributeType.ImageId &&
-                                            attribute.attributeName == AttributeItem.AttributeName.Logo)
-                                        {
-                                            dataObjects.DeleteAttribute(DataObjectId, (long)attribute.Id);
-                                        }
-                                    }
-
                                     // add the new logo
                                     await dataObjects.AddAttribute(DataObjectId, new AttributeItem
                                     {
