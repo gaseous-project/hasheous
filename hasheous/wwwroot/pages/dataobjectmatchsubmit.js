@@ -185,9 +185,9 @@ class MetadataRow {
             this.input.addEventListener('input', () => {
                 this.changed.checked = true; // Check the changed checkbox when input is modified
             });
-            this.changed.addEventListener('change', function () {
+            this.changed.addEventListener('change', () => {
                 this.input.value = ''; // Clear input when checkbox is unchecked
-            }.bind(this));
+            });
         }
         newValueCell.appendChild(this.input);
         this.tableRow.appendChild(newValueCell);
