@@ -2082,6 +2082,21 @@ namespace hasheous_server.Classes
             // remove any empty candidates
             SearchCandidates.RemoveAll(x => string.IsNullOrWhiteSpace(x));
 
+            // loop all candidates and convert roman numerals to numbers
+            List<string> tempSearchCandidates = SearchCandidates.ToList();
+            foreach (var candidate in tempSearchCandidates.Select((o, i) => new { Value = o, Index = i }))
+            {
+                string? romanNumeral = Common.RomanNumerals.FindFirstRomanNumeral(candidate.Value);
+                if (!String.IsNullOrEmpty(romanNumeral))
+                {
+                    string newCandidate = candidate.Value.Replace(romanNumeral, Common.RomanNumerals.RomanToInt(romanNumeral).ToString());
+                    if (candidate.Index + 1 == tempSearchCandidates.Count)
+                        SearchCandidates.Add(newCandidate); // add a new candidate if the roman numeral is at the end
+                    else
+                        SearchCandidates.Insert(candidate.Index + 1, newCandidate); // insert a new candidate after the current one
+                }
+            }
+
             Logging.Log(Logging.LogType.Information, "Import Game", "Search candidates: " + String.Join(", ", SearchCandidates));
 
             return SearchCandidates;
