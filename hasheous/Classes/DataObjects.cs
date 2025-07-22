@@ -2076,12 +2076,6 @@ namespace hasheous_server.Classes
             // add the original name as a candidate
             SearchCandidates.Add(GameName);
 
-            // remove duplicates
-            SearchCandidates = SearchCandidates.Distinct().ToList();
-
-            // remove any empty candidates
-            SearchCandidates.RemoveAll(x => string.IsNullOrWhiteSpace(x));
-
             // loop all candidates and convert roman numerals to numbers
             List<string> tempSearchCandidates = SearchCandidates.ToList();
             foreach (var candidate in tempSearchCandidates.Select((o, i) => new { Value = o, Index = i }))
@@ -2096,6 +2090,12 @@ namespace hasheous_server.Classes
                         SearchCandidates.Insert(candidate.Index + 1, newCandidate); // insert a new candidate after the current one
                 }
             }
+
+            // remove duplicates
+            SearchCandidates = SearchCandidates.Distinct().ToList();
+
+            // remove any empty candidates
+            SearchCandidates.RemoveAll(x => string.IsNullOrWhiteSpace(x));
 
             Logging.Log(Logging.LogType.Information, "Import Game", "Search candidates: " + String.Join(", ", SearchCandidates));
 

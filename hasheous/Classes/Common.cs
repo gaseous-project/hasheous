@@ -89,8 +89,7 @@ namespace Classes
 				foreach (Match match in matches)
 				{
 					if (match.Success && !string.IsNullOrEmpty(match.Value))
-						if (match.Success && !string.IsNullOrEmpty(match.Value))
-							return match.Value.ToUpper();
+						return match.Value.ToUpper();
 				}
 
 				return null;
