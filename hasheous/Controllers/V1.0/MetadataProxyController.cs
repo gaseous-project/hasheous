@@ -29,6 +29,7 @@ namespace hasheous_server.Controllers.v1_0
     [Insight(Insights.InsightSourceType.MetadataProxy)]
     public class MetadataProxyController : ControllerBase
     {
+        #region IGDB
         /// <summary>
         /// Get metadata from IGDB
         /// </summary>
@@ -532,6 +533,9 @@ namespace hasheous_server.Controllers.v1_0
             }
         }
 
+        #endregion IGDB
+
+        #region TheGamesDB
         /// <summary>
         /// Get image from TheGamesDB
         /// </summary>
@@ -1032,5 +1036,11 @@ namespace hasheous_server.Controllers.v1_0
             return Ok(publishers);
         }
 
+        #endregion TheGamesDB
+
+        #region GiantBomb
+
+
+        #endregion GiantBomb
     }
 }
