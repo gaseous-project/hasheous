@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Data;
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 
 namespace Classes
 {
@@ -30,6 +31,117 @@ namespace Classes
 			DateTime dateTime = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
 			dateTime = dateTime.AddSeconds(UnixTimeStamp).ToLocalTime();
 			return dateTime;
+		}
+
+		public class RomanNumerals
+		{
+			/// <summary>
+			/// Converts an integer to its Roman numeral representation.
+			/// </summary>
+			/// <param name="number">The integer to convert (1-3999).</param>
+			/// <returns>A string containing the Roman numeral.</returns>
+			public static string IntToRoman(int number)
+			{
+				if (number < 1 || number > 3999)
+					throw new ArgumentOutOfRangeException(nameof(number), "Value must be in the range 1-3999.");
+
+				var numerals = new[]
+				{
+				new { Value = 1000, Numeral = "M" },
+				new { Value = 900, Numeral = "CM" },
+				new { Value = 500, Numeral = "D" },
+				new { Value = 400, Numeral = "CD" },
+				new { Value = 100, Numeral = "C" },
+				new { Value = 90, Numeral = "XC" },
+				new { Value = 50, Numeral = "L" },
+				new { Value = 40, Numeral = "XL" },
+				new { Value = 10, Numeral = "X" },
+				new { Value = 9, Numeral = "IX" },
+				new { Value = 5, Numeral = "V" },
+				new { Value = 4, Numeral = "IV" },
+				new { Value = 1, Numeral = "I" }
+			};
+
+				var result = string.Empty;
+				foreach (var item in numerals)
+				{
+					while (number >= item.Value)
+					{
+						result += item.Numeral;
+						number -= item.Value;
+					}
+				}
+				return result;
+			}
+
+			/// <summary>
+			/// Finds the first Roman numeral in a string.
+			/// </summary>
+			/// <param name="input">The input string to search.</param>
+			/// <returns>The first Roman numeral found, or null if none found.</returns>
+			public static string? FindFirstRomanNumeral(string input)
+			{
+				if (string.IsNullOrEmpty(input))
+					return null;
+
+				// Regex for Roman numerals (1-3999, case-insensitive)
+				var matches = Regex.Matches(input, @"\bM{0,3}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})\b", RegexOptions.IgnoreCase);
+				foreach (Match match in matches)
+				{
+					if (match.Success && !string.IsNullOrEmpty(match.Value))
+						return match.Value.ToUpper();
+				}
+
+				return null;
+			}
+
+			/// <summary>
+			/// Converts a Roman numeral string to its integer representation.
+			/// </summary>
+			/// <param name="roman">The Roman numeral string to convert.</param>
+			/// <returns>The integer representation of the Roman numeral.</returns>
+			public static int RomanToInt(string roman)
+			{
+				if (string.IsNullOrEmpty(roman))
+					throw new ArgumentException("Input cannot be null or empty.", nameof(roman));
+
+				var romanMap = new Dictionary<char, int>
+			{
+				{ 'I', 1 },
+				{ 'V', 5 },
+				{ 'X', 10 },
+				{ 'L', 50 },
+				{ 'C', 100 },
+				{ 'D', 500 },
+				{ 'M', 1000 }
+			};
+
+				int total = 0;
+				int prevValue = 0;
+
+				foreach (char c in roman.ToUpper())
+				{
+					if (!romanMap.ContainsKey(c))
+						throw new ArgumentException($"Invalid Roman numeral character: {c}", nameof(roman));
+
+					int currentValue = romanMap[c];
+
+					// If the current value is greater than the previous value, subtract twice the previous value
+					// (to account for the addition in the previous iteration).
+					if (currentValue > prevValue)
+					{
+						total += currentValue - 2 * prevValue;
+					}
+					else
+					{
+						total += currentValue;
+					}
+
+					prevValue = currentValue;
+				}
+
+				return total;
+			}
 		}
 
 		public class hashObject

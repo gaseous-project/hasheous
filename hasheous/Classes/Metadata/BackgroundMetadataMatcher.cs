@@ -195,10 +195,8 @@ namespace BackgroundMetadataMatcher
                                 foreach (AttributeItem attribute in dataObjectItem.Attributes)
                                 {
                                     if (
-                                        (attribute.attributeType == AttributeItem.AttributeType.ImageId &&
-                                        attribute.attributeName == AttributeItem.AttributeName.Logo) ||
-                                        (attribute.attributeType == AttributeItem.AttributeType.ImageAttribution &&
-                                        attribute.attributeName == AttributeItem.AttributeName.LogoAttribution)
+                                        attribute.attributeType == AttributeItem.AttributeType.ImageId &&
+                                        attribute.attributeName == AttributeItem.AttributeName.Logo
                                     )
                                     {
                                         dataObjects.DeleteAttribute(DataObjectId, (long)attribute.Id);
