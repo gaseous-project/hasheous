@@ -47,6 +47,10 @@ namespace Classes
 
         [Newtonsoft.Json.JsonIgnore]
         [System.Text.Json.Serialization.JsonIgnore]
+        public List<gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType>? returnSources { get; set; } = null;
+
+        [Newtonsoft.Json.JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
         public string returnFields { get; set; } = "All";
 
         public enum ValidFields
@@ -64,12 +68,13 @@ namespace Classes
 
         }
 
-        public HashLookup(Database db, hasheous_server.Models.HashLookupModel model, bool? returnAllSources = false, string? returnFields = "All")
+        public HashLookup(Database db, hasheous_server.Models.HashLookupModel model, bool? returnAllSources = false, string? returnFields = "All", List<gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType>? returnSources = null)
         {
             this.db = db;
             this.model = model;
             this.returnAllSources = returnAllSources ?? false;
             this.returnFields = returnFields ?? "All";
+            this.returnSources = returnSources ?? null;
         }
 
         public async Task PerformLookup()
@@ -372,22 +377,48 @@ namespace Classes
 
                 if (validFields.Contains(ValidFields.Signatures) || validFields.Contains(ValidFields.All))
                 {
-                    if (returnAllSources == true)
+                    // if returnSources is not null and count is greater than 0, filter signatures by returnSources
+                    // if returnSources is null or count is 0, use returnAllSources
+                    // if returnAllSources is true, return all signatures
+                    // if returnAllSources is false, return only the first signature
+
+                    bool useReturnSources = returnSources != null && returnSources.Count > 0;
+                    bool breakAfterFirst = false;
+
+                    if (useReturnSources == false && returnAllSources == true)
                     {
                         // get all signatures
-                        this.Signatures = new Dictionary<RomSignatureObject.Game.Rom.SignatureSourceType, List<SignatureLookupItem.SignatureResult>>();
-                        foreach (Signatures_Games_2 sig in rawSignatures)
+                        returnSources = new List<gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType>();
+                        foreach (gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType source in Enum.GetValues(typeof(gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType)))
                         {
-                            if (!this.Signatures.ContainsKey(sig.Rom.SignatureSource))
-                            {
-                                this.Signatures.Add(sig.Rom.SignatureSource, new List<SignatureLookupItem.SignatureResult>());
-                            }
-                            this.Signatures[sig.Rom.SignatureSource].Add(new SignatureLookupItem.SignatureResult(sig));
+                            returnSources.Add((gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType)source);
                         }
+                    }
+                    else if (useReturnSources == false && returnAllSources == false)
+                    {
+                        breakAfterFirst = true;
+                    }
+
+                    if (breakAfterFirst == true)
+                    {
+                        // get the first signature
+                        this.Signature = new SignatureLookupItem.SignatureResult(discoveredSignature);
                     }
                     else
                     {
-                        this.Signature = new SignatureLookupItem.SignatureResult(discoveredSignature);
+                        // get only the signatures in returnSources
+                        this.Signatures = new Dictionary<RomSignatureObject.Game.Rom.SignatureSourceType, List<SignatureLookupItem.SignatureResult>>();
+                        foreach (Signatures_Games_2 sig in rawSignatures)
+                        {
+                            if (returnSources.Contains(sig.Rom.SignatureSource))
+                            {
+                                if (!this.Signatures.ContainsKey(sig.Rom.SignatureSource))
+                                {
+                                    this.Signatures.Add(sig.Rom.SignatureSource, new List<SignatureLookupItem.SignatureResult>());
+                                }
+                                this.Signatures[sig.Rom.SignatureSource].Add(new SignatureLookupItem.SignatureResult(sig));
+                            }
+                        }
                     }
                 }
 
