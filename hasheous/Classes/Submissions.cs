@@ -329,5 +329,62 @@ namespace hasheous_server.Classes
                 }
             }
         }
+
+        public async Task<ArchiveObservationModel> AddArchiveObservation(string UserId, ArchiveObservationModel model)
+        {
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+
+            // check if the content hash already exists
+            HashLookup hashLookup = new HashLookup(db, new Models.HashLookupModel
+            {
+                MD5 = model.Content.MD5,
+                SHA1 = model.Content.SHA1,
+                SHA256 = model.Content.SHA256,
+                CRC = model.Content.CRC
+            });
+            await hashLookup.PerformLookup();
+
+            // if the content hash does not exist, reject the observation
+            if (hashLookup.Id == null)
+            {
+                throw new HashLookup.HashNotFoundException("The provided content hash was not found in the signature database.");
+            }
+
+            // check if the archive hash already exists in the database against this user
+            string sql = "SELECT * FROM UserArchiveObservations WHERE UserId = @userId AND ArchiveMD5 = @md5 AND ArchiveSHA1 = @sha1 AND ArchiveSHA256 = @sha256;";
+            DataTable data = db.ExecuteCMD(sql, new Dictionary<string, object>
+            {
+                { "userId", UserId },
+                { "md5", model.Archive.MD5 },
+                { "sha1", model.Archive.SHA1 },
+                { "sha256", model.Archive.SHA256 }
+            });
+
+            if (data.Rows.Count > 0)
+            {
+                // archive observation already exists for this user
+                throw new Exception("An archive observation with the same hashes already exists for this user.");
+            }
+
+            // insert the archive observation
+            sql = "INSERT INTO UserArchiveObservations (UserId, ArchiveMD5, ArchiveSHA1, ArchiveSHA256, ArchiveCRC32, ArchiveSize, ArchiveType, ContentMD5, ContentSHA1, ContentSHA256, ContentCRC32) VALUES (@userId, @archivemd5, @archivesha1, @archivesha256, @archivecrc, @archivesize, @archivetype, @contentmd5, @contentsha1, @contentsha256, @contentcrc);";
+            db.ExecuteNonQuery(sql, new Dictionary<string, object>
+            {
+                { "userId", UserId },
+                { "archivemd5", model.Archive.MD5 },
+                { "archivesha1", model.Archive.SHA1 },
+                { "archivesha256", model.Archive.SHA256 },
+                { "archivecrc", model.Archive.CRC },
+                { "archivesize", model.Archive.Size },
+                { "archivetype", model.Archive.Type },
+                { "contentmd5", model.Content.MD5 },
+                { "contentsha1", model.Content.SHA1 },
+                { "contentsha256", model.Content.SHA256 },
+                { "contentcrc", model.Content.CRC }
+            });
+
+            // return the model with the archive details
+            return model;
+        }
     }
 }

@@ -66,5 +66,39 @@ namespace hasheous_server.Controllers.v1_0
                 return NotFound();
             }
         }
+
+        /// <summary>
+        /// Add an archive observation to the database. An observation is a record of an archive file that has been observed - including its hashes - matching it to a specific ROM hash.
+        /// This is used to assit ROM managers in indentifying and managing archive files that contain ROMs.
+        /// </summary>
+        /// <param name="model">
+        /// The model containing the archive observation details
+        /// </param>
+        /// <returns>
+        /// The result of the archive observation submission
+        /// </returns>
+        [MapToApiVersion("1.0")]
+        [HttpPost]
+        [Route("ArchiveObservation")]
+        [ProducesResponseType(typeof(ArchiveObservationModel), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ApiKey()]
+        [IgnoreAntiforgeryToken]
+        public async Task<IActionResult> ArchiveObservation(ArchiveObservationModel model)
+        {
+            Submissions submissions = new Submissions();
+            try
+            {
+                return Ok(await submissions.AddArchiveObservation(_userManager.GetUserId(HttpContext.User), model));
+            }
+            catch (HashLookup.HashNotFoundException hnfEx)
+            {
+                return NotFound("The provided content hash was not found in the signature database.");
+            }
+            catch
+            {
+                return NotFound();
+            }
+        }
     }
 }
