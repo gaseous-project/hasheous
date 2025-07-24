@@ -23,8 +23,12 @@ namespace hasheous_server.Controllers.v1_0
         /// <param name="model" required="true">
         /// A JSON element with MD5 or SHA1 key value pairs representing the hashes of the ROM being queried.
         /// </param>
-        /// <param name="returnAllSources" required="false" default="false" example="false">
-        /// If true, all sources will be returned in the response. If false, only the first source will be returned.
+        /// <param name="returnAllSources" required="false" default="false" example="true">
+        /// If true, all sources will be returned. If false, only the first source will be returned.
+        /// </param>
+        /// <param name="returnSources" required="false" default="null" example="TOSEC, MAMEArcade">
+        /// A comma separated list of sources to return. If null, fallback to returnAllSources. Valid options are:
+        /// TOSEC, MAMEArcade, MAMEMess, NoIntros, Redump, WHDLoad, RetroAchievements, FBNeo
         /// </param>
         /// <param name="returnFields" required="false" default="All" example="All">
         /// A comma-separated list of fields to return in the response. If "All", all fields will be returned. Valid options are:
@@ -49,11 +53,30 @@ namespace hasheous_server.Controllers.v1_0
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ResponseCache(CacheProfileName = "5Minute")]
         [Route("ByHash")]
-        public async Task<IActionResult> LookupPost(HashLookupModel model, bool? returnAllSources = false, string? returnFields = "All")
+        public async Task<IActionResult> LookupPost(HashLookupModel model, bool? returnAllSources = false, string? returnFields = "All", string? returnSources = null)
         {
             try
             {
-                HashLookup hashLookup = new HashLookup(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), model, returnAllSources, returnFields);
+                List<gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType>? returnSourcesList = new List<gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType>();
+
+                if (returnSources != null)
+                {
+                    string[] sources = returnSources.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                    foreach (string source in sources)
+                    {
+                        if (Enum.TryParse<gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType>(source, true, out var sourceType))
+                        {
+                            returnSourcesList.Add(sourceType);
+                        }
+                        else
+                        {
+                            Logging.Log(Logging.LogType.Warning, "Hash Lookup", $"Invalid source type provided: {source}");
+                            return BadRequest($"Invalid source type provided: {source}");
+                        }
+                    }
+                }
+
+                HashLookup hashLookup = new HashLookup(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), model, returnAllSources, returnFields, returnSourcesList);
                 var lookupTask = hashLookup.PerformLookup();
                 if (await Task.WhenAny(lookupTask, Task.Delay(TimeSpan.FromSeconds(10))) == lookupTask)
                 {
