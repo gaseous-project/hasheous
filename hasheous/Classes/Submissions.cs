@@ -8,6 +8,12 @@ using static hasheous_server.Models.DataObjectItem;
 
 namespace hasheous_server.Classes
 {
+    // Custom exception for duplicate archive observations
+    public class DuplicateArchiveObservationException : Exception
+    {
+        public DuplicateArchiveObservationException(string message) : base(message) { }
+    }
+
     public class Submissions
     {
         /// <summary>
@@ -363,7 +369,7 @@ namespace hasheous_server.Classes
             if (data.Rows.Count > 0)
             {
                 // archive observation already exists for this user
-                throw new Exception("An archive observation with the same hashes already exists for this user.");
+                throw new DuplicateArchiveObservationException("An archive observation with the same hashes already exists for this user.");
             }
 
             // insert the archive observation

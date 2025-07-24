@@ -69,7 +69,7 @@ namespace hasheous_server.Controllers.v1_0
 
         /// <summary>
         /// Add an archive observation to the database. An observation is a record of an archive file that has been observed - including its hashes - matching it to a specific ROM hash.
-        /// This is used to assit ROM managers in indentifying and managing archive files that contain ROMs.
+        /// This is used to assist ROM managers in identifying and managing archive files that contain ROMs.
         /// </summary>
         /// <param name="model">
         /// The model containing the archive observation details
