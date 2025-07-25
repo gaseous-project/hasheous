@@ -422,17 +422,6 @@ ProcessQueue.QueueItems.Add(
         )
     );
 
-// ProcessQueue.QueueItems.Add(
-//     new ProcessQueue.QueueItem(
-//         ProcessQueue.QueueItemType.GetMissingArtwork,
-//         10080,
-//         new List<ProcessQueue.QueueItemType>
-//         {
-//             ProcessQueue.QueueItemType.TallyVotes, ProcessQueue.QueueItemType.MetadataMatchSearch, ProcessQueue.QueueItemType.AutoMapper, ProcessQueue.QueueItemType.FetchTheGamesDbMetadata, ProcessQueue.QueueItemType.FetchVIMMMetadata
-//         }
-//         )
-//     );
-
 ProcessQueue.QueueItems.Add(
 new ProcessQueue.QueueItem(
     ProcessQueue.QueueItemType.FetchVIMMMetadata,
@@ -498,17 +487,6 @@ MetadataSearch.ForceExecute();
 ProcessQueue.QueueItems.Add(
     MetadataSearch
 );
-
-// ProcessQueue.QueueItems.Add(
-// new ProcessQueue.QueueItem(
-//     ProcessQueue.QueueItemType.AutoMapper,
-//     10080,
-//     new List<ProcessQueue.QueueItemType>
-//     {
-//         ProcessQueue.QueueItemType.GetMissingArtwork, ProcessQueue.QueueItemType.MetadataMatchSearch, ProcessQueue.QueueItemType.TallyVotes, ProcessQueue.QueueItemType.FetchTheGamesDbMetadata, ProcessQueue.QueueItemType.FetchVIMMMetadata
-//     }
-//     )
-// );
 
 ProcessQueue.QueueItems.Add(
     new ProcessQueue.QueueItem(

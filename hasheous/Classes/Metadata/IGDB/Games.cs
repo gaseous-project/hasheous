@@ -75,7 +75,11 @@ namespace hasheous_server.Classes.Metadata.IGDB
                         var game = await Metadata.GetMetadata<Game>(altName.Game.Id);
                         if (game != null)
                         {
-                            altNameGames.Add(game);
+                            if (game.Platforms != null && game.Platforms.Ids != null && game.Platforms.Ids.Contains(PlatformId))
+                            {
+                                // only add games that are on the specified platform
+                                altNameGames.Add(game);
+                            }
                         }
                     }
 
@@ -100,7 +104,11 @@ namespace hasheous_server.Classes.Metadata.IGDB
                             var game = await Metadata.GetMetadata<Game>(localisedName.Game.Id);
                             if (game != null)
                             {
-                                localisedGames.Add(game);
+                                if (game.Platforms != null && game.Platforms.Ids != null && game.Platforms.Ids.Contains(PlatformId))
+                                {
+                                    // only add games that are on the specified platform
+                                    localisedGames.Add(game);
+                                }
                             }
                         }
 

@@ -1,5 +1,7 @@
 using System.Data;
+using System.Xml;
 using Classes;
+using GiantBomb.Models;
 
 namespace GiantBomb
 {
@@ -293,6 +295,211 @@ namespace GiantBomb
             Config.SetSetting($"GiantBomb_LastGameFetch-{platformId}", DateTime.UtcNow);
 
             Logging.Log(Logging.LogType.Information, "GiantBomb", $"Finished downloading games for platform ID {platformId} from GiantBomb.");
+        }
+
+        public void DownloadImages()
+        {
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql;
+
+            // download images for each platform
+            sql = $"SELECT guid, image_tags FROM {dbName}.Platform WHERE image_tags IS NOT NULL AND image_tags != ''";
+            _ProcessImageDatabase(db, sql);
+
+            // download images for each game
+            sql = $"SELECT guid, image_tags FROM {dbName}.Game WHERE image_tags IS NOT NULL AND image_tags != ''";
+            _ProcessImageDatabase(db, sql);
+        }
+
+        private async void _ProcessImageDatabase(Database db, string sql)
+        {
+            // Execute the SQL query to get the image tags
+            var imageTagsData = await db.ExecuteCMDAsync(sql);
+            if (imageTagsData.Rows.Count == 0)
+            {
+                Logging.Log(Logging.LogType.Warning, "GiantBomb", "No image tags found in the database.");
+            }
+            List<ImageTag> imageTags = new List<ImageTag>();
+            foreach (DataRow row in imageTagsData.Rows)
+            {
+                string guid = row["guid"].ToString();
+
+                // check if guid was last checked more than 30 days ago
+                // get the last game fetch date and time from settings
+                DateTime lastFetchDateTime = Config.ReadSetting($"GiantBomb_LastImageFetch-{guid}", DateTime.UtcNow.AddDays(-31));
+                // check if the last fetch date and time is older than the expiration time
+                if (DateTime.UtcNow - lastFetchDateTime < TimeSpan.FromDays(TimeToExpire))
+                {
+                    Logging.Log(Logging.LogType.Information, "GiantBomb", $"Images for guid {guid} are up to date. No need to download.");
+                    continue;
+                }
+
+                string image_tags = row["image_tags"].ToString();
+                if (string.IsNullOrEmpty(guid) || string.IsNullOrEmpty(image_tags))
+                {
+                    Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Invalid guid or image_tags for row: {row}");
+                    continue;
+                }
+                var tags = _GetImageTags(guid, image_tags);
+                if (tags != null && tags.Count > 0)
+                {
+                    // start downloading images for the guid
+                    _DownloadImages(db, guid, tags);
+                }
+
+                // download complete, update the last fetch date and time in settings
+                Config.SetSetting($"GiantBomb_LastImageFetch-{guid}", DateTime.UtcNow);
+                Logging.Log(Logging.LogType.Information, "GiantBomb", $"Finished downloading images for guid {guid}.");
+            }
+        }
+
+        private List<ImageTag> _GetImageTags(string guid, string image_tags)
+        {
+            // Ensure that the image_tags are not null or empty
+            if (string.IsNullOrEmpty(image_tags))
+            {
+                Logging.Log(Logging.LogType.Warning, "GiantBomb", $"No image tags found for guid: {guid}");
+                return new List<ImageTag>();
+            }
+
+            // Deserialise the image_tags json to a list of ImageTag objects
+            List<ImageTag> imageTags = new List<ImageTag>();
+            try
+            {
+                imageTags = Newtonsoft.Json.JsonConvert.DeserializeObject<List<ImageTag>>(image_tags);
+            }
+            catch (Exception ex)
+            {
+                Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Error deserializing image tags for guid: {guid}. Exception: {ex.Message}", ex);
+                return new List<ImageTag>();
+            }
+
+            if (imageTags == null || imageTags.Count == 0)
+            {
+                Logging.Log(Logging.LogType.Information, "GiantBomb", $"No valid image tags found for guid: {guid}");
+                return new List<ImageTag>();
+            }
+
+            return imageTags;
+        }
+
+        private void _DownloadImages(Database db, string guid, List<ImageTag> image_tags)
+        {
+            // capture images
+            Dictionary<string, GiantBomb.Models.Image> images = new Dictionary<string, GiantBomb.Models.Image>();
+            foreach (var imageTag in image_tags)
+            {
+                int offset = 0;
+
+                while (true)
+                {
+                    string imageTagUrl = $"/api/images/{guid}/?api_key={Config.GiantBomb.APIKey}&format=json&limit=100&offset={offset}&filter=image_tag:{imageTag.name}";
+                    var imageJson = GetJson<Models.GiantBombImageResponse>(imageTagUrl);
+
+                    if (imageJson == null || imageJson.results == null || imageJson.results.Count == 0)
+                    {
+                        // No more images to fetch, exit the loop
+                        Logging.Log(Logging.LogType.Information, "GiantBomb", $"No more images found for guid: {guid} with image tag: {imageTag.name}");
+                        break;
+                    }
+
+                    if (imageJson.results != null && imageJson.results.Count > 0)
+                    {
+                        foreach (var image in imageJson.results)
+                        {
+                            image.guid = guid; // Set the guid for the image
+
+                            // Check if the image already exists in the dictionary
+                            if (!images.ContainsKey(image.original_url))
+                            {
+                                images[image.original_url] = image; // Add the image to the dictionary
+                            }
+
+                            // get the image from the dictionary
+                            var existingImage = images[image.original_url];
+                            // if the existing tags are blank, use the current one
+                            if (string.IsNullOrEmpty(existingImage.image_tags))
+                            {
+                                existingImage.image_tags = imageTag.name; // Set the image tag
+                            }
+                            else if (!existingImage.image_tags.Contains(imageTag.name))
+                            {
+                                existingImage.image_tags += $",{imageTag.name}"; // Append the image tag
+                            }
+                            // write the image to the dictionary
+                            images[image.original_url] = existingImage; // Update the image in the dictionary
+                        }
+                    }
+
+                    offset += 100;
+                }
+            }
+            // Store the images in the database
+            foreach (var image in images.Values)
+            {
+                // delete any entries with the same guid to clear out old records
+                string deleteQuery = $"DELETE FROM {dbName}.Image WHERE guid = @guid";
+                db.ExecuteCMD(deleteQuery, new Dictionary<string, object>
+                                {
+                                    { "guid", image.guid },
+                                    { "original_url", image.original_url }
+                                });
+                // insert the image into the database
+                string insertQuery = $"INSERT INTO {dbName}.Image (guid, icon_url, medium_url, screen_url, screen_large_url, small_url, super_url, thumb_url, tiny_url, original_url, image_tags) VALUES (@guid, @icon_url, @medium_url, @screen_url, @screen_large_url, @small_url, @super_url, @thumb_url, @tiny_url, @original_url, @image_tags)";
+                db.ExecuteCMD(insertQuery, new Dictionary<string, object>
+                                {
+                                    { "guid", image.guid },
+                                    { "icon_url", image.icon_url },
+                                    { "medium_url", image.medium_url },
+                                    { "screen_url", image.screen_url },
+                                    { "screen_large_url", image.screen_large_url },
+                                    { "small_url", image.small_url },
+                                    { "super_url", image.super_url },
+                                    { "thumb_url", image.thumb_url },
+                                    { "tiny_url", image.tiny_url },
+                                    { "original_url", image.original_url },
+                                    { "image_tags", image.image_tags }
+                                });
+
+                // download the images
+                // loop through each property of the image and download if the property name ends with "_url"
+                foreach (var prop in image.GetType().GetProperties())
+                {
+                    if (prop.Name.EndsWith("_url") && prop.GetValue(image) is string imageUrl && !string.IsNullOrEmpty(imageUrl))
+                    {
+                        // download the image
+                        string imageDirectoryName = Path.Combine(LocalFilePath, "Images", guid, prop.Name.Split("_")[0]);
+                        if (Directory.Exists(imageDirectoryName) == false)
+                        {
+                            Directory.CreateDirectory(imageDirectoryName);
+                        }
+
+                        string imageFileName = Path.Combine(imageDirectoryName, $"{Path.GetFileName(imageUrl)}");
+                        if (!File.Exists(imageFileName))
+                        {
+                            try
+                            {
+                                var imageResponse = client.GetAsync(new Uri(new Uri(BaseUrl), new Uri(imageUrl))).Result;
+                                if (imageResponse.IsSuccessStatusCode)
+                                {
+                                    var imageBytes = imageResponse.Content.ReadAsByteArrayAsync().Result;
+                                    File.WriteAllBytes(imageFileName, imageBytes);
+                                    Logging.Log(Logging.LogType.Information, "GiantBomb", $"Downloaded image: {imageFileName}");
+                                }
+                                else
+                                {
+                                    Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Failed to download image: {imageUrl}. Status code: {imageResponse.StatusCode}");
+                                    Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Response: {imageResponse.ReasonPhrase}");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Error downloading image: {imageUrl}. Exception: {ex.Message}", ex);
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         public void DownloadSubTypes<TResponse, TObject>(string endpoint, string? query = "")

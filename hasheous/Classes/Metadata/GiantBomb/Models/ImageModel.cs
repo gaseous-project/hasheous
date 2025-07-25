@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace GiantBomb.Models
 {
     public class GiantBombImageResponse : IBaseResponse<Image>
@@ -16,6 +18,13 @@ namespace GiantBomb.Models
         public string thumb_url { get; set; }
         public string tiny_url { get; set; }
         public string original_url { get; set; }
+
+        [Newtonsoft.Json.JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
+        public string guid { get; set; }
+
+        [Newtonsoft.Json.JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
         public string image_tags { get; set; }
     }
 }
