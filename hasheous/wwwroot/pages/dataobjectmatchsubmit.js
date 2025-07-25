@@ -118,7 +118,24 @@ function renderContent() {
             true
         ).then(function (response) {
             if (response.ok) {
-                window.location.replace("/index.html?page=dataobjectdetail&type=" + pageType + "&id=" + getQueryString('id', 'int'));
+                response.json().then(data => {
+                    let errorOccurred = false;
+                    let errorDiv = document.getElementById('dataobject_submissionerrors');
+                    errorDiv.innerHTML = '';
+                    for (const key of Object.keys(data)) {
+                        if (data[key] !== 'OK') {
+                            errorOccurred = true;
+                            let errorMessage = document.createElement('div');
+                            errorMessage.innerHTML = `<strong>${lang.getLang(key)}:</strong> ${data[key]}`;
+                            errorDiv.appendChild(errorMessage);
+                        }
+                    }
+                    if (errorOccurred) {
+                        errorDiv.style.display = 'block';
+                    } else {
+                        window.location.replace("/index.html?page=dataobjectdetail&type=" + pageType + "&id=" + getQueryString('id', 'int'));
+                    }
+                });
             } else {
                 response.json().then(errorData => {
                     console.error('Error submitting data:', errorData);

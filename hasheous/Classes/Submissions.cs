@@ -22,7 +22,7 @@ namespace hasheous_server.Classes
         /// <param name="UserId"></param>
         /// <param name="model"></param>
         /// <returns></returns>
-        public async Task<SubmissionsMatchFixModel> AddVote(string UserId, SubmissionsMatchFixModel model)
+        public async Task<Dictionary<Communications.MetadataSources, string>> AddVote(string UserId, SubmissionsMatchFixModel model)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
 
@@ -54,6 +54,7 @@ namespace hasheous_server.Classes
                 }
             }
 
+            Dictionary<Communications.MetadataSources, string> responseStatus = new Dictionary<Communications.MetadataSources, string>();
             if (dataObjectId != null)
             {
                 // rom hash was found - store vote
@@ -62,13 +63,28 @@ namespace hasheous_server.Classes
                 {
                     // before inserting or updating, check that the metadata source has the data
                     bool AllowInsert = false;
+                    string matchedId = metadataMatch.GameId;
                     switch (metadataMatch.Source)
                     {
                         case Communications.MetadataSources.IGDB:
-                            IGDB.Models.Game game = await hasheous_server.Classes.Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Game>(metadataMatch.GameId);
+                            IGDB.Models.Game game;
+                            if (long.TryParse(metadataMatch.GameId, out long gameId))
+                            {
+                                game = await hasheous_server.Classes.Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Game>(gameId);
+                            }
+                            else
+                            {
+                                game = await hasheous_server.Classes.Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Game>(metadataMatch.GameId);
+                            }
                             if (game != null)
                             {
                                 AllowInsert = true;
+                                matchedId = game.Id.ToString();
+                                responseStatus[Communications.MetadataSources.IGDB] = "OK";
+                            }
+                            else
+                            {
+                                responseStatus[Communications.MetadataSources.IGDB] = $"{System.Net.WebUtility.HtmlEncode(metadataMatch.GameId)} - Not Found";
                             }
                             break;
 
@@ -88,6 +104,12 @@ namespace hasheous_server.Classes
                             if (games != null && games.data != null && games.data.count > 0)
                             {
                                 AllowInsert = true;
+                                matchedId = metadataMatch.GameId; // keep the original ID for these sources
+                                responseStatus[Communications.MetadataSources.TheGamesDb] = "OK";
+                            }
+                            else
+                            {
+                                responseStatus[Communications.MetadataSources.TheGamesDb] = $"{System.Net.WebUtility.HtmlEncode(metadataMatch.GameId)} - Not Found";
                             }
                             break;
 
@@ -97,6 +119,12 @@ namespace hasheous_server.Classes
                             if (int.TryParse(metadataMatch.GameId, out _))
                             {
                                 AllowInsert = true;
+                                matchedId = metadataMatch.GameId; // keep the original ID for these sources
+                                responseStatus[metadataMatch.Source] = "OK";
+                            }
+                            else
+                            {
+                                responseStatus[metadataMatch.Source] = $"{System.Net.WebUtility.HtmlEncode(metadataMatch.GameId)} - Not Found";
                             }
                             break;
 
@@ -106,6 +134,12 @@ namespace hasheous_server.Classes
                             if (Uri.TryCreate(url, UriKind.Absolute, out Uri? uri) && uri.Host.Contains("store.epicgames.com"))
                             {
                                 AllowInsert = true;
+                                matchedId = metadataMatch.GameId; // keep the original ID for these sources
+                                responseStatus[Communications.MetadataSources.EpicGameStore] = "OK";
+                            }
+                            else
+                            {
+                                responseStatus[Communications.MetadataSources.EpicGameStore] = $"{System.Net.WebUtility.HtmlEncode(metadataMatch.GameId)} - Not Found";
                             }
                             break;
 
@@ -115,6 +149,12 @@ namespace hasheous_server.Classes
                             if (Uri.TryCreate(url, UriKind.Absolute, out uri) && uri.Host.Contains("store.steampowered.com"))
                             {
                                 AllowInsert = true;
+                                matchedId = metadataMatch.GameId; // keep the original ID for these sources
+                                responseStatus[Communications.MetadataSources.Steam] = "OK";
+                            }
+                            else
+                            {
+                                responseStatus[Communications.MetadataSources.Steam] = $"{System.Net.WebUtility.HtmlEncode(metadataMatch.GameId)} - Not Found";
                             }
                             break;
 
@@ -124,6 +164,12 @@ namespace hasheous_server.Classes
                             if (Uri.TryCreate(url, UriKind.Absolute, out uri) && uri.Host.Contains("www.gog.com"))
                             {
                                 AllowInsert = true;
+                                matchedId = metadataMatch.GameId; // keep the original ID for these sources
+                                responseStatus[Communications.MetadataSources.GOG] = "OK";
+                            }
+                            else
+                            {
+                                responseStatus[Communications.MetadataSources.GOG] = $"{System.Net.WebUtility.HtmlEncode(metadataMatch.GameId)} - Not Found";
                             }
                             break;
 
@@ -132,6 +178,12 @@ namespace hasheous_server.Classes
                             if (long.TryParse(metadataMatch.GameId, out _))
                             {
                                 AllowInsert = true;
+                                matchedId = metadataMatch.GameId; // keep the original ID for these sources
+                                responseStatus[Communications.MetadataSources.SteamGridDb] = "OK";
+                            }
+                            else
+                            {
+                                responseStatus[Communications.MetadataSources.SteamGridDb] = $"{System.Net.WebUtility.HtmlEncode(metadataMatch.GameId)} - Not Found";
                             }
                             break;
 
@@ -141,12 +193,20 @@ namespace hasheous_server.Classes
                             if (Uri.TryCreate(url, UriKind.Absolute, out uri) && uri.Host.Contains("wikipedia.org"))
                             {
                                 AllowInsert = true;
+                                matchedId = metadataMatch.GameId; // keep the original ID for these sources
+                                responseStatus[Communications.MetadataSources.Wikipedia] = "OK";
+                            }
+                            else
+                            {
+                                responseStatus[Communications.MetadataSources.Wikipedia] = $"{System.Net.WebUtility.HtmlEncode(metadataMatch.GameId)} - Not Found";
                             }
                             break;
 
                         default:
                             // other sources can be added here
                             AllowInsert = true; // default to true for other sources
+                            matchedId = metadataMatch.GameId; // keep the original ID for these sources
+                            responseStatus[metadataMatch.Source] = "OK";
                             break;
                     }
 
@@ -169,7 +229,7 @@ namespace hasheous_server.Classes
                                 { "dataObjectId", dataObjectId },
                                 { "userId", UserId },
                                 { "metadataSourceId", metadataMatch.Source },
-                                { "metadataGameId", metadataMatch.GameId }
+                                { "metadataGameId", matchedId }
                             });
                         }
                         else
@@ -182,7 +242,7 @@ namespace hasheous_server.Classes
                                     { "dataObjectId", dataObjectId },
                                     { "userId", UserId },
                                     { "metadataSourceId", metadataMatch.Source },
-                                    { "metadataGameId", metadataMatch.GameId }
+                                    { "metadataGameId", matchedId }
                                 });
                             }
                         }
@@ -195,7 +255,7 @@ namespace hasheous_server.Classes
                 // TODO: add a new hash record on vote submission
             }
 
-            return model;
+            return responseStatus;
         }
 
         /// <summary>
