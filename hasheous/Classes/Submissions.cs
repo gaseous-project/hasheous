@@ -84,7 +84,7 @@ namespace hasheous_server.Classes
                             }
                             else
                             {
-                                responseStatus[Communications.MetadataSources.IGDB] = String.Format("{0} - Not Found", metadataMatch.GameId);
+                                responseStatus[Communications.MetadataSources.IGDB] = $"{System.Net.WebUtility.HtmlEncode(metadataMatch.GameId)} - Not Found";
                             }
                             break;
 
@@ -109,7 +109,7 @@ namespace hasheous_server.Classes
                             }
                             else
                             {
-                                responseStatus[Communications.MetadataSources.TheGamesDb] = String.Format("{0} - Not Found", metadataMatch.GameId);
+                                responseStatus[Communications.MetadataSources.TheGamesDb] = $"{System.Net.WebUtility.HtmlEncode(metadataMatch.GameId)} - Not Found";
                             }
                             break;
 
@@ -124,7 +124,7 @@ namespace hasheous_server.Classes
                             }
                             else
                             {
-                                responseStatus[metadataMatch.Source] = String.Format("{0} - Not Found", metadataMatch.GameId);
+                                responseStatus[metadataMatch.Source] = $"{System.Net.WebUtility.HtmlEncode(metadataMatch.GameId)} - Not Found";
                             }
                             break;
 
@@ -139,7 +139,7 @@ namespace hasheous_server.Classes
                             }
                             else
                             {
-                                responseStatus[Communications.MetadataSources.EpicGameStore] = String.Format("{0} - Not Found", metadataMatch.GameId);
+                                responseStatus[Communications.MetadataSources.EpicGameStore] = $"{System.Net.WebUtility.HtmlEncode(metadataMatch.GameId)} - Not Found";
                             }
                             break;
 
@@ -154,7 +154,7 @@ namespace hasheous_server.Classes
                             }
                             else
                             {
-                                responseStatus[Communications.MetadataSources.Steam] = String.Format("{0} - Not Found", metadataMatch.GameId);
+                                responseStatus[Communications.MetadataSources.Steam] = $"{System.Net.WebUtility.HtmlEncode(metadataMatch.GameId)} - Not Found";
                             }
                             break;
 
@@ -169,7 +169,7 @@ namespace hasheous_server.Classes
                             }
                             else
                             {
-                                responseStatus[Communications.MetadataSources.GOG] = String.Format("{0} - Not Found", metadataMatch.GameId);
+                                responseStatus[Communications.MetadataSources.GOG] = $"{System.Net.WebUtility.HtmlEncode(metadataMatch.GameId)} - Not Found";
                             }
                             break;
 
@@ -183,7 +183,7 @@ namespace hasheous_server.Classes
                             }
                             else
                             {
-                                responseStatus[Communications.MetadataSources.SteamGridDb] = String.Format("{0} - Not Found", metadataMatch.GameId);
+                                responseStatus[Communications.MetadataSources.SteamGridDb] = $"{System.Net.WebUtility.HtmlEncode(metadataMatch.GameId)} - Not Found";
                             }
                             break;
 
@@ -198,7 +198,7 @@ namespace hasheous_server.Classes
                             }
                             else
                             {
-                                responseStatus[Communications.MetadataSources.Wikipedia] = String.Format("{0} - Not Found", metadataMatch.GameId);
+                                responseStatus[Communications.MetadataSources.Wikipedia] = $"{System.Net.WebUtility.HtmlEncode(metadataMatch.GameId)} - Not Found";
                             }
                             break;
 
