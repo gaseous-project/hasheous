@@ -27,6 +27,17 @@ namespace Classes
 
         public async Task<List<Signatures_Games_2>> GetRawSignatures(HashLookupModel model)
         {
+            // check the archive observations for the provided hashes
+            HashLookupModel? observedHashes = await GetObservedArchiveHashesAsync(model);
+            if (observedHashes != null)
+            {
+                // if the archive is observed, return the hashes from the observations
+                model.MD5 = observedHashes.MD5;
+                model.SHA1 = observedHashes.SHA1;
+                model.SHA256 = observedHashes.SHA256;
+                model.CRC = observedHashes.CRC;
+            }
+
             string cacheKey = RedisConnection.GenerateKey("Signature", model);
             // check if the query is cached
             if (Config.RedisConfiguration.Enabled)
@@ -110,6 +121,58 @@ namespace Classes
             else
             {
                 throw new Exception("Invalid search model");
+            }
+        }
+
+        private async Task<HashLookupModel?> GetObservedArchiveHashesAsync(HashLookupModel model)
+        {
+            // check the archive observations for the provided hashes
+            // there needs to be at least 5 submissions with the same hashes for the archive to be considered
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql = @"
+SELECT
+    ContentMD5,
+    ContentSHA1,
+    ContentSHA256,
+    ContentCRC32
+FROM
+    UserArchiveObservations
+WHERE
+    ArchiveMD5 = @md5
+    AND ArchiveSHA1 = @sha1
+    AND ArchiveSHA256 = @sha256
+GROUP BY
+    ContentMD5,
+    ContentSHA1,
+    ContentSHA256
+HAVING
+    COUNT(DISTINCT UserId) >= 5;
+            ";
+
+            DataTable result = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>
+            {
+                { "md5", model.MD5 },
+                { "sha1", model.SHA1 },
+                { "sha256", model.SHA256 },
+                { "crc", model.CRC }
+            });
+
+            // query should only return one row if the archive is observed and meets the criteria
+            if (result.Rows.Count == 1)
+            {
+                DataRow row = result.Rows[0];
+                return new HashLookupModel
+                {
+                    MD5 = row["ContentMD5"].ToString(),
+                    SHA1 = row["ContentSHA1"].ToString(),
+                    SHA256 = row["ContentSHA256"].ToString(),
+                    CRC = row["ContentCRC32"].ToString()
+                };
+            }
+            else
+            {
+                // no observed archive found
+                return null;
             }
         }
 
