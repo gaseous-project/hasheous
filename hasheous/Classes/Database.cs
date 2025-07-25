@@ -497,7 +497,7 @@ namespace Classes
 			}
 		}
 
-		public void BuildTableFromType(string databaseName, string prefix, Type type)
+		public void BuildTableFromType(string databaseName, string prefix, Type type, string overrideId = "")
 		{
 			// Get the table name from the class name
 			string tableName = type.Name;
@@ -519,6 +519,11 @@ namespace Classes
 
 			// Create the table with the basic structure if it does not exist
 			string createTableQuery = $"CREATE TABLE IF NOT EXISTS `{databaseName}`.`{tableName}` (`Id` BIGINT PRIMARY KEY, `dateAdded` DATETIME DEFAULT CURRENT_TIMESTAMP, `lastUpdated` DATETIME DEFAULT CURRENT_TIMESTAMP )";
+			if (!string.IsNullOrEmpty(overrideId))
+			{
+				// If an override ID is provided, use it as the primary key - don't create it now as the field might not exist yet
+				createTableQuery = $"CREATE TABLE IF NOT EXISTS `{databaseName}`.`{tableName}` (`dateAdded` DATETIME DEFAULT CURRENT_TIMESTAMP, `lastUpdated` DATETIME DEFAULT CURRENT_TIMESTAMP )";
+			}
 			db.ExecuteNonQuery(createTableQuery);
 
 			// Loop through each property to add it as a column in the table
@@ -628,6 +633,41 @@ namespace Classes
 				string addColumnQuery = $"ALTER TABLE `{databaseName}`.`{tableName}` ADD COLUMN IF NOT EXISTS `{columnName}` {columnType}";
 				Console.WriteLine($"Executing query: {addColumnQuery}");
 				db.ExecuteNonQuery(addColumnQuery);
+			}
+
+			if (!string.IsNullOrEmpty(overrideId))
+			{
+				// If an override ID is provided, add it as the primary key
+				// check if the primary key already exists - if the columns are not the same, we need to drop the primary key first
+				string checkPrimaryKeyQuery = $"SHOW KEYS FROM `{databaseName}`.`{tableName}` WHERE Key_name = 'PRIMARY'";
+				var primaryKeyResult = db.ExecuteCMD(checkPrimaryKeyQuery);
+				string[] overrideIdFields = overrideId.Split(',').Select(f => f.Trim()).ToArray();
+				if (primaryKeyResult.Rows.Count > 0)
+				{
+					// Primary key already exists, check if the fields match
+					string existingPrimaryKey = "";
+					foreach (DataRow row in primaryKeyResult.Rows)
+					{
+						if (existingPrimaryKey != "")
+						{
+							existingPrimaryKey += ",";
+						}
+						existingPrimaryKey += row["Column_name"].ToString();
+					}
+					string[] existingPrimaryKeyFields = existingPrimaryKey.Split(',').Select(f => f.Trim()).ToArray();
+					if (!overrideIdFields.SequenceEqual(existingPrimaryKeyFields))
+					{
+						// If the primary key fields do not match, we need to drop the primary key first
+						string dropPrimaryKeyQuery = $"ALTER TABLE `{databaseName}`.`{tableName}` DROP PRIMARY KEY";
+						Console.WriteLine($"Executing query: {dropPrimaryKeyQuery}");
+						db.ExecuteNonQuery(dropPrimaryKeyQuery);
+					}
+				}
+
+				// Add the override ID as the primary key
+				string addPrimaryKeyQuery = $"ALTER TABLE `{databaseName}`.`{tableName}` ADD PRIMARY KEY ({overrideId})";
+				Console.WriteLine($"Executing query: {addPrimaryKeyQuery}");
+				db.ExecuteNonQuery(addPrimaryKeyQuery);
 			}
 		}
 	}

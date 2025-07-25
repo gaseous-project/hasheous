@@ -215,7 +215,7 @@ namespace Classes
 
                                     Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
                                     db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Company));
-                                    db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Image));
+                                    db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Image), "guid,original_url");
                                     db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.ImageTag));
                                     db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Platform));
                                     db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Game));
@@ -225,10 +225,11 @@ namespace Classes
                                     db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Review));
                                     db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.UserReview));
 
-                                    gbDownloader.DownloadPlatforms();
-                                    gbDownloader.DownloadGames();
+                                    // gbDownloader.DownloadPlatforms();
+                                    // gbDownloader.DownloadGames();
                                     // gbDownloader.DownloadSubTypes<GiantBomb.Models.GiantBombReviewResponse, GiantBomb.Models.Review>("reviews");
-                                    gbDownloader.DownloadSubTypes<GiantBomb.Models.GiantBombUserReviewResponse, GiantBomb.Models.UserReview>("user_reviews");
+                                    // gbDownloader.DownloadSubTypes<GiantBomb.Models.GiantBombUserReviewResponse, GiantBomb.Models.UserReview>("user_reviews");
+                                    gbDownloader.DownloadImages();
                                     break;
 
                                 case QueueItemType.AutoMapper:

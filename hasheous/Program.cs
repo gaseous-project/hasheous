@@ -433,49 +433,49 @@ ProcessQueue.QueueItems.Add(
         )
     );
 
-ProcessQueue.QueueItems.Add(
-new ProcessQueue.QueueItem(
-    ProcessQueue.QueueItemType.FetchVIMMMetadata,
-    10080,
-    new List<ProcessQueue.QueueItemType>
-    {
-        ProcessQueue.QueueItemType.GetMissingArtwork, ProcessQueue.QueueItemType.MetadataMatchSearch, ProcessQueue.QueueItemType.AutoMapper, ProcessQueue.QueueItemType.FetchTheGamesDbMetadata, ProcessQueue.QueueItemType.FetchRetroAchievementsMetadata
-    }
-    )
-);
+// ProcessQueue.QueueItems.Add(
+// new ProcessQueue.QueueItem(
+//     ProcessQueue.QueueItemType.FetchVIMMMetadata,
+//     10080,
+//     new List<ProcessQueue.QueueItemType>
+//     {
+//         ProcessQueue.QueueItemType.GetMissingArtwork, ProcessQueue.QueueItemType.MetadataMatchSearch, ProcessQueue.QueueItemType.AutoMapper, ProcessQueue.QueueItemType.FetchTheGamesDbMetadata, ProcessQueue.QueueItemType.FetchRetroAchievementsMetadata
+//     }
+//     )
+// );
 
-ProcessQueue.QueueItem fetchTheGamesDbMetadata = new ProcessQueue.QueueItem(ProcessQueue.QueueItemType.FetchTheGamesDbMetadata, 10080, new List<ProcessQueue.QueueItemType> {
-    ProcessQueue.QueueItemType.GetMissingArtwork, ProcessQueue.QueueItemType.MetadataMatchSearch, ProcessQueue.QueueItemType.AutoMapper, ProcessQueue.QueueItemType.FetchVIMMMetadata, ProcessQueue.QueueItemType.FetchRetroAchievementsMetadata, ProcessQueue.QueueItemType.FetchIGDBMetadata
-});
-fetchTheGamesDbMetadata.ForceExecute();
-ProcessQueue.QueueItems.Add(
-    fetchTheGamesDbMetadata
-);
+// ProcessQueue.QueueItem fetchTheGamesDbMetadata = new ProcessQueue.QueueItem(ProcessQueue.QueueItemType.FetchTheGamesDbMetadata, 10080, new List<ProcessQueue.QueueItemType> {
+//     ProcessQueue.QueueItemType.GetMissingArtwork, ProcessQueue.QueueItemType.MetadataMatchSearch, ProcessQueue.QueueItemType.AutoMapper, ProcessQueue.QueueItemType.FetchVIMMMetadata, ProcessQueue.QueueItemType.FetchRetroAchievementsMetadata, ProcessQueue.QueueItemType.FetchIGDBMetadata
+// });
+// fetchTheGamesDbMetadata.ForceExecute();
+// ProcessQueue.QueueItems.Add(
+//     fetchTheGamesDbMetadata
+// );
 
-if (Config.IGDB.UseDumps == true)
-{
-    ProcessQueue.QueueItem fetchIGDBMetadata = new ProcessQueue.QueueItem(ProcessQueue.QueueItemType.FetchIGDBMetadata, 10080, new List<ProcessQueue.QueueItemType> {
-    ProcessQueue.QueueItemType.GetMissingArtwork, ProcessQueue.QueueItemType.MetadataMatchSearch, ProcessQueue.QueueItemType.AutoMapper, ProcessQueue.QueueItemType.FetchVIMMMetadata, ProcessQueue.QueueItemType.FetchRetroAchievementsMetadata, ProcessQueue.QueueItemType.FetchTheGamesDbMetadata
-});
-    fetchIGDBMetadata.ForceExecute();
-    ProcessQueue.QueueItems.Add(
-        fetchIGDBMetadata
-    );
-}
+// if (Config.IGDB.UseDumps == true)
+// {
+//     ProcessQueue.QueueItem fetchIGDBMetadata = new ProcessQueue.QueueItem(ProcessQueue.QueueItemType.FetchIGDBMetadata, 10080, new List<ProcessQueue.QueueItemType> {
+//     ProcessQueue.QueueItemType.GetMissingArtwork, ProcessQueue.QueueItemType.MetadataMatchSearch, ProcessQueue.QueueItemType.AutoMapper, ProcessQueue.QueueItemType.FetchVIMMMetadata, ProcessQueue.QueueItemType.FetchRetroAchievementsMetadata, ProcessQueue.QueueItemType.FetchTheGamesDbMetadata
+// });
+//     fetchIGDBMetadata.ForceExecute();
+//     ProcessQueue.QueueItems.Add(
+//         fetchIGDBMetadata
+//     );
+// }
 
-if (Config.RetroAchievements.APIKey != null)
-{
-    if (Config.RetroAchievements.APIKey != "")
-    {
-        ProcessQueue.QueueItem fetchRetroAchievementsMetadata = new ProcessQueue.QueueItem(ProcessQueue.QueueItemType.FetchRetroAchievementsMetadata, 10080, new List<ProcessQueue.QueueItemType> {
-    ProcessQueue.QueueItemType.GetMissingArtwork, ProcessQueue.QueueItemType.MetadataMatchSearch, ProcessQueue.QueueItemType.AutoMapper, ProcessQueue.QueueItemType.FetchVIMMMetadata, ProcessQueue.QueueItemType.FetchTheGamesDbMetadata, ProcessQueue.QueueItemType.FetchIGDBMetadata
-});
-        fetchRetroAchievementsMetadata.ForceExecute();
-        ProcessQueue.QueueItems.Add(
-            fetchRetroAchievementsMetadata
-        );
-    }
-}
+// if (Config.RetroAchievements.APIKey != null)
+// {
+//     if (Config.RetroAchievements.APIKey != "")
+//     {
+//         ProcessQueue.QueueItem fetchRetroAchievementsMetadata = new ProcessQueue.QueueItem(ProcessQueue.QueueItemType.FetchRetroAchievementsMetadata, 10080, new List<ProcessQueue.QueueItemType> {
+//     ProcessQueue.QueueItemType.GetMissingArtwork, ProcessQueue.QueueItemType.MetadataMatchSearch, ProcessQueue.QueueItemType.AutoMapper, ProcessQueue.QueueItemType.FetchVIMMMetadata, ProcessQueue.QueueItemType.FetchTheGamesDbMetadata, ProcessQueue.QueueItemType.FetchIGDBMetadata
+// });
+//         fetchRetroAchievementsMetadata.ForceExecute();
+//         ProcessQueue.QueueItems.Add(
+//             fetchRetroAchievementsMetadata
+//         );
+//     }
+// }
 
 if (Config.GiantBomb.APIKey != null)
 {
@@ -498,17 +498,6 @@ MetadataSearch.ForceExecute();
 ProcessQueue.QueueItems.Add(
     MetadataSearch
 );
-
-// ProcessQueue.QueueItems.Add(
-// new ProcessQueue.QueueItem(
-//     ProcessQueue.QueueItemType.AutoMapper,
-//     10080,
-//     new List<ProcessQueue.QueueItemType>
-//     {
-//         ProcessQueue.QueueItemType.GetMissingArtwork, ProcessQueue.QueueItemType.MetadataMatchSearch, ProcessQueue.QueueItemType.TallyVotes, ProcessQueue.QueueItemType.FetchTheGamesDbMetadata, ProcessQueue.QueueItemType.FetchVIMMMetadata
-//     }
-//     )
-// );
 
 ProcessQueue.QueueItems.Add(
     new ProcessQueue.QueueItem(

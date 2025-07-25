@@ -1039,30 +1039,30 @@ namespace hasheous_server.Controllers.v1_0
         #endregion TheGamesDB
 
         #region GiantBomb
-        [MapToApiVersion("1.0")]
-        [HttpGet]
-        [ProducesResponseType(typeof(GiantBomb.Models.GiantBombGenericResponse), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [Route("GiantBomb/game")]
-        [Route("GiantBomb/games")]
-        public async Task<IActionResult> GetGiantBombGames(string? filter = null, string? sort = null, int limit = 100, int offset = 0)
-        {
-            // Validate input parameters
-            if (limit <= 0 || offset < 0)
-            {
-                return BadRequest("Invalid limit or offset.");
-            }
+        // [MapToApiVersion("1.0")]
+        // [HttpGet]
+        // [ProducesResponseType(typeof(GiantBomb.Models.GiantBombGenericResponse), StatusCodes.Status200OK)]
+        // [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        // [Route("GiantBomb/game")]
+        // [Route("GiantBomb/games")]
+        // public async Task<IActionResult> GetGiantBombGames(string? filter = null, string? sort = null, int limit = 100, int offset = 0)
+        // {
+        //     // Validate input parameters
+        //     if (limit <= 0 || offset < 0)
+        //     {
+        //         return BadRequest("Invalid limit or offset.");
+        //     }
 
-            // Search for metadata
-            GiantBomb.Models.GiantBombGenericResponse response = GiantBomb.MetadataQuery.SearchForMetadata<GiantBomb.Models.Game>(filter, sort, limit, offset);
+        //     // Search for metadata
+        //     GiantBomb.Models.GiantBombGenericResponse response = GiantBomb.MetadataQuery.SearchForMetadata<GiantBomb.Models.Game>(filter, sort, limit, offset);
 
-            if (response.results == null || response.results.Count == 0)
-            {
-                return NotFound(new Dictionary<string, string> { { "Error", "No games found matching the search criteria." } });
-            }
+        //     if (response.results == null || response.results.Count == 0)
+        //     {
+        //         return NotFound(new Dictionary<string, string> { { "Error", "No games found matching the search criteria." } });
+        //     }
 
-            return Ok(response);
-        }
+        //     return Ok(response);
+        // }
 
         #endregion GiantBomb
     }
