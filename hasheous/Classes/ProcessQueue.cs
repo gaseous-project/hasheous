@@ -225,10 +225,10 @@ namespace Classes
                                     db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Review));
                                     db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.UserReview));
 
-                                    // gbDownloader.DownloadPlatforms();
-                                    // gbDownloader.DownloadGames();
+                                    gbDownloader.DownloadPlatforms();
+                                    gbDownloader.DownloadGames();
                                     // gbDownloader.DownloadSubTypes<GiantBomb.Models.GiantBombReviewResponse, GiantBomb.Models.Review>("reviews");
-                                    // gbDownloader.DownloadSubTypes<GiantBomb.Models.GiantBombUserReviewResponse, GiantBomb.Models.UserReview>("user_reviews");
+                                    gbDownloader.DownloadSubTypes<GiantBomb.Models.GiantBombUserReviewResponse, GiantBomb.Models.UserReview>("user_reviews");
                                     gbDownloader.DownloadImages();
                                     break;
 
