@@ -3,7 +3,7 @@ namespace Classes.ProcessQueue
     /// <summary>
     /// Represents a queue task that fetches metadata from TheGamesDB.
     /// </summary>
-    public class FetchTheGamesDbMetadata
+    public class FetchTheGamesDbMetadata : IQueueTask
     {
         /// <inheritdoc/>
         public List<QueueItemType> Blocks => new List<QueueItemType>

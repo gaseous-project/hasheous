@@ -26,6 +26,59 @@ namespace Classes.ProcessQueue
                 _Interval = ExecutionInterval;
                 _AllowManualStart = AllowManualStart;
                 _RemoveWhenStopped = RemoveWhenStopped;
+
+                _SaveLastRunTime = true;
+
+                switch (ItemType)
+                {
+                    case QueueItemType.SignatureIngestor:
+                        Task = new SignatureIngestor();
+                        break;
+
+                    case QueueItemType.TallyVotes:
+                        Task = new TallyVotes();
+                        break;
+
+                    case QueueItemType.MetadataMatchSearch:
+                        Task = new MetadataMatchSearch();
+                        break;
+
+                    case QueueItemType.GetMissingArtwork:
+                        Task = new GetMissingArtwork();
+                        break;
+
+                    case QueueItemType.FetchVIMMMetadata:
+                        Task = new FetchVIMMMetadata();
+                        break;
+
+                    case QueueItemType.FetchTheGamesDbMetadata:
+                        Task = new FetchTheGamesDbMetadata();
+                        break;
+
+                    case QueueItemType.FetchRetroAchievementsMetadata:
+                        Task = new FetchRetroAchievementsMetadata();
+                        break;
+
+                    case QueueItemType.FetchIGDBMetadata:
+                        Task = new FetchIGDBMetadata();
+                        break;
+
+                    case QueueItemType.FetchGiantBombMetadata:
+                        Task = new FetchGiantBombMetadata();
+                        break;
+
+                    case QueueItemType.DailyMaintenance:
+                        Task = new DailyMaintenance();
+                        break;
+
+                    case QueueItemType.WeeklyMaintenance:
+                        Task = new WeeklyMaintenance();
+                        break;
+
+                    case QueueItemType.CacheWarmer:
+                        Task = new CacheWarmer();
+                        break;
+                }
             }
 
             private QueueItemType _ItemType = QueueItemType.NotConfigured;

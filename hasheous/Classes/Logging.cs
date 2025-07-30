@@ -182,7 +182,7 @@ namespace Classes
                     dbDict.Add("callingprocess", callingProcess);
                     dbDict.Add("callinguser", callingUser);
 
-                    Task.Run(async () =>
+                    _ = Task.Run(async () =>
                     {
                         try
                         {
@@ -190,30 +190,30 @@ namespace Classes
                         }
                         catch (Exception ex)
                         {
-                            LogToDisk(logItem, TraceOutput, ex);
+                            await LogToDisk(logItem, TraceOutput, ex);
                         }
                     });
                 }
                 else
                 {
-                    LogToDisk(logItem, TraceOutput, null);
+                    _ = LogToDisk(logItem, TraceOutput, null);
                 }
             }
         }
 
-        static void LogToDisk(LogItem logItem, string TraceOutput, Exception? exception)
+        static async Task LogToDisk(LogItem logItem, string TraceOutput, Exception? exception)
         {
             if (exception != null)
             {
                 // dump the error
-                File.AppendAllText(Config.LogFilePath, logItem.EventTime.ToString("yyyyMMdd HHmmss") + ": " + logItem.EventType.ToString() + ": " + logItem.Process + ": " + logItem.Message + Environment.NewLine + exception.ToString());
+                await File.AppendAllTextAsync(Config.LogFilePath, logItem.EventTime.ToString("yyyyMMdd HHmmss") + ": " + logItem.EventType.ToString() + ": " + logItem.Process + ": " + logItem.Message + Environment.NewLine + exception.ToString());
 
 
                 // something went wrong writing to the db
-                File.AppendAllText(Config.LogFilePath, logItem.EventTime.ToString("yyyyMMdd HHmmss") + ": The following event was unable to be written to the log database:");
+                await File.AppendAllTextAsync(Config.LogFilePath, logItem.EventTime.ToString("yyyyMMdd HHmmss") + ": The following event was unable to be written to the log database:");
             }
 
-            File.AppendAllText(Config.LogFilePath, TraceOutput);
+            await File.AppendAllTextAsync(Config.LogFilePath, TraceOutput);
         }
 
         /// <summary>
