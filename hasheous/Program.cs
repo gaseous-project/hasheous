@@ -404,51 +404,31 @@ app.Use(async (context, next) =>
 });
 
 // add background tasks
-QueueProcessor.QueueItem signatureIngestor = new QueueProcessor.QueueItem(QueueItemType.SignatureIngestor, 60, new List<QueueItemType>());
-signatureIngestor.ForceExecute();
-QueueProcessor.QueueItems.Add(
-    signatureIngestor
-    );
-
-var signatureIngestorQueueItem = new QueueProcessor.QueueItem(QueueItemType.SignatureIngestor, 60, new List<QueueItemType>());
-QueueProcessor.QueueItems.Add(signatureIngestorQueueItem);
+var signatureIngestor = new QueueProcessor.QueueItem(QueueItemType.SignatureIngestor, 60);
+QueueProcessor.QueueItems.Add(signatureIngestor);
 
 QueueProcessor.QueueItems.Add(
     new QueueProcessor.QueueItem(
         QueueItemType.TallyVotes,
-        1440,
-        new List<QueueItemType>
-        {
-            QueueItemType.GetMissingArtwork, QueueItemType.MetadataMatchSearch
-        }
+        1440
         )
     );
 
 QueueProcessor.QueueItems.Add(
 new QueueProcessor.QueueItem(
     QueueItemType.FetchVIMMMetadata,
-    10080,
-    new List<QueueItemType>
-    {
-        QueueItemType.GetMissingArtwork, QueueItemType.MetadataMatchSearch
-    }
+    10080
     )
 );
 
-QueueProcessor.QueueItem fetchTheGamesDbMetadata = new QueueProcessor.QueueItem(QueueItemType.FetchTheGamesDbMetadata, 10080, new List<QueueItemType> {
-    QueueItemType.GetMissingArtwork, QueueItemType.MetadataMatchSearch
-});
-fetchTheGamesDbMetadata.ForceExecute();
+QueueProcessor.QueueItem fetchTheGamesDbMetadata = new QueueProcessor.QueueItem(QueueItemType.FetchTheGamesDbMetadata, 10080);
 QueueProcessor.QueueItems.Add(
     fetchTheGamesDbMetadata
 );
 
 if (Config.IGDB.UseDumps == true)
 {
-    QueueProcessor.QueueItem fetchIGDBMetadata = new QueueProcessor.QueueItem(QueueItemType.FetchIGDBMetadata, 10080, new List<QueueItemType> {
-    QueueItemType.GetMissingArtwork, QueueItemType.MetadataMatchSearch
-});
-    fetchIGDBMetadata.ForceExecute();
+    QueueProcessor.QueueItem fetchIGDBMetadata = new QueueProcessor.QueueItem(QueueItemType.FetchIGDBMetadata, 10080);
     QueueProcessor.QueueItems.Add(
         fetchIGDBMetadata
     );
@@ -458,10 +438,7 @@ if (Config.RetroAchievements.APIKey != null)
 {
     if (Config.RetroAchievements.APIKey != "")
     {
-        QueueProcessor.QueueItem fetchRetroAchievementsMetadata = new QueueProcessor.QueueItem(QueueItemType.FetchRetroAchievementsMetadata, 10080, new List<QueueItemType> {
-    QueueItemType.GetMissingArtwork, QueueItemType.MetadataMatchSearch
-});
-        fetchRetroAchievementsMetadata.ForceExecute();
+        QueueProcessor.QueueItem fetchRetroAchievementsMetadata = new QueueProcessor.QueueItem(QueueItemType.FetchRetroAchievementsMetadata, 10080);
         QueueProcessor.QueueItems.Add(
             fetchRetroAchievementsMetadata
         );
@@ -472,20 +449,14 @@ if (Config.GiantBomb.APIKey != null)
 {
     if (Config.GiantBomb.APIKey != "")
     {
-        QueueProcessor.QueueItem fetchGiantBombMetadata = new QueueProcessor.QueueItem(QueueItemType.FetchGiantBombMetadata, 120, new List<QueueItemType> {
-    QueueItemType.GetMissingArtwork, QueueItemType.MetadataMatchSearch
-});
-        fetchGiantBombMetadata.ForceExecute();
+        QueueProcessor.QueueItem fetchGiantBombMetadata = new QueueProcessor.QueueItem(QueueItemType.FetchGiantBombMetadata, 120);
         QueueProcessor.QueueItems.Add(
             fetchGiantBombMetadata
         );
     }
 }
 
-QueueProcessor.QueueItem MetadataSearch = new QueueProcessor.QueueItem(QueueItemType.MetadataMatchSearch, 120, new List<QueueItemType> {
-    QueueItemType.GetMissingArtwork, QueueItemType.TallyVotes
-});
-MetadataSearch.ForceExecute();
+QueueProcessor.QueueItem MetadataSearch = new QueueProcessor.QueueItem(QueueItemType.MetadataMatchSearch, 120);
 QueueProcessor.QueueItems.Add(
     MetadataSearch
 );
@@ -493,30 +464,19 @@ QueueProcessor.QueueItems.Add(
 QueueProcessor.QueueItems.Add(
     new QueueProcessor.QueueItem(
         QueueItemType.DailyMaintenance,
-        1440,
-        new List<QueueItemType>
-        {
-            QueueItemType.All
-        }
-        )
+        1440)
     );
 
 QueueProcessor.QueueItems.Add(
     new QueueProcessor.QueueItem(
         QueueItemType.WeeklyMaintenance,
-        10080,
-        new List<QueueItemType>{
-            QueueItemType.All
-        }
-        )
+        10080)
     );
 
 QueueProcessor.QueueItems.Add(
     new QueueProcessor.QueueItem(
         QueueItemType.CacheWarmer,
-        30,
-        new List<QueueItemType>()
-        )
+        30)
     );
 
 Logging.WriteToDiskOnly = false;

@@ -8,7 +8,11 @@ namespace Classes.ProcessQueue
     public class TallyVotes : IQueueTask
     {
         /// <inheritdoc/>
-        public string TaskName { get; set; } = "TallyVotes";
+        public List<QueueItemType> Blocks => new List<QueueItemType>
+        {
+            QueueItemType.GetMissingArtwork,
+            QueueItemType.MetadataMatchSearch
+        };
 
         /// <inheritdoc/>
         public async Task<object?> ExecuteAsync()

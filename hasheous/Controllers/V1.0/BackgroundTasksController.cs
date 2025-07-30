@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Classes;
 using Microsoft.AspNetCore.Authorization;
+using Classes.ProcessQueue;
 
 namespace hasheous_server.Controllers.v1_0
 {
@@ -19,9 +20,9 @@ namespace hasheous_server.Controllers.v1_0
         [MapToApiVersion("1.0")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [AllowAnonymous]
-        public List<ProcessQueue.QueueItem> GetQueue()
+        public List<QueueProcessor.QueueItem> GetQueue()
         {
-            return ProcessQueue.QueueItems;
+            return QueueProcessor.QueueItems;
         }
 
         [HttpGet]
@@ -30,9 +31,9 @@ namespace hasheous_server.Controllers.v1_0
         [Authorize(Roles = "Admin")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public ActionResult<ProcessQueue.QueueItem> ForceRun(ProcessQueue.QueueItemType TaskType, Boolean ForceRun)
+        public ActionResult<QueueProcessor.QueueItem> ForceRun(QueueItemType TaskType, Boolean ForceRun)
         {
-            foreach (ProcessQueue.QueueItem qi in ProcessQueue.QueueItems)
+            foreach (QueueProcessor.QueueItem qi in QueueProcessor.QueueItems)
             {
                 if (qi.AllowManualStart == true)
                 {

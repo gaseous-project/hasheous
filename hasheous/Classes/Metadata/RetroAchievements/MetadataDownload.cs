@@ -193,7 +193,7 @@ namespace RetroAchievements
             // force start the signature ingest process
             foreach (var process in Classes.ProcessQueue.QueueProcessor.QueueItems)
             {
-                if (process.ItemType == Classes.ProcessQueue.QueueProcessor.QueueItemType.SignatureIngestor)
+                if (process.ItemType == Classes.ProcessQueue.QueueItemType.SignatureIngestor)
                 {
                     process.ForceExecute();
                 }

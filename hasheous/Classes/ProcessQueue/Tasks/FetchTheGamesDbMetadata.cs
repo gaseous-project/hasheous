@@ -6,7 +6,11 @@ namespace Classes.ProcessQueue
     public class FetchTheGamesDbMetadata
     {
         /// <inheritdoc/>
-        public string TaskName { get; set; } = "FetchTheGamesDbMetadata";
+        public List<QueueItemType> Blocks => new List<QueueItemType>
+        {
+            QueueItemType.GetMissingArtwork,
+            QueueItemType.MetadataMatchSearch
+        };
 
         /// <inheritdoc/>
         public async Task<object?> ExecuteAsync()

@@ -11,7 +11,7 @@ namespace Classes.ProcessQueue
     public class CacheWarmer : IQueueTask
     {
         /// <inheritdoc/>
-        public string TaskName { get; set; } = "CacheWarmer";
+        public List<QueueItemType> Blocks => new List<QueueItemType>();
 
         /// <inheritdoc/>
         public async Task<object?> ExecuteAsync()

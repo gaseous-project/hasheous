@@ -8,7 +8,11 @@ namespace Classes.ProcessQueue
     public class MetadataMatchSearch : IQueueTask
     {
         /// <inheritdoc/>
-        public string TaskName { get; set; } = "MetadataMatchSearch";
+        public List<QueueItemType> Blocks => new List<QueueItemType>
+        {
+            QueueItemType.GetMissingArtwork,
+            QueueItemType.TallyVotes
+        };
 
         /// <inheritdoc/>
         public async Task<object?> ExecuteAsync()

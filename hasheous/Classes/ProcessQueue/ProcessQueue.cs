@@ -28,17 +28,6 @@ namespace Classes.ProcessQueue
                 _RemoveWhenStopped = RemoveWhenStopped;
             }
 
-            public QueueItem(QueueItemType ItemType, int ExecutionInterval, List<QueueItemType> Blocks, bool AllowManualStart = true, bool RemoveWhenStopped = false)
-            {
-                _ItemType = ItemType;
-                _ItemState = QueueItemState.NeverStarted;
-                _LastRunTime = Config.ReadSetting("LastRun_" + _ItemType.ToString(), DateTime.UtcNow);
-                _Interval = ExecutionInterval;
-                _AllowManualStart = AllowManualStart;
-                _RemoveWhenStopped = RemoveWhenStopped;
-                _Blocks = Blocks;
-            }
-
             private QueueItemType _ItemType = QueueItemType.NotConfigured;
             private QueueItemState _ItemState = QueueItemState.NeverStarted;
             private DateTime _LastRunTime = DateTime.UtcNow;
@@ -65,7 +54,6 @@ namespace Classes.ProcessQueue
             private bool _RemoveWhenStopped = false;
             private bool _IsBlocked = false;
             private string _CorrelationId = "";
-            private List<QueueItemType> _Blocks = new List<QueueItemType>();
 
             public QueueItemType ItemType => _ItemType;
             public QueueItemState ItemState => _ItemState;
@@ -89,9 +77,22 @@ namespace Classes.ProcessQueue
             public string CorrelationId => _CorrelationId;
             public bool IsBlocked => _IsBlocked;
             public object? Options { get; set; } = null;
-            public List<QueueItemType> Blocks => _Blocks;
 
             public IQueueTask? Task { get; set; } = null;
+            public List<QueueItemType> Blocks
+            {
+                get
+                {
+                    if (Task != null)
+                    {
+                        return Task.Blocks;
+                    }
+                    else
+                    {
+                        return new List<QueueItemType>();
+                    }
+                }
+            }
 
             public async Task Execute()
             {

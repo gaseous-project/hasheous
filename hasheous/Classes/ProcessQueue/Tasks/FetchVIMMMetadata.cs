@@ -9,7 +9,11 @@ namespace Classes.ProcessQueue
     public class FetchVIMMMetadata : IQueueTask
     {
         /// <inheritdoc/>
-        public string TaskName { get; set; } = "FetchVIMMMetadata";
+        public List<QueueItemType> Blocks => new List<QueueItemType>
+        {
+            QueueItemType.GetMissingArtwork,
+            QueueItemType.MetadataMatchSearch
+        };
 
         /// <inheritdoc/>
         public async Task<object?> ExecuteAsync()

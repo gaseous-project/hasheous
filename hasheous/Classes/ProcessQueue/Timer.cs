@@ -29,17 +29,19 @@ namespace Classes
             //_logger.LogInformation(
             //    "Timed Hosted Service is working. Count: {Count}", count);
 
-            List<ProcessQueue.QueueItem> ActiveList = new List<ProcessQueue.QueueItem>();
-            ActiveList.AddRange(ProcessQueue.QueueItems);
-            foreach (ProcessQueue.QueueItem qi in ActiveList) {
-                if (CheckIfProcessIsBlockedByOthers(qi) == false) {
+            List<ProcessQueue.QueueProcessor.QueueItem> ActiveList = new List<ProcessQueue.QueueProcessor.QueueItem>();
+            ActiveList.AddRange(ProcessQueue.QueueProcessor.QueueItems);
+            foreach (ProcessQueue.QueueProcessor.QueueItem qi in ActiveList)
+            {
+                if (CheckIfProcessIsBlockedByOthers(qi) == false)
+                {
                     qi.BlockedState(false);
                     if (DateTime.UtcNow > qi.NextRunTime || qi.Force == true)
                     {
                         qi.Execute();
-                        if (qi.RemoveWhenStopped == true && qi.ItemState == ProcessQueue.QueueItemState.Stopped)
+                        if (qi.RemoveWhenStopped == true && qi.ItemState == ProcessQueue.QueueProcessor.QueueItemState.Stopped)
                         {
-                            ProcessQueue.QueueItems.Remove(qi);
+                            ProcessQueue.QueueProcessor.QueueItems.Remove(qi);
                         }
                     }
                 }
@@ -62,11 +64,12 @@ namespace Classes
             _timer?.Dispose();
         }
 
-        private bool CheckIfProcessIsBlockedByOthers(ProcessQueue.QueueItem queueItem)
+        private bool CheckIfProcessIsBlockedByOthers(ProcessQueue.QueueProcessor.QueueItem queueItem)
         {
-            foreach (ProcessQueue.QueueItem qi in ProcessQueue.QueueItems)
+            foreach (ProcessQueue.QueueProcessor.QueueItem qi in ProcessQueue.QueueProcessor.QueueItems)
             {
-                if (qi.ItemState == ProcessQueue.QueueItemState.Running) {
+                if (qi.ItemState == ProcessQueue.QueueProcessor.QueueItemState.Running)
+                {
                     // other service is running, check if queueItem is blocked by it
                     if (
                         qi.Blocks.Contains(queueItem.ItemType) ||

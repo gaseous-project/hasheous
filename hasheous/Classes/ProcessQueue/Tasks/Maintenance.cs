@@ -6,7 +6,10 @@ namespace Classes.ProcessQueue
     public class DailyMaintenance : IQueueTask
     {
         /// <inheritdoc/>
-        public string TaskName { get; set; } = "DailyMaintenance";
+        public List<QueueItemType> Blocks => new List<QueueItemType>
+        {
+            QueueItemType.All
+        };
 
         /// <inheritdoc/>
         public async Task<object?> ExecuteAsync()
@@ -24,7 +27,10 @@ namespace Classes.ProcessQueue
     public class WeeklyMaintenance : IQueueTask
     {
         /// <inheritdoc/>
-        public string TaskName { get; set; } = "WeeklyMaintenance";
+        public List<QueueItemType> Blocks => new List<QueueItemType>
+        {
+            QueueItemType.All
+        };
 
         /// <inheritdoc/>
         public async Task<object?> ExecuteAsync()

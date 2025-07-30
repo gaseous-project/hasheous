@@ -6,7 +6,11 @@ namespace Classes.ProcessQueue
     public class FetchRetroAchievementsMetadata : IQueueTask
     {
         /// <inheritdoc/>
-        public string TaskName { get; set; } = "FetchRetroAchievementsMetadata";
+        public List<QueueItemType> Blocks => new List<QueueItemType>
+        {
+            QueueItemType.GetMissingArtwork,
+            QueueItemType.MetadataMatchSearch
+        };
 
         /// <inheritdoc/>
         public async Task<object?> ExecuteAsync()

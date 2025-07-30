@@ -8,9 +8,9 @@ namespace Classes.ProcessQueue
     public interface IQueueTask
     {
         /// <summary>
-        /// Gets or sets the name of the task.
+        /// Gets or sets the list of queue items blocked by this task.
         /// </summary>
-        string TaskName { get; set; }
+        List<QueueItemType> Blocks { get; }
 
         /// <summary>
         /// Executes the task asynchronously.

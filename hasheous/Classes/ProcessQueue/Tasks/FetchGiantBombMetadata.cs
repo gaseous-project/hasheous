@@ -3,10 +3,14 @@ namespace Classes.ProcessQueue
     /// <summary>
     /// Represents a queue task that fetches metadata from GiantBomb and updates the database accordingly.
     /// </summary>
-        public class FetchGiantBombMetadata : IQueueTask
+    public class FetchGiantBombMetadata : IQueueTask
     {
         /// <inheritdoc/>
-        public string TaskName { get; set; } = "FetchGiantBombMetadata";
+        public List<QueueItemType> Blocks => new List<QueueItemType>
+        {
+            QueueItemType.GetMissingArtwork,
+            QueueItemType.MetadataMatchSearch
+        };
 
         /// <inheritdoc/>
         public async Task<object?> ExecuteAsync()

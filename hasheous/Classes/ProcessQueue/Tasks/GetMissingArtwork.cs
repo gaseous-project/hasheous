@@ -6,7 +6,11 @@ namespace Classes.ProcessQueue
     public class GetMissingArtwork : IQueueTask
     {
         /// <inheritdoc/>
-        public string TaskName { get; set; } = "GetMissingArtwork";
+        public List<QueueItemType> Blocks => new List<QueueItemType>
+        {
+            QueueItemType.MetadataMatchSearch,
+            QueueItemType.TallyVotes
+        };
 
         /// <inheritdoc/>
         public async Task<object?> ExecuteAsync()

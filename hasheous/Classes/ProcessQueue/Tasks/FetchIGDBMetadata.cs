@@ -7,7 +7,11 @@ namespace Classes.ProcessQueue
     public class FetchIGDBMetadata : IQueueTask
     {
         /// <inheritdoc/>
-        public string TaskName { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+        public List<QueueItemType> Blocks => new List<QueueItemType>
+        {
+            QueueItemType.GetMissingArtwork,
+            QueueItemType.MetadataMatchSearch
+        };
 
         /// <inheritdoc/>
         public async Task<object?> ExecuteAsync()
