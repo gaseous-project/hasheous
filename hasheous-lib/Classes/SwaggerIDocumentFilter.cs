@@ -1,6 +1,5 @@
 using System.Text.Json;
 using hasheous_server.Classes.Metadata.IGDB;
-using hasheous_server.Controllers.v1_0;
 using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerGen;

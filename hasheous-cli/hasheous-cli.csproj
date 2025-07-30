@@ -22,6 +22,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\hasheous\hasheous.csproj" />
+    <ProjectReference Include="..\hasheous-lib\hasheous-lib.csproj" />
   </ItemGroup>
 </Project>

@@ -134,7 +134,6 @@ builder.Services.AddSwaggerGen(options =>
         });
 
         options.OperationFilter<AuthorizationOperationFilter>();
-        options.DocumentFilter<IGDBMetadataDocumentFilter>();
 
         options.SwaggerDoc("v1", new OpenApiInfo
         {
