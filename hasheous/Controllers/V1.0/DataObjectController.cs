@@ -551,7 +551,7 @@ namespace hasheous_server.Controllers.v1_0
 
                 if (forceScan)
                 {
-                    DataObjects.DataObjectMetadataSearch(ObjectType, Id, true);
+                    await DataObjects.DataObjectMetadataSearch(ObjectType, Id, true);
                 }
 
                 return Ok(DataObjects.GetMetadataMap(ObjectType, Id));

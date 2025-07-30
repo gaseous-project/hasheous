@@ -43,7 +43,7 @@ namespace TheGamesDB.JSON
             return age.TotalDays > MaxAgeInDays;
         }
 
-        public string Download()
+        public async Task<string> Download()
         {
             if (!Directory.Exists(LocalFilePath))
             {
@@ -55,8 +55,8 @@ namespace TheGamesDB.JSON
                 Logging.Log(Logging.LogType.Information, "TheGamesDb", "Downloading meadata database from TheGamesDb");
                 using (var client = new WebClient())
                 {
-                    var json = client.DownloadString(Url);
-                    File.WriteAllText(LocalFileName, json);
+                    var json = await client.DownloadStringTaskAsync(new Uri(Url));
+                    await File.WriteAllTextAsync(LocalFileName, json);
                 }
             }
             else

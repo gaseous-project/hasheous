@@ -53,7 +53,10 @@ namespace GiantBomb
         }
 
 
-        public void DownloadPlatforms()
+        /// <summary>
+        /// Downloads platform data from GiantBomb and updates the local database asynchronously.
+        /// </summary>
+        public async Task DownloadPlatforms()
         {
             // ensure that the local file path exists
             if (!Directory.Exists(LocalFilePath))
@@ -68,23 +71,23 @@ namespace GiantBomb
             // Add an index to the Name column
             string indexQuery = $"CREATE INDEX IF NOT EXISTS `idx_Platform_name` ON `{dbName}`.`Platform` (`name`); CREATE INDEX IF NOT EXISTS `idx_Platform_aliases` ON `{dbName}`.`Platform` (`aliases`);";
             Console.WriteLine($"Executing query: {indexQuery}");
-            db.ExecuteNonQuery(indexQuery);
+            await Task.Run(() => db.ExecuteNonQuery(indexQuery));
 
             // Add a Full Text Search index to the Name column
             // Check if the FULLTEXT index already exists before adding it
             string checkFullTextIndexQuery = $@"
-                SELECT * 
-                FROM information_schema.STATISTICS 
-                WHERE table_schema = '{dbName}' 
-                  AND table_name = 'Platform' 
-                  AND index_name = 'ft_idx_Platform_name'";
-            var fullTextIndexExists = Convert.ToInt32(db.ExecuteCMD(checkFullTextIndexQuery).Rows.Count) > 0;
+                        SELECT * 
+                        FROM information_schema.STATISTICS 
+                        WHERE table_schema = '{dbName}' 
+                          AND table_name = 'Platform' 
+                          AND index_name = 'ft_idx_Platform_name'";
+            var fullTextIndexExists = Convert.ToInt32((await db.ExecuteCMDAsync(checkFullTextIndexQuery)).Rows.Count) > 0;
 
             string fullTextIndexQuery = $"ALTER TABLE `{dbName}`.`Platform` ADD FULLTEXT INDEX `ft_idx_Platform_name` (`name`); ALTER TABLE `{dbName}`.`Platform` ADD FULLTEXT INDEX `ft_idx_Platform_aliases` (`aliases`);";
             if (!fullTextIndexExists)
             {
                 Console.WriteLine($"Executing query: {fullTextIndexQuery}");
-                db.ExecuteNonQuery(fullTextIndexQuery);
+                await Task.Run(() => db.ExecuteNonQuery(fullTextIndexQuery));
             }
             else
             {
@@ -114,7 +117,7 @@ namespace GiantBomb
                 {
                     // Fetch platforms from GiantBomb API
                     string url = $"/api/platforms/?api_key={Config.GiantBomb.APIKey}&format=json&limit=100&offset={offset}";
-                    var json = GetJson<Models.GiantBombPlatformResponse>(url);
+                    var json = await Task.Run(() => GetJson<Models.GiantBombPlatformResponse>(url));
 
                     if (json.results == null || json.results.Count == 0)
                     {
@@ -128,7 +131,7 @@ namespace GiantBomb
                         if (platform is GiantBomb.Models.Platform platformDict)
                         {
                             // Assuming you have a Database instance `db` and an object `myObj`:
-                            StoreObjectWithSubclasses(platform, db, dbName, platform.id);
+                            await StoreObjectWithSubclasses(platform, db, dbName, platform.id);
 
                             // Log the platform processing
                             Logging.Log(Logging.LogType.Information, "GiantBomb", $"Processed platform: {platformDict.name}");
@@ -146,7 +149,7 @@ namespace GiantBomb
                     offset += 100;
 
                     // To avoid hitting API rate limits, delay the next request
-                    System.Threading.Thread.Sleep(5000); // Sleep for 5 seconds
+                    await Task.Delay(5000); // Sleep for 5 seconds
                 }
             }
 
@@ -154,13 +157,15 @@ namespace GiantBomb
             Config.SetSetting("GiantBomb_LastPlatformFetch", DateTime.UtcNow);
 
             Logging.Log(Logging.LogType.Information, "GiantBomb", "Finished downloading platforms from GiantBomb.");
+
+            return;
         }
 
-        public void DownloadGames()
+        public async Task DownloadGames()
         {
             // get the list of platforms from the database
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            var platforms = db.ExecuteCMD($"SELECT Id FROM {dbName}.Platform;");
+            var platforms = await db.ExecuteCMDAsync($"SELECT Id FROM {dbName}.Platform;");
 
             // check if there are any platforms to download games for
             if (platforms.Rows.Count == 0)
@@ -173,11 +178,13 @@ namespace GiantBomb
             foreach (DataRow row in platforms.Rows)
             {
                 long platformId = Convert.ToInt64(row["Id"]);
-                _DownloadGames(platformId);
+                await _DownloadGames(platformId);
             }
+
+            return;
         }
 
-        private void _DownloadGames(long platformId)
+        private async Task _DownloadGames(long platformId)
         {
             // Ensure that the local file path exists
             if (!Directory.Exists(LocalFilePath))
@@ -202,7 +209,7 @@ namespace GiantBomb
             // Add an index to the Name column
             string indexQuery = $"CREATE INDEX IF NOT EXISTS `idx_Game_name` ON `{dbName}`.`Game` (`name`); CREATE INDEX IF NOT EXISTS `idx_Game_aliases` ON `{dbName}`.`Game` (`aliases`);";
             Console.WriteLine($"Executing query: {indexQuery}");
-            db.ExecuteNonQuery(indexQuery);
+            await db.ExecuteCMDAsync(indexQuery);
 
             // Add a Full Text Search index to the Name column
             // Check if the FULLTEXT index already exists before adding it
@@ -212,13 +219,13 @@ namespace GiantBomb
                 WHERE table_schema = '{dbName}' 
                   AND table_name = 'Game' 
                   AND index_name = 'ft_idx_Game_name'";
-            var fullTextIndexExists = Convert.ToInt32(db.ExecuteCMD(checkFullTextIndexQuery).Rows.Count) > 0;
+            var fullTextIndexExists = Convert.ToInt32((await db.ExecuteCMDAsync(checkFullTextIndexQuery)).Rows.Count) > 0;
 
             string fullTextIndexQuery = $"ALTER TABLE `{dbName}`.`Game` ADD FULLTEXT INDEX `ft_idx_Game_name` (`name`); ALTER TABLE `{dbName}`.`Game` ADD FULLTEXT INDEX `ft_idx_Game_aliases` (`aliases`);";
             if (!fullTextIndexExists)
             {
                 Console.WriteLine($"Executing query: {fullTextIndexQuery}");
-                db.ExecuteNonQuery(fullTextIndexQuery);
+                await db.ExecuteCMDAsync(fullTextIndexQuery);
             }
             else
             {
@@ -250,7 +257,7 @@ namespace GiantBomb
                 {
                     // Fetch games from GiantBomb API
                     string url = $"/api/games/?api_key={Config.GiantBomb.APIKey}&format=json&limit=100&offset={offset}&platforms={platformId}";
-                    var json = GetJson<Models.GiantBombGameResponse>(url);
+                    var json = await GetJson<Models.GiantBombGameResponse>(url);
 
                     if (json.results == null || json.results.Count == 0)
                     {
@@ -266,7 +273,7 @@ namespace GiantBomb
                         Logging.Log(Logging.LogType.Information, "GiantBomb", $"Found game: {game.name}");
                         if (game is GiantBomb.Models.Game gameDict)
                         {
-                            StoreObjectWithSubclasses(gameDict, db, dbName, game.id);
+                            await StoreObjectWithSubclasses(gameDict, db, dbName, game.id);
                         }
                     }
 
@@ -284,7 +291,7 @@ namespace GiantBomb
                     offset += 100;
 
                     // To avoid hitting API rate limits, delay the next request
-                    System.Threading.Thread.Sleep(10000); // Sleep for 10 seconds
+                    await Task.Delay(10000); // Sleep for 10 seconds
                 }
 
                 // reset the offset to 0 for the next fetch
@@ -297,21 +304,21 @@ namespace GiantBomb
             Logging.Log(Logging.LogType.Information, "GiantBomb", $"Finished downloading games for platform ID {platformId} from GiantBomb.");
         }
 
-        public void DownloadImages()
+        public async Task DownloadImages()
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql;
 
             // download images for each platform
             sql = $"SELECT guid, image_tags FROM {dbName}.Platform WHERE image_tags IS NOT NULL AND image_tags != ''";
-            _ProcessImageDatabase(db, sql);
+            await _ProcessImageDatabase(db, sql);
 
             // download images for each game
             sql = $"SELECT guid, image_tags FROM {dbName}.Game WHERE image_tags IS NOT NULL AND image_tags != ''";
-            _ProcessImageDatabase(db, sql);
+            await _ProcessImageDatabase(db, sql);
         }
 
-        private async void _ProcessImageDatabase(Database db, string sql)
+        private async Task _ProcessImageDatabase(Database db, string sql)
         {
             // Execute the SQL query to get the image tags
             var imageTagsData = await db.ExecuteCMDAsync(sql);
@@ -383,7 +390,7 @@ namespace GiantBomb
             return imageTags;
         }
 
-        private void _DownloadImages(Database db, string guid, List<ImageTag> image_tags)
+        private async Task _DownloadImages(Database db, string guid, List<ImageTag> image_tags)
         {
             // capture images
             Dictionary<string, GiantBomb.Models.Image> images = new Dictionary<string, GiantBomb.Models.Image>();
@@ -394,7 +401,7 @@ namespace GiantBomb
                 while (true)
                 {
                     string imageTagUrl = $"/api/images/{guid}/?api_key={Config.GiantBomb.APIKey}&format=json&limit=100&offset={offset}&filter=image_tag:{imageTag.name}";
-                    var imageJson = GetJson<Models.GiantBombImageResponse>(imageTagUrl);
+                    var imageJson = await GetJson<Models.GiantBombImageResponse>(imageTagUrl);
 
                     if (imageJson == null || imageJson.results == null || imageJson.results.Count == 0)
                     {
@@ -439,14 +446,14 @@ namespace GiantBomb
             {
                 // delete any entries with the same guid to clear out old records
                 string deleteQuery = $"DELETE FROM {dbName}.Image WHERE guid = @guid";
-                db.ExecuteCMD(deleteQuery, new Dictionary<string, object>
+                await db.ExecuteCMDAsync(deleteQuery, new Dictionary<string, object>
                                 {
                                     { "guid", image.guid },
                                     { "original_url", image.original_url }
                                 });
                 // insert the image into the database
                 string insertQuery = $"INSERT INTO {dbName}.Image (guid, icon_url, medium_url, screen_url, screen_large_url, small_url, super_url, thumb_url, tiny_url, original_url, image_tags) VALUES (@guid, @icon_url, @medium_url, @screen_url, @screen_large_url, @small_url, @super_url, @thumb_url, @tiny_url, @original_url, @image_tags)";
-                db.ExecuteCMD(insertQuery, new Dictionary<string, object>
+                await db.ExecuteCMDAsync(insertQuery, new Dictionary<string, object>
                                 {
                                     { "guid", image.guid },
                                     { "icon_url", image.icon_url },
@@ -479,10 +486,10 @@ namespace GiantBomb
                         {
                             try
                             {
-                                var imageResponse = client.GetAsync(new Uri(new Uri(BaseUrl), new Uri(imageUrl))).Result;
+                                var imageResponse = await client.GetAsync(new Uri(new Uri(BaseUrl), new Uri(imageUrl)));
                                 if (imageResponse.IsSuccessStatusCode)
                                 {
-                                    var imageBytes = imageResponse.Content.ReadAsByteArrayAsync().Result;
+                                    var imageBytes = await imageResponse.Content.ReadAsByteArrayAsync();
                                     File.WriteAllBytes(imageFileName, imageBytes);
                                     Logging.Log(Logging.LogType.Information, "GiantBomb", $"Downloaded image: {imageFileName}");
                                 }
@@ -500,9 +507,11 @@ namespace GiantBomb
                     }
                 }
             }
+
+            return;
         }
 
-        public void DownloadSubTypes<TResponse, TObject>(string endpoint, string? query = "")
+        public async Task DownloadSubTypes<TResponse, TObject>(string endpoint, string? query = "")
             where TResponse : class
         {
             // get the name of TObject
@@ -543,7 +552,7 @@ namespace GiantBomb
                 {
                     // Fetch objects from GiantBomb API
                     string url = $"/api/{endpoint}/?api_key={Config.GiantBomb.APIKey}&format=json&limit=100&offset={offset}{(query != null && query != "" ? $"&filter={query}" : "")}";
-                    var json = GetJson<TResponse>(url);
+                    var json = await GetJson<TResponse>(url);
 
                     // Use reflection to get the 'results' property
                     var resultsProp = typeof(TResponse).GetProperty("results");
@@ -563,7 +572,7 @@ namespace GiantBomb
                         var idProp = apiObject.GetType().GetProperty("id") ?? apiObject.GetType().GetProperty("Id");
                         var idValue = idProp?.GetValue(apiObject);
                         Logging.Log(Logging.LogType.Information, "GiantBomb", $"Found {typeName}: {idValue}");
-                        StoreObjectWithSubclasses(apiObject, db, dbName, idValue as long?);
+                        await StoreObjectWithSubclasses(apiObject, db, dbName, idValue as long?);
                     }
 
                     // Store the offset in settings for the next batch
@@ -580,7 +589,7 @@ namespace GiantBomb
                     offset += 100;
 
                     // To avoid hitting API rate limits, delay the next request
-                    System.Threading.Thread.Sleep(10000); // Sleep for 10 seconds
+                    await Task.Delay(10000); // Sleep for 10 seconds
                 }
 
                 // reset the offset to 0 for the next fetch
@@ -591,11 +600,13 @@ namespace GiantBomb
             Config.SetSetting(settingName, DateTime.UtcNow);
 
             Logging.Log(Logging.LogType.Information, "GiantBomb", $"Finished downloading {typeName} from GiantBomb.");
+
+            return;
         }
 
-        private T GetJson<T>(string url)
+        private async Task<T> GetJson<T>(string url)
         {
-            checkRequestLimit();
+            await checkRequestLimit();
 
             int maxRetries = 5;
             int retryCount = 0;
@@ -604,7 +615,7 @@ namespace GiantBomb
             {
                 try
                 {
-                    return _GetJson<T>(url);
+                    return await _GetJson<T>(url);
                 }
                 catch (Exception ex)
                 {
@@ -623,14 +634,14 @@ namespace GiantBomb
                     Logging.Log(Logging.LogType.Information, "GiantBomb", $"Sleeping for {sleepTime / 1000} seconds before retrying.");
 
                     // Sleep for a while before retrying
-                    System.Threading.Thread.Sleep(sleepTime); // Wait before retrying
+                    await Task.Delay(sleepTime); // Wait before retrying
                 }
             }
 
             throw new Exception("Max retries reached without success.");
         }
 
-        private T _GetJson<T>(string url)
+        private async Task<T> _GetJson<T>(string url)
         {
             try
             {
@@ -648,7 +659,7 @@ namespace GiantBomb
                 var response = client.GetAsync(new Uri(new Uri(BaseUrl), new Uri(url))).Result;
                 if (response.IsSuccessStatusCode)
                 {
-                    var jsonString = response.Content.ReadAsStringAsync().Result;
+                    var jsonString = await response.Content.ReadAsStringAsync();
                     T jsonResponse = Newtonsoft.Json.JsonConvert.DeserializeObject<T>(jsonString);
                     return jsonResponse;
                 }
@@ -661,12 +672,12 @@ namespace GiantBomb
                     {
                         var retryAfter = response.Headers.RetryAfter.Delta?.TotalSeconds ?? 300; // Default to 300 seconds if not specified
                         Logging.Log(Logging.LogType.Information, "GiantBomb", $"Retry after: {retryAfter} seconds");
-                        System.Threading.Thread.Sleep((int)retryAfter * 1000); // Sleep for the specified time
+                        await Task.Delay((int)retryAfter * 1000); // Sleep for the specified time
                     }
                     else
                     {
                         Logging.Log(Logging.LogType.Information, "GiantBomb", "No Retry-After header found. Defaulting to 300 seconds.");
-                        System.Threading.Thread.Sleep(300000); // Default to 5 minutes if no Retry-After header is present
+                        await Task.Delay(300000); // Default to 5 minutes if no Retry-After header is present
                     }
 
                     throw new Exception("Rate limit exceeded. Please wait before retrying.");
@@ -717,7 +728,7 @@ namespace GiantBomb
         /// The table name is the type name. Subclasses are stored in their own tables and linked by Id.
         /// Subclasses without an Id property will be assigned one by the database (auto-increment).
         /// </summary>
-        private void StoreObjectWithSubclasses(object obj, Database db, string dbName, long? id = null)
+        private async Task StoreObjectWithSubclasses(object obj, Database db, string dbName, long? id = null)
         {
             if (obj == null) return;
 
@@ -762,11 +773,11 @@ namespace GiantBomb
                                 INDEX idx_{tableName}_id ({tableName}_id),
                                 INDEX idx_{prop.Name}_id ({prop.Name}_id)
                             );";
-                            db.ExecuteCMD(createTableSql, new Dictionary<string, object>());
+                            await db.ExecuteCMDAsync(createTableSql, new Dictionary<string, object>());
 
                             // remove all existing relationships for this object
                             string deleteSql = $"DELETE FROM {dbName}.{relationshipTableName} WHERE {tableName}_id = @id";
-                            db.ExecuteCMD(deleteSql, new Dictionary<string, object> { { "id", id } });
+                            await db.ExecuteCMDAsync(deleteSql, new Dictionary<string, object> { { "id", id } });
 
                             // store a JSON array of Ids for the collection
                             var ids = new List<object>();
@@ -779,7 +790,7 @@ namespace GiantBomb
                                 if (subId != null)
                                 {
                                     string insertSql = $"INSERT INTO {dbName}.{relationshipTableName} ({tableName}_id, {prop.Name}_id) VALUES (@{tableName}_id, @{prop.Name}_id)";
-                                    db.ExecuteCMD(insertSql, new Dictionary<string, object>
+                                    await db.ExecuteCMDAsync(insertSql, new Dictionary<string, object>
                                     {
                                         { $"{tableName}_id", id },
                                         { $"{prop.Name}_id", subId }
@@ -802,7 +813,7 @@ namespace GiantBomb
                         var subIdProp = prop.PropertyType.GetProperty("id") ?? prop.PropertyType.GetProperty("Id");
                         if (subIdProp != null)
                         {
-                            StoreObjectWithSubclasses(value, db, dbName);
+                            await StoreObjectWithSubclasses(value, db, dbName);
 
                             var subId = subIdProp.GetValue(value);
                             parameters[prop.Name] = subId ?? DBNull.Value;
@@ -834,7 +845,7 @@ namespace GiantBomb
             if (idValue != null)
             {
                 string checkSql = $"SELECT `id` FROM {dbName}.{tableName} WHERE id = @id";
-                var result = db.ExecuteCMD(checkSql, new Dictionary<string, object> { { "id", idValue } });
+                var result = await db.ExecuteCMDAsync(checkSql, new Dictionary<string, object> { { "id", idValue } });
                 exists = result.Rows.Count > 0;
             }
 
@@ -846,7 +857,7 @@ namespace GiantBomb
                 var setClause = string.Join(", ", parameters.Keys.Where(k => !k.Equals("id", StringComparison.OrdinalIgnoreCase)).Select(k => $"`{k}` = @{k}"));
                 sql = $"UPDATE {dbName}.{tableName} SET {setClause} WHERE id = @id";
 
-                db.ExecuteCMD(sql, parameters);
+                await db.ExecuteCMDAsync(sql, parameters);
             }
             else
             {
@@ -856,8 +867,10 @@ namespace GiantBomb
                 sql = $"INSERT INTO {dbName}.{tableName} ({cols}) VALUES ({vals});";
 
                 // Execute insert
-                var result = db.ExecuteCMD(sql, parameters);
+                var result = await db.ExecuteCMDAsync(sql, parameters);
             }
+
+            return;
         }
     }
 }

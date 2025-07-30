@@ -11,7 +11,7 @@ namespace XML
 {
     public class XMLIngestor
     {
-        public void Import(string SearchPath, string ProcessedDirectory, gaseous_signature_parser.parser.SignatureParser XMLType)
+        public async Task Import(string SearchPath, string ProcessedDirectory, gaseous_signature_parser.parser.SignatureParser XMLType)
         {
             // connect to database
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);

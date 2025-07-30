@@ -927,7 +927,7 @@ namespace hasheous_server.Classes
                         }
                     }
 
-                    DataObjectMetadataSearch(objectType, (long)(ulong)data.Rows[0][0]);
+                    await DataObjectMetadataSearch(objectType, (long)(ulong)data.Rows[0][0]);
                     break;
 
                 case DataObjectType.App:
@@ -968,7 +968,7 @@ namespace hasheous_server.Classes
 
             db.ExecuteNonQuery(sql, dbDict);
 
-            DataObjectMetadataSearch(objectType, id);
+            await DataObjectMetadataSearch(objectType, id);
 
             // purge redis cache of all keys for this object type
             if (Config.RedisConfiguration.Enabled)
@@ -1309,27 +1309,25 @@ namespace hasheous_server.Classes
         /// <summary>
         /// Performs a metadata look up on DataObjects with no match metadata
         /// </summary>
-        public MatchItem? DataObjectMetadataSearch(DataObjectType objectType, bool ForceSearch = false)
+        public async Task<MatchItem?> DataObjectMetadataSearch(DataObjectType objectType, bool ForceSearch = false)
         {
-            var retVal = _DataObjectMetadataSearch(objectType, null, ForceSearch);
-            retVal.Wait(new TimeSpan(0, 0, 15));
-            return retVal.Result;
+            var retVal = await _DataObjectMetadataSearch(objectType, null, ForceSearch);
+            return retVal;
         }
 
         /// <summary>
         /// Performs a metadata look up on the selected DataObject if it has no metadata match
         /// </summary>
         /// <param name="id"></param>
-        public MatchItem? DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch = false)
+        public async Task<MatchItem?> DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch = false)
         {
             switch (objectType)
             {
                 case DataObjectType.Company:
                 case DataObjectType.Platform:
                 case DataObjectType.Game:
-                    var retVal = _DataObjectMetadataSearch(objectType, id, ForceSearch);
-                    retVal.Wait(new TimeSpan(0, 0, 15));
-                    return retVal.Result;
+                    var retVal = await _DataObjectMetadataSearch(objectType, id, ForceSearch);
+                    return retVal;
 
                 default:
                     return null;
@@ -2495,8 +2493,8 @@ namespace hasheous_server.Classes
             // apply changes if commit = true
             if (commit == true)
             {
-                EditDataObject(targetObject.ObjectType, targetObject.Id, targetObject);
-                DataObjectMetadataSearch(targetObject.ObjectType, targetObject.Id, false);
+                var editDataObject = EditDataObject(targetObject.ObjectType, targetObject.Id, targetObject);
+                var dataObjectMetadataSearch = DataObjectMetadataSearch(targetObject.ObjectType, targetObject.Id, false);
                 UpdateDataObjectDate(targetObject.Id);
                 DeleteDataObject(sourceObject.ObjectType, sourceObject.Id);
             }

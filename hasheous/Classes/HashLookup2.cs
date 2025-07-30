@@ -161,7 +161,7 @@ namespace Classes
                             dataObjects.AddSignature(publisher.Id, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
 
                             // force metadata search
-                            dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Company, publisher.Id, true);
+                            await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Company, publisher.Id, true);
 
                             // re-get the publisher
                             publisher = await dataObjects.GetDataObject(DataObjects.DataObjectType.Company, publisher.Id);
@@ -212,7 +212,7 @@ namespace Classes
                     dataObjects.AddSignature(platform.Id, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId);
 
                     // force metadata search
-                    dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Platform, platform.Id, true);
+                    await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Platform, platform.Id, true);
 
                     // re-get the platform
                     platform = await dataObjects.GetDataObject(DataObjects.DataObjectType.Platform, platform.Id);
@@ -296,7 +296,7 @@ namespace Classes
                             });
                         }
                         // force metadata search
-                        dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true);
+                        await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true);
                     }
 
                     // add signature mapping to game

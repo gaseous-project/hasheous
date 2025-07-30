@@ -70,7 +70,7 @@ namespace RetroAchievements
             return age.TotalDays > MaxAgeInDays;
         }
 
-        public void Download()
+        public async Task Download()
         {
             // download the platforms file
             _Download(PlatformsUrl, PlatformsLocalFileName, "Platforms");
@@ -191,13 +191,15 @@ namespace RetroAchievements
             }
 
             // force start the signature ingest process
-            foreach (var process in ProcessQueue.QueueItems)
+            foreach (var process in Classes.ProcessQueue.QueueProcessor.QueueItems)
             {
-                if (process.ItemType == ProcessQueue.QueueItemType.SignatureIngestor)
+                if (process.ItemType == Classes.ProcessQueue.QueueProcessor.QueueItemType.SignatureIngestor)
                 {
                     process.ForceExecute();
                 }
             }
+
+            return;
         }
 
         private Dictionary<string, string> _Download(string Url, string DestinationFile, string DataType)

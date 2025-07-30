@@ -47,7 +47,7 @@ namespace TheGamesDB.SQL
             return age.TotalDays > MaxAgeInDays;
         }
 
-        public string Download()
+        public async Task<string?> Download()
         {
             if (!Directory.Exists(LocalFilePath))
             {
@@ -72,15 +72,10 @@ namespace TheGamesDB.SQL
 
                 // download the zip file
                 string downloadZipFile = Path.Combine(downloadZipFileToPath, "tgdb_dump.zip");
-                var result = DownloadFile(Url, downloadZipFile);
+                var result = await DownloadFile(Url, downloadZipFile);
 
                 // wait until result is completed
-                while (result.IsCompleted == false)
-                {
-                    Thread.Sleep(1000);
-                }
-
-                if (result.Result == false)
+                if (result == null || result == false)
                 {
                     Logging.Log(Logging.LogType.Critical, "TheGamesDb", "Failed to download meadata database from TheGamesDb");
                     return null;
@@ -113,11 +108,11 @@ namespace TheGamesDB.SQL
 
                 // delete the existing database
                 string sql = "DROP DATABASE IF EXISTS `thegamesdb`;";
-                db.ExecuteCMD(sql);
+                await db.ExecuteCMDAsync(sql);
 
                 // create the new database
                 sql = "CREATE DATABASE `thegamesdb`;";
-                db.ExecuteCMD(sql);
+                await db.ExecuteCMDAsync(sql);
 
                 // execute mariadb command to import the sql file
                 string command = "mariadb --force -h " + Config.DatabaseConfiguration.HostName + " -P " + Config.DatabaseConfiguration.Port + " -u " + Config.DatabaseConfiguration.UserName + " -p" + Config.DatabaseConfiguration.Password + " thegamesdb < " + LocalFileName;

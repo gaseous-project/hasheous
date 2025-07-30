@@ -50,7 +50,7 @@ namespace InternetGameDatabase
 
         private static AuthenticationToken AuthToken = new AuthenticationToken();
 
-        public void Download()
+        public Task Download()
         {
             // ensure target directory exists
             if (!Directory.Exists(LocalFilePath))
@@ -521,6 +521,8 @@ namespace InternetGameDatabase
 
             // log the completion of the download
             Logging.Log(Logging.LogType.Information, "IGDB Dumps", "Dumps download and import completed successfully.");
+
+            return null; // Assuming the method returns void, we return null here.
         }
 
         private string[] SplitCSVIntoLines(string csvContent)

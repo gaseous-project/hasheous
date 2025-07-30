@@ -57,7 +57,7 @@ namespace BackgroundMetadataMatcher
             Voted = 5
         }
 
-        public void GetGamesWithoutArtwork()
+        public Task GetGamesWithoutArtwork()
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = @"
@@ -88,6 +88,8 @@ namespace BackgroundMetadataMatcher
                 Logging.Log(Logging.LogType.Information, "Background Metadata Matcher", "Getting artwork for game " + (string)row["Name"]);
                 _ = GetGameArtwork((long)row["Id"]);
             }
+
+            return Task.CompletedTask;
         }
 
         public async Task GetGameArtwork(long DataObjectId, bool force = false)
