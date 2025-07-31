@@ -281,7 +281,8 @@ namespace hasheous_server.Classes
                     (long)data.Rows[i]["Id"],
                     data.Rows[i],
                     GetChildRelations,
-                    GetMetadataMap
+                    GetMetadataMap,
+                    false
                 );
 
                 DataObjects.Add(item);
@@ -431,21 +432,25 @@ namespace hasheous_server.Classes
             }
         }
 
-        private async Task<Models.DataObjectItem> BuildDataObject(DataObjectType ObjectType, long id, DataRow row, bool GetChildRelations = false, bool GetMetadata = true)
+        private async Task<Models.DataObjectItem> BuildDataObject(DataObjectType ObjectType, long id, DataRow row, bool GetChildRelations = false, bool GetMetadata = true, bool GetSignatureData = true)
         {
             // get attributes
             List<AttributeItem> attributes = await GetAttributes(id, GetChildRelations);
 
             // get signature items
-            List<Dictionary<string, object>> signatureItems = await GetSignatures(ObjectType, id);
-
-            // get extra attributes if dataobjecttype is game
-            if (ObjectType == DataObjectType.Game)
+            List<Dictionary<string, object>> signatureItems = new List<Dictionary<string, object>>();
+            if (GetSignatureData == true)
             {
-                if (GetChildRelations == true)
+                signatureItems = await GetSignatures(ObjectType, id);
+
+                // get extra attributes if dataobjecttype is game
+                if (ObjectType == DataObjectType.Game)
                 {
-                    attributes.Add(await GetRoms(signatureItems));
-                    attributes.AddRange(GetCountriesAndLanguagesForGame(signatureItems));
+                    if (GetChildRelations == true)
+                    {
+                        attributes.Add(await GetRoms(signatureItems));
+                        attributes.AddRange(GetCountriesAndLanguagesForGame(signatureItems));
+                    }
                 }
             }
 
