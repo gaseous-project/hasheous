@@ -147,7 +147,7 @@ namespace BackgroundMetadataMatcher
                                             // if not, try to get it by name
                                             game = await hasheous_server.Classes.Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Game>(metadata.Id);
                                         }
-                                        if (game != null && game.Cover != null)
+                                        if (game.Cover != null)
                                         {
                                             if (game.Cover.Id != null)
                                             {
@@ -185,7 +185,7 @@ namespace BackgroundMetadataMatcher
                                                     {
                                                         Images images = new Images();
                                                         coverProvider = Communications.MetadataSources.IGDB;
-                                                        imageRef = images.AddImage("Cover.jpg", File.ReadAllBytes(CoverPath)) + ":" + coverProvider.ToString();
+                                                        imageRef = await images.AddImage("Cover.jpg", File.ReadAllBytes(CoverPath)) + ":" + coverProvider.ToString();
                                                     }
                                                 }
                                             }
