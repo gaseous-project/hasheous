@@ -4,10 +4,12 @@ services:
     container_name: hasheous-server
     build:
       context: ./
+      dockerfile: ./hasheous/docker/Dockerfile
     restart: unless-stopped
     networks:
       - hasheous
     depends_on:
+      - valkey
       - hsdb
     ports:
       - 7157:80
@@ -20,6 +22,28 @@ services:
       - igdbclientid=<clientid>
       - igdbclientsecret=<clientsecret>
       - igdbusedumps=false
+      - redisenabled=true
+      - redishost=valkey
+      - redisport=6379
+  hasheous-orchestrator:
+    container_name: hasheous-orchestrator
+    build:
+      context: ./
+      dockerfile: ./service-orchestrator/docker/Dockerfile
+    restart: unless-stopped
+    networks:
+      - hasheous
+    depends_on:
+      - valkey
+      - hsdb
+    ports:
+      - 7023:80
+    volumes:
+      - hs:/root/.hasheous-server
+    environment:
+      - dbhost=hsdb
+      - dbuser=root
+      - dbpass=hasheous
       - redisenabled=true
       - redishost=valkey
       - redisport=6379

@@ -10,7 +10,7 @@ RUN echo "Build: $BUILDPLATFORM"
 # Copy everything
 COPY . ./
 
-# Build Gaseous Web Server
+# Build Hasheous Web Server
 # Restore as distinct layers
 RUN dotnet restore "hasheous/hasheous.csproj" -a $TARGETARCH
 # Build and publish a release
