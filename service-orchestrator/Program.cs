@@ -11,6 +11,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Versioning;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.OpenApi.Models;
+using hasheous_server.Controllers.v1_0;
+using static Authentication.InterHostApiKey;
 using static Classes.Common;
 
 Logging.WriteToDiskOnly = true;
@@ -115,22 +117,13 @@ builder.Services.Configure<FormOptions>(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
     {
-        options.AddSecurityDefinition("API Key", new OpenApiSecurityScheme
+        options.AddSecurityDefinition("Inter Host API Key", new OpenApiSecurityScheme
         {
-            Name = ApiKey.ApiKeyHeaderName,
+            Name = InterHostApiKey.ApiKeyHeaderName,
             In = ParameterLocation.Header,
             Type = SecuritySchemeType.ApiKey,
-            Description = "API Key Authentication",
+            Description = "Inter HostAPI Key Authentication",
             Scheme = "ApiKeyScheme"
-        });
-
-        options.AddSecurityDefinition("Client API Key", new OpenApiSecurityScheme
-        {
-            Name = ClientApiKey.APIKeyHeaderName,
-            In = ParameterLocation.Header,
-            Type = SecuritySchemeType.ApiKey,
-            Description = "Client API Key",
-            Scheme = "ClientApiKeyScheme"
         });
 
         options.OperationFilter<AuthorizationOperationFilter>();
@@ -177,6 +170,14 @@ builder.Services.AddSwaggerGen(options =>
 // set up the background task timer
 builder.Services.AddHostedService<TimedHostedService>();
 
+// set up api key authentication
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add<InterHostApiKeyAuthorizationFilter>();
+});
+builder.Services.AddSingleton<IInterHostApiKeyValidator, InterHostApiKeyValidator>();
+builder.Services.AddSingleton<InterHostApiKeyAuthorizationFilter>();
+
 // build the app
 var app = builder.Build();
 
@@ -215,6 +216,48 @@ app.Use(async (context, next) =>
     context.Response.Headers.Append("x-correlation-id", correlationId.ToString());
     await next();
 });
+
+// configure background services
+Classes.ProcessQueue.QueueProcessor.QueueItems = new List<Classes.ProcessQueue.QueueProcessor.QueueItem>
+{
+    // signature ingestor
+    new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.SignatureIngestor, 60, false),
+
+    // tally votes
+    new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.TallyVotes, 1440, false),
+
+    // metadata rematch
+    new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.MetadataMatchSearch, 120, false),
+
+    // maintenance services
+    // daily
+    new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.DailyMaintenance, 1440, false),
+    // weekly
+    new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.WeeklyMaintenance, 10080, false),
+
+    // default metadata fetchers
+    // fetch VIMM metadata
+    new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchVIMMMetadata, 10080, false),
+    // fetch TheGamesDB metadata
+    new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchTheGamesDbMetadata, 10080, false)
+};
+
+// non-default metadata fetchers
+// IGDB
+if (Config.IGDB.UseDumps == true)
+{
+    Classes.ProcessQueue.QueueProcessor.QueueItems.Add(new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchIGDBMetadata, 10080, false));
+}
+// RetroAchievements
+if (Config.RetroAchievements.APIKey != "")
+{
+    Classes.ProcessQueue.QueueProcessor.QueueItems.Add(new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchRetroAchievementsMetadata, 10080, false));
+}
+// GiantBomb
+if (Config.GiantBomb.APIKey != "")
+{
+    Classes.ProcessQueue.QueueProcessor.QueueItems.Add(new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchGiantBombMetadata, 10080, false));
+}
 
 // start the app
 Logging.WriteToDiskOnly = false;

@@ -115,19 +115,21 @@ namespace Classes
                 {
                     if (Config.LoggingConfiguration.AlwaysLogToDisk == true)
                     {
-                        LogToDisk(logItem, TraceOutput, null);
+                        _ = LogToDisk(logItem, TraceOutput, null);
                     }
 
-                    string correlationId;
+                    string correlationId = "";
+                    string callingProcess = "";
+                    string callingUser = "";
+
                     try
                     {
-                        if (CallContext.GetData("CorrelationId").ToString() == null)
+                        if (CallContext.GetData("CorrelationId") != null)
                         {
-                            correlationId = "";
-                        }
-                        else
-                        {
-                            correlationId = CallContext.GetData("CorrelationId").ToString();
+                            if (CallContext.GetData("CorrelationId").ToString() != null)
+                            {
+                                correlationId = CallContext.GetData("CorrelationId")?.ToString() ?? "";
+                            }
                         }
                     }
                     catch
@@ -135,16 +137,14 @@ namespace Classes
                         correlationId = "";
                     }
 
-                    string callingProcess;
                     try
                     {
-                        if (CallContext.GetData("CallingProcess").ToString() == null)
+                        if (CallContext.GetData("CallingProcess") != null)
                         {
-                            callingProcess = "";
-                        }
-                        else
-                        {
-                            callingProcess = CallContext.GetData("CallingProcess").ToString();
+                            if (CallContext.GetData("CallingProcess").ToString() != null)
+                            {
+                                callingProcess = CallContext.GetData("CallingProcess")?.ToString() ?? "";
+                            }
                         }
                     }
                     catch
@@ -152,16 +152,15 @@ namespace Classes
                         callingProcess = "";
                     }
 
-                    string callingUser;
+
                     try
                     {
-                        if (CallContext.GetData("CallingUser").ToString() == null)
+                        if (CallContext.GetData("CallingUser") != null)
                         {
-                            callingUser = "";
-                        }
-                        else
-                        {
-                            callingUser = CallContext.GetData("CallingUser").ToString();
+                            if (CallContext.GetData("CallingUser").ToString() != null)
+                            {
+                                callingUser = CallContext.GetData("CallingUser")?.ToString() ?? "";
+                            }
                         }
                     }
                     catch
@@ -182,17 +181,14 @@ namespace Classes
                     dbDict.Add("callingprocess", callingProcess);
                     dbDict.Add("callinguser", callingUser);
 
-                    _ = Task.Run(async () =>
+                    try
                     {
-                        try
-                        {
-                            await db.ExecuteCMDAsync(sql, dbDict);
-                        }
-                        catch (Exception ex)
-                        {
-                            await LogToDisk(logItem, TraceOutput, ex);
-                        }
-                    });
+                        _ = db.ExecuteCMDAsync(sql, dbDict);
+                    }
+                    catch (Exception ex)
+                    {
+                        _ = LogToDisk(logItem, TraceOutput, ex);
+                    }
                 }
                 else
                 {

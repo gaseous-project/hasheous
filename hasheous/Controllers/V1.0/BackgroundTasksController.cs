@@ -1,11 +1,6 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Classes;
 using Microsoft.AspNetCore.Authorization;
-using Classes.ProcessQueue;
 
 namespace hasheous_server.Controllers.v1_0
 {
@@ -20,35 +15,44 @@ namespace hasheous_server.Controllers.v1_0
         [MapToApiVersion("1.0")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [AllowAnonymous]
-        public List<QueueProcessor.QueueItem> GetQueue()
+        public async Task<IActionResult> GetQueue()
         {
-            return QueueProcessor.QueueItems;
+            return Ok(await BackgroundTasks.GetServerData());
         }
 
         [HttpGet]
         [MapToApiVersion("1.0")]
-        [Route("{TaskType}")]
+        [Route("{ProcessId:guid}")]
         [Authorize(Roles = "Admin")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public ActionResult<QueueProcessor.QueueItem> ForceRun(QueueItemType TaskType, Boolean ForceRun)
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> ManageQueueItem(Guid ProcessId, bool? ForceRun = null, bool? Enabled = null)
         {
-            foreach (QueueProcessor.QueueItem qi in QueueProcessor.QueueItems)
+            try
             {
-                if (qi.AllowManualStart == true)
+                var item = await BackgroundTasks.ManageQueueItem(ProcessId, ForceRun, Enabled);
+                if (item == null)
                 {
-                    if (TaskType == qi.ItemType)
-                    {
-                        if (ForceRun == true)
-                        {
-                            qi.ForceExecute();
-                        }
-                        return qi;
-                    }
+                    return NotFound();
                 }
-            }
 
-            return NotFound();
+                return Ok(item);
+            }
+            catch (ArgumentException aggEx)
+            {
+                return BadRequest(aggEx.Message);
+            }
+            catch (KeyNotFoundException knfEx)
+            {
+                return NotFound(knfEx.Message);
+            }
+            catch (Exception ex)
+            {
+                // Log the exception (not shown here for brevity)
+                return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while processing your request.");
+            }
         }
     }
 }

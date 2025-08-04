@@ -256,5 +256,9 @@
     "locked": "Locked",
     "fieldlocked": "This field is locked and cannot be edited.",
     "nometadatachanges": "No metadata changes have been made.",
-    "submissionhelp": "Get help with submitting updates"
+    "submissionhelp": "Get help with submitting updates",
+    "servicebackgroundtasksforlocal": "Web Server Background Tasks",
+    "servicebackgroundtasksforremote": "Service Manager Background Tasks",
+    "enable": "Enable",
+    "disable": "Disable"
 }

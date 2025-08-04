@@ -27,28 +27,32 @@ namespace Classes
         {
             var count = Interlocked.Increment(ref executionCount);
 
-            //_logger.LogInformation(
-            //    "Timed Hosted Service is working. Count: {Count}", count);
-
             List<ProcessQueue.QueueProcessor.QueueItem> ActiveList = new List<ProcessQueue.QueueProcessor.QueueItem>();
             ActiveList.AddRange(ProcessQueue.QueueProcessor.QueueItems);
             foreach (ProcessQueue.QueueProcessor.QueueItem qi in ActiveList)
             {
-                if (CheckIfProcessIsBlockedByOthers(qi) == false)
+                if (qi.Enabled == true)
                 {
-                    qi.BlockedState(false);
-                    if (DateTime.UtcNow > qi.NextRunTime || qi.Force == true)
+                    if (CheckIfProcessIsBlockedByOthers(qi) == false)
                     {
-                        qi.Execute();
-                        if (qi.RemoveWhenStopped == true && qi.ItemState == ProcessQueue.QueueProcessor.QueueItemState.Stopped)
+                        qi.BlockedState(false);
+                        if (DateTime.UtcNow > qi.NextRunTime || qi.Force == true)
                         {
-                            ProcessQueue.QueueProcessor.QueueItems.Remove(qi);
+                            Task.Run(async () =>
+                            {
+                                await qi.Execute();
+                            });
+
+                            if (qi.RemoveWhenStopped == true && qi.ItemState == ProcessQueue.QueueProcessor.QueueItemState.Stopped)
+                            {
+                                ProcessQueue.QueueProcessor.QueueItems.Remove(qi);
+                            }
                         }
                     }
-                }
-                else
-                {
-                    qi.BlockedState(true);
+                    else
+                    {
+                        qi.BlockedState(true);
+                    }
                 }
             }
         }

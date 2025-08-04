@@ -1,23 +1,23 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Nullable>enable</Nullable>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>service_host</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
-    <RootNamespace>service_orchestrator</RootNamespace>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <WarningLevel>4</WarningLevel>
-    <DocumentationFile>bin\Debug\net8.0\service-orchestrator.xml</DocumentationFile>
+    <DocumentationFile>bin\Debug\net8.0\service-host.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <WarningLevel>4</WarningLevel>
-    <DocumentationFile>bin\Release\net8.0\service-orchestrator.xml</DocumentationFile>
+    <DocumentationFile>bin\Release\net8.0\service-host.xml</DocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="../hasheous-lib/hasheous-lib.csproj" />
-    <ProjectReference Include="../service-host/service-host.csproj" />
   </ItemGroup>
 
 </Project>

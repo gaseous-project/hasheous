@@ -3,6 +3,7 @@ using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using static Authentication.ApiKey;
 using static Authentication.ClientApiKey;
+using static Authentication.InterHostApiKey;
 
 public class AuthorizationOperationFilter : IOperationFilter
 {
@@ -61,6 +62,35 @@ public class AuthorizationOperationFilter : IOperationFilter
                             {
                                 Type = ReferenceType.SecurityScheme,
                                 Id = "Client API Key"
+                            }
+                        },
+                        securityRequirements
+                    }
+                }
+            };
+        }
+
+        // get Inter host API key attribute
+        var interhostApiKeyAttribute = context.MethodInfo.DeclaringType.GetCustomAttributes(true)
+            .Union(context.MethodInfo.GetCustomAttributes(true))
+            .OfType<InterHostApiKeyAttribute>();
+
+        if (interhostApiKeyAttribute != null && interhostApiKeyAttribute.Count() > 0)
+        {
+            securityRequirements.Add("Inter Host API Key");
+
+            // add security requirement
+            operation.Security = new List<OpenApiSecurityRequirement>
+            {
+                new OpenApiSecurityRequirement
+                {
+                    {
+                        new OpenApiSecurityScheme
+                        {
+                            Reference = new OpenApiReference
+                            {
+                                Type = ReferenceType.SecurityScheme,
+                                Id = "Inter Host API Key"
                             }
                         },
                         securityRequirements

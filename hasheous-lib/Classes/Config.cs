@@ -60,6 +60,14 @@ namespace Classes
             }
         }
 
+        public static ConfigFile.ServiceCommunication ServiceCommunication
+        {
+            get
+            {
+                return _config.ServiceConfiguration;
+            }
+        }
+
         public static ConfigFile.MetadataAPI MetadataConfiguration
         {
             get
@@ -100,11 +108,24 @@ namespace Classes
             }
         }
 
+        private static string _logName = System.Reflection.Assembly.GetExecutingAssembly().GetName().Name ?? "Server Log";
+        public static string LogName
+        {
+            get
+            {
+                return _logName;
+            }
+            set
+            {
+                _logName = value;
+            }
+        }
+
         public static string LogPath
         {
             get
             {
-                string logPath = Path.Combine(ConfigurationPath, "Logs");
+                string logPath = Path.Combine(ConfigurationPath, "Logs", _logName);
                 if (!Directory.Exists(logPath))
                 {
                     Directory.CreateDirectory(logPath);
@@ -119,7 +140,7 @@ namespace Classes
             {
                 string logFileExtension = "txt";
 
-                string logPathName = Path.Combine(LogPath, "Server Log " + DateTime.Now.ToUniversalTime().ToString("yyyyMMdd") + "." + logFileExtension);
+                string logPathName = Path.Combine(LogPath, DateTime.Now.ToUniversalTime().ToString("yyyyMMdd") + "." + logFileExtension);
                 return logPathName;
             }
         }
@@ -168,9 +189,6 @@ namespace Classes
                     UpdateConfig();
                 }
             }
-
-            Console.WriteLine("Using configuration:");
-            Console.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(_config, Formatting.Indented));
         }
 
         public static void UpdateConfig()
@@ -253,8 +271,18 @@ namespace Classes
                                 else if (type.ToString() == "System.Boolean")
                                 {
                                     // boolean value
-                                    AppSettings.Add(SettingName, (T)(object)Convert.ToBoolean(dbResponse.Rows[0]["Value"]));
-                                    return (T)(object)Convert.ToBoolean(dbResponse.Rows[0]["Value"]);
+                                    // convert the value to int first, then to boolean
+                                    // this is to handle the case where the value is stored as an int (0 or 1)
+                                    // in the database, which is common for boolean values
+                                    int intValue = Convert.ToInt32(dbResponse.Rows[0]["Value"].ToString());
+                                    if (intValue < 0 || intValue > 1)
+                                    {
+                                        throw new InvalidCastException("Invalid boolean value stored in database for setting " + SettingName);
+                                    }
+                                    bool boolValue = Convert.ToBoolean(intValue);
+
+                                    AppSettings.Add(SettingName, (T)(object)boolValue);
+                                    return (T)(object)boolValue;
                                 }
                                 else if (type.ToString() == "System.Int32")
                                 {
@@ -428,6 +456,8 @@ namespace Classes
 
             [JsonIgnore]
             public Library LibraryConfiguration = new Library();
+
+            public ServiceCommunication ServiceConfiguration = new ServiceCommunication();
 
             public MetadataAPI MetadataConfiguration = new MetadataAPI();
 
@@ -693,6 +723,46 @@ namespace Classes
                     if (!Directory.Exists(LibraryMetadataDirectory_GiantBomb)) { Directory.CreateDirectory(LibraryMetadataDirectory_GiantBomb); }
                     if (!Directory.Exists(LibraryTempDirectory)) { Directory.CreateDirectory(LibraryTempDirectory); }
                 }
+            }
+
+            public class ServiceCommunication
+            {
+                private static string _ReportingServerUrl
+                {
+                    get
+                    {
+                        string? envVar = Environment.GetEnvironmentVariable("reportingserver");
+                        if (!String.IsNullOrEmpty(envVar))
+                        {
+                            return envVar;
+                        }
+                        else
+                        {
+                            return "http://localhost:5140";
+                        }
+                    }
+                }
+
+                private static string _APIKey
+                {
+                    get
+                    {
+                        string? envVar = Environment.GetEnvironmentVariable("reportingserverapikey");
+                        if (!String.IsNullOrEmpty(envVar))
+                        {
+                            return envVar;
+                        }
+                        else
+                        {
+                            // default API key - initial value will be a randomly generated key
+                            // use a guid converted to a base64 string
+                            return Convert.ToBase64String(Guid.NewGuid().ToByteArray()).TrimEnd('=');
+                        }
+                    }
+                }
+
+                public string ReportingServerUrl = _ReportingServerUrl;
+                public string APIKey = _APIKey;
             }
 
             public class MetadataAPI

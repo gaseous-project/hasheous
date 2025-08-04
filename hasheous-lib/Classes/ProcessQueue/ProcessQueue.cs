@@ -1,5 +1,8 @@
 ﻿using System;
 using System.Data.Common;
+using System.Diagnostics;
+using System.Reflection;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Classes;
 using hasheous.Classes;
@@ -14,16 +17,42 @@ namespace Classes.ProcessQueue
 {
     public static class QueueProcessor
     {
+        /// <summary>
+        /// Gets the list of queue items to be processed.
+        /// </summary>
         public static List<QueueItem> QueueItems = new List<QueueItem>();
 
+        /// <summary>
+        /// Represents an item in the process queue with its execution logic and state.
+        /// </summary>
         public class QueueItem
         {
-            public QueueItem(QueueItemType ItemType, int ExecutionInterval, bool AllowManualStart = true, bool RemoveWhenStopped = false)
+            /// <summary>
+            /// Initializes a new instance of the <see cref="QueueItem"/> class for serialization purposes.
+            /// </summary>
+            public QueueItem()
+            {
+                // Default constructor for serialization purposes
+            }
+
+            /// <summary>
+            /// Initializes a new instance of the <see cref="QueueItem"/> class.
+            /// </summary>
+            /// <param name="ItemType">The type of the queue item.</param>
+            /// <param name="ExecutionInterval">The interval in minutes between executions.</param>
+            /// <param name="InProcess"> 
+            /// Whether the item will run in this process or not.
+            /// If false, it will be run in a separate process.
+            ///  </param>
+            /// <param name="AllowManualStart">Whether manual start is allowed.</param>
+            /// <param name="RemoveWhenStopped">Whether to remove the item when stopped.</param>
+            public QueueItem(QueueItemType ItemType, int ExecutionInterval, bool InProcess, bool AllowManualStart = true, bool RemoveWhenStopped = false)
             {
                 _ItemType = ItemType;
                 _ItemState = QueueItemState.NeverStarted;
                 _LastRunTime = Config.ReadSetting("LastRun_" + _ItemType.ToString(), DateTime.UtcNow);
                 _Interval = ExecutionInterval;
+                _InProcess = InProcess;
                 _AllowManualStart = AllowManualStart;
                 _RemoveWhenStopped = RemoveWhenStopped;
 
@@ -81,6 +110,11 @@ namespace Classes.ProcessQueue
                 }
             }
 
+            /// <summary>
+            /// Gets the unique identifier for the process associated with this queue item.
+            /// </summary>
+            public readonly Guid ProcessId = Guid.NewGuid();
+
             private QueueItemType _ItemType = QueueItemType.NotConfigured;
             private QueueItemState _ItemState = QueueItemState.NeverStarted;
             private DateTime _LastRunTime = DateTime.UtcNow;
@@ -103,6 +137,7 @@ namespace Classes.ProcessQueue
             private string _LastResult = "";
             private string? _LastError = null;
             private bool _ForceExecute = false;
+            private bool _InProcess = false;
             private bool _AllowManualStart = true;
             private bool _RemoveWhenStopped = false;
             private bool _IsBlocked = false;
@@ -129,8 +164,21 @@ namespace Classes.ProcessQueue
             public bool RemoveWhenStopped => _RemoveWhenStopped;
             public string CorrelationId => _CorrelationId;
             public bool IsBlocked => _IsBlocked;
+            public bool Enabled
+            {
+                get
+                {
+                    return Config.ReadSetting<bool>("Enabled_" + _ItemType.ToString(), true);
+                }
+                set
+                {
+                    Config.SetSetting("Enabled_" + _ItemType.ToString(), value);
+                }
+            }
             public object? Options { get; set; } = null;
 
+            [System.Text.Json.Serialization.JsonIgnore]
+            [Newtonsoft.Json.JsonIgnore]
             public IQueueTask? Task { get; set; } = null;
             public List<QueueItemType> Blocks
             {
@@ -171,12 +219,39 @@ namespace Classes.ProcessQueue
 
                         try
                         {
-                            hasheous_server.Classes.DataObjects DataObjects = new hasheous_server.Classes.DataObjects();
-
                             // if we have a task, execute it
-                            if (Task != null)
+                            if (Task != null && _InProcess == true)
                             {
                                 await Task.ExecuteAsync();
+                            }
+                            else
+                            {
+                                // if we don't have a task, execute the service-host with item type
+                                string[] args = new string[] { "service-host.dll", "--service", _ItemType.ToString(), "--reportingserver", Config.ServiceCommunication.ReportingServerUrl, "--correlationid", _CorrelationId };
+                                var process = new Process
+                                {
+                                    StartInfo = new ProcessStartInfo
+                                    {
+                                        FileName = "dotnet",
+                                        WorkingDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location),
+                                        Arguments = string.Join(" ", args),
+                                        UseShellExecute = false,
+                                        RedirectStandardOutput = false,
+                                        RedirectStandardError = false,
+                                        CreateNoWindow = true
+                                    }
+                                };
+                                Logging.Log(Logging.LogType.Information, "Timered Event", "Executing service-host with arguments: " + string.Join(" ", args));
+
+                                // start the process
+                                process.Start();
+
+                                await process.WaitForExitAsync();
+
+                                if (process.ExitCode != 0)
+                                {
+                                    throw new Exception("Service-host exited with code " + process.ExitCode);
+                                }
                             }
                         }
                         catch (Exception ex)
@@ -213,6 +288,26 @@ namespace Classes.ProcessQueue
             Running,
             Stopped,
             Disabled
+        }
+
+        public class SimpleQueueItem
+        {
+            public Guid ProcessId { get; set; }
+            public QueueItemType ItemType { get; set; }
+            public QueueItemState ItemState { get; set; }
+            public DateTime LastRunTime { get; set; }
+            public DateTime LastFinishTime { get; set; }
+            public double LastRunDuration { get; set; }
+            public DateTime NextRunTime { get; set; }
+            public int Interval { get; set; }
+            public string LastResult { get; set; }
+            public bool Force { get; set; }
+            public bool AllowManualStart { get; set; }
+            public bool RemoveWhenStopped { get; set; }
+            public string CorrelationId { get; set; }
+            public bool IsBlocked { get; set; }
+            public bool Enabled { get; set; }
+            public List<QueueItemType> Blocks { get; set; }
         }
     }
 }

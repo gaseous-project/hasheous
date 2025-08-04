@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "service-orchestrator", "ser
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "hasheous-lib", "hasheous-lib\hasheous-lib.csproj", "{DCDE72D0-5B03-4B5C-B85C-DCFEA3A93119}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "service-host", "service-host\service-host.csproj", "{EE31901D-72C9-48DF-B6A6-FDDBABE1F01C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -36,5 +38,9 @@ Global
 		{DCDE72D0-5B03-4B5C-B85C-DCFEA3A93119}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DCDE72D0-5B03-4B5C-B85C-DCFEA3A93119}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DCDE72D0-5B03-4B5C-B85C-DCFEA3A93119}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EE31901D-72C9-48DF-B6A6-FDDBABE1F01C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EE31901D-72C9-48DF-B6A6-FDDBABE1F01C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EE31901D-72C9-48DF-B6A6-FDDBABE1F01C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EE31901D-72C9-48DF-B6A6-FDDBABE1F01C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
