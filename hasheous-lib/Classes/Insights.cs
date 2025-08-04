@@ -167,7 +167,7 @@ namespace Classes.Insights
                     event_datetime >= NOW() - INTERVAL 30 DAY
                         " + appWhereClause + @"
                 GROUP BY country
-                ORDER BY unique_visitors DESC;";
+                ORDER BY unique_visitors DESC LIMIT 5;";
             DataTable uniqueVisitorsPerCountryTable = await db.ExecuteCMDAsync(sql, dbDict);
             List<Dictionary<string, object>> uniqueVisitorsPerCountry = new List<Dictionary<string, object>>();
             foreach (DataRow row in uniqueVisitorsPerCountryTable.Rows)
