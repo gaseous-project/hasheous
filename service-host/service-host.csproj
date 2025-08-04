@@ -2,26 +2,22 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <RootNamespace>hasheous_cli</RootNamespace>
+    <RootNamespace>service_host</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <WarningLevel>4</WarningLevel>
-    <DocumentationFile>bin\Debug\net8.0\hasheous-cli.xml</DocumentationFile>
+    <DocumentationFile>bin\Debug\net8.0\service-host.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <WarningLevel>4</WarningLevel>
-    <DocumentationFile>bin\Release\net8.0\hasheous-cli.xml</DocumentationFile>
+    <DocumentationFile>bin\Release\net8.0\service-host.xml</DocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="MySqlConnector" Version="2.4.0" />
+    <ProjectReference Include="../hasheous-lib/hasheous-lib.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\hasheous-lib\hasheous-lib.csproj" />
-  </ItemGroup>
 </Project>

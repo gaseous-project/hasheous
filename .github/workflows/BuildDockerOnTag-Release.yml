@@ -34,11 +34,11 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push standard image
+      - name: Build and push Hasheous Web Server image
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: ./Dockerfile
+          context: ./hasheous
+          file: ./docker/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
@@ -46,3 +46,15 @@ jobs:
             gaseousgames/hasheous:${{ github.ref_name}}
             ghcr.io/gaseous-project/hasheous:latest
             ghcr.io/gaseous-project/hasheous:${{ github.ref_name}}
+      - name: Build and push Hasheous Orchestration Server image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./service-ochestrator
+          file: ./docker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            gaseousgames/hasheous-orchestrator:latest
+            gaseousgames/hasheous-orchestrator:${{ github.ref_name}}
+            ghcr.io/gaseous-project/hasheous-orchestrator:latest
+            ghcr.io/gaseous-project/hasheous-orchestrator:${{ github.ref_name}}

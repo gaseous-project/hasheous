@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.Json.Serialization;
 using Classes;
+using Classes.ProcessQueue;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Versioning;
@@ -44,13 +45,11 @@ do
 
 db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
 
-db.InitDB();
+await db.InitDB();
 Classes.Metadata.Utility.TableBuilder.BuildTables();
 
 // write updated settings back to the config file
 Config.UpdateConfig();
-
-var poo = await Metadata.GetMetadata<IGDB.Models.Platform>("c64");
 
 // set up server
 var builder = WebApplication.CreateBuilder(args);
@@ -400,122 +399,19 @@ app.Use(async (context, next) =>
     }
     CallContext.SetData("CallingUser", userIdentity);
 
-    context.Response.Headers.Add("x-correlation-id", correlationId.ToString());
+    context.Response.Headers.Append("x-correlation-id", correlationId.ToString());
     await next();
 });
 
-// add background tasks
-ProcessQueue.QueueItem signatureIngestor = new ProcessQueue.QueueItem(ProcessQueue.QueueItemType.SignatureIngestor, 60, new List<ProcessQueue.QueueItemType>());
-signatureIngestor.ForceExecute();
-ProcessQueue.QueueItems.Add(
-    signatureIngestor
-    );
-
-ProcessQueue.QueueItems.Add(
-    new ProcessQueue.QueueItem(
-        ProcessQueue.QueueItemType.TallyVotes,
-        1440,
-        new List<ProcessQueue.QueueItemType>
-        {
-            ProcessQueue.QueueItemType.GetMissingArtwork, ProcessQueue.QueueItemType.MetadataMatchSearch, ProcessQueue.QueueItemType.AutoMapper
-        }
-        )
-    );
-
-ProcessQueue.QueueItems.Add(
-new ProcessQueue.QueueItem(
-    ProcessQueue.QueueItemType.FetchVIMMMetadata,
-    10080,
-    new List<ProcessQueue.QueueItemType>
-    {
-        ProcessQueue.QueueItemType.GetMissingArtwork, ProcessQueue.QueueItemType.MetadataMatchSearch, ProcessQueue.QueueItemType.AutoMapper
-    }
-    )
+// configure the in-process cache warmer
+QueueProcessor.QueueItem cacheWarmerQueueItem = new QueueProcessor.QueueItem(
+    QueueItemType.CacheWarmer,
+    30,
+    true
 );
-
-ProcessQueue.QueueItem fetchTheGamesDbMetadata = new ProcessQueue.QueueItem(ProcessQueue.QueueItemType.FetchTheGamesDbMetadata, 10080, new List<ProcessQueue.QueueItemType> {
-    ProcessQueue.QueueItemType.GetMissingArtwork, ProcessQueue.QueueItemType.MetadataMatchSearch, ProcessQueue.QueueItemType.AutoMapper
-});
-fetchTheGamesDbMetadata.ForceExecute();
-ProcessQueue.QueueItems.Add(
-    fetchTheGamesDbMetadata
-);
-
-if (Config.IGDB.UseDumps == true)
-{
-    ProcessQueue.QueueItem fetchIGDBMetadata = new ProcessQueue.QueueItem(ProcessQueue.QueueItemType.FetchIGDBMetadata, 10080, new List<ProcessQueue.QueueItemType> {
-    ProcessQueue.QueueItemType.GetMissingArtwork, ProcessQueue.QueueItemType.MetadataMatchSearch, ProcessQueue.QueueItemType.AutoMapper
-});
-    fetchIGDBMetadata.ForceExecute();
-    ProcessQueue.QueueItems.Add(
-        fetchIGDBMetadata
-    );
-}
-
-if (Config.RetroAchievements.APIKey != null)
-{
-    if (Config.RetroAchievements.APIKey != "")
-    {
-        ProcessQueue.QueueItem fetchRetroAchievementsMetadata = new ProcessQueue.QueueItem(ProcessQueue.QueueItemType.FetchRetroAchievementsMetadata, 10080, new List<ProcessQueue.QueueItemType> {
-    ProcessQueue.QueueItemType.GetMissingArtwork, ProcessQueue.QueueItemType.MetadataMatchSearch, ProcessQueue.QueueItemType.AutoMapper
-});
-        fetchRetroAchievementsMetadata.ForceExecute();
-        ProcessQueue.QueueItems.Add(
-            fetchRetroAchievementsMetadata
-        );
-    }
-}
-
-if (Config.GiantBomb.APIKey != null)
-{
-    if (Config.GiantBomb.APIKey != "")
-    {
-        ProcessQueue.QueueItem fetchGiantBombMetadata = new ProcessQueue.QueueItem(ProcessQueue.QueueItemType.FetchGiantBombMetadata, 120, new List<ProcessQueue.QueueItemType> {
-    ProcessQueue.QueueItemType.GetMissingArtwork, ProcessQueue.QueueItemType.MetadataMatchSearch, ProcessQueue.QueueItemType.AutoMapper
-});
-        fetchGiantBombMetadata.ForceExecute();
-        ProcessQueue.QueueItems.Add(
-            fetchGiantBombMetadata
-        );
-    }
-}
-
-ProcessQueue.QueueItem MetadataSearch = new ProcessQueue.QueueItem(ProcessQueue.QueueItemType.MetadataMatchSearch, 120, new List<ProcessQueue.QueueItemType> {
-    ProcessQueue.QueueItemType.GetMissingArtwork, ProcessQueue.QueueItemType.TallyVotes, ProcessQueue.QueueItemType.AutoMapper
-});
-MetadataSearch.ForceExecute();
-ProcessQueue.QueueItems.Add(
-    MetadataSearch
-);
-
-ProcessQueue.QueueItems.Add(
-    new ProcessQueue.QueueItem(
-        ProcessQueue.QueueItemType.DailyMaintenance,
-        1440,
-        new List<ProcessQueue.QueueItemType>
-        {
-            ProcessQueue.QueueItemType.All
-        }
-        )
-    );
-
-ProcessQueue.QueueItems.Add(
-    new ProcessQueue.QueueItem(
-        ProcessQueue.QueueItemType.WeeklyMaintenance,
-        10080,
-        new List<ProcessQueue.QueueItemType>{
-            ProcessQueue.QueueItemType.All
-        }
-        )
-    );
-
-ProcessQueue.QueueItems.Add(
-    new ProcessQueue.QueueItem(
-        ProcessQueue.QueueItemType.CacheWarmer,
-        30,
-        new List<ProcessQueue.QueueItemType>()
-        )
-    );
+cacheWarmerQueueItem.Task = new Classes.ProcessQueue.CacheWarmer();
+cacheWarmerQueueItem.ForceExecute();
+QueueProcessor.QueueItems.Add(cacheWarmerQueueItem);
 
 Logging.WriteToDiskOnly = false;
 
