@@ -147,7 +147,7 @@ namespace BackgroundMetadataMatcher
                                             // if not, try to get it by name
                                             game = await hasheous_server.Classes.Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Game>(metadata.Id);
                                         }
-                                        if (game.Cover != null)
+                                        if (game != null && game.Cover != null)
                                         {
                                             if (game.Cover.Id != null)
                                             {
