@@ -542,9 +542,9 @@ namespace hasheous_server.Controllers.v1_0
             }
             else
             {
-                // only users who hold the admin or moderator role should be able to force a scan
+                // only users who hold the admin or moderator or member role should be able to force a scan
                 // check if the logged in user has the required role
-                if (!User.IsInRole("Admin") && !User.IsInRole("Moderator"))
+                if (!User.IsInRole("Admin") && !User.IsInRole("Moderator") && !User.IsInRole("Member"))
                 {
                     forceScan = false;
                 }

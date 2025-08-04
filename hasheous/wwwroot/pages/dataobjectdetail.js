@@ -15,11 +15,11 @@ if (userProfile != null && userProfile.Roles != null) {
             if (userProfile.Roles.includes('Moderator') || userProfile.Roles.includes('Admin')) {
                 showEditControls = true;
                 showMergeControls = true;
-                showRescanButton = true;
             }
 
-            // show metadata submit button to all signed in users
+            // show metadata submit and rescan buttons to all signed in users
             showMetadataSubmitButton = true;
+            showRescanButton = true;
             break;
 
         case "platform":
