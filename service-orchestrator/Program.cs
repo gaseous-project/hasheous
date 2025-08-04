@@ -171,10 +171,6 @@ builder.Services.AddSwaggerGen(options =>
 builder.Services.AddHostedService<TimedHostedService>();
 
 // set up api key authentication
-builder.Services.AddControllers(options =>
-{
-    options.Filters.Add<InterHostApiKeyAuthorizationFilter>();
-});
 builder.Services.AddSingleton<IInterHostApiKeyValidator, InterHostApiKeyValidator>();
 builder.Services.AddSingleton<InterHostApiKeyAuthorizationFilter>();
 
