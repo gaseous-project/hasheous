@@ -147,7 +147,7 @@ try
 }
 catch (Exception ex)
 {
-    Logging.Log(Logging.LogType.Critical, serviceName, $"Failed to start service: {ex.Message}");
+    Logging.Log(Logging.LogType.Critical, serviceName, $"An error occurred while executing service.", ex);
     // terminate the application with a non-zero exit code
     Environment.Exit(1);
 }
