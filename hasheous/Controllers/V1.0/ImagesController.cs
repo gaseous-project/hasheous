@@ -26,7 +26,7 @@ namespace hasheous_server.Controllers.v1_0
         {
             Images images = new Images();
 
-            ImageItem image = images.GetImage(Id);
+            ImageItem? image = await images.GetImage(Id);
 
             if (image == null)
             {
@@ -67,7 +67,7 @@ namespace hasheous_server.Controllers.v1_0
                     byte[] fileBytes = ms.ToArray();
 
                     Images images = new Images();
-                    imageHash = images.AddImage(file.FileName, fileBytes);
+                    imageHash = await images.AddImage(file.FileName, fileBytes);
                 }
             }
 

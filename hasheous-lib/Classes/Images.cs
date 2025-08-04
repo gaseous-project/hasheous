@@ -15,7 +15,7 @@ namespace hasheous_server.Classes
             { ".svg", "image/svg+xml" }
         };
 
-        public string AddImage(string fileName, byte[] bytes)
+        public async Task<string> AddImage(string fileName, byte[] bytes)
         {
             // check if it's a supported file type
             if (!supportedImages.ContainsKey(Path.GetExtension(fileName).ToLower()))
@@ -30,33 +30,41 @@ namespace hasheous_server.Classes
                 hash = string.Concat(sha1.ComputeHash(bytes).Select(x => x.ToString("X2")));
             }
 
-            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql = "SELECT `Id` FROM Images WHERE Id = @id";
-            DataTable data = db.ExecuteCMD(sql, new Dictionary<string, object>{
-                { "id", hash }
-            });
-            if (data.Rows.Count > 0)
+            // save the image to disk
+            string filePath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_HasheousImages, hash + Path.GetExtension(fileName));
+            if (!Directory.Exists(Config.LibraryConfiguration.LibraryMetadataDirectory_HasheousImages))
             {
-                return hash;
+                Directory.CreateDirectory(Config.LibraryConfiguration.LibraryMetadataDirectory_HasheousImages);
             }
+            await File.WriteAllBytesAsync(filePath, bytes);
 
-            // add the image to the database
-            sql = "INSERT INTO Images (Id, Content, Extension) VALUES (@id, @content, @ext);";
-            db.ExecuteNonQuery(sql, new Dictionary<string, object>
-            {
-                { "id", hash },
-                { "content", bytes },
-                { "ext", Path.GetExtension(fileName) }
-            });
-
+            // return the hash
             return hash;
         }
 
-        public ImageItem? GetImage(string sha1hash)
+        public async Task<ImageItem?> GetImage(string sha1hash)
         {
+            // check if the image exists on disk first before querying the database
+            var diskImage = Common.GetFileNameWithExtension(Config.LibraryConfiguration.LibraryMetadataDirectory_HasheousImages, sha1hash);
+            if (diskImage != null)
+            {
+                string filePath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_HasheousImages, diskImage);
+                if (File.Exists(filePath))
+                {
+                    return new ImageItem
+                    {
+                        Id = sha1hash,
+                        content = await File.ReadAllBytesAsync(filePath),
+                        mimeType = supportedImages[Path.GetExtension(diskImage)],
+                        extension = Path.GetExtension(diskImage)
+                    };
+                }
+            }
+
+            // if not found on disk, query the database
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "SELECT Content, Extension FROM Images WHERE Id=@id";
-            DataTable data = db.ExecuteCMD(sql, new Dictionary<string, object>{
+            DataTable data = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>{
                 { "id", sha1hash }
             });
 

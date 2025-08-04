@@ -626,6 +626,22 @@ namespace Classes
                     }
                 }
 
+                public string LibraryMetadataDirectory_Hasheous
+                {
+                    get
+                    {
+                        return Path.Combine(LibraryMetadataDirectory, "Hasheous");
+                    }
+                }
+
+                public string LibraryMetadataDirectory_HasheousImages
+                {
+                    get
+                    {
+                        return Path.Combine(LibraryMetadataDirectory_Hasheous, "Images");
+                    }
+                }
+
                 public string LibraryMetadataDirectory_IGDB
                 {
                     get
@@ -716,6 +732,8 @@ namespace Classes
                     if (!Directory.Exists(LibraryRootDirectory)) { Directory.CreateDirectory(LibraryRootDirectory); }
                     if (!Directory.Exists(LibraryUploadDirectory)) { Directory.CreateDirectory(LibraryUploadDirectory); }
                     if (!Directory.Exists(LibraryMetadataDirectory)) { Directory.CreateDirectory(LibraryMetadataDirectory); }
+                    if (!Directory.Exists(LibraryMetadataDirectory_Hasheous)) { Directory.CreateDirectory(LibraryMetadataDirectory_Hasheous); }
+                    if (!Directory.Exists(LibraryMetadataDirectory_HasheousImages)) { Directory.CreateDirectory(LibraryMetadataDirectory_HasheousImages); }
                     if (!Directory.Exists(LibraryMetadataDirectory_IGDB)) { Directory.CreateDirectory(LibraryMetadataDirectory_IGDB); }
                     if (!Directory.Exists(LibraryMetadataDirectory_VIMMSLair)) { Directory.CreateDirectory(LibraryMetadataDirectory_VIMMSLair); }
                     if (!Directory.Exists(LibraryMetadataDirectory_TheGamesDb)) { Directory.CreateDirectory(LibraryMetadataDirectory_TheGamesDb); }

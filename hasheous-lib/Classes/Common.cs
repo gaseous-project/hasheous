@@ -265,6 +265,22 @@ namespace Classes
 		}
 
 		/// <summary>
+		/// Returns the file name (with extension) if a file exists in the directory matching the given name (ignoring extension), or null if not found.
+		/// </summary>
+		public static string? GetFileNameWithExtension(string directoryPath, string fileNameWithoutExtension)
+		{
+			if (!Directory.Exists(directoryPath))
+				return null;
+
+			var files = Directory.GetFiles(directoryPath);
+			var match = files.FirstOrDefault(f =>
+				Path.GetFileNameWithoutExtension(f)
+					.Equals(fileNameWithoutExtension, StringComparison.OrdinalIgnoreCase));
+
+			return match != null ? Path.GetFileName(match) : null;
+		}
+
+		/// <summary>
 		/// Provides a way to set contextual data that flows with the call and 
 		/// async context of a test or invocation.
 		/// </summary>
