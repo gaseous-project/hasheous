@@ -25,6 +25,7 @@ services:
       - redisenabled=true
       - redishost=valkey
       - redisport=6379
+      - reportingserverurl=http://hasheous-orchestrator:7023
   hasheous-orchestrator:
     container_name: hasheous-orchestrator
     build:
