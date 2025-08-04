@@ -1,6 +1,5 @@
 function LoadStatusPage() {
     const statusTable = document.getElementById('status-table');
-    statusTable.innerHTML = ''; // Clear previous content
 
     let columnCount = 5; // Default column count
 
@@ -15,6 +14,7 @@ function LoadStatusPage() {
         })
         .then(data => {
             taskList = data; // Store the fetched data for potential future use
+            let tableContent = document.createElement('table');
             for (const server of Object.keys(data)) {
                 if (data[server] && data[server].length > 0) {
                     // build the table
@@ -24,7 +24,7 @@ function LoadStatusPage() {
                     // Add server header
                     const serverHeader = document.createElement('tr');
                     serverHeader.innerHTML = `<td colspan="${columnCount}"><h2>${lang.getLang('servicebackgroundtasksfor' + server)}</h2></td>`;
-                    statusTable.appendChild(serverHeader);
+                    tableContent.appendChild(serverHeader);
 
                     const headRow = document.createElement('tr');
 
@@ -53,7 +53,7 @@ function LoadStatusPage() {
                     headCell5.innerHTML = '&nbsp;'; // Empty cell for buttons
                     headRow.appendChild(headCell5);
 
-                    statusTable.appendChild(headRow);
+                    tableContent.appendChild(headRow);
 
                     const tableGroups = {
                         "signatures": [
@@ -145,13 +145,15 @@ function LoadStatusPage() {
                         });
 
                         if (groupFound) {
-                            statusTable.appendChild(groupBody);
+                            tableContent.appendChild(groupBody);
                         }
                     });
                 } else {
-                    statusTable.innerHTML = `<tr><td colspan="${columnCount}">No background tasks found.</td></tr>`;
+                    tableContent.innerHTML = `<tr><td colspan="${columnCount}">No background tasks found.</td></tr>`;
                 }
             }
+
+            statusTable.innerHTML = tableContent.innerHTML;
         })
         .catch(error => {
             console.error('Error fetching background tasks:', error);
