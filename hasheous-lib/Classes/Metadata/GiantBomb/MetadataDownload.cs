@@ -468,44 +468,44 @@ namespace GiantBomb
                                     { "image_tags", image.image_tags }
                                 });
 
-                // download the images
-                // loop through each property of the image and download if the property name ends with "_url"
-                foreach (var prop in image.GetType().GetProperties())
-                {
-                    if (prop.Name.EndsWith("_url") && prop.GetValue(image) is string imageUrl && !string.IsNullOrEmpty(imageUrl))
-                    {
-                        // download the image
-                        string imageDirectoryName = Path.Combine(LocalFilePath, "Images", guid, prop.Name.Split("_")[0]);
-                        if (Directory.Exists(imageDirectoryName) == false)
-                        {
-                            Directory.CreateDirectory(imageDirectoryName);
-                        }
+                // // download the images
+                // // loop through each property of the image and download if the property name ends with "_url"
+                // foreach (var prop in image.GetType().GetProperties())
+                // {
+                //     if (prop.Name.EndsWith("_url") && prop.GetValue(image) is string imageUrl && !string.IsNullOrEmpty(imageUrl))
+                //     {
+                //         // download the image
+                //         string imageDirectoryName = Path.Combine(LocalFilePath, "Images", guid, prop.Name.Split("_")[0]);
+                //         if (Directory.Exists(imageDirectoryName) == false)
+                //         {
+                //             Directory.CreateDirectory(imageDirectoryName);
+                //         }
 
-                        string imageFileName = Path.Combine(imageDirectoryName, $"{Path.GetFileName(imageUrl)}");
-                        if (!File.Exists(imageFileName))
-                        {
-                            try
-                            {
-                                var imageResponse = await client.GetAsync(new Uri(new Uri(BaseUrl), new Uri(imageUrl)));
-                                if (imageResponse.IsSuccessStatusCode)
-                                {
-                                    var imageBytes = await imageResponse.Content.ReadAsByteArrayAsync();
-                                    File.WriteAllBytes(imageFileName, imageBytes);
-                                    Logging.Log(Logging.LogType.Information, "GiantBomb", $"Downloaded image: {imageFileName}");
-                                }
-                                else
-                                {
-                                    Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Failed to download image: {imageUrl}. Status code: {imageResponse.StatusCode}");
-                                    Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Response: {imageResponse.ReasonPhrase}");
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Error downloading image: {imageUrl}. Exception: {ex.Message}", ex);
-                            }
-                        }
-                    }
-                }
+                //         string imageFileName = Path.Combine(imageDirectoryName, $"{Path.GetFileName(imageUrl)}");
+                //         if (!File.Exists(imageFileName))
+                //         {
+                //             try
+                //             {
+                //                 var imageResponse = await client.GetAsync(new Uri(new Uri(BaseUrl), new Uri(imageUrl)));
+                //                 if (imageResponse.IsSuccessStatusCode)
+                //                 {
+                //                     var imageBytes = await imageResponse.Content.ReadAsByteArrayAsync();
+                //                     File.WriteAllBytes(imageFileName, imageBytes);
+                //                     Logging.Log(Logging.LogType.Information, "GiantBomb", $"Downloaded image: {imageFileName}");
+                //                 }
+                //                 else
+                //                 {
+                //                     Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Failed to download image: {imageUrl}. Status code: {imageResponse.StatusCode}");
+                //                     Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Response: {imageResponse.ReasonPhrase}");
+                //                 }
+                //             }
+                //             catch (Exception ex)
+                //             {
+                //                 Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Error downloading image: {imageUrl}. Exception: {ex.Message}", ex);
+                //             }
+                //         }
+                //     }
+                // }
             }
 
             return;
