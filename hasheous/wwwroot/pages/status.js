@@ -167,7 +167,7 @@ LoadStatusPage();
 
 let statusRefresh = setInterval(() => {
     LoadStatusPage();
-}, 30000); // Refresh every 30 seconds
+}, 5000); // Refresh every 5 seconds
 
 window.addEventListener('beforeunload', () => {
     clearInterval(statusRefresh);
