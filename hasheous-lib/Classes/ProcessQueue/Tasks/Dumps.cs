@@ -75,7 +75,13 @@ namespace Classes.ProcessQueue
                         Directory.CreateDirectory(platformPath);
                     }
 
-                    string fileName = $"{dataObject.Name} ({dataObject.Id}).json";
+                    // Ensure the file name is safe for writing to disk
+                    string unsafeFileName = $"{dataObject.Name.Trim()} ({dataObject.Id}).json";
+                    foreach (char c in Path.GetInvalidFileNameChars())
+                    {
+                        unsafeFileName = unsafeFileName.Replace(c, '_');
+                    }
+                    string fileName = unsafeFileName;
                     string filePath = Path.Combine(platformPath, fileName);
 
                     // serialize the dictionary to JSON and write to file
