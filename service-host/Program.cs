@@ -1,5 +1,6 @@
 using Classes;
 using Classes.ProcessQueue;
+using hasheous_server.Classes;
 using HasheousServerHost.Classes.CLI;
 using static Classes.Common;
 
@@ -133,6 +134,10 @@ switch (taskType)
 
     case QueueItemType.CacheWarmer:
         Task = new CacheWarmer();
+        break;
+
+    case QueueItemType.MetadataMapDump:
+        Task = new Dumps();
         break;
 
     default:
