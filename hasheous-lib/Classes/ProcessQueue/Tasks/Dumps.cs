@@ -16,22 +16,16 @@ namespace Classes.ProcessQueue
         /// <inheritdoc/>
         public async Task<object?> ExecuteAsync()
         {
-            string outputPath = Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory;
+            string outputPath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "Content");
 
             // Ensure the output directory exists
-            if (Directory.Exists(outputPath))
+            if (!Directory.Exists(outputPath))
             {
-                Directory.Delete(outputPath, true);
+                Directory.CreateDirectory(outputPath);
             }
-            Directory.CreateDirectory(outputPath);
 
-            // create the build directory
-            string buildPath = Path.Combine(outputPath, "build");
-            if (Directory.Exists(buildPath))
-            {
-                Directory.Delete(buildPath, true);
-            }
-            Directory.CreateDirectory(buildPath);
+            // Define the path for the zip file
+            string zipFilePath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "MetadataMap.zip");
 
             // initialize the DataObjects class
             DataObjects dataObjects = new DataObjects();
@@ -99,17 +93,16 @@ namespace Classes.ProcessQueue
             }
 
             // step 3: zip the output directory
-            string zipFilePath = Path.Combine(outputPath, "MetadataMap.zip");
             if (File.Exists(zipFilePath))
             {
                 File.Delete(zipFilePath);
             }
-            System.IO.Compression.ZipFile.CreateFromDirectory(buildPath, zipFilePath);
+            System.IO.Compression.ZipFile.CreateFromDirectory(outputPath, zipFilePath);
 
             // clean up the build directory
-            if (Directory.Exists(buildPath))
+            if (Directory.Exists(outputPath))
             {
-                Directory.Delete(buildPath, true);
+                Directory.Delete(outputPath, true);
             }
 
             return null; // Assuming the method returns void, we return null here.
