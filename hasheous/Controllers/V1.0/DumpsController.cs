@@ -9,7 +9,6 @@ namespace hasheous_server.Controllers.v1_0
     [Route("api/v{version:apiVersion}/[controller]/")]
     [ApiVersion("1.0")]
     [ApiExplorerSettings(IgnoreApi = false)]
-    [Authorize]
     public class DumpsController : ControllerBase
     {
         /// <summary>
