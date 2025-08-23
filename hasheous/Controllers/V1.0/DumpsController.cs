@@ -19,8 +19,9 @@ namespace hasheous_server.Controllers.v1_0
         /// <response code="200">Returns the zip file.</response>
         /// <response code="404">If the metadata map dump is not found.</response>
         /// <response code="500">If an error occurs while generating the dump.</response>
-        [HttpGet("MetadataMapDump")]
+        [HttpGet("MetadataMap.zip")]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> GetMetadataMapDump()
@@ -36,17 +37,35 @@ namespace hasheous_server.Controllers.v1_0
                     return NotFound("Metadata map dump not found.");
                 }
 
-                // Stream the zip file with range support to avoid loading it into memory
+                // Prefer PhysicalFileResult so the server can use optimized sendfile/zero-copy where available
                 var fileInfo = new System.IO.FileInfo(zipFilePath);
-                var stream = new System.IO.FileStream(
-                    fileInfo.FullName,
-                    System.IO.FileMode.Open,
-                    System.IO.FileAccess.Read,
-                    System.IO.FileShare.Read,
-                    bufferSize: 1024 * 1024,
-                    options: System.IO.FileOptions.Asynchronous | System.IO.FileOptions.SequentialScan);
 
-                return File(stream, "application/zip", fileDownloadName: fileInfo.Name, enableRangeProcessing: true);
+                // Optional: Expose validators to help clients/proxies cache (strong ETag + Last-Modified)
+                var lastWrite = fileInfo.LastWriteTimeUtc;
+                var etag = '"' + Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(fileInfo.FullName + "|" + fileInfo.Length + "|" + lastWrite.Ticks))) + '"';
+                Response.Headers[Microsoft.Net.Http.Headers.HeaderNames.ETag] = etag;
+                Response.Headers[Microsoft.Net.Http.Headers.HeaderNames.LastModified] = lastWrite.ToString("R");
+                // Optional: allow long-lived caching if your auth/usage policy permits it
+                Response.Headers[Microsoft.Net.Http.Headers.HeaderNames.CacheControl] = "private, max-age=86400"; // 1 day, per-user
+
+                // Conditional GET handling: return 304 if client already has the latest
+                var request = Request;
+                var clientETag = request.Headers[Microsoft.Net.Http.Headers.HeaderNames.IfNoneMatch].ToString();
+                if (!string.IsNullOrEmpty(clientETag) && string.Equals(clientETag, etag, StringComparison.Ordinal))
+                {
+                    return StatusCode(StatusCodes.Status304NotModified);
+                }
+                var ifModifiedSince = request.Headers[Microsoft.Net.Http.Headers.HeaderNames.IfModifiedSince].ToString();
+                if (string.IsNullOrEmpty(clientETag) && DateTimeOffset.TryParse(ifModifiedSince, out var ims))
+                {
+                    // If-Modified-Since has second precision; treat unchanged if not newer
+                    if (lastWrite <= ims)
+                    {
+                        return StatusCode(StatusCodes.Status304NotModified);
+                    }
+                }
+
+                return PhysicalFile(fileInfo.FullName, "application/zip", fileDownloadName: fileInfo.Name, enableRangeProcessing: true);
             }
             catch (Exception ex)
             {
