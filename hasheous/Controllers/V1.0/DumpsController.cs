@@ -27,10 +27,6 @@ namespace hasheous_server.Controllers.v1_0
         {
             try
             {
-                // Execute the Dumps task to create the metadata map dump
-                var dumpsTask = new Dumps();
-                await dumpsTask.ExecuteAsync();
-
                 // Define the path to the zip file
                 string zipFilePath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "MetadataMap.zip");
 
@@ -40,8 +36,17 @@ namespace hasheous_server.Controllers.v1_0
                     return NotFound("Metadata map dump not found.");
                 }
 
-                // Return the zip file as a file result
-                return PhysicalFile(zipFilePath, "application/zip", "MetadataMap.zip");
+                // Stream the zip file with range support to avoid loading it into memory
+                var fileInfo = new System.IO.FileInfo(zipFilePath);
+                var stream = new System.IO.FileStream(
+                    fileInfo.FullName,
+                    System.IO.FileMode.Open,
+                    System.IO.FileAccess.Read,
+                    System.IO.FileShare.Read,
+                    bufferSize: 1024 * 1024,
+                    options: System.IO.FileOptions.Asynchronous | System.IO.FileOptions.SequentialScan);
+
+                return File(stream, "application/zip", fileDownloadName: fileInfo.Name, enableRangeProcessing: true);
             }
             catch (Exception ex)
             {
