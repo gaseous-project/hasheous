@@ -107,6 +107,10 @@ namespace Classes.ProcessQueue
                     case QueueItemType.CacheWarmer:
                         Task = new CacheWarmer();
                         break;
+
+                    case QueueItemType.MetadataMapDump:
+                        Task = new Dumps();
+                        break;
                 }
             }
 
