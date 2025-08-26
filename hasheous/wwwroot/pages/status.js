@@ -74,7 +74,8 @@ function LoadStatusPage() {
                         "servicemanagement": [
                             "TallyVotes",
                             "MetadataMatchSearch",
-                            "GetMissingArtwork"
+                            "GetMissingArtwork",
+                            "MetadataMapDump"
                         ]
                     }
 

@@ -626,6 +626,22 @@ namespace Classes
                     }
                 }
 
+                public string LibraryDumpsDirectory
+                {
+                    get
+                    {
+                        return Path.Combine(LibraryRootDirectory, "Dumps");
+                    }
+                }
+
+                public string LibraryMetadataMapDumpsDirectory
+                {
+                    get
+                    {
+                        return Path.Combine(LibraryDumpsDirectory, "MetadataMap");
+                    }
+                }
+
                 public string LibraryMetadataDirectory_Hasheous
                 {
                     get
