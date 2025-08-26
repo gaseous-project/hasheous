@@ -73,6 +73,11 @@ namespace Classes.ProcessQueue
         /// <summary>
         /// Reserved for cache warming tasks - no actual background service is tied to this type
         /// </summary>
-        CacheWarmer
+        CacheWarmer,
+
+        /// <summary>
+        /// Metadata map dump task
+        /// </summary>
+        MetadataMapDump
     }
 }

@@ -235,7 +235,10 @@ Classes.ProcessQueue.QueueProcessor.QueueItems = new List<Classes.ProcessQueue.Q
     // fetch VIMM metadata
     new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchVIMMMetadata, 10080, false),
     // fetch TheGamesDB metadata
-    new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchTheGamesDbMetadata, 10080, false)
+    new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchTheGamesDbMetadata, 10080, false),
+
+    // dump all data objects
+    new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.MetadataMapDump, 10080, false)
 };
 
 // non-default metadata fetchers

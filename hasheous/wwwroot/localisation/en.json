@@ -244,6 +244,7 @@
     "servicetallyvotes": "Tally Votes",
     "servicemetadatamatchsearch": "Metadata Match Search",
     "servicegetmissingartwork": "Get Missing Artwork",
+    "servicemetadatamapdump": "Metadata Map Dump",
     "servicestopped": "Stopped",
     "servicerunning": "Running",
     "serviceneverstarted": "Stopped",
