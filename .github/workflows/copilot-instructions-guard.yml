@@ -7,6 +7,8 @@ on:
 jobs:
   guard:
     if: github.event.pull_request.draft == false
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -35,13 +37,13 @@ jobs:
           UPDATED_DOC=$(echo "$CHANGED" | grep -E "^${INSTRUCTIONS_PATH}$" || true)
 
           if [ -n "$NEEDS_UPDATE" ] && [ -z "$UPDATED_DOC" ]; then
-            echo "::error::Detected changes to architecture/config files without updating ${INSTRUCTIONS_PATH}. Please review and update it or add an exception if not needed."
-            echo "Files triggering this check:"
-            echo "$NEEDS_UPDATE" | sed 's/^/ - /'
-            if [ -f .github/scripts/copilot-instructions-help.sh ]; then
-              echo "$NEEDS_UPDATE" | bash .github/scripts/copilot-instructions-help.sh "$INSTRUCTIONS_PATH"
-            fi
-            exit 1
+          echo "::error::Detected changes to architecture/config files without updating ${INSTRUCTIONS_PATH}. Please review and update it or add an exception if not needed."
+          echo "Files triggering this check:"
+          echo "$NEEDS_UPDATE" | sed 's/^/ - /'
+          if [ -f .github/scripts/copilot-instructions-help.sh ]; then
+            echo "$NEEDS_UPDATE" | bash .github/scripts/copilot-instructions-help.sh "$INSTRUCTIONS_PATH"
+          fi
+          exit 1
           else
-            echo "No copilot-instructions update required."
+          echo "No copilot-instructions update required."
           fi
