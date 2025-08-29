@@ -142,9 +142,8 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 - Update this guide when changing routing, auth, migrations, orchestrator queue, docker, or README. The PR guard will fail otherwise and prints hints.
 - UI/static: for changes under `wwwroot/`, include before/after screenshots if relevant.
 
-```async guidance
+## async guidance
 - Prefer Task-returning actions: `public async Task<IActionResult> Action(...)`.
 - Await DB calls (`ExecuteCMDAsync`/`ExecuteCMDDictAsync`) and long-running operations.
 - Use `Task.WhenAny` for bounded latency where appropriate (see `LookupController`).
 - Avoid `.Result`/`.Wait()` to prevent thread-pool starvation and deadlocks.
-```
