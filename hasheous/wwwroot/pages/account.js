@@ -26,10 +26,10 @@ let resendButton = document.getElementById('resend_verification');
 emailField.innerHTML = userProfile.EmailAddress;
 
 if (userProfile.EmailConfirmed) {
-    emailStatusField.innerHTML = '<span style="color: green;">✓ Email verified</span>';
+    emailStatusField.innerHTML = `<span class="email-status-verified">✓ ${lang.getLang('emailverified')}</span>`;
     resendButton.style.display = 'none';
 } else {
-    emailStatusField.innerHTML = '<span style="color: orange;">⚠ Email not verified</span>';
+    emailStatusField.innerHTML = `<span class="email-status-unverified">⚠ ${lang.getLang('emailnotverified')}</span>`;
     resendButton.style.display = 'inline-block';
 }
 
@@ -37,7 +37,7 @@ if (userProfile.EmailConfirmed) {
 resendButton.addEventListener('click', function(e) {
     e.preventDefault();
     resendButton.disabled = true;
-    resendButton.innerHTML = 'Sending...';
+    resendButton.innerHTML = lang.getLang('sendingemailverification');
     
     fetch('/api/v1/Account/ResendEmailVerification', {
         method: 'POST',
@@ -51,14 +51,14 @@ resendButton.addEventListener('click', function(e) {
             throw new Error('Failed to send verification email');
         }
     }).then(message => {
-        resendButton.innerHTML = 'Email Sent!';
+        resendButton.innerHTML = lang.getLang('emailverificationsent');
         setTimeout(() => {
-            resendButton.innerHTML = 'Resend Verification Email';
+            resendButton.innerHTML = lang.getLang('resendemailverification');
             resendButton.disabled = false;
         }, 3000);
     }).catch(error => {
         console.error('Error:', error);
-        resendButton.innerHTML = 'Error - Try Again';
+        resendButton.innerHTML = lang.getLang('emailverificationerror');
         resendButton.disabled = false;
     });
 });
