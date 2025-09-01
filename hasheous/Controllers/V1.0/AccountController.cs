@@ -39,6 +39,28 @@ namespace hasheous_server.Controllers.v1_0
             _logger = loggerFactory.CreateLogger<AccountController>();
         }
 
+        /// <summary>
+        /// Manages the "Verified Email" role based on the user's email confirmation status
+        /// </summary>
+        /// <param name="user">The user to update</param>
+        private async Task UpdateVerifiedEmailRole(ApplicationUser user)
+        {
+            const string verifiedEmailRole = "Verified Email";
+            bool isEmailConfirmed = await _userManager.IsEmailConfirmedAsync(user);
+            bool hasVerifiedEmailRole = await _userManager.IsInRoleAsync(user, verifiedEmailRole);
+
+            if (isEmailConfirmed && !hasVerifiedEmailRole)
+            {
+                // Email is confirmed but user doesn't have the verified email role - add it
+                await _userManager.AddToRoleAsync(user, verifiedEmailRole);
+            }
+            else if (!isEmailConfirmed && hasVerifiedEmailRole)
+            {
+                // Email is not confirmed but user has the verified email role - remove it
+                await _userManager.RemoveFromRoleAsync(user, verifiedEmailRole);
+            }
+        }
+
         [HttpPost]
         [AllowAnonymous]
         [Route("Login")]
@@ -98,6 +120,7 @@ namespace hasheous_server.Controllers.v1_0
             ApplicationUser user = await _userManager.FindByIdAsync(profile.UserId);
             profile.UserName = _userManager.GetUserName(HttpContext.User);
             profile.EmailAddress = await _userManager.GetEmailAsync(user);
+            profile.EmailConfirmed = await _userManager.IsEmailConfirmedAsync(user);
             profile.Roles = new List<string>(await _userManager.GetRolesAsync(user));
             profile.SecurityProfile = user.SecurityProfile;
             profile.Roles.Sort();
@@ -118,6 +141,7 @@ namespace hasheous_server.Controllers.v1_0
                 profile.UserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
                 profile.UserName = _userManager.GetUserName(HttpContext.User);
                 profile.EmailAddress = await _userManager.GetEmailAsync(user);
+                profile.EmailConfirmed = await _userManager.IsEmailConfirmedAsync(user);
                 profile.Roles = new List<string>(await _userManager.GetRolesAsync(user));
                 profile.SecurityProfile = user.SecurityProfile;
                 profile.Roles.Sort();
@@ -225,6 +249,9 @@ namespace hasheous_server.Controllers.v1_0
                     // add all users to the member role
                     await _userManager.AddToRoleAsync(user, "Member");
 
+                    // Update the "Verified Email" role based on email confirmation status
+                    await UpdateVerifiedEmailRole(user);
+
                     //await _signInManager.SignInAsync(user, isPersistent: false);
 
                     Logging.Log(Logging.LogType.Information, "User Management", "New user " + model.Email + " created with password.");
@@ -261,11 +288,53 @@ namespace hasheous_server.Controllers.v1_0
             var result = await _userManager.ConfirmEmailAsync(user, code);
             if (result.Succeeded == true)
             {
+                // Update the "Verified Email" role
+                await UpdateVerifiedEmailRole(user);
                 return new RedirectResult("/index.html?page=emailconfirmed");
             }
             else
             {
                 return Ok(result);
+            }
+        }
+
+        /// <summary>
+        /// Resend email verification to the current user
+        /// </summary>
+        /// <returns>Success or error result</returns>
+        [HttpPost]
+        [Route("ResendEmailVerification")]
+        [ApiExplorerSettings(IgnoreApi = true)]
+        [Authorize]
+        public async Task<IActionResult> ResendEmailVerification()
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Unauthorized("User not found");
+            }
+
+            if (await _userManager.IsEmailConfirmedAsync(user))
+            {
+                return BadRequest("Email is already confirmed");
+            }
+
+            try
+            {
+                // Generate email confirmation token
+                var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+                var callbackUrl = Url.Action("ConfirmEmail", "Account", new { userId = user.Id, code = code }, protocol: HttpContext.Request.Scheme);
+                
+                // Send confirmation email
+                await _emailSender.SendEmailAsync(user.Email, "Confirm your account",
+                   "Please confirm your account by clicking this link: <a href=\"" + callbackUrl + "\">link</a>");
+
+                return Ok("Verification email sent successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("Error sending verification email to {Email}: {Message}", user.Email, ex.Message);
+                return StatusCode(500, "Error sending verification email. Please try again later.");
             }
         }
 
@@ -469,6 +538,8 @@ namespace hasheous_server.Controllers.v1_0
                     var addLoginResult = await _userManager.AddLoginAsync(user, info);
                     if (addLoginResult.Succeeded)
                     {
+                        // Update the "Verified Email" role based on email confirmation status
+                        await UpdateVerifiedEmailRole(user);
                         await _signInManager.SignInAsync(user, isPersistent: true);
                         return LocalRedirect(returnUrl);
                     }
@@ -500,6 +571,10 @@ namespace hasheous_server.Controllers.v1_0
 
                         // add all users to the member role
                         await _userManager.AddToRoleAsync(user, "Member");
+
+                        // Update the "Verified Email" role based on email confirmation status
+                        await UpdateVerifiedEmailRole(user);
+
                         await _signInManager.SignInAsync(user, isPersistent: true);
                         return LocalRedirect(returnUrl);
                     }
@@ -539,6 +614,8 @@ namespace hasheous_server.Controllers.v1_0
                     var addLoginResult = await _userManager.AddLoginAsync(user, info);
                     if (addLoginResult.Succeeded)
                     {
+                        // Update the "Verified Email" role based on email confirmation status
+                        await UpdateVerifiedEmailRole(user);
                         await _signInManager.SignInAsync(user, isPersistent: true);
                         return LocalRedirect(returnUrl);
                     }
@@ -571,6 +648,9 @@ namespace hasheous_server.Controllers.v1_0
                         {
                             return Unauthorized(updateResult.Errors);
                         }
+
+                        // Update the "Verified Email" role based on email confirmation status
+                        await UpdateVerifiedEmailRole(user);
 
                         await _signInManager.SignInAsync(user, isPersistent: true);
                         return LocalRedirect(returnUrl);

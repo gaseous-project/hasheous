@@ -291,6 +291,7 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("Admin", policy => policy.RequireRole("Admin"));
     options.AddPolicy("Moderator", policy => policy.RequireRole("Moderator"));
     options.AddPolicy("Member", policy => policy.RequireRole("Member"));
+    options.AddPolicy("VerifiedEmail", policy => policy.RequireRole("Verified Email"));
 });
 
 // setup api key
@@ -353,7 +354,8 @@ app.UseForwardedHeaders();
 using (var scope = app.Services.CreateScope())
 {
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleStore>();
-    var roles = new[] { "Admin", "Moderator", "Member" };
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+    var roles = new[] { "Admin", "Moderator", "Member", "Verified Email" };
 
     foreach (var role in roles)
     {
@@ -363,6 +365,17 @@ using (var scope = app.Services.CreateScope())
             applicationRole.Name = role;
             applicationRole.NormalizedName = role.ToUpper();
             await roleManager.CreateAsync(applicationRole, CancellationToken.None);
+        }
+    }
+
+    // Update existing users to have the "Verified Email" role if their email is confirmed
+    const string verifiedEmailRole = "Verified Email";
+    var usersWithConfirmedEmails = userManager.Users.Where(u => u.EmailConfirmed).ToList();
+    foreach (var user in usersWithConfirmedEmails)
+    {
+        if (!await userManager.IsInRoleAsync(user, verifiedEmailRole))
+        {
+            await userManager.AddToRoleAsync(user, verifiedEmailRole);
         }
     }
 }
