@@ -31,7 +31,8 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Swagger is enabled with custom schema IDs and API key security definitions.
 
 - Auth & security
-  - Identity cookies configured; roles/policies: Admin, Moderator, Member. Roles are seeded on startup.
+  - Identity cookies configured; roles/policies: Admin, Moderator, Member, "Verified Email". Roles are seeded on startup.
+  - Role hierarchy: Admin > Moderator > Member. "Verified Email" is a status role (not hierarchical) automatically assigned/removed based on email confirmation status.
   - API keys:
   - User key header `X-API-Key` via `[Authentication.ApiKey.ApiKeyAttribute]` (`ApiKeyAuthorizationFilter` wired in `hasheous/Program.cs`) — identifies individual users and their actions.
   - Client key header `X-Client-API-Key` via `[Authentication.ClientApiKey.ClientApiKeyAttribute]` — identifies client apps (e.g., Gaseous, Romm); typically required when `Config.RequireClientAPIKey` is true. Required to access the metadata proxy endpoints.
@@ -54,6 +55,8 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
 - Examples to copy
   - Healthcheck: `hasheous-lib/Controllers/HealthcheckController.cs` → `[AllowAnonymous]`, versioned route, `Ok()`.
   - Lookup: `hasheous/Controllers/V1.0/LookupController.cs` shows async handlers, request models, cache usage, and the timeout pattern.
+  - Account management: `hasheous/Controllers/V1.0/AccountController.cs` shows authenticated endpoints with `[Authorize]`, user context access via `_userManager.GetUserAsync(User)`, and role management patterns.
+  - Email verification: Account controller demonstrates automatic role assignment (`UpdateVerifiedEmailRole()`) and secure user-specific operations.
 
 - Gotchas
   - Large uploads are allowed (Kestrel/FormOptions set to max); ensure proxies forward `X-Forwarded-*` (already configured).
@@ -66,6 +69,7 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
   - Create a controller under `hasheous/Controllers/V1.0` with `[ApiController]`, `[ApiVersion("1.0")]`, `[Route("api/v{version:apiVersion}/[controller]/")]`.
   - Reuse cache profiles via `[ResponseCache(CacheProfileName = "5Minute")]` or `"7Days"`.
   - Protect with `[Authentication.ApiKey.ApiKeyAttribute]` or `[Authentication.ClientApiKey.ClientApiKeyAttribute]` when needed.
+  - For authenticated endpoints, use `[Authorize]` and access user context via `_userManager.GetUserAsync(User)`.
   - Use `new Classes.Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString)` and `ExecuteCMD/ExecuteCMDDict` for DB work.
   - If caching, build keys with `hasheous.Classes.RedisConnection.GenerateKey(prefix, keyObj)`.
 
@@ -80,7 +84,13 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
   - See `LookupController.LookupPost`: `Task.WhenAny(..., Task.Delay(TimeSpan.FromSeconds(10)))` and set `Retry-After = 90` on 503 responses.
 
 - Correlation & logging
-  - Middleware sets `CallContext` values (CorrelationId, CallingProcess, CallingUser); orchestrator also returns `x-correlation-id` header.eamodio.gitlens
+  - Middleware sets `CallContext` values (CorrelationId, CallingProcess, CallingUser); orchestrator also returns `x-correlation-id` header.
+
+- Email verification system
+  - "Verified Email" role is automatically assigned/removed based on `user.EmailConfirmed` status.
+  - Use `UpdateVerifiedEmailRole(user)` pattern after email confirmation changes.
+  - `ProfileBasicViewModel.EmailConfirmed` provides frontend email status.
+  - Frontend: use `postData()` for authenticated API calls (handles CSRF tokens and cookies).
 
 ## Maintenance
 - A PR guard (`.github/workflows/copilot-instructions-guard.yml`) fails when architecture/config files change without updating this file; it prints hints via `.github/scripts/copilot-instructions-help.sh`.
@@ -91,6 +101,7 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
     - GET lookup: `curl -H "X-API-Key: <USER_KEY>" "https://localhost:7157/api/v1/Lookup/ByHash/md5/<md5>"`
     - POST lookup: `curl -H "X-API-Key: <USER_KEY>" -H "Content-Type: application/json" -d '{"MD5":"...","SHA1":"..."}' "https://localhost:7157/api/v1/Lookup/ByHash"`
 - Client API key (header `X-Client-API-Key`): include the header on client-protected endpoints when `Config.RequireClientAPIKey` is true.
+- Authenticated endpoints (Account management): use cookie-based authentication with CSRF protection via `postData()` function in frontend.
 
 ## Ingestion paths (local)
 - Place DAT/XML files under `~/.hasheous-server/Data/Signatures/`:
@@ -141,6 +152,9 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 - Build/run checks: ensure the solution builds and the API boots locally; prefer the VS Code `watch` task for quick verification.
 - Update this guide when changing routing, auth, migrations, orchestrator queue, docker, or README. The PR guard will fail otherwise and prints hints.
 - UI/static: for changes under `wwwroot/`, include before/after screenshots if relevant.
+  - Localization: move all user-visible text to `wwwroot/localisation/en.json` and use `data-lang` attributes or `lang.getLang()` calls.
+  - CSS: use CSS variables (`--warning-color`, `--valid-color`, `--invalid-color`) and semantic class names instead of inline styles.
+  - Frontend API: use `postData()` function for authenticated requests instead of direct `fetch()` - handles CSRF tokens and authentication cookies automatically.
 
 ## async guidance
 - Prefer Task-returning actions: `public async Task<IActionResult> Action(...)`.
