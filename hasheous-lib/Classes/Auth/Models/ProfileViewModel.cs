@@ -5,6 +5,7 @@ namespace Authentication
         public string UserId { get; set; }
         public string UserName { get; set; }
         public string EmailAddress { get; set; }
+        public bool EmailConfirmed { get; set; }
         public List<String> Roles { get; set; }
         public SecurityProfileViewModel SecurityProfile { get; set; }
         public string HighestRole
@@ -34,10 +35,21 @@ namespace Authentication
                                 _highestRole = role;
                             }
                             break;
+                        case "Verified Email":
+                            // Verified Email is a status role, not hierarchical - skip it
+                            break;
                         default:
-                            _highestRole = "Member";
+                            if (_highestRole == "")
+                            {
+                                _highestRole = "Member";
+                            }
                             break;
                     }
+                }
+
+                if (_highestRole == "")
+                {
+                    _highestRole = "Member";
                 }
 
                 return _highestRole;

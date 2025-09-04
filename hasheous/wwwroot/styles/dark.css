@@ -35,6 +35,7 @@
         --footer-button-text-color: rgb(255, 255, 255);
         --valid-color: rgb(0, 181, 12);
         --invalid-color: rgb(178, 26, 26);
+        --warning-color: rgb(255, 165, 0);
         --badge-text-color: rgb(255, 255, 255);
         --badge-background-color: rgb(127, 127, 127);
         --signature-source-color-none: #7f7f7f;

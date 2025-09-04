@@ -710,6 +710,14 @@ td {
     color: var(--invalid-color);
 }
 
+.email-status-verified {
+    color: var(--valid-color);
+}
+
+.email-status-unverified {
+    color: var(--warning-color);
+}
+
 #dataObjectLogoBox {
     padding: 20px;
     text-align: center;
