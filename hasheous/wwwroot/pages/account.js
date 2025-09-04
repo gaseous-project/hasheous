@@ -39,38 +39,37 @@ resendButton.addEventListener('click', function(e) {
     resendButton.disabled = true;
     resendButton.innerHTML = lang.getLang('sendingemailverification');
     
-    fetch('/api/v1/Account/ResendEmailVerification', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        }
-    }).then(response => {
-        if (response.ok) {
-            return response.text();
-        } else {
-            throw new Error('Failed to send verification email');
-        }
-    }).then(message => {
-        resendButton.innerHTML = lang.getLang('emailverificationsent');
-        setTimeout(() => {
-            resendButton.innerHTML = lang.getLang('resendemailverification');
+    postData('/api/v1.0/Account/ResendEmailVerification', 'POST', {}, true)
+        .then(response => {
+            if (response.ok) {
+                return response.text();
+            } else {
+                throw new Error('Failed to send verification email');
+            }
+        })
+        .then(message => {
+            resendButton.innerHTML = lang.getLang('emailverificationsent');
+            setTimeout(() => {
+                resendButton.innerHTML = lang.getLang('resendemailverification');
+                resendButton.disabled = false;
+            }, 3000);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            resendButton.innerHTML = lang.getLang('emailverificationerror');
             resendButton.disabled = false;
-        }, 3000);
-    }).catch(error => {
-        console.error('Error:', error);
-        resendButton.innerHTML = lang.getLang('emailverificationerror');
-        resendButton.disabled = false;
-    });
+        });
 });
 
 // setup submission api key
 let submissionApiKeyField = document.getElementById('submissionapikey');
 function GetApiKey() {
-    fetch('/api/v1/Account/APIKey', {
+    fetch('/api/v1.0/Account/APIKey', {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json'
-        }
+        },
+        credentials: 'include'
     }).then(response => {
         if (response.ok) {
             return response.text();
@@ -87,7 +86,7 @@ GetApiKey();
 
 // setup submission api key reset
 document.getElementById('submissionapikeyresetbutton').addEventListener('click', function (e) {
-    postData('/api/v1/Account/APIKey', 'POST', {}, true)
+    postData('/api/v1.0/Account/APIKey', 'POST', {}, true)
         .then(data => {
             // Handle success
             console.log('API Key reset successfully:', data);
