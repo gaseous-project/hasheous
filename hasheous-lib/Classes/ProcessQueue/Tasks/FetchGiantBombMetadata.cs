@@ -29,9 +29,9 @@ namespace Classes.ProcessQueue
             db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Review));
             db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.UserReview));
 
-            // await gbDownloader.DownloadPlatforms();
-            // await gbDownloader.DownloadGames();
-            // await gbDownloader.DownloadSubTypes<GiantBomb.Models.GiantBombUserReviewResponse, GiantBomb.Models.UserReview>("user_reviews");
+            await gbDownloader.DownloadPlatforms();
+            await gbDownloader.DownloadGames();
+            await gbDownloader.DownloadSubTypes<GiantBomb.Models.GiantBombUserReviewResponse, GiantBomb.Models.UserReview>("user_reviews");
             await gbDownloader.DownloadImages();
 
             return null; // Assuming the method returns void, we return null here.
