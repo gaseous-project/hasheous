@@ -8,10 +8,104 @@ namespace GiantBomb
     public class MetadataDownload
     {
         private static readonly HttpClient client = new HttpClient();
+        private static bool headersConfigured = false;
+
+        // --- Rate limiting fields ---
+        // Updated policy:
+        //   Soft threshold: 200 requests in rolling 1h. After this we dramatically slow down to ~1 request / 2-3 minutes.
+        //   Hard threshold: 300 requests in rolling 1h. After this we revert to strict blocking until window frees (original behaviour).
+        //   Below 200: light velocity limit (>=2s spacing) to avoid bursts.
+        private static readonly SemaphoreSlim _rateGate = new SemaphoreSlim(1, 1); // serialize rate calculations
+        private static readonly Queue<DateTime> _recentRequests = new Queue<DateTime>(); // timestamps of recent requests
+        private static readonly TimeSpan _hourWindow = TimeSpan.FromHours(1);
+        private static readonly int _softHourlyThreshold = 200; // start slowdown
+        private static readonly int _hardHourlyMax = 300;        // absolute blocking cap
+        private static readonly TimeSpan _minSpacing = TimeSpan.FromSeconds(2); // baseline spacing under soft threshold
+        private static readonly Random _rng = new Random();
+
+        // Central wait logic. Ensures we:
+        // 1. Do not exceed 200 requests in any rolling 60 minute window.
+        // 2. Space individual requests by at least _minSpacing to avoid short-term bursts.
+        private static async Task WaitForRateLimitAsync(CancellationToken ct)
+        {
+            while (true)
+            {
+                ct.ThrowIfCancellationRequested();
+                TimeSpan? waitNeeded = null;
+                bool softSlowdownApplied = false;
+                await _rateGate.WaitAsync(ct).ConfigureAwait(false);
+                try
+                {
+                    var now = DateTime.UtcNow;
+                    // Drop expired timestamps (older than 1 hour)
+                    while (_recentRequests.Count > 0 && (now - _recentRequests.Peek()) > _hourWindow)
+                        _recentRequests.Dequeue();
+
+                    var count = _recentRequests.Count;
+
+                    if (count >= _hardHourlyMax)
+                    {
+                        // Hard cap: behave like original logic (strict block until a slot frees)
+                        var oldest = _recentRequests.Peek();
+                        var releaseAt = oldest + _hourWindow; // when that oldest request exits the 1h window
+                        waitNeeded = releaseAt - now;
+                    }
+                    else if (count >= _softHourlyThreshold)
+                    {
+                        // Soft slowdown region (200-299): enforce large spacing 2-3 minutes between requests.
+                        if (count > 0)
+                        {
+                            var last = _recentRequests.Last();
+                            var sinceLast = now - last;
+                            // Random per-attempt spacing between 2 and 3 minutes.
+                            var targetSpacing = TimeSpan.FromMinutes(2 + _rng.NextDouble());
+                            if (sinceLast < targetSpacing)
+                            {
+                                waitNeeded = targetSpacing - sinceLast;
+                                softSlowdownApplied = true;
+                            }
+                        }
+                    }
+                    else if (count > 0)
+                    {
+                        // Below soft threshold: light velocity spacing (>= _minSpacing)
+                        var last = _recentRequests.Last();
+                        var sinceLast = now - last;
+                        if (sinceLast < _minSpacing)
+                            waitNeeded = _minSpacing - sinceLast;
+                    }
+
+                    if (waitNeeded == null || waitNeeded <= TimeSpan.Zero)
+                    {
+                        // Reserve a slot now (we count attempted calls whether they succeed or 420/429)
+                        _recentRequests.Enqueue(now);
+                        return; // proceed
+                    }
+                }
+                finally
+                {
+                    _rateGate.Release();
+                }
+
+                if (waitNeeded.HasValue && waitNeeded.Value > TimeSpan.Zero)
+                {
+                    if (softSlowdownApplied)
+                        Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Soft threshold reached (>= {_softHourlyThreshold}). Slowdown wait {waitNeeded.Value.TotalSeconds:F1}s. Current hour count={_recentRequests.Count}.");
+                    else if (_recentRequests.Count >= _hardHourlyMax)
+                        Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Hard threshold {_hardHourlyMax} reached. Blocking for {waitNeeded.Value.TotalSeconds:F1}s until window frees.");
+                    else
+                        Logging.Log(Logging.LogType.Information, "GiantBomb", $"Rate limiter sleeping {waitNeeded.Value.TotalSeconds:F1}s (velocity control).");
+                    await Task.Delay(waitNeeded.Value, ct).ConfigureAwait(false);
+                }
+            }
+        }
 
         // check if Config.GiantBomb.BaseURL is set, otherwise use default
         string BaseUrl = Config.GiantBomb.BaseURL ?? "https://www.giantbomb.com/";
 
+        /// <summary>
+        /// Root directory where GiantBomb metadata is cached locally.
+        /// </summary>
         public string LocalFilePath
         {
             get
@@ -20,37 +114,96 @@ namespace GiantBomb
             }
         }
 
+        private static object? GetTracking(string key, object? defaultValue = null)
+        {
+            try
+            {
+                string dir = Config.LibraryConfiguration.LibraryMetadataDirectory_GiantBomb;
+                if (string.IsNullOrWhiteSpace(dir) || !Directory.Exists(dir))
+                    return defaultValue;
+
+                string trackingFile = Path.Combine(dir, "tracking.json");
+                if (!File.Exists(trackingFile))
+                    return defaultValue;
+
+                string json = File.ReadAllText(trackingFile);
+                if (string.IsNullOrWhiteSpace(json))
+                    return defaultValue;
+
+                Dictionary<string, object>? data;
+                try
+                {
+                    data = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
+                }
+                catch
+                {
+                    return defaultValue;
+                }
+
+                if (data != null && data.TryGetValue(key, out var value) && value != null)
+                    return value;
+
+                return defaultValue;
+            }
+            catch (Exception ex)
+            {
+                Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Error reading tracking key '{key}': {ex.Message}", ex);
+                return defaultValue;
+            }
+        }
+
+        private static void SetTracking(string key, object value)
+        {
+            try
+            {
+                string dir = Config.LibraryConfiguration.LibraryMetadataDirectory_GiantBomb;
+                if (string.IsNullOrWhiteSpace(dir))
+                    return;
+
+                if (!Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
+
+                string trackingFile = Path.Combine(dir, "tracking.json");
+                Dictionary<string, object> data = new Dictionary<string, object>();
+                if (File.Exists(trackingFile))
+                {
+                    string json = File.ReadAllText(trackingFile);
+                    if (!string.IsNullOrWhiteSpace(json))
+                    {
+                        try
+                        {
+                            var existingData = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
+                            if (existingData != null)
+                                data = existingData;
+                        }
+                        catch
+                        {
+                            // Ignore errors and start fresh
+                        }
+                    }
+                }
+
+                data[key] = value;
+                string newJson = Newtonsoft.Json.JsonConvert.SerializeObject(data, Newtonsoft.Json.Formatting.Indented);
+                File.WriteAllText(trackingFile, newJson);
+            }
+            catch (Exception ex)
+            {
+                Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Error writing tracking key '{key}': {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// Database/schema name used for GiantBomb metadata tables.
+        /// </summary>
         public string dbName { get; set; } = "giantbomb";
 
+        /// <summary>
+        /// Age in days after which cached data will be refreshed.
+        /// </summary>
         public int TimeToExpire { get; set; } = 30; // Default expiration time for cached data
 
-        public static int MaximumRequestsPerMinute = 30;
-        public static int RateLimitSleepTime = 10; // time in seconds to sleep when rate limit is hit
-        private static int requestCount = 0;
-        private static DateTime lastResetTime = DateTime.UtcNow;
-        private async Task<bool> checkRequestLimit()
-        {
-            // Enforce a slow down mechanism to avoid hitting the API rate limit
-            await Task.Delay(1000); // Sleep for 1 second between requests
-
-            // Reset the request count every minute
-            if ((DateTime.UtcNow - lastResetTime).TotalMinutes >= 1)
-            {
-                requestCount = 0;
-                lastResetTime = DateTime.UtcNow;
-            }
-            // Check if the request count exceeds the maximum allowed requests per minute
-            if (requestCount >= MaximumRequestsPerMinute)
-            {
-                Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Rate limit exceeded. Sleeping for {RateLimitSleepTime} seconds.");
-                System.Threading.Thread.Sleep(RateLimitSleepTime * 1000);
-                requestCount = 0;
-                lastResetTime = DateTime.UtcNow;
-                return false; // Indicate that the request limit was hit
-            }
-            requestCount++;
-            return true; // Indicate that the request limit was not hit
-        }
+        // Legacy per-minute limiter removed (MaximumRequestsPerMinute / RateLimitSleepTime / checkRequestLimit) – superseded by async sliding window limiter above.
 
 
         /// <summary>
@@ -95,7 +248,8 @@ namespace GiantBomb
             }
 
             // get the last platform fetch date and time from settings
-            DateTime lastFetchDateTime = Config.ReadSetting("GiantBomb_LastPlatformFetch", DateTime.UtcNow.AddDays(-31));
+            var lastPlatformFetchObj = GetTracking("GiantBomb_LastPlatformFetch", DateTime.UtcNow.AddDays(-31));
+            DateTime lastFetchDateTime = lastPlatformFetchObj is DateTime dtP ? dtP : DateTime.UtcNow.AddDays(-31);
 
             // check if the last fetch date and time is older than the expiration time
             if (DateTime.UtcNow - lastFetchDateTime < TimeSpan.FromDays(TimeToExpire))
@@ -154,13 +308,16 @@ namespace GiantBomb
             }
 
             // Update the last fetch date and time in settings
-            Config.SetSetting("GiantBomb_LastPlatformFetch", DateTime.UtcNow);
+            SetTracking("GiantBomb_LastPlatformFetch", DateTime.UtcNow);
 
             Logging.Log(Logging.LogType.Information, "GiantBomb", "Finished downloading platforms from GiantBomb.");
 
             return;
         }
 
+        /// <summary>
+        /// Downloads game metadata for all platforms present in the database.
+        /// </summary>
         public async Task DownloadGames()
         {
             // get the list of platforms from the database
@@ -193,7 +350,8 @@ namespace GiantBomb
             }
 
             // get the last game fetch date and time from settings
-            DateTime lastFetchDateTime = Config.ReadSetting($"GiantBomb_LastGameFetch-{platformId}", DateTime.UtcNow.AddDays(-31));
+            var lastGameFetchObj = GetTracking($"GiantBomb_LastGameFetch-{platformId}", DateTime.UtcNow.AddDays(-31));
+            DateTime lastFetchDateTime = lastGameFetchObj is DateTime dtG ? dtG : DateTime.UtcNow.AddDays(-31);
 
             // check if the last fetch date and time is older than the expiration time
             if (DateTime.UtcNow - lastFetchDateTime < TimeSpan.FromDays(TimeToExpire))
@@ -240,7 +398,8 @@ namespace GiantBomb
                 int offset = 0;
 
                 // get the current offset from settings, default to 0 if not set
-                offset = int.Parse(Config.ReadSetting($"GiantBomb_GameOffset-{platformId}", 0).ToString());
+                var offGameObj = GetTracking($"GiantBomb_GameOffset-{platformId}", 0);
+                if (offGameObj is int ogi) offset = ogi; else if (offGameObj is long ogl) offset = (int)ogl; else if (!int.TryParse(offGameObj?.ToString(), out offset)) offset = 0;
 
                 // Initialize the list to hold game results
                 var games = new List<GiantBomb.Models.Game>();
@@ -278,7 +437,7 @@ namespace GiantBomb
                     }
 
                     // Store the offset in settings for the next batch
-                    Config.SetSetting($"GiantBomb_GameOffset-{platformId}", offset);
+                    SetTracking($"GiantBomb_GameOffset-{platformId}", offset);
 
                     // Check if there are more games to fetch
                     if (json.results.Count < 100)
@@ -295,15 +454,18 @@ namespace GiantBomb
                 }
 
                 // reset the offset to 0 for the next fetch
-                Config.SetSetting($"GiantBomb_GameOffset-{platformId}", 0);
+                SetTracking($"GiantBomb_GameOffset-{platformId}", 0);
             }
 
             // Update the last fetch date and time in settings
-            Config.SetSetting($"GiantBomb_LastGameFetch-{platformId}", DateTime.UtcNow);
+            SetTracking($"GiantBomb_LastGameFetch-{platformId}", DateTime.UtcNow);
 
             Logging.Log(Logging.LogType.Information, "GiantBomb", $"Finished downloading games for platform ID {platformId} from GiantBomb.");
         }
 
+        /// <summary>
+        /// Downloads images for platforms (and optionally games) based on stored image tags.
+        /// </summary>
         public async Task DownloadImages()
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
@@ -313,9 +475,9 @@ namespace GiantBomb
             sql = $"SELECT guid, image_tags FROM {dbName}.Platform WHERE image_tags IS NOT NULL AND image_tags != ''";
             await _ProcessImageDatabase(db, sql);
 
-            // download images for each game
-            sql = $"SELECT guid, image_tags FROM {dbName}.Game WHERE image_tags IS NOT NULL AND image_tags != ''";
-            await _ProcessImageDatabase(db, sql);
+            // // download images for each game
+            // sql = $"SELECT guid, image_tags FROM {dbName}.Game WHERE image_tags IS NOT NULL AND image_tags != ''";
+            // await _ProcessImageDatabase(db, sql);
         }
 
         private async Task _ProcessImageDatabase(Database db, string sql)
@@ -329,11 +491,12 @@ namespace GiantBomb
             List<ImageTag> imageTags = new List<ImageTag>();
             foreach (DataRow row in imageTagsData.Rows)
             {
-                string guid = row["guid"].ToString();
+                var guid = Convert.ToString(row["guid"]) ?? string.Empty;
 
                 // check if guid was last checked more than 30 days ago
                 // get the last game fetch date and time from settings
-                DateTime lastFetchDateTime = Config.ReadSetting($"GiantBomb_LastImageFetch-{guid}", DateTime.UtcNow.AddDays(-31));
+                var lastImageFetchObj = GetTracking($"GiantBomb_LastImageFetch-{guid}", DateTime.UtcNow.AddDays(-31));
+                DateTime lastFetchDateTime = lastImageFetchObj is DateTime dtI ? dtI : DateTime.UtcNow.AddDays(-31);
                 // check if the last fetch date and time is older than the expiration time
                 if (DateTime.UtcNow - lastFetchDateTime < TimeSpan.FromDays(TimeToExpire))
                 {
@@ -341,7 +504,7 @@ namespace GiantBomb
                     continue;
                 }
 
-                string image_tags = row["image_tags"].ToString();
+                var image_tags = Convert.ToString(row["image_tags"]) ?? string.Empty;
                 if (string.IsNullOrEmpty(guid) || string.IsNullOrEmpty(image_tags))
                 {
                     Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Invalid guid or image_tags for row: {row}");
@@ -351,11 +514,11 @@ namespace GiantBomb
                 if (tags != null && tags.Count > 0)
                 {
                     // start downloading images for the guid
-                    _DownloadImages(db, guid, tags);
+                    await _DownloadImages(db, guid, tags);
                 }
 
                 // download complete, update the last fetch date and time in settings
-                Config.SetSetting($"GiantBomb_LastImageFetch-{guid}", DateTime.UtcNow);
+                SetTracking($"GiantBomb_LastImageFetch-{guid}", DateTime.UtcNow);
                 Logging.Log(Logging.LogType.Information, "GiantBomb", $"Finished downloading images for guid {guid}.");
             }
         }
@@ -373,7 +536,8 @@ namespace GiantBomb
             List<ImageTag> imageTags = new List<ImageTag>();
             try
             {
-                imageTags = Newtonsoft.Json.JsonConvert.DeserializeObject<List<ImageTag>>(image_tags);
+                var deserTags = Newtonsoft.Json.JsonConvert.DeserializeObject<List<ImageTag>>(image_tags);
+                if (deserTags != null) imageTags = deserTags;
             }
             catch (Exception ex)
             {
@@ -467,259 +631,193 @@ namespace GiantBomb
                                     { "original_url", image.original_url },
                                     { "image_tags", image.image_tags }
                                 });
-
-                // // download the images
-                // // loop through each property of the image and download if the property name ends with "_url"
-                // foreach (var prop in image.GetType().GetProperties())
-                // {
-                //     if (prop.Name.EndsWith("_url") && prop.GetValue(image) is string imageUrl && !string.IsNullOrEmpty(imageUrl))
-                //     {
-                //         // download the image
-                //         string imageDirectoryName = Path.Combine(LocalFilePath, "Images", guid, prop.Name.Split("_")[0]);
-                //         if (Directory.Exists(imageDirectoryName) == false)
-                //         {
-                //             Directory.CreateDirectory(imageDirectoryName);
-                //         }
-
-                //         string imageFileName = Path.Combine(imageDirectoryName, $"{Path.GetFileName(imageUrl)}");
-                //         if (!File.Exists(imageFileName))
-                //         {
-                //             try
-                //             {
-                //                 var imageResponse = await client.GetAsync(new Uri(new Uri(BaseUrl), new Uri(imageUrl)));
-                //                 if (imageResponse.IsSuccessStatusCode)
-                //                 {
-                //                     var imageBytes = await imageResponse.Content.ReadAsByteArrayAsync();
-                //                     File.WriteAllBytes(imageFileName, imageBytes);
-                //                     Logging.Log(Logging.LogType.Information, "GiantBomb", $"Downloaded image: {imageFileName}");
-                //                 }
-                //                 else
-                //                 {
-                //                     Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Failed to download image: {imageUrl}. Status code: {imageResponse.StatusCode}");
-                //                     Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Response: {imageResponse.ReasonPhrase}");
-                //                 }
-                //             }
-                //             catch (Exception ex)
-                //             {
-                //                 Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Error downloading image: {imageUrl}. Exception: {ex.Message}", ex);
-                //             }
-                //         }
-                //     }
-                // }
             }
 
             return;
         }
 
-        public async Task DownloadSubTypes<TResponse, TObject>(string endpoint, string? query = "")
-            where TResponse : class
+        /// <summary>
+        /// Generic downloader for subtype collections with optional filter query.
+        /// </summary>
+        public async Task DownloadSubTypes<TResponse, TObject>(string endpoint, string? query = "") where TResponse : class
         {
-            // get the name of TObject
             string typeName = typeof(TObject).Name;
 
-            // ensure that the local file path exists
             if (!Directory.Exists(LocalFilePath))
             {
                 Directory.CreateDirectory(LocalFilePath);
             }
 
-            // get the last fetch date and time from settings
             string settingName = $"GiantBomb_{typeName}Fetch{"_" + query}";
-            DateTime lastFetchDateTime = Config.ReadSetting(settingName, DateTime.UtcNow.AddDays(-31));
+            var lastSubtypeFetchObj = GetTracking(settingName, DateTime.UtcNow.AddDays(-31));
+            DateTime lastFetchDateTime = lastSubtypeFetchObj is DateTime dtS ? dtS : DateTime.UtcNow.AddDays(-31);
 
-            // check if the last fetch date and time is older than the expiration time
             if (DateTime.UtcNow - lastFetchDateTime < TimeSpan.FromDays(TimeToExpire))
             {
                 Logging.Log(Logging.LogType.Information, "GiantBomb", $"Data for {typeName} up to date. No need to download.");
                 return;
             }
 
-            // setup database if it doesn't exist
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-
             Logging.Log(Logging.LogType.Information, "GiantBomb", $"Downloading {typeName} from GiantBomb.");
 
-            // check if API key is set, otherwise exit
-            if (!String.IsNullOrEmpty(Config.GiantBomb.APIKey))
+            if (!string.IsNullOrEmpty(Config.GiantBomb.APIKey))
             {
                 int offset = 0;
+                var offObj = GetTracking($"{settingName}Offset", 0);
+                if (offObj is int oi) offset = oi; else if (offObj is long ol) offset = (int)ol; else if (!int.TryParse(offObj?.ToString(), out offset)) offset = 0;
 
-                // get the current offset from settings, default to 0 if not set
-                offset = int.Parse(Config.ReadSetting($"{settingName}Offset", 0).ToString());
-
-                // repeat until we get no more objects, incrementing offset by 100 each time
                 while (true)
                 {
-                    // Fetch objects from GiantBomb API
-                    string url = $"/api/{endpoint}/?api_key={Config.GiantBomb.APIKey}&format=json&limit=100&offset={offset}{(query != null && query != "" ? $"&filter={query}" : "")}";
+                    string url = $"/api/{endpoint}/?api_key={Config.GiantBomb.APIKey}&format=json&limit=100&offset={offset}{(string.IsNullOrEmpty(query) ? string.Empty : $"&filter={query}")}";
                     var json = await GetJson<TResponse>(url);
-
-                    // Use reflection to get the 'results' property
                     var resultsProp = typeof(TResponse).GetProperty("results");
                     var results = resultsProp?.GetValue(json) as IEnumerable<object>;
-
-                    if (results == null || !results.Cast<object>().Any())
-                    {
-                        // No more objects to fetch, exit the loop
+                    var resultsList = results?.Cast<object>().ToList();
+                    if (resultsList == null || resultsList.Count == 0)
                         break;
-                    }
 
-                    // Process each object
-                    foreach (var apiObject in results)
+                    foreach (var apiObject in resultsList)
                     {
-                        // Here you can process the object as needed
-                        // For example, you can log the object id or store it in a list
                         var idProp = apiObject.GetType().GetProperty("id") ?? apiObject.GetType().GetProperty("Id");
                         var idValue = idProp?.GetValue(apiObject);
                         Logging.Log(Logging.LogType.Information, "GiantBomb", $"Found {typeName}: {idValue}");
                         await StoreObjectWithSubclasses(apiObject, db, dbName, idValue as long?);
                     }
 
-                    // Store the offset in settings for the next batch
-                    Config.SetSetting($"{settingName}Offset", offset);
-
-                    // Check if there are more objects to fetch
-                    if (results.Count() < 100)
-                    {
-                        // If the count is less than 100, we have fetched all objects
+                    SetTracking($"{settingName}Offset", offset);
+                    if (resultsList.Count < 100)
                         break;
-                    }
-
-                    // Increment offset for the next batch
                     offset += 100;
-
-                    // To avoid hitting API rate limits, delay the next request
-                    await Task.Delay(10000); // Sleep for 10 seconds
+                    await Task.Delay(10000); // pacing
                 }
-
-                // reset the offset to 0 for the next fetch
-                Config.SetSetting($"{settingName}Offset", 0);
+                SetTracking($"{settingName}Offset", 0);
             }
 
-            // Update the last fetch date and time in settings
-            Config.SetSetting(settingName, DateTime.UtcNow);
-
+            SetTracking(settingName, DateTime.UtcNow);
             Logging.Log(Logging.LogType.Information, "GiantBomb", $"Finished downloading {typeName} from GiantBomb.");
-
-            return;
         }
 
         private async Task<T> GetJson<T>(string url)
         {
-            await checkRequestLimit();
+            // Unified implementation: rate limit + retry semantics inline. _GetJson removed per request.
+            CancellationToken ct = CancellationToken.None; // placeholder if future cancellation desired
 
-            int maxRetries = 5;
-            int retryCount = 0;
-
-            while (retryCount < maxRetries)
+            if (!headersConfigured)
             {
-                try
-                {
-                    return await _GetJson<T>(url);
-                }
-                catch (Exception ex)
-                {
-                    Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Error fetching JSON from {url}: {ex.Message}", ex);
-                    retryCount++;
-                    if (retryCount >= maxRetries)
-                    {
-                        throw new Exception($"Failed to fetch JSON after {maxRetries} attempts.", ex);
-                    }
-                    Logging.Log(Logging.LogType.Information, "GiantBomb", $"Retrying... ({retryCount}/{maxRetries})");
-
-                    // Wait before retrying
-                    // This is to avoid hitting API rate limits or transient errors
-                    // Adjust the sleep time as necessary
-                    int sleepTime = (int)Math.Pow(2, retryCount) * 10000; // Exponential backoff
-                    Logging.Log(Logging.LogType.Information, "GiantBomb", $"Sleeping for {sleepTime / 1000} seconds before retrying.");
-
-                    // Sleep for a while before retrying
-                    await Task.Delay(sleepTime); // Wait before retrying
-                }
-            }
-
-            throw new Exception("Max retries reached without success.");
-        }
-
-        private async Task<T> _GetJson<T>(string url)
-        {
-            try
-            {
-                // reset the client
                 client.DefaultRequestHeaders.Clear();
                 client.DefaultRequestHeaders.UserAgent.Add(new System.Net.Http.Headers.ProductInfoHeaderValue("Hasheous", "1.0"));
                 client.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
-                client.DefaultRequestHeaders.ConnectionClose = false; // Keep the connection alive
+                client.DefaultRequestHeaders.ConnectionClose = false;
+                headersConfigured = true;
+            }
 
-                // make the request
-                url = url.StartsWith("/") ? url : "/" + url; // Ensure the URL starts with a slash
-                url = BaseUrl.TrimEnd('/') + url; // Ensure the base URL is properly formatted
-                Logging.Log(Logging.LogType.Information, "GiantBomb", $"Fetching JSON from {url}");
+            // Normalize URL
+            url = url.StartsWith("/") ? url : "/" + url;
+            var absoluteUrl = new Uri(new Uri(BaseUrl.TrimEnd('/')), url);
 
-                var response = client.GetAsync(new Uri(new Uri(BaseUrl), new Uri(url))).Result;
+            int transientRetry = 0;
+            const int transientMax = 5; // for non-rate-limit transient errors (5xx)
+
+            while (true)
+            {
+                await WaitForRateLimitAsync(ct).ConfigureAwait(false);
+                Logging.Log(Logging.LogType.Information, "GiantBomb", $"Fetching JSON from {absoluteUrl}");
+
+                HttpResponseMessage response;
+                try
+                {
+                    response = await client.GetAsync(absoluteUrl, ct).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    // Network-level error: apply bounded retry with exponential backoff
+                    transientRetry++;
+                    if (transientRetry > transientMax)
+                        throw new Exception($"Network error after {transientMax} retries: {ex.Message}", ex);
+                    var wait = TimeSpan.FromSeconds(Math.Min(60, Math.Pow(2, transientRetry)));
+                    Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Network error '{ex.Message}'. Retry {transientRetry}/{transientMax} in {wait.TotalSeconds}s.");
+                    await Task.Delay(wait, ct).ConfigureAwait(false);
+                    continue;
+                }
+
                 if (response.IsSuccessStatusCode)
                 {
-                    var jsonString = await response.Content.ReadAsStringAsync();
-                    T jsonResponse = Newtonsoft.Json.JsonConvert.DeserializeObject<T>(jsonString);
-                    return jsonResponse;
-                }
-                else if (response.StatusCode == (System.Net.HttpStatusCode)420) // Rate limit exceeded
-                {
-                    Logging.Log(Logging.LogType.Warning, "GiantBomb", "Rate limit exceeded. Please wait before retrying.");
-
-                    // Check if the response contains a Retry-After header
-                    if (response.Headers.RetryAfter != null)
+                    var jsonString = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                    try
                     {
-                        var retryAfter = response.Headers.RetryAfter.Delta?.TotalSeconds ?? 300; // Default to 300 seconds if not specified
-                        Logging.Log(Logging.LogType.Information, "GiantBomb", $"Retry after: {retryAfter} seconds");
-                        await Task.Delay((int)retryAfter * 1000); // Sleep for the specified time
+                        var obj = Newtonsoft.Json.JsonConvert.DeserializeObject<T>(jsonString);
+                        if (obj == null)
+                            throw new Exception("Deserialized JSON was null.");
+                        return obj;
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        Logging.Log(Logging.LogType.Information, "GiantBomb", "No Retry-After header found. Defaulting to 300 seconds.");
-                        await Task.Delay(300000); // Default to 5 minutes if no Retry-After header is present
+                        throw new Exception("Deserialization failure", ex);
                     }
+                }
 
-                    throw new Exception("Rate limit exceeded. Please wait before retrying.");
-                }
-                else if (response.StatusCode == (System.Net.HttpStatusCode)429) // Too many requests
+                // Extract Retry-After if present
+                double? retryAfterSeconds = null;
+                if (response.Headers.RetryAfter != null)
                 {
-                    Logging.Log(Logging.LogType.Warning, "GiantBomb", "Too many requests. Please wait before retrying.");
-                    throw new Exception("Too many requests. Please wait before retrying.");
+                    retryAfterSeconds = response.Headers.RetryAfter.Delta?.TotalSeconds;
+                    if (retryAfterSeconds == null && response.Headers.RetryAfter.Date.HasValue)
+                        retryAfterSeconds = (response.Headers.RetryAfter.Date.Value - DateTimeOffset.UtcNow).TotalSeconds;
                 }
-                else if (response.StatusCode == (System.Net.HttpStatusCode)401) // Unauthorized
+
+                var status = (int)response.StatusCode;
+                if (status == 420 || status == 429)
                 {
-                    Logging.Log(Logging.LogType.Warning, "GiantBomb", "Unauthorized access. Please check your API key.");
-                    throw new Exception("Unauthorized access. Please check your API key.");
+                    // Infinite retry policy for 420 / 429
+                    TimeSpan wait;
+                    if (status == 420)
+                    {
+                        // Long cool-down: header value if available, else random 5-10 minutes
+                        if (retryAfterSeconds.HasValue && retryAfterSeconds > 0)
+                            wait = TimeSpan.FromSeconds(retryAfterSeconds.Value);
+                        else
+                            wait = TimeSpan.FromMinutes(5 + _rng.NextDouble() * 5); // 5-10 min
+                        Logging.Log(Logging.LogType.Warning, "GiantBomb", $"420 secondary rate limit triggered. Waiting {wait.TotalMinutes:F1} minutes before retrying.");
+                    }
+                    else // 429
+                    {
+                        if (retryAfterSeconds.HasValue && retryAfterSeconds > 0)
+                            wait = TimeSpan.FromSeconds(retryAfterSeconds.Value);
+                        else
+                        {
+                            // Progressive backoff but capped (start modest; typical velocity limit)
+                            transientRetry++;
+                            var baseWait = Math.Min(120, Math.Pow(2, transientRetry)); // cap at 2 minutes
+                            wait = TimeSpan.FromSeconds(baseWait);
+                        }
+                        Logging.Log(Logging.LogType.Warning, "GiantBomb", $"429 too many requests. Waiting {wait.TotalSeconds:F0}s before retrying.");
+                    }
+                    await Task.Delay(wait, ct).ConfigureAwait(false);
+                    // For rate-limit responses we do not increment transientRetry beyond what 429 logic used above.
+                    continue; // retry indefinitely
                 }
-                else if (response.StatusCode == (System.Net.HttpStatusCode)403) // Forbidden
+                else if (status >= 500 && status < 600)
                 {
-                    Logging.Log(Logging.LogType.Warning, "GiantBomb", "Forbidden access. You do not have permission to access this resource.");
-                    throw new Exception("Forbidden access. You do not have permission to access this resource.");
+                    // Transient server error: bounded retries
+                    transientRetry++;
+                    if (transientRetry > transientMax)
+                        throw new Exception($"Server error {(int)response.StatusCode} after {transientMax} retries: {response.ReasonPhrase}");
+                    var wait = TimeSpan.FromSeconds(Math.Min(60, Math.Pow(2, transientRetry))); // exp backoff capped at 60s
+                    Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Server error {(int)response.StatusCode}. Retry {transientRetry}/{transientMax} in {wait.TotalSeconds}s.");
+                    await Task.Delay(wait, ct).ConfigureAwait(false);
+                    continue;
                 }
-                else if (response.StatusCode == (System.Net.HttpStatusCode)404) // Not found
+                else if (status == 401 || status == 403 || status == 404)
                 {
-                    Logging.Log(Logging.LogType.Warning, "GiantBomb", "Resource not found.");
-                    throw new Exception("Resource not found.");
-                }
-                else if (response.StatusCode == (System.Net.HttpStatusCode)500) // Internal server error
-                {
-                    Logging.Log(Logging.LogType.Warning, "GiantBomb", "Internal server error. Please try again later.");
-                    throw new Exception("Internal server error. Please try again later.");
-                }
-                else if (response.StatusCode == (System.Net.HttpStatusCode)503) // Service unavailable
-                {
-                    Logging.Log(Logging.LogType.Warning, "GiantBomb", "Service unavailable. Please try again later.");
-                    throw new Exception("Service unavailable. Please try again later.");
+                    // Non-retryable (per instructions we "skip" by surfacing exception)
+                    throw new Exception($"Non-retryable HTTP {status}: {response.ReasonPhrase}");
                 }
                 else
                 {
-                    throw new Exception($"Error fetching data: {response.ReasonPhrase}");
+                    // Other unexpected status; treat as non-retryable.
+                    throw new Exception($"Unexpected HTTP {status}: {response.ReasonPhrase}");
                 }
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Exception occurred while fetching JSON: {ex.Message}", ex);
             }
         }
 
@@ -737,7 +835,7 @@ namespace GiantBomb
 
             var properties = objType.GetProperties();
             var parameters = new Dictionary<string, object>();
-            object idValue = null;
+            object? idValue = null;
 
             foreach (var prop in properties)
             {
@@ -777,7 +875,8 @@ namespace GiantBomb
 
                             // remove all existing relationships for this object
                             string deleteSql = $"DELETE FROM {dbName}.{relationshipTableName} WHERE {tableName}_id = @id";
-                            await db.ExecuteCMDAsync(deleteSql, new Dictionary<string, object> { { "id", id } });
+                            await db.ExecuteCMDAsync(deleteSql, new Dictionary<string, object> { { "id", id ?? (object)DBNull.Value } });
+                            await db.ExecuteCMDAsync(deleteSql, new Dictionary<string, object> { { "id", id ?? (object)DBNull.Value } });
 
                             // store a JSON array of Ids for the collection
                             var ids = new List<object>();
@@ -792,7 +891,7 @@ namespace GiantBomb
                                     string insertSql = $"INSERT INTO {dbName}.{relationshipTableName} ({tableName}_id, {prop.Name}_id) VALUES (@{tableName}_id, @{prop.Name}_id)";
                                     await db.ExecuteCMDAsync(insertSql, new Dictionary<string, object>
                                     {
-                                        { $"{tableName}_id", id },
+                                        { $"{tableName}_id", id ?? (object)DBNull.Value },
                                         { $"{prop.Name}_id", subId }
                                     });
                                 }
@@ -835,7 +934,7 @@ namespace GiantBomb
                     parameters[prop.Name] = value ?? DBNull.Value;
                     if (prop.Name.Equals("id", StringComparison.OrdinalIgnoreCase) || prop.Name.Equals("Id", StringComparison.OrdinalIgnoreCase))
                     {
-                        idValue = value;
+                        idValue = value ?? DBNull.Value;
                     }
                 }
             }
