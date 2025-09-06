@@ -497,7 +497,7 @@ namespace Classes
 			}
 		}
 
-		public void BuildTableFromType(string databaseName, string prefix, Type type, string overrideId = "")
+		public void BuildTableFromType(string databaseName, string prefix, Type type, string overrideId = "", string customColumnIndexes = "")
 		{
 			// Get the table name from the class name
 			string tableName = type.Name;
@@ -668,6 +668,27 @@ namespace Classes
 				string addPrimaryKeyQuery = $"ALTER TABLE `{databaseName}`.`{tableName}` ADD PRIMARY KEY ({overrideId})";
 				Console.WriteLine($"Executing query: {addPrimaryKeyQuery}");
 				db.ExecuteNonQuery(addPrimaryKeyQuery);
+			}
+
+			// Add custom indexes if provided
+			if (!string.IsNullOrEmpty(customColumnIndexes))
+			{
+				string[] indexes = customColumnIndexes.Split(',');
+				foreach (string index in indexes)
+				{
+					string trimmedIndex = index.Trim();
+					if (!string.IsNullOrEmpty(trimmedIndex))
+					{
+						string checkIndexQuery = $"SHOW INDEX FROM `{databaseName}`.`{tableName}` WHERE Key_name = 'idx_{trimmedIndex}'";
+						var indexResult = db.ExecuteCMD(checkIndexQuery);
+						if (indexResult.Rows.Count == 0)
+						{
+							string createIndexQuery = $"CREATE INDEX `idx_{trimmedIndex}` ON `{databaseName}`.`{tableName}` (`{trimmedIndex}`)";
+							Console.WriteLine($"Executing query: {createIndexQuery}");
+							db.ExecuteNonQuery(createIndexQuery);
+						}
+					}
+				}
 			}
 		}
 	}
