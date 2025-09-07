@@ -475,9 +475,9 @@ namespace GiantBomb
             sql = $"SELECT guid, image_tags FROM {dbName}.Platform WHERE image_tags IS NOT NULL AND image_tags != ''";
             await _ProcessImageDatabase(db, sql);
 
-            // // download images for each game
-            // sql = $"SELECT guid, image_tags FROM {dbName}.Game WHERE image_tags IS NOT NULL AND image_tags != ''";
-            // await _ProcessImageDatabase(db, sql);
+            // download images for each game
+            sql = $"SELECT guid, image_tags FROM {dbName}.Game WHERE image_tags IS NOT NULL AND image_tags != ''";
+            await _ProcessImageDatabase(db, sql);
         }
 
         private async Task _ProcessImageDatabase(Database db, string sql)

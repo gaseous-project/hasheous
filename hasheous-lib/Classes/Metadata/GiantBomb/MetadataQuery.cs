@@ -199,6 +199,164 @@ namespace GiantBomb
             return response;
         }
 
+        public static GiantBombGenericResponse SearchForMetadata(QueryableTypes dataType, string? filter, string fieldList, string? sort, int limit = 100, int offset = 0)
+        {
+            GiantBombSourceMapItem? sourceMapItem = GiantBombSourceMap.GetValueOrDefault(dataType);
+
+            if (sourceMapItem == null || sourceMapItem.ClassType == null)
+            {
+                throw new ArgumentException("Invalid data type specified.");
+            }
+
+            // validate the fieldList
+            var validFields = new HashSet<string>(sourceMapItem.ClassType.GetProperties().Select(p => p.Name), StringComparer.OrdinalIgnoreCase);
+            if (fieldList == "*")
+            {
+                // Get all properties of the class type
+                fieldList = string.Join(",", sourceMapItem.ClassType.GetProperties().Select(p => p.Name));
+            }
+            else
+            {
+                // Validate the provided fields against the class properties
+                var requestedFields = fieldList.Split(',').Select(f => f.Trim()).ToList();
+
+                foreach (var field in requestedFields)
+                {
+                    if (!validFields.Contains(field))
+                    {
+                        throw new ArgumentException($"Invalid field '{field}' specified for type '{dataType}'.");
+                    }
+                }
+
+                fieldList = string.Join(",", requestedFields);
+            }
+
+            // validate the filter
+            // format should be:
+            // Single filter: &filter=field:value
+            // Multiple filters: &filter=field:value,field:value
+            // Date filters: &filter=field:start value|end value (using datetime format)
+            // Field names should be validated against the class properties
+            if (!string.IsNullOrEmpty(filter))
+            {
+                var filterParts = filter.Split(',', StringSplitOptions.RemoveEmptyEntries);
+                foreach (var part in filterParts)
+                {
+                    var fieldValue = part.Split(':', 2);
+                    if (fieldValue.Length != 2)
+                    {
+                        throw new ArgumentException($"Invalid filter format '{part}'. Expected format is 'field:value'.");
+                    }
+                    var field = fieldValue[0].Trim();
+                    if (!validFields.Contains(field))
+                    {
+                        throw new ArgumentException($"Invalid filter field '{field}' specified for type '{dataType}'.");
+                    }
+                }
+            }
+
+            // validate the sort
+            // format should be:
+            // Single sort: &sort=field:asc|desc
+            if (!string.IsNullOrEmpty(sort))
+            {
+                var sortParts = sort.Split(',', StringSplitOptions.RemoveEmptyEntries);
+                foreach (var part in sortParts)
+                {
+                    var fieldOrder = part.Split(':', 2);
+                    var field = fieldOrder[0].Trim();
+                    if (!validFields.Contains(field))
+                    {
+                        throw new ArgumentException($"Invalid sort field '{field}' specified for type '{dataType}'.");
+                    }
+                    if (fieldOrder.Length == 2)
+                    {
+                        var order = fieldOrder[1].Trim().ToLower();
+                        if (order != "asc" && order != "desc")
+                        {
+                            throw new ArgumentException($"Invalid sort order '{order}' specified for field '{field}'. Expected 'asc' or 'desc'.");
+                        }
+                    }
+                }
+            }
+
+            // Build the SQL query
+            StringBuilder sql = new StringBuilder("SELECT ");
+            sql.Append(fieldList);
+            sql.Append(" FROM `giantbomb`.`");
+            sql.Append(sourceMapItem.TableName);
+            sql.Append("`");
+
+            var parameters = new Dictionary<string, object>();
+
+            if (!string.IsNullOrEmpty(filter))
+            {
+                sql.Append(" WHERE ");
+                // Note: Parameters for filter should be added to 'parameters' dictionary as needed.
+                var filterItems = filter.Split(',', StringSplitOptions.RemoveEmptyEntries);
+                bool first = true;
+                foreach (var item in filterItems)
+                {
+                    if (!first)
+                    {
+                        sql.Append(" AND ");
+                    }
+                    first = false;
+                    var fieldValue = item.Split(':', 2);
+                    var field = fieldValue[0].Trim();
+                    var value = fieldValue[1].Trim();
+
+                    if (value.Contains('|'))
+                    {
+                        // Date range filter
+                        var dateParts = value.Split('|', 2);
+                        if (dateParts.Length == 2)
+                        {
+                            var startDate = dateParts[0].Trim();
+                            var endDate = dateParts[1].Trim();
+                            sql.Append($"(`{field}` BETWEEN @start_{field} AND @end_{field})");
+                            parameters.Add($"@start_{field}", startDate);
+                            parameters.Add($"@end_{field}", endDate);
+                        }
+                        else
+                        {
+                            throw new ArgumentException($"Invalid date range filter format '{value}' for field '{field}'. Expected format is 'start|end'.");
+                        }
+                    }
+                    else
+                    {
+                        // Single value filter
+                        sql.Append($"`{field}` = @filter_{field}");
+                        parameters.Add($"@filter_{field}", value);
+                    }
+                }
+            }
+
+            if (!string.IsNullOrEmpty(sort))
+            {
+                sql.Append(" ORDER BY ");
+                sql.Append(sort);
+            }
+
+            sql.Append(" LIMIT @limit OFFSET @offset;");
+            parameters.Add("@limit", limit);
+            parameters.Add("@offset", offset);
+
+            string sqlString = sql.ToString();
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            var result = db.ExecuteCMD(sqlString, parameters);
+
+            // Invoke generic BuildResponseFromDataTable<T>() with runtime type sourceMapItem.ClassType
+            var mq = new MetadataQuery();
+            var buildMethod = typeof(MetadataQuery)
+                .GetMethod("BuildResponseFromDataTable", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (buildMethod == null)
+                throw new InvalidOperationException("BuildResponseFromDataTable method not found.");
+            var genericBuild = buildMethod.MakeGenericMethod(sourceMapItem.ClassType);
+            var response = (GiantBombGenericResponse)genericBuild.Invoke(mq, new object[] { result, offset });
+            return response;
+        }
+
         private GiantBombGenericResponse BuildResponseFromDataTable<T>(DataTable table, int offset = 0) where T : new()
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
@@ -381,178 +539,5 @@ namespace GiantBomb
             response.status_code = 1;
             return response;
         }
-
-        // public static GiantBombGenericResponse SearchForMetadata<T>(string? filter, string? sort, int limit = 100, int offset = 0)
-        // {
-        //     GiantBombGenericResponse response = new GiantBombGenericResponse();
-
-        //     // Parse the filter parameter
-        //     // filters are comma separated lists of key value pairs separated by a colon
-        //     // keys are the names of fields in the database
-        //     // values are the values to filter by
-        //     // Single filter: field:value
-        //     // Multiple filters: field:value,field:value - the same field can be used multiple times as an OR filter
-        //     // Date filters: field:start value|end value (using datetime format)
-        //     List<string> filters = new List<string>();
-        //     Dictionary<string, string> filterDict = new Dictionary<string, string>();
-
-        //     if (!string.IsNullOrEmpty(filter))
-        //     {
-        //         string[] filterParts = filter.Split(',');
-        //         foreach (string part in filterParts)
-        //         {
-        //             string[] keyValue = part.Split(':');
-        //             if (keyValue.Length == 2)
-        //             {
-        //                 filters.Add($"`{keyValue[0]}` = '{keyValue[1]}'");
-        //                 filterDict[keyValue[0]] = keyValue[1];
-        //             }
-        //             else if (keyValue.Length == 3 && keyValue[1].Contains('|'))
-        //             {
-        //                 // Handle date range
-        //                 string[] dateRange = keyValue[1].Split('|');
-        //                 if (dateRange.Length == 2)
-        //                 {
-        //                     filters.Add($"{keyValue[0]} BETWEEN '{dateRange[0]}' AND '{dateRange[1]}'");
-        //                 }
-        //             }
-        //         }
-        //     }
-
-        //     // Parse the sort parameter
-        //     // sort is a comma separated list of fields to sort by, with an optional direction (asc/desc)
-        //     // Example: field1:asc,field2:desc
-        //     List<string> sortFields = new List<string>();
-        //     if (!string.IsNullOrEmpty(sort))
-        //     {
-        //         string[] sortParts = sort.Split(',');
-        //         foreach (string part in sortParts)
-        //         {
-        //             string[] sortKeyValue = part.Split(':');
-        //             if (sortKeyValue.Length == 2)
-        //             {
-        //                 string field = sortKeyValue[0];
-        //                 string direction = sortKeyValue[1].ToLower() == "desc" ? "DESC" : "ASC";
-        //                 sortFields.Add($"`{field}` {direction}");
-        //             }
-        //             else if (sortKeyValue.Length == 1)
-        //             {
-        //                 // Default to ascending if no direction is specified
-        //                 sortFields.Add($"`{sortKeyValue[0]}` ASC");
-        //             }
-        //         }
-        //     }
-
-        //     // Build the SQL query
-        //     StringBuilder sql = new StringBuilder("SELECT * FROM `giantbomb`.");
-        //     sql.Append("`");
-        //     sql.Append(typeof(T).Name);
-        //     sql.Append("`");
-        //     sql.Append(" WHERE ");
-        //     if (filters.Count > 0)
-        //     {
-        //         sql.Append(string.Join(" AND ", filters));
-        //     }
-        //     else
-        //     {
-        //         sql.Append("1 = 1"); // No filters, select all
-        //     }
-        //     if (sortFields.Count > 0)
-        //     {
-        //         sql.Append(" ORDER BY ");
-        //         sql.Append(string.Join(", ", sortFields));
-        //     }
-        //     sql.Append(" LIMIT @limit OFFSET @offset;");
-        //     var parameters = new Dictionary<string, object>
-        //     {
-        //         { "@limit", limit },
-        //         { "@offset", offset }
-        //     };
-
-        //     string sqlString = sql.ToString();
-
-        //     Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-        //     var result = db.ExecuteCMD(sqlString, parameters);
-        //     List<T> metadataList = new List<T>();
-
-        //     foreach (DataRow row in result.Rows)
-        //     {
-        //         T metadata = Activator.CreateInstance<T>();
-        //         foreach (var prop in typeof(T).GetProperties())
-        //         {
-        //             if (row.Table.Columns.Contains(prop.Name) && prop.CanWrite)
-        //             {
-        //                 object value = row[prop.Name];
-        //                 if (value != DBNull.Value)
-        //                 {
-        //                     // If property is a class (not string), treat as subclass
-        //                     if (value != null && prop.PropertyType.IsClass && prop.PropertyType != typeof(string))
-        //                     {
-        //                         // check if the property type is a collection or array
-        //                         if (prop.PropertyType.IsGenericType && prop.PropertyType.GetInterfaces().Any(i =>
-        //                 i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEnumerable<>)) && prop.PropertyType != typeof(string))
-        //                         {
-        //                             // check if subclassess in the collection have an Id property
-        //                             var subIdProp = prop.PropertyType.GetGenericArguments()[0].GetProperty("id") ?? prop.PropertyType.GetGenericArguments()[0].GetProperty("Id");
-        //                             if (subIdProp == null)
-        //                             {
-        //                                 // deserialise the value as a JSON array into the property type
-        //                                 var jsonValue = value.ToString();
-        //                                 if (!string.IsNullOrEmpty(jsonValue))
-        //                                 {
-        //                                     var deserializedValue = Newtonsoft.Json.JsonConvert.DeserializeObject(jsonValue, prop.PropertyType);
-        //                                     prop.SetValue(metadata, deserializedValue);
-        //                                 }
-        //                             }
-        //                             else
-        //                             {
-        //                                 // value is a JSON array of ids, deserialise to a list of longs, and then populate the property with a list of objects
-        //                                 var jsonValue = value.ToString();
-        //                                 if (!string.IsNullOrEmpty(jsonValue))
-        //                                 {
-        //                                     var ids = Newtonsoft.Json.JsonConvert.DeserializeObject<List<long>>(jsonValue);
-        //                                     var listType = typeof(List<>).MakeGenericType(prop.PropertyType.GetGenericArguments()[0]);
-        //                                     var listInstance = Activator.CreateInstance(listType);
-        //                                     foreach (var id in ids)
-        //                                     {
-        //                                         // Assuming you have a method to get the object by ID
-        //                                         var item = db.GetById(prop.PropertyType.GetGenericArguments()[0], id);
-        //                                         if (item != null)
-        //                                         {
-        //                                             listType.GetMethod("Add")?.Invoke(listInstance, new[] { item });
-        //                                         }
-        //                                     }
-        //                                     prop.SetValue(metadata, listInstance);
-        //                                 }
-        //                             }
-
-
-
-
-
-
-
-
-
-
-        //                             prop.SetValue(metadata, Convert.ChangeType(value, prop.PropertyType));
-        //                         }
-        //                     }
-        //                 }
-        //                 metadataList.Add(metadata);
-        //             }
-
-        //             // compile the response
-        //             response.results = metadataList.Cast<object>().ToList();
-        //             response.error = "OK";
-        //             response.limit = result.Rows.Count < limit ? result.Rows.Count : limit;
-        //             response.offset = offset;
-        //             response.version = "1.0";
-        //             response.status_code = 1;
-
-        //             return response;
-        //         }
-        //     }
-        // }
     }
 }
