@@ -24,6 +24,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
 - Configuration
   - File: `~/.hasheous-server/config.json` (auto-updated on startup by `Config.UpdateConfig()`). Env vars (used by Docker): `dbhost`, `dbuser`, `dbpass`, `igdbclientid`, `igdbclientsecret`, `redisenabled`, `redishost`, `redisport`, `reportingserverurl`, etc.
   - Development mode disables client API key requirement (`Config.RequireClientAPIKey = false`) and enables developer exception page.
+  - GiantBomb: set `gbapikey` env var (or update config.json) to enable GiantBomb metadata ingestion & proxy; optional `BaseURL` override (defaults to `https://www.giantbomb.com/`).
 
 - API versioning & routing
   - Controllers use `[ApiController]`, `[ApiVersion("1.0")]`, `[Route("api/v{version:apiVersion}/[controller]/")]`.
@@ -48,6 +49,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
 
 - Background jobs
   - Add/adjust scheduled tasks in `service-orchestrator/Program.cs` under `QueueProcessor.QueueItems` (e.g., `FetchIGDBMetadata`, timings are minutes).
+  - GiantBomb: when `Config.GiantBomb.APIKey` is present a `FetchGiantBombMetadata` job is queued (default 10080 minutes / 7 days) to refresh GiantBomb platform/game/image data.
 
 - JSON & serialization
   - System.Text.Json and Newtonsoft are both configured: enums-as-strings, nulls ignored, max depth 64, indented output (Newtonsoft).
@@ -117,6 +119,7 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 - `InsightsReport`: insights/report queries and cache warmer.
 - `DataObject`: invalidated on data object mutations.
 - `ApiKeys` / `ClientApiKeys`: in-memory/Redis API key caches.
+ - GiantBomb queries currently read directly from the `giantbomb` schema; cached files & images stored under `~/.hasheous-server/Data/Metadata/GiantBomb` (images in `Images/`).
 
 ## Dump files (MetadataMap.zip)
 - Producer: `hasheous-lib/Classes/ProcessQueue/Tasks/Dumps.cs` (queued as `QueueItemType.MetadataMapDump` in `service-orchestrator/Program.cs`, default every 10080 minutes = 7 days).
@@ -137,6 +140,23 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
   - `CreatedDate`, `UpdatedDate`
   - `Permissions` and `UserPermissions` (if included by the API)
 - Lifecycle: JSON files are written under `.../Content/...`, then zipped into `MetadataMap.zip`; the `Content` directory is deleted after zipping. The zip remains as the artifact.
+
+## GiantBomb metadata
+- Enable by supplying `gbapikey` env var (or editing config file -> `GiantBombConfiguration.APIKey`). Without a key GiantBomb tasks/endpoints remain inert.
+- Local storage: `~/.hasheous-server/Data/Metadata/GiantBomb` plus `Images/` subfolder for retrieved images.
+- DB schema: data persisted to `giantbomb` schema tables (platforms, games, images, relations) and queried via `GiantBomb.MetadataQuery` (reflection-based field selection & relationship expansion).
+- Background job: `FetchGiantBombMetadata` (platforms → games → images) scheduled every 10080 minutes (7 days) once API key present. Incremental logic uses Settings table tracking keys (e.g., `GiantBomb_LastPlatformFetch`, `GiantBomb_GameOffset-*`).
+- Rate limiting: adaptive soft/hard hourly thresholds with backoff & retry (see `MetadataDownload.cs`).
+- Proxy endpoints (require `X-Client-API-Key` when client keys enforced):
+  - Singular: `GET /api/v1/MetadataProxy/GiantBomb/{datatype}/{guid}?field_list=*` (datatype: company|game|platform|image|rating|release|user_review)
+  - Collections: `GET /api/v1/MetadataProxy/GiantBomb/{datatype}s?filter=...&sort=...&limit=100&offset=0&field_list=*`
+  - Companies plural convenience: `GET /api/v1/MetadataProxy/GiantBomb/companies`
+  - Image passthrough (lazy fetch & local cache): `GET /api/v1/MetadataProxy/GiantBomb/a/uploads/<path>` (sanitized; refuses path traversal).
+- Response formats: `json` (default), `xml`, `jsonp` via `format` query parameter.
+- Adding new GiantBomb data type: extend `GiantBomb.MetadataQuery.QueryableTypes` and `GiantBombSourceMap` (table name, class type, ID column), ensure ingestion populates table, then proxy automatically supports it.
+
+### GiantBomb quick curl example
+`curl -H "X-Client-API-Key: <CLIENT_KEY>" "https://localhost:7157/api/v1/MetadataProxy/GiantBomb/games?filter=name:like:Mario&limit=5"`
 
 ## Contributing with AI
 - Keep PRs small and single-purpose. Describe intent, touched areas, and any migration/caching impact.

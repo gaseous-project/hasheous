@@ -2,6 +2,7 @@ using System.Data;
 using System.Reflection;
 using System.Security.Cryptography.X509Certificates;
 using System.Security.Policy;
+using System.Text.RegularExpressions;
 using Classes;
 using NuGet.Packaging;
 
@@ -74,7 +75,7 @@ namespace TheGamesDB.SQL
                         }
                     }
 
-                    sql = "SELECT " + string.Join(", ", fieldList) + " FROM thegamesdb.games WHERE " + queryValidator.sqlWhereClause + " ORDER BY game_title ASC";
+                    sql = "SELECT " + string.Join(", ", fieldList.Select(QuoteIdentifier)) + " FROM thegamesdb.games WHERE " + queryValidator.sqlWhereClause + " ORDER BY `game_title` ASC";
                     if (queryModel.page > 0)
                     {
                         sql += " LIMIT " + (queryModel.page - 1) * queryModel.pageSize + ", " + queryModel.pageSize;
@@ -268,7 +269,7 @@ namespace TheGamesDB.SQL
                     gamesImages.data.images = new Dictionary<string, List<HasheousClient.Models.Metadata.TheGamesDb.GameImage>>();
 
                     // generate the sql query
-                    sql = "SELECT " + String.Join(", ", queryValidator.baseFieldList) + " FROM thegamesdb.banners WHERE " + queryValidator.sqlWhereClause;
+                    sql = "SELECT " + String.Join(", ", queryValidator.baseFieldList.Select(QuoteIdentifier)) + " FROM thegamesdb.banners WHERE " + queryValidator.sqlWhereClause;
                     parameters = queryValidator.sqlWhereClauseValues;
 
                     // add the filter clause
@@ -340,7 +341,7 @@ namespace TheGamesDB.SQL
                     platforms.data.platforms = new Dictionary<string, HasheousClient.Models.Metadata.TheGamesDb.Platform>();
 
                     // generate the sql query
-                    sql = "SELECT " + string.Join(", ", queryValidator.fieldItems) + " FROM thegamesdb.platforms ORDER BY `name` ASC";
+                    sql = "SELECT " + string.Join(", ", queryValidator.fieldItems.Select(QuoteIdentifier)) + " FROM thegamesdb.platforms ORDER BY `name` ASC";
 
                     // execute the query
                     DataTable dtPlatforms = db.ExecuteCMD(sql);
@@ -402,7 +403,7 @@ namespace TheGamesDB.SQL
                     platformsByID.data.platforms = new Dictionary<string, HasheousClient.Models.Metadata.TheGamesDb.Platform>();
 
                     // generate the sql query
-                    sql = "SELECT " + string.Join(", ", queryValidator.fieldItems) + " FROM thegamesdb.platforms WHERE " + queryValidator.sqlWhereClause;
+                    sql = "SELECT " + string.Join(", ", queryValidator.fieldItems.Select(QuoteIdentifier)) + " FROM thegamesdb.platforms WHERE " + queryValidator.sqlWhereClause;
                     parameters = queryValidator.sqlWhereClauseValues;
 
                     // execute the query
@@ -465,7 +466,7 @@ namespace TheGamesDB.SQL
                     platformsByName.data.platforms = new List<HasheousClient.Models.Metadata.TheGamesDb.Platform>();
 
                     // generate the sql query
-                    sql = "SELECT " + string.Join(", ", queryValidator.fieldItems) + " FROM thegamesdb.platforms WHERE " + queryValidator.sqlWhereClause;
+                    sql = "SELECT " + string.Join(", ", queryValidator.fieldItems.Select(QuoteIdentifier)) + " FROM thegamesdb.platforms WHERE " + queryValidator.sqlWhereClause;
                     parameters = queryValidator.sqlWhereClauseValues;
 
                     // execute the query
@@ -528,7 +529,7 @@ namespace TheGamesDB.SQL
                     platformsImages.data.images = new Dictionary<string, List<HasheousClient.Models.Metadata.TheGamesDb.PlatformImage>>();
 
                     // generate the sql query
-                    sql = "SELECT " + string.Join(", ", queryValidator.baseFieldList) + " FROM thegamesdb.platforms_images WHERE " + queryValidator.sqlWhereClause;
+                    sql = "SELECT " + string.Join(", ", queryValidator.baseFieldList.Select(QuoteIdentifier)) + " FROM thegamesdb.platforms_images WHERE " + queryValidator.sqlWhereClause;
                     parameters = queryValidator.sqlWhereClauseValues;
 
                     // add the filter clause
@@ -599,7 +600,7 @@ namespace TheGamesDB.SQL
                     genres.data.genres = new Dictionary<string, HasheousClient.Models.Metadata.TheGamesDb.Genre>();
 
                     // generate the sql query
-                    sql = "SELECT " + string.Join(", ", queryValidator.fieldItems) + " FROM thegamesdb.genres ORDER BY `genre` ASC";
+                    sql = "SELECT " + string.Join(", ", queryValidator.fieldItems.Select(QuoteIdentifier)) + " FROM thegamesdb.genres ORDER BY `genre` ASC";
 
                     // execute the query
                     DataTable dtGenresList = db.ExecuteCMD(sql);
@@ -668,7 +669,7 @@ namespace TheGamesDB.SQL
                     developers.data.developers = new Dictionary<string, HasheousClient.Models.Metadata.TheGamesDb.Developer>();
 
                     // generate the sql query
-                    sql = "SELECT " + string.Join(", ", queryValidator.fieldItems) + " FROM thegamesdb.devs_list ORDER BY `name` ASC";
+                    sql = "SELECT " + string.Join(", ", queryValidator.fieldItems.Select(QuoteIdentifier)) + " FROM thegamesdb.devs_list ORDER BY `name` ASC";
 
                     // add the limit clause
                     if (queryModel.page > 0)
@@ -737,7 +738,7 @@ namespace TheGamesDB.SQL
                     publishers.data.publishers = new Dictionary<string, HasheousClient.Models.Metadata.TheGamesDb.Publisher>();
 
                     // generate the sql query
-                    sql = "SELECT " + string.Join(", ", queryValidator.fieldItems) + " FROM thegamesdb.pubs_list ORDER BY `name` ASC";
+                    sql = "SELECT " + string.Join(", ", queryValidator.fieldItems.Select(QuoteIdentifier)) + " FROM thegamesdb.pubs_list ORDER BY `name` ASC";
 
                     // add the limit clause
                     if (queryModel.page > 0)
@@ -822,6 +823,18 @@ namespace TheGamesDB.SQL
             cropped_center_thumb,
             medium,
             large
+        }
+
+        // Validate and quote SQL identifiers to prevent injection via dynamic field lists.
+        private static readonly Regex IdentifierRegex = new Regex("^[A-Za-z0-9_]+$", RegexOptions.Compiled);
+
+        private static string QuoteIdentifier(string identifier)
+        {
+            if (string.IsNullOrWhiteSpace(identifier) || !IdentifierRegex.IsMatch(identifier))
+            {
+                throw new ArgumentException($"Invalid identifier: {identifier}");
+            }
+            return $"`{identifier}`";
         }
     }
 }

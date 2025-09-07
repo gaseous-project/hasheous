@@ -1039,31 +1039,171 @@ namespace hasheous_server.Controllers.v1_0
         #endregion TheGamesDB
 
         #region GiantBomb
-        // [MapToApiVersion("1.0")]
-        // [HttpGet]
-        // [ProducesResponseType(typeof(GiantBomb.Models.GiantBombGenericResponse), StatusCodes.Status200OK)]
-        // [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        // [Route("GiantBomb/game")]
-        // [Route("GiantBomb/games")]
-        // public async Task<IActionResult> GetGiantBombGames(string? filter = null, string? sort = null, int limit = 100, int offset = 0)
-        // {
-        //     // Validate input parameters
-        //     if (limit <= 0 || offset < 0)
-        //     {
-        //         return BadRequest("Invalid limit or offset.");
-        //     }
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(typeof(GiantBomb.Models.GiantBombGenericResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [Route("GiantBomb/{datatype}/{guid}")]
+        public async Task<IActionResult> GetGiantBombResponse_Singular(GiantBomb.MetadataQuery.QueryableTypes datatype, string guid, string? field_list = "*", GiantBomb.MetadataQuery.GiantBombReturnTypes format = GiantBomb.MetadataQuery.GiantBombReturnTypes.json)
+        {
+            // Search for metadata
+            GiantBomb.Models.GiantBombGenericResponse response = GiantBomb.MetadataQuery.GetMetadataByGuid(datatype, guid, field_list);
 
-        //     // Search for metadata
-        //     GiantBomb.Models.GiantBombGenericResponse response = GiantBomb.MetadataQuery.SearchForMetadata<GiantBomb.Models.Game>(filter, sort, limit, offset);
+            if (response.results == null || response.results.Count == 0)
+            {
+                return NotFound(new Dictionary<string, string> { { "Error", "No items found matching the search criteria." } });
+            }
 
-        //     if (response.results == null || response.results.Count == 0)
-        //     {
-        //         return NotFound(new Dictionary<string, string> { { "Error", "No games found matching the search criteria." } });
-        //     }
+            return FormatOutput(response, format);
+        }
 
-        //     return Ok(response);
-        // }
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(typeof(GiantBomb.Models.GiantBombGenericResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [Route("GiantBomb/{datatype}s")]
+        public async Task<IActionResult> GetGiantBombResponse_List(GiantBomb.MetadataQuery.QueryableTypes datatype, string? filter = null, string? sort = null, int limit = 100, int offset = 0, string field_list = "*", GiantBomb.MetadataQuery.GiantBombReturnTypes format = GiantBomb.MetadataQuery.GiantBombReturnTypes.json)
+        {
+            // Validate input parameters
+            if (limit <= 0 || offset < 0)
+            {
+                return BadRequest("Invalid limit or offset.");
+            }
 
+            // Search for metadata
+            GiantBomb.Models.GiantBombGenericResponse response = GiantBomb.MetadataQuery.SearchForMetadata(datatype, filter, field_list, sort, limit, offset);
+
+            if (response.results == null || response.results.Count == 0)
+            {
+                return NotFound(new Dictionary<string, string> { { "Error", "No games found matching the search criteria." } });
+            }
+
+            return Ok(response);
+        }
+
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(typeof(GiantBomb.Models.GiantBombGenericResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [Route("GiantBomb/companies")]
+        public async Task<IActionResult> GetGiantBombResponse_List_CompanyPlural(string? filter = null, string? sort = null, int limit = 100, int offset = 0, string field_list = "*", GiantBomb.MetadataQuery.GiantBombReturnTypes format = GiantBomb.MetadataQuery.GiantBombReturnTypes.json)
+        {
+            return await GetGiantBombResponse_List(GiantBomb.MetadataQuery.QueryableTypes.company, filter, sort, limit, offset, field_list, format);
+        }
+
+        private IActionResult FormatOutput(GiantBomb.Models.GiantBombGenericResponse response, GiantBomb.MetadataQuery.GiantBombReturnTypes format)
+        {
+            // return the response in the requested format xml, json, or jsonp
+            switch (format)
+            {
+                case GiantBomb.MetadataQuery.GiantBombReturnTypes.xml:
+                    {
+                        // Collect concrete result types so XmlSerializer is aware of them (prevents 'type was not expected' errors)
+                        var knownTypes = response.results?
+                            .Where(r => r != null)
+                            .Select(r => r.GetType())
+                            .Distinct()
+                            .ToArray() ?? Type.EmptyTypes;
+
+                        var serializer = new System.Xml.Serialization.XmlSerializer(typeof(GiantBomb.Models.GiantBombGenericResponse), knownTypes);
+                        using var sw = new StringWriter();
+                        serializer.Serialize(sw, response);
+                        return Content(sw.ToString(), "application/xml");
+                    }
+
+                case GiantBomb.MetadataQuery.GiantBombReturnTypes.jsonp:
+                    {
+                        // Optional callback name (?callback=foo); default to 'callback'
+                        var callback = HttpContext.Request.Query.TryGetValue("callback", out var cbVal) && !string.IsNullOrWhiteSpace(cbVal)
+                            ? cbVal.ToString()
+                            : "callback";
+
+                        var json = Newtonsoft.Json.JsonConvert.SerializeObject(response,
+                            new Newtonsoft.Json.JsonSerializerSettings { NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore });
+
+                        var jsonp = $"{callback}({json});";
+                        return Content(jsonp, "application/javascript");
+                    }
+
+                // json (default) will fall through to existing return Ok(response);
+                default:
+                    break;
+            }
+
+            return Ok(response);
+        }
+
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [Route("GiantBomb/a/uploads/{*GiantBombImagePath}")]
+        [ResponseCache(CacheProfileName = "7Days")]
+        public IActionResult GetGiantBombImage(string GiantBombImagePath)
+        {
+            GiantBombImagePath = System.Uri.UnescapeDataString(GiantBombImagePath);
+            if (GiantBombImagePath.Contains("..") || GiantBombImagePath.Contains("\\"))
+            {
+                return BadRequest("Invalid image ID");
+            }
+            else if (GiantBombImagePath.Contains("/"))
+            {
+                // forward slashes are allowed in the file name
+            }
+            string imageFile = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_GiantBomb, "Images", GiantBombImagePath);
+            string imagePath = Path.GetDirectoryName(imageFile);
+
+            // create directory if it doesn't exist
+            if (!Directory.Exists(imagePath))
+            {
+                Directory.CreateDirectory(imagePath);
+            }
+
+            // check if image exists
+            if (System.IO.File.Exists(imageFile))
+            {
+                // check the file is non-zero length
+                FileInfo fileInfo = new FileInfo(imageFile);
+                if (fileInfo.Length == 0)
+                {
+                    System.IO.File.Delete(imageFile);
+                    return NotFound();
+                }
+
+                return PhysicalFile(imageFile, "image/jpeg");
+            }
+            else
+            {
+                // download image from url
+                try
+                {
+                    Uri giantBombUri = new Uri("https://www.giantbomb.com/a/uploads/" + GiantBombImagePath);
+
+                    DownloadManager downloadManager = new DownloadManager();
+                    var result = downloadManager.DownloadFile(giantBombUri.ToString(), imageFile);
+
+                    // wait until result is completed
+                    while (result.IsCompleted == false)
+                    {
+                        Thread.Sleep(1000);
+                    }
+
+                    // check the file is non-zero length
+                    FileInfo fileInfo = new FileInfo(imageFile);
+                    if (fileInfo.Length == 0)
+                    {
+                        System.IO.File.Delete(imageFile);
+                        return NotFound();
+                    }
+
+                    return PhysicalFile(imageFile, "image/jpeg");
+                }
+                catch (Exception ex)
+                {
+                    return NotFound();
+                }
+            }
+        }
         #endregion GiantBomb
     }
 }

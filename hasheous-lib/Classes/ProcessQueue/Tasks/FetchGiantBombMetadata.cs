@@ -18,20 +18,19 @@ namespace Classes.ProcessQueue
             GiantBomb.MetadataDownload gbDownloader = new GiantBomb.MetadataDownload();
 
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Company));
+            db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Company), "", "name");
             db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Image), "guid,original_url");
             db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.ImageTag));
-            db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Platform));
-            db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Game));
-            db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Dlc));
-            db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Rating));
-            db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Release));
-            db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Review));
-            db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.UserReview));
+            db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Platform), "", "name,guid");
+            db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Game), "", "name,guid");
+            db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Dlc), "", "name,guid");
+            db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Rating), "", "name.guid");
+            db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Release), "", "name,guid");
+            db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Review), "", "guid");
+            db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.UserReview), "", "guid");
 
             await gbDownloader.DownloadPlatforms();
             await gbDownloader.DownloadGames();
-            // await gbDownloader.DownloadSubTypes<GiantBomb.Models.GiantBombReviewResponse, GiantBomb.Models.Review>("reviews");
             await gbDownloader.DownloadSubTypes<GiantBomb.Models.GiantBombUserReviewResponse, GiantBomb.Models.UserReview>("user_reviews");
             await gbDownloader.DownloadImages();
 
