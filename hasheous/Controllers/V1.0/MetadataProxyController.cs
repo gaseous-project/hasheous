@@ -1081,6 +1081,16 @@ namespace hasheous_server.Controllers.v1_0
             return Ok(response);
         }
 
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(typeof(GiantBomb.Models.GiantBombGenericResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [Route("GiantBomb/companies")]
+        public async Task<IActionResult> GetGiantBombResponse_List_CompanyPlural(string? filter = null, string? sort = null, int limit = 100, int offset = 0, string field_list = "*", GiantBomb.MetadataQuery.GiantBombReturnTypes format = GiantBomb.MetadataQuery.GiantBombReturnTypes.json)
+        {
+            return await GetGiantBombResponse_List(GiantBomb.MetadataQuery.QueryableTypes.company, filter, sort, limit, offset, field_list, format);
+        }
+
         private IActionResult FormatOutput(GiantBomb.Models.GiantBombGenericResponse response, GiantBomb.MetadataQuery.GiantBombReturnTypes format)
         {
             // return the response in the requested format xml, json, or jsonp
