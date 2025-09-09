@@ -7,6 +7,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - `service-orchestrator/` ASP.NET Core API hosting background orchestration and scheduled jobs.
   - `hasheous-lib/` Shared library: data access, config, auth, background tasks, models, migrations (embedded SQL).
   - `hasheous-cli/` CLI utilities.
+  - NOTE (resource namespace): Embedded resources (SQL migrations, support data lists) now resolve under the assembly root namespace `hasheous_lib` (e.g. `hasheous_lib.Schema.hasheous-1004.sql`, `hasheous_lib.Support.Country.txt`). Use that prefix when adding new embedded resources; prior references using `hasheous.*` were refactored.
 
 - Architecture & data flow
   - MariaDB/MySQL is the source of truth. On startup, schema is created/migrated via embedded scripts (see `hasheous-lib/Classes/Database.cs::InitDB`, scripts named `hasheous-####.sql`).
@@ -43,6 +44,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Create a `new Classes.Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString)`.
   - Prefer async methods: `ExecuteCMDAsync`/`ExecuteCMDDictAsync`; use `await` in controllers/handlers. Avoid blocking sync calls unless there’s no async alternative.
   - Add new migration scripts in `hasheous-lib/Schema` as `hasheous-####.sql` with the next number.
+  - Embedded migration & support file manifest names now start with `hasheous_lib.Schema.` or `hasheous_lib.Support.`. After adding a file, ensure Build Action = EmbeddedResource and verify with `Assembly.GetExecutingAssembly().GetManifestResourceNames()` if debugging mismatches.
 
 - Caching
   - Use `hasheous.Classes.RedisConnection.GenerateKey(prefix, keyObj)` and `PurgeCache(prefix)`. Redis enabled when `Config.RedisConfiguration.Enabled`.
@@ -50,6 +52,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
 - Background jobs
   - Add/adjust scheduled tasks in `service-orchestrator/Program.cs` under `QueueProcessor.QueueItems` (e.g., `FetchIGDBMetadata`, timings are minutes).
   - GiantBomb: when `Config.GiantBomb.APIKey` is present a `FetchGiantBombMetadata` job is queued (default 10080 minutes / 7 days) to refresh GiantBomb platform/game/image data.
+  - Queue task refactor: obsolete blocking entries `GetMissingArtwork` and `MetadataMatchSearch` were removed from metadata fetch task `Blocks` lists. Don’t rely on them for future coordination.
 
 - JSON & serialization
   - System.Text.Json and Newtonsoft are both configured: enums-as-strings, nulls ignored, max depth 64, indented output (Newtonsoft).
@@ -81,12 +84,29 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 
 - Add a DB migration
   - Create `hasheous-lib/Schema/hasheous-####.sql` using the next available number; `InitDB()` applies scripts in order and bumps `schema_version`.
+  - When referencing a migration or support text file at runtime, construct resource names with `hasheous_lib.Schema.` / `hasheous_lib.Support.` prefixes.
 
 - Use the lookup timeout pattern
   - See `LookupController.LookupPost`: `Task.WhenAny(..., Task.Delay(TimeSpan.FromSeconds(10)))` and set `Retry-After = 90` on 503 responses.
 
 - Correlation & logging
   - Middleware sets `CallContext` values (CorrelationId, CallingProcess, CallingUser); orchestrator also returns `x-correlation-id` header.
+
+### Object property hashing (new utility)
+- Helper: `ComputeObjectPropertyHash(object obj, string? algorithm = "SHA256", string[]? ignoredProperties = null)` (added in shared library).
+- Purpose: lightweight deterministic fingerprint of an object's public instance property values (ordered alphabetically) for change detection / cache keys.
+- Behavior:
+  - Null object => empty string.
+  - Properties read via reflection; enumerable (non-string) values flattened as `[item1,item2,...]` using `ToString()` per element.
+  - Null property values serialized as `<null>`.
+  - Optionally ignore specific property names (case-insensitive) to exclude volatile fields (timestamps, etc.).
+  - Not a deep graph cryptographic signature; avoid for security decisions.
+- Usage examples:
+  - Cache key: `var key = RedisConnection.GenerateKey("DataObjectFingerprint", ComputeObjectPropertyHash(model, ignoredProperties: new[]{"UpdatedDate"}));`
+  - Change detection: persist last hash and compare before writing/invalidating heavy derived data.
+- Guidelines:
+  - Keep ignored lists small; if many fields are excluded consider crafting a purpose-built DTO instead.
+  - For large collections, ensure ordering is deterministic before hashing (sort if source order can vary).
 
 - Email verification system
   - "Verified Email" role is automatically assigned/removed based on `user.EmailConfirmed` status.
@@ -96,6 +116,7 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 
 ## Maintenance
 - A PR guard (`.github/workflows/copilot-instructions-guard.yml`) fails when architecture/config files change without updating this file; it prints hints via `.github/scripts/copilot-instructions-help.sh`.
+  - Update this file when: resource namespace conventions change (e.g., `hasheous_lib.*` migration), new cross-cutting utilities like `ComputeObjectPropertyHash` are added, or queue coordination semantics are modified.
 
 ## API key usage examples
 - User API key (header `X-API-Key`):
