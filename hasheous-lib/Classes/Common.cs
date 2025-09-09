@@ -281,6 +281,109 @@ namespace Classes
 		}
 
 		/// <summary>
+		/// Generates a deterministic hash (default SHA256) from the public instance properties of an object.
+		/// - Orders properties alphabetically by name.
+		/// - For enumerable (non-string) properties, flattens items in order.
+		/// - Null values are represented as &lt;null&gt;.
+		/// Can optionally ignore specific properties by name (case-insensitive).
+		/// The intent is a lightweight fingerprint for change detection, not a cryptographic signature of deep graphs.
+		/// </summary>
+		/// <param name="obj">Object to hash (returns empty string if null).</param>
+		/// <param name="algorithm">Hash algorithm name (SHA256, SHA1, MD5, etc.). Defaults to SHA256.</param>
+		/// <param name="ignoredProperties">Array of public property names to ignore (case-insensitive). Optional.</param>
+		/// <returns>Lowercase hex hash string.</returns>
+		public static string ComputeObjectPropertyHash(object? obj, string? algorithm = "SHA256", string[]? ignoredProperties = null)
+		{
+			if (obj == null) return string.Empty;
+
+			var type = obj.GetType();
+
+			// Cache property infos per type for performance
+			var props = _hashPropsCache.GetOrAdd(type, t =>
+				t.GetProperties(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
+				 .Where(p => p.CanRead)
+				 .OrderBy(p => p.Name, StringComparer.Ordinal)
+				 .ToArray());
+
+			HashSet<string>? ignoreSet = null;
+			if (ignoredProperties != null && ignoredProperties.Length > 0)
+			{
+				ignoreSet = new HashSet<string>(ignoredProperties.Where(s => !string.IsNullOrWhiteSpace(s)),
+					StringComparer.OrdinalIgnoreCase);
+			}
+
+			var sb = new System.Text.StringBuilder(256);
+
+			foreach (var p in props)
+			{
+				if (ignoreSet != null && ignoreSet.Contains(p.Name))
+					continue;
+
+				object? value;
+				try
+				{
+					value = p.GetValue(obj);
+				}
+				catch
+				{
+					// If a getter throws, skip it to keep hash generation resilient.
+					continue;
+				}
+
+				sb.Append(p.Name);
+				sb.Append('=');
+
+				if (value == null)
+				{
+					sb.Append("<null>");
+				}
+				else if (value is string s)
+				{
+					sb.Append(s);
+				}
+				else if (value is System.Collections.IEnumerable enumerable && value is not System.Collections.IDictionary)
+				{
+					var first = true;
+					sb.Append('[');
+					foreach (var item in enumerable)
+					{
+						if (!first) sb.Append(',');
+						first = false;
+						sb.Append(item?.ToString() ?? "<null>");
+					}
+					sb.Append(']');
+				}
+				else
+				{
+					sb.Append(value.ToString());
+				}
+
+				sb.Append(';');
+			}
+
+			var bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+			var algoName = string.IsNullOrWhiteSpace(algorithm) ? "SHA256" : algorithm.Trim();
+
+			using var hashAlgo = System.Security.Cryptography.HashAlgorithm.Create(algoName)
+				?? System.Security.Cryptography.SHA256.Create();
+
+			var hash = hashAlgo.ComputeHash(bytes);
+			var hex = new char[hash.Length * 2];
+			int i = 0;
+			foreach (var b in hash)
+			{
+				hex[i++] = GetHexNibble(b >> 4);
+				hex[i++] = GetHexNibble(b & 0xF);
+			}
+			return new string(hex);
+		}
+
+		static char GetHexNibble(int val) => (char)(val < 10 ? ('0' + val) : ('a' + (val - 10)));
+
+		static readonly ConcurrentDictionary<Type, System.Reflection.PropertyInfo[]> _hashPropsCache =
+			new ConcurrentDictionary<Type, System.Reflection.PropertyInfo[]>();
+
+		/// <summary>
 		/// Provides a way to set contextual data that flows with the call and 
 		/// async context of a test or invocation.
 		/// </summary>
