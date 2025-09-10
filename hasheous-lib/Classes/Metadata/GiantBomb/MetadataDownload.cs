@@ -114,7 +114,7 @@ namespace GiantBomb
             }
         }
 
-        private static object? GetTracking(string key, object? defaultValue = null)
+        public static object? GetTracking(string key, object? defaultValue = null)
         {
             try
             {
@@ -152,7 +152,7 @@ namespace GiantBomb
             }
         }
 
-        private static void SetTracking(string key, object value)
+        public static void SetTracking(string key, object value)
         {
             try
             {
@@ -202,6 +202,24 @@ namespace GiantBomb
         /// Age in days after which cached data will be refreshed.
         /// </summary>
         public int TimeToExpire { get; set; } = 30; // Default expiration time for cached data
+
+        /// <summary>
+        /// Last update date in "yyyy-MM-dd" format. Used for fetching incremental updates.
+        /// </summary>
+        public string LastUpdate
+        {
+            get
+            {
+                var lastUpdateObj = GetTracking("GiantBomb_LastUpdate", DateTime.UtcNow.AddDays(-31));
+                DateTime lastUpdate = lastUpdateObj is DateTime dt ? dt : DateTime.UtcNow.AddDays(-31);
+                return lastUpdate.ToString("yyyy-MM-dd");
+            }
+        }
+
+        /// <summary>
+        /// GiantBomb requires an end date for it's date filter - set far in the future to ensure all updates are captured.
+        /// </summary>
+        private string UpdateEndDate { get; } = "3000-01-01";
 
         // Legacy per-minute limiter removed (MaximumRequestsPerMinute / RateLimitSleepTime / checkRequestLimit) – superseded by async sliding window limiter above.
 
@@ -270,7 +288,7 @@ namespace GiantBomb
                 while (true)
                 {
                     // Fetch platforms from GiantBomb API
-                    string url = $"/api/platforms/?api_key={Config.GiantBomb.APIKey}&format=json&limit=100&offset={offset}";
+                    string url = $"/api/platforms/?api_key={Config.GiantBomb.APIKey}&format=json&limit=100&offset={offset}&filter=date_last_updated:{LastUpdate}|{UpdateEndDate}";
                     var json = await Task.Run(() => GetJson<Models.GiantBombPlatformResponse>(url));
 
                     if (json.results == null || json.results.Count == 0)
@@ -286,6 +304,8 @@ namespace GiantBomb
                         {
                             // Assuming you have a Database instance `db` and an object `myObj`:
                             await Classes.Metadata.MetadataStorage.StoreObjectWithSubclasses(platform, db, dbName, platform.id);
+
+                            await ProcessImageTags(db, platform.guid, platform.image_tags);
 
                             // Log the platform processing
                             Logging.Log(Logging.LogType.Information, "GiantBomb", $"Processed platform: {platformDict.name}");
@@ -415,7 +435,7 @@ namespace GiantBomb
                 while (true)
                 {
                     // Fetch games from GiantBomb API
-                    string url = $"/api/games/?api_key={Config.GiantBomb.APIKey}&format=json&limit=100&offset={offset}&platforms={platformId}";
+                    string url = $"/api/games/?api_key={Config.GiantBomb.APIKey}&format=json&limit=100&offset={offset}&platforms={platformId}&filter=date_last_updated:{LastUpdate}|{UpdateEndDate}";
                     var json = await GetJson<Models.GiantBombGameResponse>(url);
 
                     if (json.results == null || json.results.Count == 0)
@@ -463,95 +483,28 @@ namespace GiantBomb
             Logging.Log(Logging.LogType.Information, "GiantBomb", $"Finished downloading games for platform ID {platformId} from GiantBomb.");
         }
 
-        /// <summary>
-        /// Downloads images for platforms (and optionally games) based on stored image tags.
-        /// </summary>
-        public async Task DownloadImages()
+        private async Task ProcessImageTags(Database db, string guid, List<ImageTag> imageTags)
         {
-            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql;
-
-            // download images for each platform
-            sql = $"SELECT guid, image_tags FROM {dbName}.Platform WHERE image_tags IS NOT NULL AND image_tags != ''";
-            await _ProcessImageDatabase(db, sql);
-
-            // download images for each game
-            sql = $"SELECT guid, image_tags FROM {dbName}.Game WHERE image_tags IS NOT NULL AND image_tags != ''";
-            await _ProcessImageDatabase(db, sql);
-        }
-
-        private async Task _ProcessImageDatabase(Database db, string sql)
-        {
-            // Execute the SQL query to get the image tags
-            var imageTagsData = await db.ExecuteCMDAsync(sql);
-            if (imageTagsData.Rows.Count == 0)
+            // check if guid was last checked more than 30 days ago
+            // get the last game fetch date and time from settings
+            var lastImageFetchObj = GetTracking($"GiantBomb_LastImageFetch-{guid}", DateTime.UtcNow.AddDays(-31));
+            DateTime lastFetchDateTime = lastImageFetchObj is DateTime dtI ? dtI : DateTime.UtcNow.AddDays(-31);
+            // check if the last fetch date and time is older than the expiration time
+            if (DateTime.UtcNow - lastFetchDateTime < TimeSpan.FromDays(TimeToExpire))
             {
-                Logging.Log(Logging.LogType.Warning, "GiantBomb", "No image tags found in the database.");
-            }
-            List<ImageTag> imageTags = new List<ImageTag>();
-            foreach (DataRow row in imageTagsData.Rows)
-            {
-                var guid = Convert.ToString(row["guid"]) ?? string.Empty;
-
-                // check if guid was last checked more than 30 days ago
-                // get the last game fetch date and time from settings
-                var lastImageFetchObj = GetTracking($"GiantBomb_LastImageFetch-{guid}", DateTime.UtcNow.AddDays(-31));
-                DateTime lastFetchDateTime = lastImageFetchObj is DateTime dtI ? dtI : DateTime.UtcNow.AddDays(-31);
-                // check if the last fetch date and time is older than the expiration time
-                if (DateTime.UtcNow - lastFetchDateTime < TimeSpan.FromDays(TimeToExpire))
-                {
-                    Logging.Log(Logging.LogType.Information, "GiantBomb", $"Images for guid {guid} are up to date. No need to download.");
-                    continue;
-                }
-
-                var image_tags = Convert.ToString(row["image_tags"]) ?? string.Empty;
-                if (string.IsNullOrEmpty(guid) || string.IsNullOrEmpty(image_tags))
-                {
-                    Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Invalid guid or image_tags for row: {row}");
-                    continue;
-                }
-                var tags = _GetImageTags(guid, image_tags);
-                if (tags != null && tags.Count > 0)
-                {
-                    // start downloading images for the guid
-                    await _DownloadImages(db, guid, tags);
-                }
-
-                // download complete, update the last fetch date and time in settings
-                SetTracking($"GiantBomb_LastImageFetch-{guid}", DateTime.UtcNow);
-                Logging.Log(Logging.LogType.Information, "GiantBomb", $"Finished downloading images for guid {guid}.");
-            }
-        }
-
-        private List<ImageTag> _GetImageTags(string guid, string image_tags)
-        {
-            // Ensure that the image_tags are not null or empty
-            if (string.IsNullOrEmpty(image_tags))
-            {
-                Logging.Log(Logging.LogType.Warning, "GiantBomb", $"No image tags found for guid: {guid}");
-                return new List<ImageTag>();
+                Logging.Log(Logging.LogType.Information, "GiantBomb", $"Images for guid {guid} are up to date. No need to download.");
+                return;
             }
 
-            // Deserialise the image_tags json to a list of ImageTag objects
-            List<ImageTag> imageTags = new List<ImageTag>();
-            try
+            if (imageTags != null && imageTags.Count > 0)
             {
-                var deserTags = Newtonsoft.Json.JsonConvert.DeserializeObject<List<ImageTag>>(image_tags);
-                if (deserTags != null) imageTags = deserTags;
-            }
-            catch (Exception ex)
-            {
-                Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Error deserializing image tags for guid: {guid}. Exception: {ex.Message}", ex);
-                return new List<ImageTag>();
+                // start downloading images for the guid
+                await _DownloadImages(db, guid, imageTags);
             }
 
-            if (imageTags == null || imageTags.Count == 0)
-            {
-                Logging.Log(Logging.LogType.Information, "GiantBomb", $"No valid image tags found for guid: {guid}");
-                return new List<ImageTag>();
-            }
-
-            return imageTags;
+            // download complete, update the last fetch date and time in settings
+            SetTracking($"GiantBomb_LastImageFetch-{guid}", DateTime.UtcNow);
+            Logging.Log(Logging.LogType.Information, "GiantBomb", $"Finished downloading images for guid {guid}.");
         }
 
         private async Task _DownloadImages(Database db, string guid, List<ImageTag> image_tags)
@@ -609,7 +562,7 @@ namespace GiantBomb
             foreach (var image in images.Values)
             {
                 // delete any entries with the same guid to clear out old records
-                string deleteQuery = $"DELETE FROM {dbName}.Image WHERE guid = @guid";
+                string deleteQuery = $"DELETE FROM {dbName}.Image WHERE guid = @guid AND original_url = @original_url";
                 await db.ExecuteCMDAsync(deleteQuery, new Dictionary<string, object>
                                 {
                                     { "guid", image.guid },

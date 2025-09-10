@@ -31,7 +31,9 @@ namespace Classes.ProcessQueue
             await gbDownloader.DownloadPlatforms();
             await gbDownloader.DownloadGames();
             await gbDownloader.DownloadSubTypes<GiantBomb.Models.GiantBombUserReviewResponse, GiantBomb.Models.UserReview>("user_reviews");
-            await gbDownloader.DownloadImages();
+
+            // Update the last update time in tracking
+            GiantBomb.MetadataDownload.SetTracking("GiantBomb_LastUpdate", DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"));
 
             return null; // Assuming the method returns void, we return null here.
         }
