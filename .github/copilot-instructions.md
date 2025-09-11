@@ -166,18 +166,24 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 - Enable by supplying `gbapikey` env var (or editing config file -> `GiantBombConfiguration.APIKey`). Without a key GiantBomb tasks/endpoints remain inert.
 - Local storage: `~/.hasheous-server/Data/Metadata/GiantBomb` plus `Images/` subfolder for retrieved images.
 - DB schema: data persisted to `giantbomb` schema tables (platforms, games, images, relations) and queried via `GiantBomb.MetadataQuery` (reflection-based field selection & relationship expansion).
-- Background job: `FetchGiantBombMetadata` (platforms → games → images) scheduled every 10080 minutes (7 days) once API key present. Incremental logic uses Settings table tracking keys (e.g., `GiantBomb_LastPlatformFetch`, `GiantBomb_GameOffset-*`).
+- Background job: `FetchGiantBombMetadata` (platforms → games → sub‑types/images) scheduled every 10080 minutes (7 days) once API key present. Incremental logic now also uses a global `GiantBomb_LastUpdate` tracking key to fetch only objects whose `date_last_updated` falls within `[LastUpdate, UpdateEndDate]` (UpdateEndDate fixed at `3000-01-01`). Legacy platform/game offset & per-entity tracking keys (`GiantBomb_LastPlatformFetch`, `GiantBomb_GameOffset-*`) still apply where referenced.
 - Rate limiting: adaptive soft/hard hourly thresholds with backoff & retry (see `MetadataDownload.cs`).
 - Proxy endpoints (require `X-Client-API-Key` when client keys enforced):
-  - Singular: `GET /api/v1/MetadataProxy/GiantBomb/{datatype}/{guid}?field_list=*` (datatype: company|game|platform|image|rating|release|user_review)
-  - Collections: `GET /api/v1/MetadataProxy/GiantBomb/{datatype}s?filter=...&sort=...&limit=100&offset=0&field_list=*`
+  - Singular: `GET /api/v1/MetadataProxy/GiantBomb/{datatype}/{guid}?field_list=*` (datatype: company|game|platform|image|rating|rating_board|release|user_review)
+  - Collections: `GET /api/v1/MetadataProxy/GiantBomb/{datatype}s?filter=...&sort=...&limit=100&offset=0&field_list=*` (plural adds trailing `s`; note `rating_board` → `rating_boards`).
   - Companies plural convenience: `GET /api/v1/MetadataProxy/GiantBomb/companies`
   - Image passthrough (lazy fetch & local cache): `GET /api/v1/MetadataProxy/GiantBomb/a/uploads/<path>` (sanitized; refuses path traversal).
 - Response formats: `json` (default), `xml`, `jsonp` via `format` query parameter.
-- Adding new GiantBomb data type: extend `GiantBomb.MetadataQuery.QueryableTypes` and `GiantBombSourceMap` (table name, class type, ID column), ensure ingestion populates table, then proxy automatically supports it.
+- Adding new GiantBomb data type: extend `GiantBomb.MetadataQuery.QueryableTypes` and `GiantBombSourceMap` (table name, class type, ID column), ensure ingestion populates table, then proxy automatically supports it. Recent example: added `rating_board` mapped to `RatingBoards` table and referenced via `Rating.rating_board` (now a nested object instead of a string).
+- Incremental date filtering: Platform & Game, plus user reviews (`user_reviews`) and ratings (`game_ratings`, `rating_boards`) requests append `filter=date_last_updated:{LastUpdate}|{UpdateEndDate}`. After a successful full cycle the job sets `GiantBomb_LastUpdate` (UTC "yyyy-MM-dd HH:mm:ss"). Delete or backdate that key (in Settings) to force a wider refresh.
+- Image handling: image tag processing now occurs inline during platform ingestion (`ProcessImageTags`) and only refreshes if `GiantBomb_LastImageFetch-{guid}` is older than the configured `TimeToExpire` days (default 30). Deletion before insert is narrowed to the specific `(guid, original_url)` tuple instead of wholesale per-guid deletion.
+- Tracking helpers: `MetadataDownload.GetTracking` / `SetTracking` are now public static — reuse for new GiantBomb incremental tracking keys rather than duplicating logic.
 
 ### GiantBomb quick curl example
 `curl -H "X-Client-API-Key: <CLIENT_KEY>" "https://localhost:7157/api/v1/MetadataProxy/GiantBomb/games?filter=name:like:Mario&limit=5"`
+
+Additional example (rating boards):
+`curl -H "X-Client-API-Key: <CLIENT_KEY>" "https://localhost:7157/api/v1/MetadataProxy/GiantBomb/rating_boards?limit=10"`
 
 ## Contributing with AI
 - Keep PRs small and single-purpose. Describe intent, touched areas, and any migration/caching impact.
