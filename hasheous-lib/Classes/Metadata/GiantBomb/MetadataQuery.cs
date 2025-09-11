@@ -15,6 +15,7 @@ namespace GiantBomb
             platform,
             image,
             rating,
+            rating_board,
             release,
             user_review
         }
@@ -48,6 +49,10 @@ namespace GiantBomb
                 Type = QueryableTypes.rating,
                 TableName = "Rating",
                 ClassType = typeof(Rating) } },
+            { QueryableTypes.rating_board, new GiantBombSourceMapItem {
+                Type = QueryableTypes.rating_board,
+                TableName = "RatingBoards",
+                ClassType = typeof(RatingBoards) } },
             { QueryableTypes.release, new GiantBombSourceMapItem {
                 Type = QueryableTypes.release,
                 TableName = "Release",
