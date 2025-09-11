@@ -23,15 +23,20 @@ namespace Classes.ProcessQueue
             db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Platform), "", "name,guid");
             db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Game), "", "name,guid");
             db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Dlc), "", "name,guid");
-            db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Rating), "", "name.guid");
+            db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Rating), "", "name,guid");
+            db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.RatingBoards), "", "name,guid");
             db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Release), "", "name,guid");
             db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Review), "", "guid");
             db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.UserReview), "", "guid");
 
             await gbDownloader.DownloadPlatforms();
             await gbDownloader.DownloadGames();
-            await gbDownloader.DownloadSubTypes<GiantBomb.Models.GiantBombUserReviewResponse, GiantBomb.Models.UserReview>("user_reviews");
-            await gbDownloader.DownloadImages();
+            await gbDownloader.DownloadSubTypes<GiantBomb.Models.GiantBombUserReviewResponse, GiantBomb.Models.UserReview>("user_reviews", $"filter=date_last_updated:{gbDownloader.LastUpdate}|{gbDownloader.UpdateEndDate}");
+            await gbDownloader.DownloadSubTypes<GiantBomb.Models.GiantBombRatingBoardsResponse, GiantBomb.Models.RatingBoards>("rating_boards");
+            await gbDownloader.DownloadSubTypes<GiantBomb.Models.GiantBombRatingResponse, GiantBomb.Models.Rating>("game_ratings");
+
+            // Update the last update time in tracking
+            GiantBomb.MetadataDownload.SetTracking("GiantBomb_LastUpdate", DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"));
 
             return null; // Assuming the method returns void, we return null here.
         }
