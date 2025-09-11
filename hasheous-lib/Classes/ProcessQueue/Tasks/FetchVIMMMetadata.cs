@@ -11,8 +11,7 @@ namespace Classes.ProcessQueue
         /// <inheritdoc/>
         public List<QueueItemType> Blocks => new List<QueueItemType>
         {
-            QueueItemType.GetMissingArtwork,
-            QueueItemType.MetadataMatchSearch
+
         };
 
         /// <inheritdoc/>

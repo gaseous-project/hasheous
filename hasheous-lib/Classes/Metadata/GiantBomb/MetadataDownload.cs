@@ -114,7 +114,7 @@ namespace GiantBomb
             }
         }
 
-        private static object? GetTracking(string key, object? defaultValue = null)
+        public static object? GetTracking(string key, object? defaultValue = null)
         {
             try
             {
@@ -152,7 +152,7 @@ namespace GiantBomb
             }
         }
 
-        private static void SetTracking(string key, object value)
+        public static void SetTracking(string key, object value)
         {
             try
             {
@@ -202,6 +202,24 @@ namespace GiantBomb
         /// Age in days after which cached data will be refreshed.
         /// </summary>
         public int TimeToExpire { get; set; } = 30; // Default expiration time for cached data
+
+        /// <summary>
+        /// Last update date in "yyyy-MM-dd" format. Used for fetching incremental updates.
+        /// </summary>
+        public string LastUpdate
+        {
+            get
+            {
+                var lastUpdateObj = GetTracking("GiantBomb_LastUpdate", DateTime.Parse("1970-01-01 00:00:00"));
+                DateTime lastUpdate = lastUpdateObj is DateTime dt ? dt : DateTime.Parse("1970-01-01 00:00:00");
+                return lastUpdate.ToString("yyyy-MM-dd");
+            }
+        }
+
+        /// <summary>
+        /// GiantBomb requires an end date for it's date filter - set far in the future to ensure all updates are captured.
+        /// </summary>
+        public string UpdateEndDate { get; } = "3000-01-01";
 
         // Legacy per-minute limiter removed (MaximumRequestsPerMinute / RateLimitSleepTime / checkRequestLimit) – superseded by async sliding window limiter above.
 
@@ -270,7 +288,7 @@ namespace GiantBomb
                 while (true)
                 {
                     // Fetch platforms from GiantBomb API
-                    string url = $"/api/platforms/?api_key={Config.GiantBomb.APIKey}&format=json&limit=100&offset={offset}";
+                    string url = $"/api/platforms/?api_key={Config.GiantBomb.APIKey}&format=json&limit=100&offset={offset}&filter=date_last_updated:{LastUpdate}|{UpdateEndDate}";
                     var json = await Task.Run(() => GetJson<Models.GiantBombPlatformResponse>(url));
 
                     if (json.results == null || json.results.Count == 0)
@@ -285,7 +303,9 @@ namespace GiantBomb
                         if (platform is GiantBomb.Models.Platform platformDict)
                         {
                             // Assuming you have a Database instance `db` and an object `myObj`:
-                            await StoreObjectWithSubclasses(platform, db, dbName, platform.id);
+                            await Classes.Metadata.MetadataStorage.StoreObjectWithSubclasses(platform, db, dbName, platform.id);
+
+                            await ProcessImageTags(db, platform.guid, platform.image_tags);
 
                             // Log the platform processing
                             Logging.Log(Logging.LogType.Information, "GiantBomb", $"Processed platform: {platformDict.name}");
@@ -415,7 +435,7 @@ namespace GiantBomb
                 while (true)
                 {
                     // Fetch games from GiantBomb API
-                    string url = $"/api/games/?api_key={Config.GiantBomb.APIKey}&format=json&limit=100&offset={offset}&platforms={platformId}";
+                    string url = $"/api/games/?api_key={Config.GiantBomb.APIKey}&format=json&limit=100&offset={offset}&platforms={platformId}&filter=date_last_updated:{LastUpdate}|{UpdateEndDate}";
                     var json = await GetJson<Models.GiantBombGameResponse>(url);
 
                     if (json.results == null || json.results.Count == 0)
@@ -432,7 +452,7 @@ namespace GiantBomb
                         Logging.Log(Logging.LogType.Information, "GiantBomb", $"Found game: {game.name}");
                         if (game is GiantBomb.Models.Game gameDict)
                         {
-                            await StoreObjectWithSubclasses(gameDict, db, dbName, game.id);
+                            await Classes.Metadata.MetadataStorage.StoreObjectWithSubclasses(gameDict, db, dbName, game.id);
                         }
                     }
 
@@ -463,95 +483,28 @@ namespace GiantBomb
             Logging.Log(Logging.LogType.Information, "GiantBomb", $"Finished downloading games for platform ID {platformId} from GiantBomb.");
         }
 
-        /// <summary>
-        /// Downloads images for platforms (and optionally games) based on stored image tags.
-        /// </summary>
-        public async Task DownloadImages()
+        private async Task ProcessImageTags(Database db, string guid, List<ImageTag> imageTags)
         {
-            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql;
-
-            // download images for each platform
-            sql = $"SELECT guid, image_tags FROM {dbName}.Platform WHERE image_tags IS NOT NULL AND image_tags != ''";
-            await _ProcessImageDatabase(db, sql);
-
-            // download images for each game
-            sql = $"SELECT guid, image_tags FROM {dbName}.Game WHERE image_tags IS NOT NULL AND image_tags != ''";
-            await _ProcessImageDatabase(db, sql);
-        }
-
-        private async Task _ProcessImageDatabase(Database db, string sql)
-        {
-            // Execute the SQL query to get the image tags
-            var imageTagsData = await db.ExecuteCMDAsync(sql);
-            if (imageTagsData.Rows.Count == 0)
+            // check if guid was last checked more than 30 days ago
+            // get the last game fetch date and time from settings
+            var lastImageFetchObj = GetTracking($"GiantBomb_LastImageFetch-{guid}", DateTime.UtcNow.AddDays(-31));
+            DateTime lastFetchDateTime = lastImageFetchObj is DateTime dtI ? dtI : DateTime.UtcNow.AddDays(-31);
+            // check if the last fetch date and time is older than the expiration time
+            if (DateTime.UtcNow - lastFetchDateTime < TimeSpan.FromDays(TimeToExpire))
             {
-                Logging.Log(Logging.LogType.Warning, "GiantBomb", "No image tags found in the database.");
-            }
-            List<ImageTag> imageTags = new List<ImageTag>();
-            foreach (DataRow row in imageTagsData.Rows)
-            {
-                var guid = Convert.ToString(row["guid"]) ?? string.Empty;
-
-                // check if guid was last checked more than 30 days ago
-                // get the last game fetch date and time from settings
-                var lastImageFetchObj = GetTracking($"GiantBomb_LastImageFetch-{guid}", DateTime.UtcNow.AddDays(-31));
-                DateTime lastFetchDateTime = lastImageFetchObj is DateTime dtI ? dtI : DateTime.UtcNow.AddDays(-31);
-                // check if the last fetch date and time is older than the expiration time
-                if (DateTime.UtcNow - lastFetchDateTime < TimeSpan.FromDays(TimeToExpire))
-                {
-                    Logging.Log(Logging.LogType.Information, "GiantBomb", $"Images for guid {guid} are up to date. No need to download.");
-                    continue;
-                }
-
-                var image_tags = Convert.ToString(row["image_tags"]) ?? string.Empty;
-                if (string.IsNullOrEmpty(guid) || string.IsNullOrEmpty(image_tags))
-                {
-                    Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Invalid guid or image_tags for row: {row}");
-                    continue;
-                }
-                var tags = _GetImageTags(guid, image_tags);
-                if (tags != null && tags.Count > 0)
-                {
-                    // start downloading images for the guid
-                    await _DownloadImages(db, guid, tags);
-                }
-
-                // download complete, update the last fetch date and time in settings
-                SetTracking($"GiantBomb_LastImageFetch-{guid}", DateTime.UtcNow);
-                Logging.Log(Logging.LogType.Information, "GiantBomb", $"Finished downloading images for guid {guid}.");
-            }
-        }
-
-        private List<ImageTag> _GetImageTags(string guid, string image_tags)
-        {
-            // Ensure that the image_tags are not null or empty
-            if (string.IsNullOrEmpty(image_tags))
-            {
-                Logging.Log(Logging.LogType.Warning, "GiantBomb", $"No image tags found for guid: {guid}");
-                return new List<ImageTag>();
+                Logging.Log(Logging.LogType.Information, "GiantBomb", $"Images for guid {guid} are up to date. No need to download.");
+                return;
             }
 
-            // Deserialise the image_tags json to a list of ImageTag objects
-            List<ImageTag> imageTags = new List<ImageTag>();
-            try
+            if (imageTags != null && imageTags.Count > 0)
             {
-                var deserTags = Newtonsoft.Json.JsonConvert.DeserializeObject<List<ImageTag>>(image_tags);
-                if (deserTags != null) imageTags = deserTags;
-            }
-            catch (Exception ex)
-            {
-                Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Error deserializing image tags for guid: {guid}. Exception: {ex.Message}", ex);
-                return new List<ImageTag>();
+                // start downloading images for the guid
+                await _DownloadImages(db, guid, imageTags);
             }
 
-            if (imageTags == null || imageTags.Count == 0)
-            {
-                Logging.Log(Logging.LogType.Information, "GiantBomb", $"No valid image tags found for guid: {guid}");
-                return new List<ImageTag>();
-            }
-
-            return imageTags;
+            // download complete, update the last fetch date and time in settings
+            SetTracking($"GiantBomb_LastImageFetch-{guid}", DateTime.UtcNow);
+            Logging.Log(Logging.LogType.Information, "GiantBomb", $"Finished downloading images for guid {guid}.");
         }
 
         private async Task _DownloadImages(Database db, string guid, List<ImageTag> image_tags)
@@ -609,7 +562,7 @@ namespace GiantBomb
             foreach (var image in images.Values)
             {
                 // delete any entries with the same guid to clear out old records
-                string deleteQuery = $"DELETE FROM {dbName}.Image WHERE guid = @guid";
+                string deleteQuery = $"DELETE FROM {dbName}.Image WHERE guid = @guid AND original_url = @original_url";
                 await db.ExecuteCMDAsync(deleteQuery, new Dictionary<string, object>
                                 {
                                     { "guid", image.guid },
@@ -682,7 +635,7 @@ namespace GiantBomb
                         var idProp = apiObject.GetType().GetProperty("id") ?? apiObject.GetType().GetProperty("Id");
                         var idValue = idProp?.GetValue(apiObject);
                         Logging.Log(Logging.LogType.Information, "GiantBomb", $"Found {typeName}: {idValue}");
-                        await StoreObjectWithSubclasses(apiObject, db, dbName, idValue as long?);
+                        await Classes.Metadata.MetadataStorage.StoreObjectWithSubclasses(apiObject, db, dbName, idValue as long?);
                     }
 
                     SetTracking($"{settingName}Offset", offset);
@@ -819,157 +772,6 @@ namespace GiantBomb
                     throw new Exception($"Unexpected HTTP {status}: {response.ReasonPhrase}");
                 }
             }
-        }
-
-        /// <summary>
-        /// Stores an object and its subclasses in the database.
-        /// The table name is the type name. Subclasses are stored in their own tables and linked by Id.
-        /// Subclasses without an Id property will be assigned one by the database (auto-increment).
-        /// </summary>
-        private async Task StoreObjectWithSubclasses(object obj, Database db, string dbName, long? id = null)
-        {
-            if (obj == null) return;
-
-            Type objType = obj.GetType();
-            string tableName = objType.Name;
-
-            var properties = objType.GetProperties();
-            var parameters = new Dictionary<string, object>();
-            object? idValue = null;
-
-            foreach (var prop in properties)
-            {
-                var value = prop.GetValue(obj);
-
-                // If property is a class (not string), treat as subclass
-                if (value != null && prop.PropertyType.IsClass && prop.PropertyType != typeof(string))
-                {
-                    // check if the property type is a collection or array
-                    if (prop.PropertyType.IsGenericType && prop.PropertyType.GetInterfaces().Any(i =>
-                        i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEnumerable<>)) && prop.PropertyType != typeof(string))
-                    {
-                        // check if subclassess in the collection have an Id property
-                        var subIdProp = prop.PropertyType.GetGenericArguments()[0].GetProperty("id") ?? prop.PropertyType.GetGenericArguments()[0].GetProperty("Id");
-                        if (subIdProp == null)
-                        {
-                            // serialize the collection to JSON if no Id property exists
-                            string jsonValue = Newtonsoft.Json.JsonConvert.SerializeObject(value, new Newtonsoft.Json.JsonSerializerSettings
-                            {
-                                NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore,
-                                MaxDepth = 30
-                            });
-                            parameters[prop.Name] = jsonValue;
-                        }
-                        else
-                        {
-                            // make sure the relationship table exists
-                            string relationshipTableName = $"Relation_{tableName}_{prop.Name}";
-                            string createTableSql = $@"CREATE TABLE IF NOT EXISTS {dbName}.{relationshipTableName} (
-                                {tableName}_id BIGINT NOT NULL,
-                                {prop.Name}_id BIGINT NOT NULL,
-                                PRIMARY KEY ({tableName}_id, {prop.Name}_id),
-                                INDEX idx_{tableName}_id ({tableName}_id),
-                                INDEX idx_{prop.Name}_id ({prop.Name}_id)
-                            );";
-                            await db.ExecuteCMDAsync(createTableSql, new Dictionary<string, object>());
-
-                            // remove all existing relationships for this object
-                            string deleteSql = $"DELETE FROM {dbName}.{relationshipTableName} WHERE {tableName}_id = @id";
-                            await db.ExecuteCMDAsync(deleteSql, new Dictionary<string, object> { { "id", id ?? (object)DBNull.Value } });
-                            await db.ExecuteCMDAsync(deleteSql, new Dictionary<string, object> { { "id", id ?? (object)DBNull.Value } });
-
-                            // store a JSON array of Ids for the collection
-                            var ids = new List<object>();
-                            foreach (var item in (IEnumerable<object>)value)
-                            {
-                                var subId = subIdProp.GetValue(item);
-                                ids.Add(subId ?? DBNull.Value);
-
-                                // insert the relationship into the relationship table
-                                if (subId != null)
-                                {
-                                    string insertSql = $"INSERT INTO {dbName}.{relationshipTableName} ({tableName}_id, {prop.Name}_id) VALUES (@{tableName}_id, @{prop.Name}_id)";
-                                    await db.ExecuteCMDAsync(insertSql, new Dictionary<string, object>
-                                    {
-                                        { $"{tableName}_id", id ?? (object)DBNull.Value },
-                                        { $"{prop.Name}_id", subId }
-                                    });
-                                }
-                            }
-
-                            // store the JSON array of Ids
-                            string jsonArray = Newtonsoft.Json.JsonConvert.SerializeObject(ids, new Newtonsoft.Json.JsonSerializerSettings
-                            {
-                                NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore,
-                                MaxDepth = 30
-                            });
-                            parameters[prop.Name] = jsonArray;
-                        }
-                    }
-                    else
-                    {
-
-                        var subIdProp = prop.PropertyType.GetProperty("id") ?? prop.PropertyType.GetProperty("Id");
-                        if (subIdProp != null)
-                        {
-                            await StoreObjectWithSubclasses(value, db, dbName);
-
-                            var subId = subIdProp.GetValue(value);
-                            parameters[prop.Name] = subId ?? DBNull.Value;
-                        }
-                        else
-                        {
-                            // serialize the object to JSON if no Id property exists
-                            string jsonValue = Newtonsoft.Json.JsonConvert.SerializeObject(value, new Newtonsoft.Json.JsonSerializerSettings
-                            {
-                                NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore,
-                                MaxDepth = 30
-                            });
-                            parameters[prop.Name] = jsonValue;
-                        }
-                    }
-                }
-                else
-                {
-                    parameters[prop.Name] = value ?? DBNull.Value;
-                    if (prop.Name.Equals("id", StringComparison.OrdinalIgnoreCase) || prop.Name.Equals("Id", StringComparison.OrdinalIgnoreCase))
-                    {
-                        idValue = value ?? DBNull.Value;
-                    }
-                }
-            }
-
-            // Check if object exists (by Id)
-            bool exists = false;
-            if (idValue != null)
-            {
-                string checkSql = $"SELECT `id` FROM {dbName}.{tableName} WHERE id = @id";
-                var result = await db.ExecuteCMDAsync(checkSql, new Dictionary<string, object> { { "id", idValue } });
-                exists = result.Rows.Count > 0;
-            }
-
-            // Build SQL
-            string sql;
-            if (exists)
-            {
-                // Update
-                var setClause = string.Join(", ", parameters.Keys.Where(k => !k.Equals("id", StringComparison.OrdinalIgnoreCase)).Select(k => $"`{k}` = @{k}"));
-                sql = $"UPDATE {dbName}.{tableName} SET {setClause} WHERE id = @id";
-
-                await db.ExecuteCMDAsync(sql, parameters);
-            }
-            else
-            {
-                // Insert
-                var cols = string.Join(", ", parameters.Keys.Select(k => $"`{k}`"));
-                var vals = string.Join(", ", parameters.Keys.Select(k => $"@{k}"));
-                sql = $"INSERT INTO {dbName}.{tableName} ({cols}) VALUES ({vals});";
-
-                // Execute insert
-                var result = await db.ExecuteCMDAsync(sql, parameters);
-            }
-
-            return;
         }
     }
 }

@@ -83,7 +83,7 @@ namespace Classes
 
 					for (int i = 1000; i < 10000; i++)
 					{
-						string resourceName = "hasheous.Schema.hasheous-" + i + ".sql";
+						string resourceName = "hasheous_lib.Schema.hasheous-" + i + ".sql";
 						string dbScript = "";
 
 						string[] resources = Assembly.GetExecutingAssembly().GetManifestResourceNames();
