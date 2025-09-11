@@ -210,8 +210,8 @@ namespace GiantBomb
         {
             get
             {
-                var lastUpdateObj = GetTracking("GiantBomb_LastUpdate", DateTime.UtcNow.AddDays(-31));
-                DateTime lastUpdate = lastUpdateObj is DateTime dt ? dt : DateTime.UtcNow.AddDays(-31);
+                var lastUpdateObj = GetTracking("GiantBomb_LastUpdate", DateTime.Parse("1970-01-01 00:00:00"));
+                DateTime lastUpdate = lastUpdateObj is DateTime dt ? dt : DateTime.Parse("1970-01-01 00:00:00");
                 return lastUpdate.ToString("yyyy-MM-dd");
             }
         }
@@ -219,7 +219,7 @@ namespace GiantBomb
         /// <summary>
         /// GiantBomb requires an end date for it's date filter - set far in the future to ensure all updates are captured.
         /// </summary>
-        private string UpdateEndDate { get; } = "3000-01-01";
+        public string UpdateEndDate { get; } = "3000-01-01";
 
         // Legacy per-minute limiter removed (MaximumRequestsPerMinute / RateLimitSleepTime / checkRequestLimit) – superseded by async sliding window limiter above.
 

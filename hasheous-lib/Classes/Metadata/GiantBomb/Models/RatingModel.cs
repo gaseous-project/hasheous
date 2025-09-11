@@ -12,7 +12,7 @@ namespace GiantBomb.Models
         public long id { get; set; }
         public string image { get; set; }
         public string name { get; set; }
-        public string rating_board { get; set; }
+        public RatingBoards rating_board { get; set; }
         public string site_detail_url { get; set; }
     }
 }
