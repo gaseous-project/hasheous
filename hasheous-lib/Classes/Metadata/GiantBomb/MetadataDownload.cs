@@ -289,34 +289,42 @@ namespace GiantBomb
                 {
                     // Fetch platforms from GiantBomb API
                     string url = $"/api/platforms/?api_key={Config.GiantBomb.APIKey}&format=json&limit=100&offset={offset}&filter=date_last_updated:{LastUpdate}|{UpdateEndDate}";
-                    var json = await Task.Run(() => GetJson<Models.GiantBombPlatformResponse>(url));
-
-                    if (json.results == null || json.results.Count == 0)
+                    try
                     {
-                        // No more platforms to fetch, exit the loop
-                        break;
-                    }
+                        var json = await Task.Run(() => GetJson<Models.GiantBombPlatformResponse>(url));
 
-                    // Process each platform
-                    foreach (var platform in json.results)
-                    {
-                        if (platform is GiantBomb.Models.Platform platformDict)
+                        if (json.results == null || json.results.Count == 0)
                         {
-                            // Assuming you have a Database instance `db` and an object `myObj`:
-                            await Classes.Metadata.MetadataStorage.StoreObjectWithSubclasses(platform, db, dbName, platform.id);
+                            // No more platforms to fetch, exit the loop
+                            break;
+                        }
 
-                            await ProcessImageTags(db, platform.guid, platform.image_tags);
+                        // Process each platform
+                        foreach (var platform in json.results)
+                        {
+                            if (platform is GiantBomb.Models.Platform platformDict)
+                            {
+                                // Assuming you have a Database instance `db` and an object `myObj`:
+                                await Classes.Metadata.MetadataStorage.StoreObjectWithSubclasses(platform, db, dbName, platform.id);
 
-                            // Log the platform processing
-                            Logging.Log(Logging.LogType.Information, "GiantBomb", $"Processed platform: {platformDict.name}");
+                                await ProcessImageTags(db, platform.guid, platform.image_tags);
+
+                                // Log the platform processing
+                                Logging.Log(Logging.LogType.Information, "GiantBomb", $"Processed platform: {platformDict.name}");
+                            }
+                        }
+
+                        // cheak if there are more platforms to fetch
+                        if (json.results.Count < 100)
+                        {
+                            // If the count is less than 100, we have fetched all platforms
+                            break;
                         }
                     }
-
-                    // cheak if there are more platforms to fetch
-                    if (json.results.Count < 100)
+                    catch (Exception ex)
                     {
-                        // If the count is less than 100, we have fetched all platforms
-                        break;
+                        Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Error fetching platforms: {ex.Message}", ex);
+                        break; // Exit the loop on error
                     }
 
                     // Increment offset for the next batch
@@ -436,33 +444,41 @@ namespace GiantBomb
                 {
                     // Fetch games from GiantBomb API
                     string url = $"/api/games/?api_key={Config.GiantBomb.APIKey}&format=json&limit=100&offset={offset}&platforms={platformId}&filter=date_last_updated:{LastUpdate}|{UpdateEndDate}";
-                    var json = await GetJson<Models.GiantBombGameResponse>(url);
-
-                    if (json.results == null || json.results.Count == 0)
+                    try
                     {
-                        // No more games to fetch, exit the loop
-                        break;
-                    }
+                        var json = await GetJson<Models.GiantBombGameResponse>(url);
 
-                    // Process each game
-                    foreach (var game in json.results)
-                    {
-                        // Here you can process the game as needed
-                        // For example, you can log the game name or store it in a list
-                        Logging.Log(Logging.LogType.Information, "GiantBomb", $"Found game: {game.name}");
-                        if (game is GiantBomb.Models.Game gameDict)
+                        if (json.results == null || json.results.Count == 0)
                         {
-                            await Classes.Metadata.MetadataStorage.StoreObjectWithSubclasses(gameDict, db, dbName, game.id);
+                            // No more games to fetch, exit the loop
+                            break;
+                        }
+
+                        // Process each game
+                        foreach (var game in json.results)
+                        {
+                            // Here you can process the game as needed
+                            // For example, you can log the game name or store it in a list
+                            Logging.Log(Logging.LogType.Information, "GiantBomb", $"Found game: {game.name}");
+                            if (game is GiantBomb.Models.Game gameDict)
+                            {
+                                await Classes.Metadata.MetadataStorage.StoreObjectWithSubclasses(gameDict, db, dbName, game.id);
+                            }
+                        }
+
+                        // Store the offset in settings for the next batch
+                        SetTracking($"GiantBomb_GameOffset-{platformId}", offset);
+
+                        // Check if there are more games to fetch
+                        if (json.results.Count < 100)
+                        {
+                            // If the count is less than 100, we have fetched all games
+                            break;
                         }
                     }
-
-                    // Store the offset in settings for the next batch
-                    SetTracking($"GiantBomb_GameOffset-{platformId}", offset);
-
-                    // Check if there are more games to fetch
-                    if (json.results.Count < 100)
+                    catch (Exception ex)
                     {
-                        // If the count is less than 100, we have fetched all games
+                        Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Error downloading games for platform ID {platformId}: {ex.Message}", ex);
                         break;
                     }
 
@@ -518,41 +534,49 @@ namespace GiantBomb
                 while (true)
                 {
                     string imageTagUrl = $"/api/images/{guid}/?api_key={Config.GiantBomb.APIKey}&format=json&limit=100&offset={offset}&filter=image_tag:{imageTag.name}";
-                    var imageJson = await GetJson<Models.GiantBombImageResponse>(imageTagUrl);
-
-                    if (imageJson == null || imageJson.results == null || imageJson.results.Count == 0)
+                    try
                     {
-                        // No more images to fetch, exit the loop
-                        Logging.Log(Logging.LogType.Information, "GiantBomb", $"No more images found for guid: {guid} with image tag: {imageTag.name}");
-                        break;
-                    }
+                        var imageJson = await GetJson<Models.GiantBombImageResponse>(imageTagUrl);
 
-                    if (imageJson.results != null && imageJson.results.Count > 0)
-                    {
-                        foreach (var image in imageJson.results)
+                        if (imageJson == null || imageJson.results == null || imageJson.results.Count == 0)
                         {
-                            image.guid = guid; // Set the guid for the image
-
-                            // Check if the image already exists in the dictionary
-                            if (!images.ContainsKey(image.original_url))
-                            {
-                                images[image.original_url] = image; // Add the image to the dictionary
-                            }
-
-                            // get the image from the dictionary
-                            var existingImage = images[image.original_url];
-                            // if the existing tags are blank, use the current one
-                            if (string.IsNullOrEmpty(existingImage.image_tags))
-                            {
-                                existingImage.image_tags = imageTag.name; // Set the image tag
-                            }
-                            else if (!existingImage.image_tags.Contains(imageTag.name))
-                            {
-                                existingImage.image_tags += $",{imageTag.name}"; // Append the image tag
-                            }
-                            // write the image to the dictionary
-                            images[image.original_url] = existingImage; // Update the image in the dictionary
+                            // No more images to fetch, exit the loop
+                            Logging.Log(Logging.LogType.Information, "GiantBomb", $"No more images found for guid: {guid} with image tag: {imageTag.name}");
+                            break;
                         }
+
+                        if (imageJson.results != null && imageJson.results.Count > 0)
+                        {
+                            foreach (var image in imageJson.results)
+                            {
+                                image.guid = guid; // Set the guid for the image
+
+                                // Check if the image already exists in the dictionary
+                                if (!images.ContainsKey(image.original_url))
+                                {
+                                    images[image.original_url] = image; // Add the image to the dictionary
+                                }
+
+                                // get the image from the dictionary
+                                var existingImage = images[image.original_url];
+                                // if the existing tags are blank, use the current one
+                                if (string.IsNullOrEmpty(existingImage.image_tags))
+                                {
+                                    existingImage.image_tags = imageTag.name; // Set the image tag
+                                }
+                                else if (!existingImage.image_tags.Contains(imageTag.name))
+                                {
+                                    existingImage.image_tags += $",{imageTag.name}"; // Append the image tag
+                                }
+                                // write the image to the dictionary
+                                images[image.original_url] = existingImage; // Update the image in the dictionary
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Error downloading images for guid {guid} with image tag {imageTag.name}: {ex.Message}", ex);
+                        break;
                     }
 
                     offset += 100;
@@ -623,24 +647,32 @@ namespace GiantBomb
                 while (true)
                 {
                     string url = $"/api/{endpoint}/?api_key={Config.GiantBomb.APIKey}&format=json&limit=100&offset={offset}{(string.IsNullOrEmpty(query) ? string.Empty : $"&filter={query}")}";
-                    var json = await GetJson<TResponse>(url);
-                    var resultsProp = typeof(TResponse).GetProperty("results");
-                    var results = resultsProp?.GetValue(json) as IEnumerable<object>;
-                    var resultsList = results?.Cast<object>().ToList();
-                    if (resultsList == null || resultsList.Count == 0)
-                        break;
-
-                    foreach (var apiObject in resultsList)
+                    try
                     {
-                        var idProp = apiObject.GetType().GetProperty("id") ?? apiObject.GetType().GetProperty("Id");
-                        var idValue = idProp?.GetValue(apiObject);
-                        Logging.Log(Logging.LogType.Information, "GiantBomb", $"Found {typeName}: {idValue}");
-                        await Classes.Metadata.MetadataStorage.StoreObjectWithSubclasses(apiObject, db, dbName, idValue as long?);
-                    }
+                        var json = await GetJson<TResponse>(url);
+                        var resultsProp = typeof(TResponse).GetProperty("results");
+                        var results = resultsProp?.GetValue(json) as IEnumerable<object>;
+                        var resultsList = results?.Cast<object>().ToList();
+                        if (resultsList == null || resultsList.Count == 0)
+                            break;
 
-                    SetTracking($"{settingName}Offset", offset);
-                    if (resultsList.Count < 100)
+                        foreach (var apiObject in resultsList)
+                        {
+                            var idProp = apiObject.GetType().GetProperty("id") ?? apiObject.GetType().GetProperty("Id");
+                            var idValue = idProp?.GetValue(apiObject);
+                            Logging.Log(Logging.LogType.Information, "GiantBomb", $"Found {typeName}: {idValue}");
+                            await Classes.Metadata.MetadataStorage.StoreObjectWithSubclasses(apiObject, db, dbName, idValue as long?);
+                        }
+
+                        SetTracking($"{settingName}Offset", offset);
+                        if (resultsList.Count < 100)
+                            break;
+                    }
+                    catch (Exception ex)
+                    {
+                        Logging.Log(Logging.LogType.Warning, "GiantBomb", $"Error downloading {typeName}: {ex.Message}", ex);
                         break;
+                    }
                     offset += 100;
                     await Task.Delay(10000); // pacing
                 }
