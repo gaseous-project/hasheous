@@ -1091,6 +1091,30 @@ namespace hasheous_server.Controllers.v1_0
             return await GetGiantBombResponse_List(GiantBomb.MetadataQuery.QueryableTypes.company, filter, sort, limit, offset, field_list, format);
         }
 
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(typeof(GiantBomb.Models.GiantBombGenericResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [Route("GiantBomb/images/{guid}")]
+        public async Task<IActionResult> GetGiantBombResponse_List_Images(string guid, string? filter = null, string? sort = null, int limit = 100, int offset = 0, string field_list = "*", GiantBomb.MetadataQuery.GiantBombReturnTypes format = GiantBomb.MetadataQuery.GiantBombReturnTypes.json)
+        {
+            // Validate input parameters
+            if (limit <= 0 || offset < 0)
+            {
+                return BadRequest("Invalid limit or offset.");
+            }
+
+            // Search for metadata
+            GiantBomb.Models.GiantBombGenericResponse response = GiantBomb.MetadataQuery.SearchForMetadata(GiantBomb.MetadataQuery.QueryableTypes.image, $"guid:{guid},{filter}", field_list, sort, limit, offset);
+
+            if (response.results == null || response.results.Count == 0)
+            {
+                return NotFound(new Dictionary<string, string> { { "Error", "No games found matching the search criteria." } });
+            }
+
+            return Ok(response);
+        }
+
         private IActionResult FormatOutput(GiantBomb.Models.GiantBombGenericResponse response, GiantBomb.MetadataQuery.GiantBombReturnTypes format)
         {
             // return the response in the requested format xml, json, or jsonp

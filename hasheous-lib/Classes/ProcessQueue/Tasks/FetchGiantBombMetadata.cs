@@ -18,7 +18,7 @@ namespace Classes.ProcessQueue
 
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Company), "", "name");
-            db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Image), "guid,original_url");
+            db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Image), "guid,original_url,image_tags");
             db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.ImageTag));
             db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Platform), "", "name,guid");
             db.BuildTableFromType(gbDownloader.dbName, "", typeof(GiantBomb.Models.Game), "", "name,guid");
