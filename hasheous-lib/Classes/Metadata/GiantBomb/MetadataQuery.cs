@@ -253,6 +253,10 @@ namespace GiantBomb
                         throw new ArgumentException($"Invalid filter format '{part}'. Expected format is 'field:value'.");
                     }
                     var field = fieldValue[0].Trim();
+                    if (field == "image_tag")
+                    {
+                        field = "image_tags"; // special case for image_tags field
+                    }
                     if (!validFields.Contains(field))
                     {
                         throw new ArgumentException($"Invalid filter field '{field}' specified for type '{dataType}'.");
@@ -309,7 +313,16 @@ namespace GiantBomb
                     first = false;
                     var fieldValue = item.Split(':', 2);
                     var field = fieldValue[0].Trim();
+                    if (field == "image_tag")
+                    {
+                        field = "image_tags"; // special case for image_tags field
+                    }
                     var value = fieldValue[1].Trim();
+                    // Remove any HTTP URL encoding from the filter value
+                    if (!string.IsNullOrEmpty(value))
+                    {
+                        value = System.Net.WebUtility.UrlDecode(value);
+                    }
 
                     if (value.Contains('|'))
                     {
@@ -331,8 +344,18 @@ namespace GiantBomb
                     else
                     {
                         // Single value filter
-                        sql.Append($"`{field}` = @filter_{field}");
-                        parameters.Add($"@filter_{field}", value);
+                        if (field == "image_tags")
+                        {
+                            // search is a LIKE match
+                            sql.Append($"`{field}` LIKE @filter_{field}");
+                            parameters.Add($"@filter_{field}", $"%{value}%");
+                        }
+                        else
+                        {
+                            // exact match
+                            sql.Append($"`{field}` = @filter_{field}");
+                            parameters.Add($"@filter_{field}", value);
+                        }
                     }
                 }
             }
