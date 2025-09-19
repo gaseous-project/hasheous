@@ -463,6 +463,8 @@ namespace GiantBomb
                             if (game is GiantBomb.Models.Game gameDict)
                             {
                                 await Classes.Metadata.MetadataStorage.StoreObjectWithSubclasses(gameDict, db, dbName, game.id);
+
+                                await ProcessImageTags(db, game.guid, game.image_tags);
                             }
                         }
 
