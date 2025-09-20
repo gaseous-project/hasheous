@@ -123,7 +123,9 @@ namespace Classes.Insights
             string sql;
             Dictionary<string, object> dbDict = new Dictionary<string, object>
             {
-                { "@appId", appId }
+                { "@appId", appId },
+                { "@startdate", DateTime.UtcNow.AddDays(-30) },
+                { "@enddate", DateTime.UtcNow  }
             };
 
             string appWhereClause = "";
@@ -135,114 +137,106 @@ namespace Classes.Insights
             // get unique visitors for the last 30 days
             sql = @"
                 SELECT 
-                    COUNT(DISTINCT remote_ip) AS unique_visitors
+                    COUNT(DISTINCT remote_ip) AS unique_visitors,
+                    COUNT(*) AS total_requests,
+                    AVG(execution_time_ms) AS average_response_time
                 FROM
                     Insights_API_Requests
                 WHERE
-                    event_datetime >= NOW() - INTERVAL 30 DAY
+                    event_datetime >= @startdate AND event_datetime <= @enddate
                         " + appWhereClause + ";";
-            DataTable uniqueVisitorsTable = await db.ExecuteCMDAsync(sql, dbDict);
+            DataTable uniqueVisitorsTable = await db.ExecuteCMDAsync(sql, dbDict, 90);
             if (uniqueVisitorsTable.Rows.Count > 0)
             {
                 report["unique_visitors"] = uniqueVisitorsTable.Rows[0]["unique_visitors"];
+                report["total_requests"] = uniqueVisitorsTable.Rows[0]["total_requests"];
+                report["average_response_time"] = uniqueVisitorsTable.Rows[0]["average_response_time"];
             }
             else
             {
                 report["unique_visitors"] = 0;
+                report["total_requests"] = 0;
+                report["average_response_time"] = 0;
+            }
+
+            // load countries into a dictionary for mapping
+            sql = "SELECT Code, Value FROM Country;";
+            DataTable countryTable = await db.ExecuteCMDAsync(sql);
+            Dictionary<string, string> countryDict = new Dictionary<string, string>();
+            foreach (DataRow row in countryTable.Rows)
+            {
+                countryDict[row["Code"].ToString() ?? ""] = row["Value"].ToString() ?? "";
             }
 
             // get unique visitors per country for the last 30 days
             sql = @"
                 SELECT 
-                    CASE
-                        WHEN Country.Value IS NULL THEN Insights_API_Requests.country
-                        ELSE Country.Value
-                    END AS Country,
+                    country,
                     COUNT(DISTINCT remote_ip) AS unique_visitors
                 FROM
                     Insights_API_Requests
-                        LEFT JOIN
-                    Country ON Insights_API_Requests.country = Country.Code
                 WHERE
-                    event_datetime >= NOW() - INTERVAL 30 DAY
+                    event_datetime >= @startdate AND event_datetime <= @enddate
                         " + appWhereClause + @"
                 GROUP BY country
                 ORDER BY unique_visitors DESC LIMIT 5;";
-            DataTable uniqueVisitorsPerCountryTable = await db.ExecuteCMDAsync(sql, dbDict);
+            DataTable uniqueVisitorsPerCountryTable = await db.ExecuteCMDAsync(sql, dbDict, 90);
             List<Dictionary<string, object>> uniqueVisitorsPerCountry = new List<Dictionary<string, object>>();
             foreach (DataRow row in uniqueVisitorsPerCountryTable.Rows)
             {
+                string countryName = row["country"].ToString() ?? "Unknown";
+                if (countryDict.ContainsKey(countryName))
+                {
+                    countryName = countryDict[countryName];
+                }
+                else
+                {
+                    countryName = "Unknown";
+                }
+
                 uniqueVisitorsPerCountry.Add(new Dictionary<string, object>
                 {
-                    { "country", row["country"] },
+                    { "country", countryName },
                     { "unique_visitors", row["unique_visitors"] }
                 });
             }
             report["unique_visitors_per_country"] = uniqueVisitorsPerCountry;
 
-            // get total requests for the last 30 days
-            sql = @"
+            if (appId > 0)
+            {
+                // get unique visitors of each client api key for the last 30 days
+                sql = @"
                 SELECT 
-                    COUNT(*) AS total_requests
+                    ClientAPIKeys.`Name`, apidata.unique_visitors
                 FROM
-                    Insights_API_Requests
-                WHERE
-                    event_datetime >= NOW() - INTERVAL 30 DAY
-                        " + appWhereClause + @";";
-            DataTable totalRequestsTable = await db.ExecuteCMDAsync(sql, dbDict);
-            if (totalRequestsTable.Rows.Count > 0)
-            {
-                report["total_requests"] = totalRequestsTable.Rows[0]["total_requests"];
-            }
-            else
-            {
-                report["total_requests"] = 0;
-            }
-
-            // get average response time
-            sql = @"
-                SELECT 
-                    AVG(execution_time_ms) AS average_response_time
-                FROM
-                    Insights_API_Requests
-                WHERE
-                    event_datetime >= NOW() - INTERVAL 30 DAY
-                        " + appWhereClause + @";";
-            DataTable averageResponseTimeTable = await db.ExecuteCMDAsync(sql, dbDict);
-            if (averageResponseTimeTable.Rows.Count > 0)
-            {
-                report["average_response_time"] = averageResponseTimeTable.Rows[0]["average_response_time"];
-            }
-            else
-            {
-                report["average_response_time"] = 0;
-            }
-
-            // get unique visitors of each client api key for the last 30 days
-            sql = @"
-                SELECT 
-                    ClientAPIKeys.Name AS Country,
-                    COUNT(DISTINCT remote_ip) AS unique_visitors
-                FROM
-                    Insights_API_Requests
-                JOIN
-                    ClientAPIKeys ON Insights_API_Requests.client_apikey_id = ClientAPIKeys.ClientIdIndex AND ClientAPIKeys.DataObjectId = @appId
-                WHERE
-                    event_datetime >= NOW() - INTERVAL 30 DAY
-                        " + appWhereClause + @"
-                GROUP BY ClientAPIKeys.Name
-                ORDER BY ClientAPIKeys.Name;";
-            DataTable uniqueVisitorsPerApiKeyTable = await db.ExecuteCMDAsync(sql, dbDict);
-            List<Dictionary<string, object>> uniqueVisitorsPerApiKey = new List<Dictionary<string, object>>();
-            foreach (DataRow row in uniqueVisitorsPerApiKeyTable.Rows)
-            {
-                uniqueVisitorsPerApiKey.Add(new Dictionary<string, object>
+                    ClientAPIKeys
+                        JOIN
+                    (SELECT 
+                        client_apikey_id,
+                            COUNT(DISTINCT remote_ip) AS unique_visitors
+                    FROM
+                        Insights_API_Requests
+                    WHERE
+                        event_datetime >= @startdate
+                            AND event_datetime <= @enddate
+                            AND client_apikey_id IN (SELECT 
+                                ClientIdIndex
+                            FROM
+                                ClientAPIKeys
+                            WHERE
+                                DataObjectId = @appId)) apidata ON ClientAPIKeys.ClientIdIndex = apidata.client_apikey_id";
+                DataTable uniqueVisitorsPerApiKeyTable = await db.ExecuteCMDAsync(sql, dbDict, 90);
+                List<Dictionary<string, object>> uniqueVisitorsPerApiKey = new List<Dictionary<string, object>>();
+                foreach (DataRow row in uniqueVisitorsPerApiKeyTable.Rows)
                 {
-                    { "client_apikey_id", row["Country"] },
+                    uniqueVisitorsPerApiKey.Add(new Dictionary<string, object>
+                {
+                    { "client_apikey_id", row["Name"] },
                     { "unique_visitors", row["unique_visitors"] }
                 });
+                }
+                report["unique_visitors_per_api_key"] = uniqueVisitorsPerApiKey;
             }
-            report["unique_visitors_per_api_key"] = uniqueVisitorsPerApiKey;
 
             // cache the result
             if (Config.RedisConfiguration.Enabled)
