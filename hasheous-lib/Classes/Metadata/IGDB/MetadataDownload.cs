@@ -257,11 +257,17 @@ namespace InternetGameDatabase
                         File.Delete(filePath);
                     }
 
-                    // reset the client to ensure no previous headers are set
-                    client.DefaultRequestHeaders.Clear();
-
-                    // send the request to download the data
-                    var dataResponse = client.GetAsync(s3Url).Result;
+                    // The HttpClient headers are reset above for each dump; no need to clear here.
+                    System.Net.Http.HttpResponseMessage? dataResponse;
+                    try
+                    {
+                        dataResponse = client.GetAsync(s3Url).Result;
+                    }
+                    catch (Exception ex)
+                    {
+                        Logging.Log(Logging.LogType.Warning, "IGDB Dumps", $"Exception occurred while downloading data from {s3Url}: {ex.Message}");
+                        continue; // skip this dump
+                    }
 
                     if (!dataResponse.IsSuccessStatusCode)
                     {
