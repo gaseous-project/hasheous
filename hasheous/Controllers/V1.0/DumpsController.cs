@@ -25,11 +25,67 @@ namespace hasheous_server.Controllers.v1_0
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> GetMetadataMapDump()
         {
+            return await ReturnDumpFile(Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "MetadataMap.zip"));
+        }
+
+        [HttpGet("platforms")]
+        [ProducesResponseType(typeof(List<string>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public IActionResult GetAvailablePlatformDumps()
+        {
             try
             {
-                // Define the path to the zip file
-                string zipFilePath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "MetadataMap.zip");
+                string platformsDir = Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "Platforms");
 
+                // Check if the platforms directory exists
+                if (!Directory.Exists(platformsDir))
+                {
+                    return NotFound("No platform metadata map dumps found.");
+                }
+
+                // Get all zip files in the platforms directory
+                var zipFiles = Directory.GetFiles(platformsDir, "*.zip");
+
+                // Get the platform names from the file names
+                List<string> platformNames = zipFiles
+                    .Select(f => Path.GetFileName(f))
+                    .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                // Return the list of platform names
+                return Ok(platformNames);
+            }
+            catch (Exception ex)
+            {
+                // Log the error and return a 500 status code
+                Logging.Log(Logging.LogType.Warning, "DumpsController", "Error retrieving available platform metadata map dumps.", ex);
+                return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while retrieving the available platform metadata map dumps.");
+            }
+        }
+
+        /// <summary>
+        /// Returns a zip file containing the platform specific metadata map dump.
+        /// </summary>
+        /// <returns>A zip file containing the metadata map dump.</returns>
+        /// <response code="200">Returns the zip file.</response>
+        /// <response code="404">If the metadata map dump is not found.</response>
+        /// <response code="500">If an error occurs while generating the dump.</response>
+        [HttpGet("platforms/{platformname}.zip")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> GetPlatformMetadataMapDump(string platformname)
+        {
+            return await ReturnDumpFile(Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "Platforms", $"{platformname}.zip"));
+        }
+
+        private async Task<IActionResult> ReturnDumpFile(string zipFilePath)
+        {
+            try
+            {
                 // Check if the zip file exists
                 if (!System.IO.File.Exists(zipFilePath))
                 {
@@ -73,6 +129,5 @@ namespace hasheous_server.Controllers.v1_0
                 return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while generating the metadata map dump.");
             }
         }
-
     }
 }
