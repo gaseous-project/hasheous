@@ -79,6 +79,16 @@ namespace hasheous_server.Controllers.v1_0
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> GetPlatformMetadataMapDump(string platformname)
         {
+            // Validate input: not null/empty, no path traversal, no invalid filename chars
+            if (string.IsNullOrWhiteSpace(platformname) ||
+                platformname.IndexOfAny(System.IO.Path.GetInvalidFileNameChars()) >= 0 ||
+                platformname.Contains("..") ||
+                platformname.Contains("/") ||
+                platformname.Contains("\\"))
+            {
+                return BadRequest("Invalid platform name.");
+            }
+
             return await ReturnDumpFile(Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "Platforms", $"{platformname}.zip"));
         }
 
@@ -86,6 +96,16 @@ namespace hasheous_server.Controllers.v1_0
         {
             try
             {
+                // Validate input: not null/empty, no path traversal, no invalid filename chars
+                if (string.IsNullOrWhiteSpace(zipFilePath) ||
+                    zipFilePath.IndexOfAny(System.IO.Path.GetInvalidFileNameChars()) >= 0 ||
+                    zipFilePath.Contains("..") ||
+                    zipFilePath.Contains("/") ||
+                    zipFilePath.Contains("\\"))
+                {
+                    return BadRequest("Invalid platform name.");
+                }
+
                 // Check if the zip file exists
                 if (!System.IO.File.Exists(zipFilePath))
                 {

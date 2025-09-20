@@ -93,12 +93,7 @@ namespace Classes.ProcessQueue
                             DataObjectItem? platformDataObject = await dataObjects.GetDataObject(DataObjects.DataObjectType.Platform, platformItem.Id);
                             if (platformDataObject != null)
                             {
-                                string unsafePlatformFileName = $"PlatformMapping.json";
-                                foreach (char c in Path.GetInvalidFileNameChars())
-                                {
-                                    unsafePlatformFileName = unsafePlatformFileName.Replace(c, '_');
-                                }
-                                string platformFileName = unsafePlatformFileName;
+                                string platformFileName = "PlatformMapping.json";
                                 string platformFilePath = Path.Combine(platformPath, platformFileName);
 
                                 // serialize the dictionary to JSON and write to file
