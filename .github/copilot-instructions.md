@@ -121,6 +121,8 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
     - Prunes redundant regional overlay keys (`locales prune`).
     - Fails if pruning causes uncommitted JSON diffs (developers must run prune locally before committing).
     - Runs strict validation with JSON report (`validation-report.json` artifact) covering key parity, placeholder parity, HTML tag presence/balance, redundant overrides, and optional tag multiplicity (multiplicity currently disabled in CI; enable by adding `--multiplicity`).
+      - NOTE: Missing keys in regional overlay files (filenames containing a hyphen like `en-GB.json`) are treated as informational only and do NOT fail strict mode; they rely on fallback to the base `<lang>.json` then `en.json`. Other issues (extra keys, placeholder/tag mismatches, redundant overrides) still fail strict mode.
+  - UPDATE: Extras in regional overlay files are also informational (do not fail strict) to allow temporary region-specific wording before promoting to the base language file. Clean up by either (a) removing them (preferred minimal overlay) or (b) adding the key to all base locales.
     - To add new locales: fully populate base `<lang>.json` mirroring `en.json` keys; create minimal regional overlays `<lang>-<REGION>.json` only for differences. Run prune & validate locally before pushing.
     - To relax multiplicity enforcement or treat overlay missing keys as informational, adjust CLI flags in the workflow.
 

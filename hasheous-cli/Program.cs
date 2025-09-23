@@ -207,7 +207,9 @@ if (cmdArgs[1] == "locales")
             }
 
             // Preload all locale dictionaries for overlay comparison
-            var localeFiles = Directory.GetFiles(path, "*.json", SearchOption.TopDirectoryOnly);
+            var localeFiles = Directory.GetFiles(path, "*.json", SearchOption.TopDirectoryOnly)
+                                        .Where(f => !string.Equals(Path.GetFileName(f), "validation-report.json", StringComparison.OrdinalIgnoreCase))
+                                        .ToArray();
             var localeData = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
             foreach (var lf in localeFiles)
             {
@@ -226,7 +228,10 @@ if (cmdArgs[1] == "locales")
 
             // results for JSON report
             var reportLocales = new List<object>();
+            // anyIssues => legacy: includes all detected issues (including overlay missing keys)
+            // anyStrictIssues => excludes missing keys on overlays so strict mode won't fail due to intentional sparsity
             bool anyIssues = false;
+            bool anyStrictIssues = false;
             int fileCount = 0;
             foreach (var file in localeFiles.Where(f => !f.EndsWith("en.json", StringComparison.OrdinalIgnoreCase)))
             {
@@ -237,9 +242,14 @@ if (cmdArgs[1] == "locales")
                 var missing = enKeys.Where(k => !keys.Contains(k)).OrderBy(k => k).ToList();
                 var extras = keys.Where(k => !enKeys.Contains(k)).OrderBy(k => k).ToList();
                 double coverage = (double)(enKeys.Count - missing.Count) / enKeys.Count * 100.0;
+                bool isOverlay = fileName.Contains('-');
                 Console.WriteLine($"Locale: {fileName}  Coverage: {coverage:F1}%  Missing: {missing.Count}  Extra: {extras.Count}");
                 if (missing.Count > 0)
+                {
                     Console.WriteLine("  Missing: " + string.Join(", ", missing.Take(15)) + (missing.Count > 15 ? ", ..." : ""));
+                    if (isOverlay)
+                        Console.WriteLine("    (overlay locale: missing keys are informational; fallback to base -> en)");
+                }
                 if (extras.Count > 0)
                     Console.WriteLine("  Extra: " + string.Join(", ", extras.Take(15)) + (extras.Count > 15 ? ", ..." : ""));
 
@@ -328,7 +338,12 @@ if (cmdArgs[1] == "locales")
                 }
 
                 bool localeHasIssues = missing.Count > 0 || extras.Count > 0 || placeholderIssues.Count > 0 || htmlIssues.Count > 0 || htmlMultiplicityIssues.Count > 0 || redundant.Count > 0;
-                anyIssues |= localeHasIssues;
+                // Overlay strategy enhancement (A+B):
+                //  - Missing keys in overlays already informational.
+                //  - Extras in overlays are also informational (do not trigger strict), but still listed so they can be cleaned up / merged into base if adopted broadly.
+                bool localeStrictIssues = (placeholderIssues.Count > 0 || htmlIssues.Count > 0 || htmlMultiplicityIssues.Count > 0 || redundant.Count > 0 || (!isOverlay && (missing.Count > 0 || extras.Count > 0)) || (isOverlay && false));
+                anyIssues |= localeHasIssues;               // full accounting (legacy behavior)
+                anyStrictIssues |= localeStrictIssues;       // strict-mode gating
                 reportLocales.Add(new
                 {
                     locale = fileName,
@@ -338,7 +353,10 @@ if (cmdArgs[1] == "locales")
                     placeholderIssues,
                     htmlTagIssues = htmlIssues,
                     htmlMultiplicityIssues,
-                    redundantOverrides = redundant
+                    redundantOverrides = redundant,
+                    isOverlay,
+                    missingIgnoredForStrict = isOverlay && missing.Count > 0,
+                    extraIgnoredForStrict = isOverlay && extras.Count > 0
                 });
             }
             Console.WriteLine("Validated " + fileCount + " locale file(s). (Includes placeholder, HTML, multiplicity & overlay audits)");
@@ -350,7 +368,8 @@ if (cmdArgs[1] == "locales")
                     generatedUtc = DateTime.UtcNow,
                     strictMode = strict,
                     multiplicityEnabled = multiplicity,
-                    anyIssues,
+                    anyIssues,              // legacy includes overlay missing keys
+                    anyStrictIssues,        // used for strict gating
                     locales = reportLocales
                 };
                 var json = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true });
@@ -358,7 +377,7 @@ if (cmdArgs[1] == "locales")
                 Console.WriteLine("Report written to: " + reportFile);
             }
 
-            if (strict && anyIssues)
+            if (strict && anyStrictIssues)
             {
                 Console.WriteLine("STRICT MODE: Issues detected -> exit code 1");
                 Environment.Exit(1);

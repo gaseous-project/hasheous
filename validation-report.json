@@ -1,8 +1,9 @@
 {
-  "generatedUtc": "2025-09-23T00:48:09.7424041Z",
+  "generatedUtc": "2025-09-23T02:09:53.3471517Z",
   "strictMode": true,
-  "multiplicityEnabled": true,
+  "multiplicityEnabled": false,
   "anyIssues": true,
+  "anyStrictIssues": false,
   "locales": [
     {
       "locale": "cs.json",
@@ -11,10 +12,11 @@
       "extra": [],
       "placeholderIssues": [],
       "htmlTagIssues": [],
-      "htmlMultiplicityIssues": [
-        "termsofservicetext (tag count mismatch en[li:4,p:12,ul:2] loc[li:4,p:10,ul:2])"
-      ],
-      "redundantOverrides": []
+      "htmlMultiplicityIssues": [],
+      "redundantOverrides": [],
+      "isOverlay": false,
+      "missingIgnoredForStrict": false,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "da.json",
@@ -23,14 +25,15 @@
       "extra": [],
       "placeholderIssues": [],
       "htmlTagIssues": [],
-      "htmlMultiplicityIssues": [
-        "termsofservicetext (tag count mismatch en[li:4,p:12,ul:2] loc[li:4,p:10,ul:2])"
-      ],
-      "redundantOverrides": []
+      "htmlMultiplicityIssues": [],
+      "redundantOverrides": [],
+      "isOverlay": false,
+      "missingIgnoredForStrict": false,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "de-AT.json",
-      "coverage": 1.098901098901099,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -247,6 +250,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -281,6 +286,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -307,14 +313,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "de-CH.json",
-      "coverage": 1.098901098901099,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -531,6 +537,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -565,6 +573,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -587,20 +596,18 @@
         "wikipedia",
         "yes"
       ],
-      "extra": [
-        "colour"
-      ],
+      "extra": [],
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "de-DE.json",
-      "coverage": 1.098901098901099,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -817,6 +824,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -851,6 +860,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -877,14 +887,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "de-LI.json",
-      "coverage": 1.098901098901099,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -1101,6 +1111,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -1135,6 +1147,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -1161,14 +1174,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "de-LU.json",
-      "coverage": 1.098901098901099,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -1385,6 +1398,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -1419,6 +1434,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -1445,10 +1461,10 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "de.json",
@@ -1458,7 +1474,10 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": []
+      "redundantOverrides": [],
+      "isOverlay": false,
+      "missingIgnoredForStrict": false,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "el.json",
@@ -1467,14 +1486,15 @@
       "extra": [],
       "placeholderIssues": [],
       "htmlTagIssues": [],
-      "htmlMultiplicityIssues": [
-        "privacypolicytext (tag count mismatch en[a:4,h2:14,li:20,p:18,ul:6] loc[a:4,h2:14,li:12,p:16,ul:4])"
-      ],
-      "redundantOverrides": []
+      "htmlMultiplicityIssues": [],
+      "redundantOverrides": [],
+      "isOverlay": false,
+      "missingIgnoredForStrict": false,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "en-AU.json",
-      "coverage": 1.098901098901099,
+      "coverage": 1.094890510948905,
       "missing": [
         "accesscontrol",
         "account",
@@ -1725,6 +1745,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -1751,11 +1772,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": []
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "en-CA.json",
-      "coverage": 1.098901098901099,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -1972,6 +1996,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -2006,6 +2032,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -2028,23 +2055,18 @@
         "wikipedia",
         "yes"
       ],
-      "extra": [
-        "colour",
-        "favourite",
-        "favourites",
-        "organisation"
-      ],
+      "extra": [],
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "en-GB.json",
-      "coverage": 1.465201465201465,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -2124,6 +2146,7 @@
         "hashes",
         "home",
         "homecopyright",
+        "homepage",
         "homepagefunding",
         "homepageintro",
         "id",
@@ -2260,6 +2283,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -2294,6 +2319,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -2316,22 +2342,18 @@
         "wikipedia",
         "yes"
       ],
-      "extra": [
-        "favourite",
-        "favourites"
-      ],
+      "extra": [],
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "homepage",
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "en-IE.json",
-      "coverage": 0.3663003663003663,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -2584,6 +2606,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -2610,11 +2633,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": []
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "en-IN.json",
-      "coverage": 0.3663003663003663,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -2867,6 +2893,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -2893,11 +2920,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": []
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "en-NZ.json",
-      "coverage": 0.3663003663003663,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -3150,6 +3180,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -3176,11 +3207,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": []
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "en-SG.json",
-      "coverage": 0.3663003663003663,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -3433,6 +3467,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -3459,11 +3494,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": []
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "en-ZA.json",
-      "coverage": 0.3663003663003663,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -3716,6 +3754,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -3742,11 +3781,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": []
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "es-419.json",
-      "coverage": 1.098901098901099,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -3963,6 +4005,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -3997,6 +4041,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -4023,14 +4068,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "es-AR.json",
-      "coverage": 1.098901098901099,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -4247,6 +4292,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -4281,6 +4328,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -4307,14 +4355,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "es-CL.json",
-      "coverage": 1.098901098901099,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -4531,6 +4579,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -4565,6 +4615,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -4591,14 +4642,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "es-CO.json",
-      "coverage": 1.098901098901099,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -4815,6 +4866,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -4849,6 +4902,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -4875,14 +4929,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "es-EC.json",
-      "coverage": 1.098901098901099,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -5099,6 +5153,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -5133,6 +5189,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -5159,14 +5216,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "es-ES.json",
-      "coverage": 1.098901098901099,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -5383,6 +5440,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -5417,6 +5476,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -5443,14 +5503,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "es-MX.json",
-      "coverage": 1.098901098901099,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -5667,6 +5727,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -5701,6 +5763,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -5727,14 +5790,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "es-PE.json",
-      "coverage": 1.098901098901099,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -5951,6 +6014,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -5985,6 +6050,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -6011,14 +6077,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "es-US.json",
-      "coverage": 1.098901098901099,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -6235,6 +6301,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -6269,6 +6337,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -6295,14 +6364,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "es-UY.json",
-      "coverage": 1.098901098901099,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -6519,6 +6588,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -6553,6 +6624,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -6579,14 +6651,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "es-VE.json",
-      "coverage": 1.098901098901099,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -6803,6 +6875,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -6837,6 +6911,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -6863,10 +6938,10 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "es.json",
@@ -6875,10 +6950,11 @@
       "extra": [],
       "placeholderIssues": [],
       "htmlTagIssues": [],
-      "htmlMultiplicityIssues": [
-        "privacypolicytext (tag count mismatch en[a:4,h2:14,li:20,p:18,ul:6] loc[a:4,h2:14,li:8,p:16,ul:2])"
-      ],
-      "redundantOverrides": []
+      "htmlMultiplicityIssues": [],
+      "redundantOverrides": [],
+      "isOverlay": false,
+      "missingIgnoredForStrict": false,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "fi.json",
@@ -6888,11 +6964,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": []
+      "redundantOverrides": [],
+      "isOverlay": false,
+      "missingIgnoredForStrict": false,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "fr-BE.json",
-      "coverage": 1.098901098901099,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -7109,6 +7188,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -7143,6 +7224,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -7169,14 +7251,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "fr-CA.json",
-      "coverage": 2.197802197802198,
+      "coverage": 1.824817518248175,
       "missing": [
         "accesscontrol",
         "account",
@@ -7254,6 +7336,7 @@
         "hashes",
         "home",
         "homecopyright",
+        "homepage",
         "homepagefunding",
         "homepageintro",
         "id",
@@ -7424,6 +7507,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -7450,13 +7534,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "homepage"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "fr-CH.json",
-      "coverage": 1.098901098901099,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -7673,6 +7758,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -7707,6 +7794,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -7733,14 +7821,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "fr-FR.json",
-      "coverage": 1.098901098901099,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -7957,6 +8045,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -7991,6 +8081,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -8017,14 +8108,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "fr-LU.json",
-      "coverage": 1.098901098901099,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -8241,6 +8332,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -8275,6 +8368,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -8301,14 +8395,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "fr-MC.json",
-      "coverage": 1.098901098901099,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -8525,6 +8619,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -8559,6 +8655,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -8585,10 +8682,10 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "fr.json",
@@ -8597,10 +8694,11 @@
       "extra": [],
       "placeholderIssues": [],
       "htmlTagIssues": [],
-      "htmlMultiplicityIssues": [
-        "privacypolicytext (tag count mismatch en[a:4,h2:14,li:20,p:18,ul:6] loc[a:4,h2:14,li:16,p:16,ul:4])"
-      ],
-      "redundantOverrides": []
+      "htmlMultiplicityIssues": [],
+      "redundantOverrides": [],
+      "isOverlay": false,
+      "missingIgnoredForStrict": false,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "hu.json",
@@ -8609,10 +8707,11 @@
       "extra": [],
       "placeholderIssues": [],
       "htmlTagIssues": [],
-      "htmlMultiplicityIssues": [
-        "termsofservicetext (tag count mismatch en[li:4,p:12,ul:2] loc[li:4,p:10,ul:2])"
-      ],
-      "redundantOverrides": []
+      "htmlMultiplicityIssues": [],
+      "redundantOverrides": [],
+      "isOverlay": false,
+      "missingIgnoredForStrict": false,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "id.json",
@@ -8621,14 +8720,15 @@
       "extra": [],
       "placeholderIssues": [],
       "htmlTagIssues": [],
-      "htmlMultiplicityIssues": [
-        "privacypolicytext (tag count mismatch en[a:4,h2:14,li:20,p:18,ul:6] loc[a:4,h2:14,li:12,p:12,ul:4])"
-      ],
-      "redundantOverrides": []
+      "htmlMultiplicityIssues": [],
+      "redundantOverrides": [],
+      "isOverlay": false,
+      "missingIgnoredForStrict": false,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "it-IT.json",
-      "coverage": 1.098901098901099,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -8845,6 +8945,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -8879,6 +8981,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -8905,10 +9008,10 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "it.json",
@@ -8917,14 +9020,15 @@
       "extra": [],
       "placeholderIssues": [],
       "htmlTagIssues": [],
-      "htmlMultiplicityIssues": [
-        "termsofservicetext (tag count mismatch en[li:4,p:12,ul:2] loc[li:4,p:10,ul:2])"
-      ],
-      "redundantOverrides": []
+      "htmlMultiplicityIssues": [],
+      "redundantOverrides": [],
+      "isOverlay": false,
+      "missingIgnoredForStrict": false,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "ja-JP.json",
-      "coverage": 1.098901098901099,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -9141,6 +9245,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -9175,6 +9281,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -9201,10 +9308,10 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "ja.json",
@@ -9213,14 +9320,15 @@
       "extra": [],
       "placeholderIssues": [],
       "htmlTagIssues": [],
-      "htmlMultiplicityIssues": [
-        "privacypolicytext (tag count mismatch en[a:4,h2:14,li:20,p:18,ul:6] loc[a:4,h2:14,li:12,p:16,ul:4])"
-      ],
-      "redundantOverrides": []
+      "htmlMultiplicityIssues": [],
+      "redundantOverrides": [],
+      "isOverlay": false,
+      "missingIgnoredForStrict": false,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "ko-KR.json",
-      "coverage": 1.098901098901099,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -9437,6 +9545,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -9471,6 +9581,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -9497,10 +9608,10 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "ko.json",
@@ -9509,10 +9620,11 @@
       "extra": [],
       "placeholderIssues": [],
       "htmlTagIssues": [],
-      "htmlMultiplicityIssues": [
-        "privacypolicytext (tag count mismatch en[a:4,h2:14,li:20,p:18,ul:6] loc[a:4,h2:14,li:12,p:16,ul:4])"
-      ],
-      "redundantOverrides": []
+      "htmlMultiplicityIssues": [],
+      "redundantOverrides": [],
+      "isOverlay": false,
+      "missingIgnoredForStrict": false,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "nb.json",
@@ -9521,14 +9633,15 @@
       "extra": [],
       "placeholderIssues": [],
       "htmlTagIssues": [],
-      "htmlMultiplicityIssues": [
-        "termsofservicetext (tag count mismatch en[li:4,p:12,ul:2] loc[li:4,p:10,ul:2])"
-      ],
-      "redundantOverrides": []
+      "htmlMultiplicityIssues": [],
+      "redundantOverrides": [],
+      "isOverlay": false,
+      "missingIgnoredForStrict": false,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "nl-BE.json",
-      "coverage": 1.098901098901099,
+      "coverage": 1.094890510948905,
       "missing": [
         "accesscontrol",
         "account",
@@ -9779,6 +9892,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -9805,11 +9919,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": []
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "nl-NL.json",
-      "coverage": 1.098901098901099,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -10026,6 +10143,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -10060,6 +10179,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -10086,10 +10206,10 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "nl.json",
@@ -10098,14 +10218,15 @@
       "extra": [],
       "placeholderIssues": [],
       "htmlTagIssues": [],
-      "htmlMultiplicityIssues": [
-        "privacypolicytext (tag count mismatch en[a:4,h2:14,li:20,p:18,ul:6] loc[a:4,h2:14,li:12,p:16,ul:4])"
-      ],
-      "redundantOverrides": []
+      "htmlMultiplicityIssues": [],
+      "redundantOverrides": [],
+      "isOverlay": false,
+      "missingIgnoredForStrict": false,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "pl-PL.json",
-      "coverage": 1.098901098901099,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -10322,6 +10443,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -10356,6 +10479,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -10382,10 +10506,10 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "pl.json",
@@ -10394,14 +10518,15 @@
       "extra": [],
       "placeholderIssues": [],
       "htmlTagIssues": [],
-      "htmlMultiplicityIssues": [
-        "termsofservicetext (tag count mismatch en[li:4,p:12,ul:2] loc[li:4,p:10,ul:2])"
-      ],
-      "redundantOverrides": []
+      "htmlMultiplicityIssues": [],
+      "redundantOverrides": [],
+      "isOverlay": false,
+      "missingIgnoredForStrict": false,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "pt-AO.json",
-      "coverage": 1.8315018315018317,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -10414,6 +10539,7 @@
         "automatic",
         "automatictoomanymatches",
         "average_response_time",
+        "cancel",
         "changepasswordconfirmationcomplete",
         "changepasswordconfirmationcompleteheading",
         "changepasswordheading",
@@ -10480,6 +10606,7 @@
         "hashes",
         "home",
         "homecopyright",
+        "homepage",
         "homepagefunding",
         "homepageintro",
         "id",
@@ -10616,6 +10743,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -10650,6 +10779,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -10676,16 +10806,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "cancel",
-        "homepage",
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "pt-BR.json",
-      "coverage": 11.355311355311356,
+      "coverage": 10.218978102189782,
       "missing": [
         "accesscontrol",
         "account",
@@ -10742,6 +10870,7 @@
         "fbneodesc",
         "fbneohomepage",
         "fieldlocked",
+        "forgottenpasswordsendlink",
         "game",
         "games",
         "giantbomb",
@@ -10910,7 +11039,10 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
+        "unique_visitors_one",
+        "unique_visitors_other",
         "unique_visitors_per_api_key",
         "unique_visitors_per_country",
         "unlink",
@@ -10934,15 +11066,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "forgottenpasswordsendlink",
-        "unique_visitors_one",
-        "unique_visitors_other"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "pt-MZ.json",
-      "coverage": 1.8315018315018317,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -10979,6 +11110,8 @@
         "createddate",
         "currentvalue",
         "dataobjectdetailerror",
+        "delete",
+        "deleteaccount",
         "deleteaccountbutton",
         "deleteaccountconfirm",
         "deleteaccountdescription",
@@ -11157,6 +11290,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -11191,6 +11326,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -11217,16 +11353,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "delete",
-        "deleteaccount",
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "pt-PT.json",
-      "coverage": 1.8315018315018317,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -11375,6 +11509,7 @@
         "profile",
         "public",
         "publisher",
+        "recordcount",
         "redump",
         "redumpdesc",
         "redumphomepage",
@@ -11409,6 +11544,7 @@
         "searchresults",
         "sendingemailverification",
         "servicebackgroundtasksforlocal",
+        "servicebackgroundtasksforremote",
         "servicecachewarmer",
         "servicedailymaintenance",
         "servicedisabled",
@@ -11441,6 +11577,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -11475,6 +11613,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -11501,12 +11640,10 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "recordcount",
-        "servicebackgroundtasksforremote",
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "pt.json",
@@ -11515,10 +11652,11 @@
       "extra": [],
       "placeholderIssues": [],
       "htmlTagIssues": [],
-      "htmlMultiplicityIssues": [
-        "termsofservicetext (tag count mismatch en[li:4,p:12,ul:2] loc[li:4,p:10,ul:2])"
-      ],
-      "redundantOverrides": []
+      "htmlMultiplicityIssues": [],
+      "redundantOverrides": [],
+      "isOverlay": false,
+      "missingIgnoredForStrict": false,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "ro.json",
@@ -11527,14 +11665,15 @@
       "extra": [],
       "placeholderIssues": [],
       "htmlTagIssues": [],
-      "htmlMultiplicityIssues": [
-        "termsofservicetext (tag count mismatch en[li:4,p:12,ul:2] loc[li:4,p:10,ul:2])"
-      ],
-      "redundantOverrides": []
+      "htmlMultiplicityIssues": [],
+      "redundantOverrides": [],
+      "isOverlay": false,
+      "missingIgnoredForStrict": false,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "ru-RU.json",
-      "coverage": 1.098901098901099,
+      "coverage": 0.36496350364963503,
       "missing": [
         "accesscontrol",
         "account",
@@ -11751,6 +11890,8 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
+        "signout",
         "size",
         "source",
         "sources",
@@ -11785,6 +11926,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -11811,10 +11953,10 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "signin",
-        "signout"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "ru.json",
@@ -11823,10 +11965,11 @@
       "extra": [],
       "placeholderIssues": [],
       "htmlTagIssues": [],
-      "htmlMultiplicityIssues": [
-        "termsofservicetext (tag count mismatch en[li:4,p:12,ul:2] loc[li:4,p:10,ul:2])"
-      ],
-      "redundantOverrides": []
+      "htmlMultiplicityIssues": [],
+      "redundantOverrides": [],
+      "isOverlay": false,
+      "missingIgnoredForStrict": false,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "sv.json",
@@ -11835,10 +11978,11 @@
       "extra": [],
       "placeholderIssues": [],
       "htmlTagIssues": [],
-      "htmlMultiplicityIssues": [
-        "termsofservicetext (tag count mismatch en[li:4,p:12,ul:2] loc[li:4,p:10,ul:2])"
-      ],
-      "redundantOverrides": []
+      "htmlMultiplicityIssues": [],
+      "redundantOverrides": [],
+      "isOverlay": false,
+      "missingIgnoredForStrict": false,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "th.json",
@@ -11847,14 +11991,15 @@
       "extra": [],
       "placeholderIssues": [],
       "htmlTagIssues": [],
-      "htmlMultiplicityIssues": [
-        "privacypolicytext (tag count mismatch en[a:4,h2:14,li:20,p:18,ul:6] loc[a:4,h2:14,li:12,p:12,ul:4])"
-      ],
-      "redundantOverrides": []
+      "htmlMultiplicityIssues": [],
+      "redundantOverrides": [],
+      "isOverlay": false,
+      "missingIgnoredForStrict": false,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "tr-TR.json",
-      "coverage": 1.098901098901099,
+      "coverage": 1.094890510948905,
       "missing": [
         "accesscontrol",
         "account",
@@ -12105,6 +12250,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -12131,7 +12277,10 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": []
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "tr.json",
@@ -12140,10 +12289,11 @@
       "extra": [],
       "placeholderIssues": [],
       "htmlTagIssues": [],
-      "htmlMultiplicityIssues": [
-        "privacypolicytext (tag count mismatch en[a:4,h2:14,li:20,p:18,ul:6] loc[a:4,h2:14,li:12,p:16,ul:4])"
-      ],
-      "redundantOverrides": []
+      "htmlMultiplicityIssues": [],
+      "redundantOverrides": [],
+      "isOverlay": false,
+      "missingIgnoredForStrict": false,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "uk.json",
@@ -12152,10 +12302,11 @@
       "extra": [],
       "placeholderIssues": [],
       "htmlTagIssues": [],
-      "htmlMultiplicityIssues": [
-        "termsofservicetext (tag count mismatch en[li:4,p:12,ul:2] loc[li:4,p:10,ul:2])"
-      ],
-      "redundantOverrides": []
+      "htmlMultiplicityIssues": [],
+      "redundantOverrides": [],
+      "isOverlay": false,
+      "missingIgnoredForStrict": false,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "vi.json",
@@ -12164,14 +12315,15 @@
       "extra": [],
       "placeholderIssues": [],
       "htmlTagIssues": [],
-      "htmlMultiplicityIssues": [
-        "privacypolicytext (tag count mismatch en[a:4,h2:14,li:20,p:18,ul:6] loc[a:4,h2:14,li:12,p:12,ul:4])"
-      ],
-      "redundantOverrides": []
+      "htmlMultiplicityIssues": [],
+      "redundantOverrides": [],
+      "isOverlay": false,
+      "missingIgnoredForStrict": false,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "zh-CN.json",
-      "coverage": 1.098901098901099,
+      "coverage": 0.7299270072992701,
       "missing": [
         "accesscontrol",
         "account",
@@ -12388,6 +12540,7 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
         "size",
         "source",
         "sources",
@@ -12422,6 +12575,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -12448,13 +12602,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "signin"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "zh-Hans.json",
-      "coverage": 2.197802197802198,
+      "coverage": 1.4598540145985401,
       "missing": [
         "accesscontrol",
         "account",
@@ -12532,6 +12687,7 @@
         "google",
         "hasheous",
         "hashes",
+        "home",
         "homecopyright",
         "homepage",
         "homepagefunding",
@@ -12670,6 +12826,7 @@
         "sha256",
         "signatures",
         "signaturesource",
+        "signin",
         "size",
         "source",
         "sources",
@@ -12704,6 +12861,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_per_api_key",
         "unique_visitors_per_country",
@@ -12728,14 +12886,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": [
-        "home",
-        "signin"
-      ]
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "zh-Hant.json",
-      "coverage": 2.197802197802198,
+      "coverage": 2.18978102189781,
       "missing": [
         "accesscontrol",
         "account",
@@ -12985,6 +13143,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_per_api_key",
         "unique_visitors_per_country",
@@ -13009,11 +13168,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": []
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "zh-HK.json",
-      "coverage": 1.098901098901099,
+      "coverage": 1.094890510948905,
       "missing": [
         "accesscontrol",
         "account",
@@ -13264,6 +13426,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -13290,11 +13453,14 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": []
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "zh-TW.json",
-      "coverage": 1.098901098901099,
+      "coverage": 1.094890510948905,
       "missing": [
         "accesscontrol",
         "account",
@@ -13545,6 +13711,7 @@
         "tosecdesc",
         "tosechomepage",
         "total_requests",
+        "translationdisclaimer",
         "unique_visitors",
         "unique_visitors_one",
         "unique_visitors_other",
@@ -13571,7 +13738,10 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": []
+      "redundantOverrides": [],
+      "isOverlay": true,
+      "missingIgnoredForStrict": true,
+      "extraIgnoredForStrict": false
     },
     {
       "locale": "zh.json",
@@ -13581,7 +13751,10 @@
       "placeholderIssues": [],
       "htmlTagIssues": [],
       "htmlMultiplicityIssues": [],
-      "redundantOverrides": []
+      "redundantOverrides": [],
+      "isOverlay": false,
+      "missingIgnoredForStrict": false,
+      "extraIgnoredForStrict": false
     }
   ]
 }
