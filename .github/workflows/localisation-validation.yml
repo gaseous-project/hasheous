@@ -1,0 +1,53 @@
+name: Localisation Validation
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate-locales:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore Hasheous.sln
+
+      - name: Prune redundant overlay keys
+        run: dotnet run --project hasheous-cli/hasheous-cli.csproj -- locales prune hasheous/wwwroot/localisation
+
+      - name: Detect unexpected prune changes
+        run: |
+          if [ -n "$(git status --porcelain -- hasheous/wwwroot/localisation/*.json)" ]; then
+            echo '::error::Localisation prune produced changes. Run prune locally and commit results.'
+            git --no-pager diff -- hasheous/wwwroot/localisation/*.json || true
+            exit 1
+          fi
+
+      - name: Validate locales (strict)
+        run: dotnet run --project hasheous-cli/hasheous-cli.csproj -- locales validate hasheous/wwwroot/localisation --strict --report validation-report.json
+
+      - name: Upload validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: localisation-validation-report
+          path: validation-report.json
+
+      - name: Summary
+        if: always()
+        run: |
+          if [ -f validation-report.json ]; then
+            echo 'Validation report:'
+            cat validation-report.json | head -n 200
+          fi

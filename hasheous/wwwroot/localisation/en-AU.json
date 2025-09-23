@@ -1,4 +1,5 @@
-{
-    "signin": "Login",
-    "signout": "Log Out"
+﻿{
+  "language_native": "English (Australia)",
+  "signin": "Login",
+  "signout": "Log Out"
 }

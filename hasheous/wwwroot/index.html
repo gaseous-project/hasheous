@@ -148,6 +148,15 @@
                     class="footer_link">
                     <span id="banner_privacy_label" data-lang="privacypolicy">Privacy Policy</span>
                 </div>
+            </div>  
+            <div class="footer_social_table footer_links">
+                <div id="footer_language_selector" class="footer_link" style="min-width:220px;">
+                    <select id="language_selector" class="lang-select" data-analytics="locale-select" style="width: 210px;">
+                        <option value="en" selected>English (EN)</option>
+                    </select>
+                </div>
+                <div id="language_disclaimer" class="footer_text lang-disclaimer" data-lang="translationdisclaimer">
+                </div>
             </div>
         </div>
     </div>
@@ -157,6 +166,75 @@
     </div>
 
     <script src="/scripts/index.js"></script>
-</body>
+    <script>
+    (function(){
+        function setCookie(name, value, days) {
+            var date = new Date();
+            date.setTime(date.getTime() + (days*24*60*60*1000));
+            var expires = "expires="+ date.toUTCString();
+            document.cookie = name + "=" + value + ";" + expires + ";path=/";
+        }
+        function getCookie(name) {
+            var match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+            if (match) return match[2];
+        }
+        var sel = document.getElementById('language_selector');
+        if(!sel) return;
 
-</html>
+    fetch('/api/v1/localisation/').then(function(r){ return r.ok ? r.json() : []; }).then(function(groups){
+            try {
+                if(!Array.isArray(groups)) return;
+                var initialCookie = getCookie('userLocale');
+                var browserLang = (navigator.language || '').toLowerCase();
+                var preselect = initialCookie || browserLang;
+                sel.innerHTML = '';
+                groups.forEach(function(g){
+                    var og = document.createElement('optgroup');
+                    var label = g.baseDisplay || g.base || g.language;
+                    og.label = (label && label.length ? label.charAt(0).toUpperCase() + label.slice(1) : g.language);
+                    g.locales.forEach(function(loc){
+                        var opt = document.createElement('option');
+                        opt.value = loc.code;
+                        var show = loc.display || loc.code; // Prefer native display name
+                        opt.textContent = show;
+                        opt.title = loc.code; // Preserve code as tooltip
+                        opt.setAttribute('data-locale-code', loc.code);
+                        if(preselect && preselect.toLowerCase() === loc.code.toLowerCase()) opt.selected = true;
+                        og.appendChild(opt);
+                    });
+                    sel.appendChild(og);
+                });
+            } catch(e) { /* ignore */ }
+            initializeSelector();
+        }).catch(function(){ initializeSelector(); });
+
+        function initializeSelector(){
+            if(!sel.value) sel.value = 'en';
+            if(window.jQuery && jQuery().select2){
+                jQuery(sel).select2({
+                    width: 'resolve',
+                    dropdownAutoWidth: true,
+                    minimumResultsForSearch: 15,
+                    templateResult: function(state){ return state.text; },
+                    templateSelection: function(state){ return state.text; }
+                });
+            }
+            attachHandlers();
+        }
+        function attachHandlers(){
+            var handleChange = function(){
+                var newLocale = sel.value;
+                setCookie('userLocale', newLocale, 365);
+                if(window.navigator.sendBeacon){
+                    try {
+                        var data = new Blob([JSON.stringify({ evt: 'locale_change', locale: newLocale, ts: Date.now() })], { type: 'application/json' });
+                        navigator.sendBeacon('/api/v1/Insights/LocaleEvent', data);
+                    } catch(e) { /* ignore */ }
+                }
+                window.location.reload();
+            };
+            sel.addEventListener('change', handleChange);
+            if(window.jQuery){ jQuery(sel).on('select2:select', handleChange); }
+        }
+    })();
+    </script>

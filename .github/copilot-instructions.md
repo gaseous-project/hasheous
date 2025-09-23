@@ -117,6 +117,12 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 ## Maintenance
 - A PR guard (`.github/workflows/copilot-instructions-guard.yml`) fails when architecture/config files change without updating this file; it prints hints via `.github/scripts/copilot-instructions-help.sh`.
   - Update this file when: resource namespace conventions change (e.g., `hasheous_lib.*` migration), new cross-cutting utilities like `ComputeObjectPropertyHash` are added, or queue coordination semantics are modified.
+  - Localisation integrity: a workflow (`localisation-validation.yml`) now runs on every push & PR. It:
+    - Prunes redundant regional overlay keys (`locales prune`).
+    - Fails if pruning causes uncommitted JSON diffs (developers must run prune locally before committing).
+    - Runs strict validation with JSON report (`validation-report.json` artifact) covering key parity, placeholder parity, HTML tag presence/balance, redundant overrides, and optional tag multiplicity (multiplicity currently disabled in CI; enable by adding `--multiplicity`).
+    - To add new locales: fully populate base `<lang>.json` mirroring `en.json` keys; create minimal regional overlays `<lang>-<REGION>.json` only for differences. Run prune & validate locally before pushing.
+    - To relax multiplicity enforcement or treat overlay missing keys as informational, adjust CLI flags in the workflow.
 
 ## API key usage examples
 - User API key (header `X-API-Key`):
