@@ -132,6 +132,10 @@ switch (taskType)
         Task = new FetchTOSECMetadata();
         break;
 
+    case QueueItemType.FetchWHDLoadMetadata:
+        Task = new FetchWHDLoadMetadata();
+        break;
+
     case QueueItemType.DailyMaintenance:
         Task = new DailyMaintenance();
         break;

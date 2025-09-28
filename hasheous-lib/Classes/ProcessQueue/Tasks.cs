@@ -71,6 +71,11 @@ namespace Classes.ProcessQueue
         FetchTOSECMetadata,
 
         /// <summary>
+        /// Fetch WHDLoad metadata
+        /// </summary>
+        FetchWHDLoadMetadata,
+
+        /// <summary>
         /// Runs daily maintenance tasks
         /// </summary>
         DailyMaintenance,

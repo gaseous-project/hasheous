@@ -27,7 +27,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0
 ENV INDOCKER=1
 WORKDIR /App
 
-RUN apt update && apt upgrade -y && apt install mariadb-client curl -y
+RUN apt update && apt upgrade -y && apt install mariadb-client curl git -y
 
 # Configure healthcheck
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 CMD curl --fail http://localhost:8080/api/v1/Healthcheck || exit 1
