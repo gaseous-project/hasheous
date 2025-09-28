@@ -21,6 +21,8 @@ using System.Diagnostics;
 using StackExchange.Redis;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.HttpOverrides;
+using hasheous_server.Classes;
+using hasheous.Classes;
 
 Logging.WriteToDiskOnly = true;
 Logging.Log(Logging.LogType.Information, "Startup", "Starting Hasheous Server " + Assembly.GetExecutingAssembly().GetName().Version);
@@ -383,6 +385,84 @@ using (var scope = app.Services.CreateScope())
 app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path.Value ?? string.Empty;
+    if (context.Request.Query.TryGetValue("page", out var pageVals)
+        && string.Equals(pageVals.FirstOrDefault(), "dataobjectdetail", StringComparison.OrdinalIgnoreCase)
+        && context.Request.Query.TryGetValue("id", out var idVals)
+        && long.TryParse(idVals.FirstOrDefault(), out var id)
+        && context.Request.Query.TryGetValue("type", out var typeVals))
+    {
+        // load the index.html file
+        var templatePath = Path.Combine(app.Environment.WebRootPath, "index.html");
+        var html = await File.ReadAllTextAsync(templatePath);
+
+        // if redis is enabled, check if the cache has been populated
+        string cacheKey = $"PageCache:{id}";
+        if (Config.RedisConfiguration.Enabled == true)
+        {
+            string? cachedData = hasheous.Classes.RedisConnection.GetDatabase(0).StringGet(cacheKey);
+            if (string.IsNullOrEmpty(cachedData) == false)
+            {
+                // if cached data is found, use it
+                html = html.Replace("<!--OG_INJECT-->", cachedData);
+                await context.Response.WriteAsync(html);
+                return;
+            }
+        }
+
+        // Fetch data object
+        DataObjects dataObjects = new hasheous_server.Classes.DataObjects();
+        var item = await dataObjects.GetDataObject(id);
+        if (item != null)
+        {
+            // generate the OG meta tags
+            var title = WebUtility.HtmlEncode($"Hasheous - {item.Name}" ?? $"Item {id}");
+            var desc = WebUtility.HtmlEncode(
+                item.Attributes?.FirstOrDefault(a => a.attributeName == hasheous_server.Models.AttributeItem.AttributeName.Description)?.Value.ToString() ?? ""
+            );
+            var image = WebUtility.HtmlDecode(
+                item.Attributes?.FirstOrDefault(a => a.attributeName == hasheous_server.Models.AttributeItem.AttributeName.Logo)?.Value.ToString() ?? ""
+            );
+            if (string.IsNullOrEmpty(image) == true)
+            {
+                image = "/images/logo.svg";
+            }
+            else
+            {
+                image = $"https://localhost:7157/api/v1/images/{image}";
+            }
+            var canonical = $"{context.Request.Scheme}://{context.Request.Host}{context.Request.Path}?page=dataobjectdetail&type={typeVals}&id={id}";
+            var og = $@"
+<meta property=""og:type"" content=""website"">
+<meta property=""og:title"" content=""{title}"">
+<meta property=""og:description"" content=""{desc}"">
+<meta property=""og:url"" content=""{canonical}"">
+<meta property=""og:image"" content=""{image}"">
+<meta name=""twitter:card"" content=""summary_large_image"">
+<meta name=""twitter:title"" content=""{title}"">
+<meta name=""twitter:description"" content=""{desc}"">
+<meta name=""twitter:image"" content=""{image}"">
+<link rel=""canonical"" href=""{canonical}"">";
+
+            // cache the generated data if redis is enabled
+            if (Config.RedisConfiguration.Enabled == true)
+            {
+                hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(cacheKey, og, TimeSpan.FromHours(1));
+            }
+
+            html = html.Replace("<!--OG_INJECT-->", og);
+
+            context.Response.ContentType = "text/html; charset=utf-8";
+            await context.Response.WriteAsync(html);
+            return;
+        }
+        // fallback to normal if not found (maybe 404 page with minimal OG)
+    }
+    await next();
+});
 
 app.UseDefaultFiles();
 app.UseStaticFiles(new StaticFileOptions
