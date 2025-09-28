@@ -61,6 +61,26 @@ namespace Classes.ProcessQueue
         FetchGiantBombMetadata,
 
         /// <summary>
+        /// Fetch Redump metadata
+        /// </summary>
+        FetchRedumpMetadata,
+
+        /// <summary>
+        /// Fetch TOSEC metadata
+        /// </summary>
+        FetchTOSECMetadata,
+
+        /// <summary>
+        /// Fetch WHDLoad metadata
+        /// </summary>
+        FetchWHDLoadMetadata,
+
+        /// <summary>
+        /// Fetch FBNEO metadata
+        /// </summary>
+        FetchFBNEOMetadata,
+
+        /// <summary>
         /// Runs daily maintenance tasks
         /// </summary>
         DailyMaintenance,

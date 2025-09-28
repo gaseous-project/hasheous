@@ -124,6 +124,22 @@ switch (taskType)
         Task = new FetchGiantBombMetadata();
         break;
 
+    case QueueItemType.FetchRedumpMetadata:
+        Task = new FetchRedumpMetadata();
+        break;
+
+    case QueueItemType.FetchTOSECMetadata:
+        Task = new FetchTOSECMetadata();
+        break;
+
+    case QueueItemType.FetchWHDLoadMetadata:
+        Task = new FetchWHDLoadMetadata();
+        break;
+
+    case QueueItemType.FetchFBNEOMetadata:
+        Task = new FetchFBNEOMetadata();
+        break;
+
     case QueueItemType.DailyMaintenance:
         Task = new DailyMaintenance();
         break;

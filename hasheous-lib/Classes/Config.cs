@@ -698,6 +698,38 @@ namespace Classes
                     }
                 }
 
+                public string LibraryMetadataDirectory_Redump
+                {
+                    get
+                    {
+                        return Path.Combine(LibraryMetadataDirectory, "Redump");
+                    }
+                }
+
+                public string LibraryMetadataDirectory_TOSEC
+                {
+                    get
+                    {
+                        return Path.Combine(LibraryMetadataDirectory, "TOSEC");
+                    }
+                }
+
+                public string LibraryMetadataDirectory_WHDLoad
+                {
+                    get
+                    {
+                        return Path.Combine(LibraryMetadataDirectory, "WHDLoad");
+                    }
+                }
+
+                public string LibraryMetadataDirectory_FBNEO
+                {
+                    get
+                    {
+                        return Path.Combine(LibraryMetadataDirectory, "FBNeo");
+                    }
+                }
+
                 public string LibrarySignaturesDirectory
                 {
                     get
@@ -754,6 +786,10 @@ namespace Classes
                     if (!Directory.Exists(LibraryMetadataDirectory_VIMMSLair)) { Directory.CreateDirectory(LibraryMetadataDirectory_VIMMSLair); }
                     if (!Directory.Exists(LibraryMetadataDirectory_TheGamesDb)) { Directory.CreateDirectory(LibraryMetadataDirectory_TheGamesDb); }
                     if (!Directory.Exists(LibraryMetadataDirectory_RetroAchievements)) { Directory.CreateDirectory(LibraryMetadataDirectory_RetroAchievements); }
+                    if (!Directory.Exists(LibraryMetadataDirectory_Redump)) { Directory.CreateDirectory(LibraryMetadataDirectory_Redump); }
+                    if (!Directory.Exists(LibraryMetadataDirectory_TOSEC)) { Directory.CreateDirectory(LibraryMetadataDirectory_TOSEC); }
+                    if (!Directory.Exists(LibraryMetadataDirectory_WHDLoad)) { Directory.CreateDirectory(LibraryMetadataDirectory_WHDLoad); }
+                    if (!Directory.Exists(LibraryMetadataDirectory_FBNEO)) { Directory.CreateDirectory(LibraryMetadataDirectory_FBNEO); }
                     if (!Directory.Exists(LibraryMetadataDirectory_GiantBomb)) { Directory.CreateDirectory(LibraryMetadataDirectory_GiantBomb); }
                     if (!Directory.Exists(LibraryTempDirectory)) { Directory.CreateDirectory(LibraryTempDirectory); }
                 }
