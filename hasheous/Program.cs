@@ -440,7 +440,7 @@ app.Use(async (context, next) =>
                         var ext = Path.GetExtension(file).ToLower();
                         if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".webp" || ext == ".avif" || ext == ".gif" || ext == ".svg" || ext == ".bmp" || ext == ".tiff" || ext == ".tif" || ext == ".ico" || ext == ".jfif" || ext == ".pjpeg" || ext == ".pjp")
                         {
-                            image = $"https://localhost:7157/api/v1/images/{dataobjectImage}{ext}";
+                            image = $"{context.Request.Scheme}://{context.Request.Host}/api/v1/images/{dataobjectImage}{ext}";
                         }
                     }
                 }

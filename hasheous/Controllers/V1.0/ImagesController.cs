@@ -26,6 +26,9 @@ namespace hasheous_server.Controllers.v1_0
         {
             Images images = new Images();
 
+            // remove any file extension from the id
+            Id = Id.Split('.')[0];
+
             ImageItem? image = await images.GetImage(Id);
 
             if (image == null)
