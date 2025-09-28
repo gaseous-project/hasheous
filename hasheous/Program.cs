@@ -423,16 +423,27 @@ app.Use(async (context, next) =>
             var desc = WebUtility.HtmlEncode(
                 item.Attributes?.FirstOrDefault(a => a.attributeName == hasheous_server.Models.AttributeItem.AttributeName.Description)?.Value.ToString() ?? ""
             );
-            var image = WebUtility.HtmlDecode(
+            var dataobjectImage = WebUtility.HtmlDecode(
                 item.Attributes?.FirstOrDefault(a => a.attributeName == hasheous_server.Models.AttributeItem.AttributeName.Logo)?.Value.ToString() ?? ""
             );
-            if (string.IsNullOrEmpty(image) == true)
+            string image = "/images/logo.svg";
+            if (!string.IsNullOrEmpty(dataobjectImage))
             {
-                image = "/images/logo.svg";
-            }
-            else
-            {
-                image = $"https://localhost:7157/api/v1/images/{image}";
+                // get the extension from the file name (stored in image)
+                if (Directory.Exists(Config.LibraryConfiguration.LibraryMetadataDirectory_HasheousImages))
+                {
+                    // search for the file in the metadata directory - ignore extensions
+                    var files = Directory.GetFiles(Config.LibraryConfiguration.LibraryMetadataDirectory_HasheousImages, $"{dataobjectImage}.*");
+                    if (files.Length > 0)
+                    {
+                        var file = files[0];
+                        var ext = Path.GetExtension(file).ToLower();
+                        if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".webp" || ext == ".avif" || ext == ".gif" || ext == ".svg" || ext == ".bmp" || ext == ".tiff" || ext == ".tif" || ext == ".ico" || ext == ".jfif" || ext == ".pjpeg" || ext == ".pjp")
+                        {
+                            image = $"https://localhost:7157/api/v1/images/{dataobjectImage}{ext}";
+                        }
+                    }
+                }
             }
             var canonical = $"{context.Request.Scheme}://{context.Request.Host}{context.Request.Path}?page=dataobjectdetail&type={typeVals}&id={id}";
             var og = $@"
