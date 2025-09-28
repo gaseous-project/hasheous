@@ -59,7 +59,8 @@ function LoadStatusPage() {
                         "signatures": [
                             "SignatureIngestor",
                             "FetchTOSECMetadata",
-                            "FetchRedumpMetadata"
+                            "FetchRedumpMetadata",
+                            "FetchWHDLoadMetadata"
                         ],
                         "metadataproxy": [
                             "FetchIGDBMetadata",
