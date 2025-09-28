@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO.Compression;
 using System.Net;
 using Classes;
+using hasheous_server.Classes;
 
 namespace TheGamesDB.SQL
 {
@@ -147,72 +148,9 @@ namespace TheGamesDB.SQL
 
         public async Task<bool?> DownloadFile(string url, string DestinationFile)
         {
-            var result = await _DownloadFile(new Uri(url), DestinationFile);
+            var result = await DownloadTools.DownloadFile(new Uri(url), DestinationFile);
 
             return result;
-        }
-
-        private async Task<bool?> _DownloadFile(Uri uri, string DestinationFile)
-        {
-            Logging.Log(Logging.LogType.Information, "Communications", "Downloading from " + uri.ToString() + " to " + DestinationFile);
-
-            try
-            {
-                using (HttpResponseMessage response = client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead).Result)
-                {
-                    response.EnsureSuccessStatusCode();
-
-                    using (Stream contentStream = await response.Content.ReadAsStreamAsync(), fileStream = new FileStream(DestinationFile, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true))
-                    {
-                        var totalRead = 0L;
-                        var totalReads = 0L;
-                        var buffer = new byte[8192];
-                        var isMoreToRead = true;
-
-                        do
-                        {
-                            var read = await contentStream.ReadAsync(buffer, 0, buffer.Length);
-                            if (read == 0)
-                            {
-                                isMoreToRead = false;
-                            }
-                            else
-                            {
-                                await fileStream.WriteAsync(buffer, 0, read);
-
-                                totalRead += read;
-                                totalReads += 1;
-
-                                if (totalReads % 2000 == 0)
-                                {
-                                    Console.WriteLine(string.Format("total bytes downloaded so far: {0:n0}", totalRead));
-                                }
-                            }
-                        }
-                        while (isMoreToRead);
-                    }
-                }
-
-                return true;
-            }
-            catch (HttpRequestException ex)
-            {
-                if (ex.StatusCode == HttpStatusCode.NotFound)
-                {
-                    if (File.Exists(DestinationFile))
-                    {
-                        FileInfo fi = new FileInfo(DestinationFile);
-                        if (fi.Length == 0)
-                        {
-                            File.Delete(DestinationFile);
-                        }
-                    }
-                }
-
-                Logging.Log(Logging.LogType.Warning, "Download Images", "Error downloading file: ", ex);
-            }
-
-            return false;
         }
     }
 }

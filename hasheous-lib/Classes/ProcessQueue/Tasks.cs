@@ -61,6 +61,11 @@ namespace Classes.ProcessQueue
         FetchGiantBombMetadata,
 
         /// <summary>
+        /// Fetch Redump metadata
+        /// </summary>
+        FetchRedumpMetadata,
+
+        /// <summary>
         /// Runs daily maintenance tasks
         /// </summary>
         DailyMaintenance,

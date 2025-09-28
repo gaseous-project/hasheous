@@ -698,6 +698,14 @@ namespace Classes
                     }
                 }
 
+                public string LibraryMetadataDirectory_Redump
+                {
+                    get
+                    {
+                        return Path.Combine(LibraryMetadataDirectory, "Redump");
+                    }
+                }
+
                 public string LibrarySignaturesDirectory
                 {
                     get
@@ -754,6 +762,7 @@ namespace Classes
                     if (!Directory.Exists(LibraryMetadataDirectory_VIMMSLair)) { Directory.CreateDirectory(LibraryMetadataDirectory_VIMMSLair); }
                     if (!Directory.Exists(LibraryMetadataDirectory_TheGamesDb)) { Directory.CreateDirectory(LibraryMetadataDirectory_TheGamesDb); }
                     if (!Directory.Exists(LibraryMetadataDirectory_RetroAchievements)) { Directory.CreateDirectory(LibraryMetadataDirectory_RetroAchievements); }
+                    if (!Directory.Exists(LibraryMetadataDirectory_Redump)) { Directory.CreateDirectory(LibraryMetadataDirectory_Redump); }
                     if (!Directory.Exists(LibraryMetadataDirectory_GiantBomb)) { Directory.CreateDirectory(LibraryMetadataDirectory_GiantBomb); }
                     if (!Directory.Exists(LibraryTempDirectory)) { Directory.CreateDirectory(LibraryTempDirectory); }
                 }

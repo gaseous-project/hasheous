@@ -57,7 +57,8 @@ function LoadStatusPage() {
 
                     const tableGroups = {
                         "signatures": [
-                            "SignatureIngestor"
+                            "SignatureIngestor",
+                            "FetchRedumpMetadata"
                         ],
                         "metadataproxy": [
                             "FetchIGDBMetadata",
@@ -175,16 +176,16 @@ window.addEventListener('beforeunload', () => {
 });
 
 function SetTask(server, itemType, processId, forceRun = null, enabled = null) {
-    let arguments = "";
+    let args = "";
     if (forceRun !== null) {
-        arguments += `ForceRun=${forceRun}`;
+        args += `ForceRun=${forceRun}`;
     }
     if (enabled !== null) {
-        arguments += `Enabled=${enabled}`;
+        args += `Enabled=${enabled}`;
     }
 
     if (arguments.length > 0) {
-        fetch(`/api/v1.0/BackgroundTasks/${processId}?${arguments}`, {
+        fetch(`/api/v1.0/BackgroundTasks/${processId}?${args}`, {
             method: 'GET'
         })
             .then(response => {

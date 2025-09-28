@@ -96,6 +96,10 @@ namespace Classes.ProcessQueue
                         Task = new FetchGiantBombMetadata();
                         break;
 
+                    case QueueItemType.FetchRedumpMetadata:
+                        Task = new FetchRedumpMetadata();
+                        break;
+
                     case QueueItemType.DailyMaintenance:
                         Task = new DailyMaintenance();
                         break;
