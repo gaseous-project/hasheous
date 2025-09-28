@@ -66,6 +66,11 @@ namespace Classes.ProcessQueue
         FetchRedumpMetadata,
 
         /// <summary>
+        /// Fetch TOSEC metadata
+        /// </summary>
+        FetchTOSECMetadata,
+
+        /// <summary>
         /// Runs daily maintenance tasks
         /// </summary>
         DailyMaintenance,

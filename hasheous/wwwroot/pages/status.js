@@ -58,6 +58,7 @@ function LoadStatusPage() {
                     const tableGroups = {
                         "signatures": [
                             "SignatureIngestor",
+                            "FetchTOSECMetadata",
                             "FetchRedumpMetadata"
                         ],
                         "metadataproxy": [

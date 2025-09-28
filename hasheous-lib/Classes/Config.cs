@@ -706,6 +706,14 @@ namespace Classes
                     }
                 }
 
+                public string LibraryMetadataDirectory_TOSEC
+                {
+                    get
+                    {
+                        return Path.Combine(LibraryMetadataDirectory, "TOSEC");
+                    }
+                }
+
                 public string LibrarySignaturesDirectory
                 {
                     get
@@ -763,6 +771,7 @@ namespace Classes
                     if (!Directory.Exists(LibraryMetadataDirectory_TheGamesDb)) { Directory.CreateDirectory(LibraryMetadataDirectory_TheGamesDb); }
                     if (!Directory.Exists(LibraryMetadataDirectory_RetroAchievements)) { Directory.CreateDirectory(LibraryMetadataDirectory_RetroAchievements); }
                     if (!Directory.Exists(LibraryMetadataDirectory_Redump)) { Directory.CreateDirectory(LibraryMetadataDirectory_Redump); }
+                    if (!Directory.Exists(LibraryMetadataDirectory_TOSEC)) { Directory.CreateDirectory(LibraryMetadataDirectory_TOSEC); }
                     if (!Directory.Exists(LibraryMetadataDirectory_GiantBomb)) { Directory.CreateDirectory(LibraryMetadataDirectory_GiantBomb); }
                     if (!Directory.Exists(LibraryTempDirectory)) { Directory.CreateDirectory(LibraryTempDirectory); }
                 }

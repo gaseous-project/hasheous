@@ -128,6 +128,10 @@ switch (taskType)
         Task = new FetchRedumpMetadata();
         break;
 
+    case QueueItemType.FetchTOSECMetadata:
+        Task = new FetchTOSECMetadata();
+        break;
+
     case QueueItemType.DailyMaintenance:
         Task = new DailyMaintenance();
         break;

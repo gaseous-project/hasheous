@@ -115,8 +115,7 @@ namespace Redump
             }
             catch (Exception ex)
             {
-                // Handle exceptions (e.g., log them)
-                Console.WriteLine($"Error downloading Redump metadata: {ex.Message}");
+                Logging.Log(Logging.LogType.Critical, "Redump", $"Error during Redump metadata download: {ex.Message}");
             }
         }
     }

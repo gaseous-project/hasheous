@@ -245,6 +245,7 @@
     "servicefetchgiantbombmetadata": "Fetch Giant Bomb Metadata",
     "servicefetchvimmmetadata": "Fetch VIMM Metadata",
     "servicefetchretroachievementsmetadata": "Fetch RetroAchievements Metadata",
+    "servicefetchtosecmetadata": "Fetch TOSEC Signatures",
     "servicefetchredumpmetadata": "Fetch Redump Signatures",
     "servicedailymaintenance": "Daily Maintenance",
     "serviceweeklymaintenance": "Weekly Maintenance",
