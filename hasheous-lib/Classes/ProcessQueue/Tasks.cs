@@ -76,6 +76,11 @@ namespace Classes.ProcessQueue
         FetchWHDLoadMetadata,
 
         /// <summary>
+        /// Fetch FBNEO metadata
+        /// </summary>
+        FetchFBNEOMetadata,
+
+        /// <summary>
         /// Runs daily maintenance tasks
         /// </summary>
         DailyMaintenance,

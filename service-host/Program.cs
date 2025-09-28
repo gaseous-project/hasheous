@@ -136,6 +136,10 @@ switch (taskType)
         Task = new FetchWHDLoadMetadata();
         break;
 
+    case QueueItemType.FetchFBNEOMetadata:
+        Task = new FetchFBNEOMetadata();
+        break;
+
     case QueueItemType.DailyMaintenance:
         Task = new DailyMaintenance();
         break;

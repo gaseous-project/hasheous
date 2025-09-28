@@ -248,6 +248,7 @@
     "servicefetchtosecmetadata": "Fetch TOSEC Signatures",
     "servicefetchredumpmetadata": "Fetch Redump Signatures",
     "servicefetchwhdloadmetadata": "Fetch WHDLoad Signatures",
+    "servicefetchfbneometadata": "Fetch FBNEO Signatures",
     "servicedailymaintenance": "Daily Maintenance",
     "serviceweeklymaintenance": "Weekly Maintenance",
     "servicecachewarmer": "Cache Warmer",
