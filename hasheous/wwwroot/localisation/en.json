@@ -272,5 +272,7 @@
     "servicebackgroundtasksforlocal": "Web Server Background Tasks",
     "servicebackgroundtasksforremote": "Service Manager Background Tasks",
     "enable": "Enable",
-    "disable": "Disable"
+    "disable": "Disable",
+    "cachecontrol": "Cache Control",
+    "flushcache": "Flush Cache"
 }

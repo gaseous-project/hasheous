@@ -45,6 +45,17 @@ namespace hasheous.Classes
             return cacheKey;
         }
 
+        public static void PurgeCache()
+        {
+            var server = Connection.GetServer(Config.RedisConfiguration.HostName + ":" + Config.RedisConfiguration.Port);
+            var keys = server.Keys();
+
+            foreach (var key in keys)
+            {
+                GetDatabase(0).KeyDelete(key);
+            }
+        }
+
         public static void PurgeCache(string prefix)
         {
             if (string.IsNullOrEmpty(prefix))

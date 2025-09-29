@@ -78,3 +78,21 @@ document.getElementById('role_apply').addEventListener('click', function () {
 
 GetPrivilegedUsers();
 $('#role_type').select2();
+
+document.getElementById('flushcache').addEventListener('click', function () {
+    postData(
+        '/api/v1.0/BackgroundTasks/Cache/Flush',
+        'POST',
+        {},
+        true
+    ).then(response => {
+        if (response.ok) {
+            alert('Cache flushed successfully.');
+        } else {
+            throw new Error('Failed to flush cache');
+        }
+    }).catch(error => {
+        console.error('Error flushing cache:', error);
+        alert('Error flushing cache.');
+    });
+});

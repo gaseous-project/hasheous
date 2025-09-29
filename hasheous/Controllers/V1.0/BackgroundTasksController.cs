@@ -54,5 +54,20 @@ namespace hasheous_server.Controllers.v1_0
                 return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while processing your request.");
             }
         }
+
+        [HttpPost]
+        [MapToApiVersion("1.0")]
+        [Route("Cache/Flush")]
+        [Authorize(Roles = "Admin")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        public IActionResult FlushCache()
+        {
+            if (Config.RedisConfiguration.Enabled == true)
+            {
+                hasheous.Classes.RedisConnection.PurgeCache();
+            }
+
+            return Ok();
+        }
     }
 }
