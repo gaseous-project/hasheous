@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using Classes;
 using hasheous_server.Classes;
 
@@ -90,7 +91,20 @@ namespace Redump
                         string cueExtractDir = System.IO.Path.Combine(extractDir, "cuesheets", platformName);
                         if (!Directory.Exists(cueExtractDir)) { Directory.CreateDirectory(cueExtractDir); }
                         Logging.Log(Logging.LogType.Information, "Redump", $"Extracting cuesheet for platform {platformName} to {cueExtractDir}");
-                        System.IO.Compression.ZipFile.ExtractToDirectory(cueDownloadPath, cueExtractDir);
+                        // loop through all zip entries and extract all files - check for presence of existing files and rename if necessary
+                        using (var archive = System.IO.Compression.ZipFile.OpenRead(cueDownloadPath))
+                        {
+                            foreach (var entry in archive.Entries)
+                            {
+                                var destinationPath = Path.Combine(cueExtractDir, entry.FullName);
+                                if (File.Exists(destinationPath))
+                                {
+                                    var newFileName = $"{Path.GetFileNameWithoutExtension(entry.Name)}_{Guid.NewGuid()}{Path.GetExtension(entry.Name)}";
+                                    destinationPath = Path.Combine(cueExtractDir, newFileName);
+                                }
+                                entry.ExtractToFile(destinationPath);
+                            }
+                        }
                     }
                 }
 
