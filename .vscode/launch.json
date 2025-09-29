@@ -55,7 +55,7 @@
             "program": "${workspaceFolder}/service-host/bin/Debug/net8.0/service-host.dll",
             "args": [
                 "--service",
-                "SignatureIngestor",
+                "FetchRedumpMetadata",
                 "--reportingserver",
                 "https://localhost:5001"
             ],
