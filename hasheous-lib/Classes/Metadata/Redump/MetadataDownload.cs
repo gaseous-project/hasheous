@@ -105,7 +105,11 @@ namespace Redump
                             datFileName = tempDatFileName;
                         }
                     }
-                    System.IO.Compression.ZipFile.ExtractToDirectory(downloadPath, extractDir);
+                    // Secure extraction (Zip Slip protected)
+                    Classes.PathSecurity.ExtractZipSafely(downloadPath, extractDir, renameOnCollision: true, onSkippedEntry: (e) =>
+                    {
+                        Logging.Log(Logging.LogType.Warning, "Redump", $"Skipped potentially unsafe dat zip entry: {e}");
+                    });
 
                     // If cueSheetLink is not empty, download the cuesheet
                     if (!string.IsNullOrEmpty(cueSheetLink))
@@ -133,48 +137,10 @@ namespace Redump
                         }
                         else
                         {
-                            using (var archive = System.IO.Compression.ZipFile.OpenRead(cueDownloadPath))
+                            Classes.PathSecurity.ExtractZipSafely(cueDownloadPath, cueExtractDir, renameOnCollision: true, onSkippedEntry: (e) =>
                             {
-                                var baseDirFull = Path.GetFullPath(cueExtractDir) + Path.DirectorySeparatorChar;
-                                foreach (var entry in archive.Entries)
-                                {
-                                    // Skip directory entries
-                                    if (string.IsNullOrEmpty(entry.Name) && (entry.FullName.EndsWith("/") || entry.FullName.EndsWith("\\")))
-                                    {
-                                        continue;
-                                    }
-
-                                    // Normalize separators and basic traversal rejection
-                                    var normalizedFullName = entry.FullName.Replace('\\', '/');
-
-                                    var destinationPath = Path.GetFullPath(
-                                        Path.Combine(cueExtractDir, normalizedFullName.Replace('/', Path.DirectorySeparatorChar))
-                                    );
-
-                                    // Ensure the destination stays within the extraction root (Zip Slip mitigation)
-                                    if (!destinationPath.StartsWith(baseDirFull, StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        Logging.Log(Logging.LogType.Warning, "Redump", $"Skipping zip entry outside target directory: {entry.FullName}");
-                                        continue;
-                                    }
-
-                                    // Ensure directory exists
-                                    var destDir = Path.GetDirectoryName(destinationPath);
-                                    if (!string.IsNullOrEmpty(destDir) && !Directory.Exists(destDir))
-                                    {
-                                        Directory.CreateDirectory(destDir);
-                                    }
-
-                                    // If file exists, rename to avoid overwrite
-                                    if (File.Exists(destinationPath))
-                                    {
-                                        var newFileName = $"{Path.GetFileNameWithoutExtension(entry.Name)}_{Guid.NewGuid()}{Path.GetExtension(entry.Name)}";
-                                        destinationPath = Path.Combine(destDir ?? cueExtractDir, newFileName);
-                                    }
-
-                                    entry.ExtractToFile(destinationPath);
-                                }
-                            }
+                                Logging.Log(Logging.LogType.Warning, "Redump", $"Skipped potentially unsafe cuesheet zip entry: {e}");
+                            });
                         }
                     }
                 }

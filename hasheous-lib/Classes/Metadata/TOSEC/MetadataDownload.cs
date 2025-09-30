@@ -69,8 +69,11 @@ namespace TOSEC
                 Logging.Log(Logging.LogType.Information, "TOSEC", $"Downloading TOSEC datfile from {datfileDownloadUrl}");
                 string tempZipPath = System.IO.Path.Combine(tempDir, "tosec_datfiles.zip");
                 await DownloadTools.DownloadFile(new Uri(datfileDownloadUrl), tempZipPath);
-                // extract the zip
-                System.IO.Compression.ZipFile.ExtractToDirectory(tempZipPath, extractDir);
+                // secure extraction (Zip Slip protected)
+                Classes.PathSecurity.ExtractZipSafely(tempZipPath, extractDir, renameOnCollision: true, onSkippedEntry: (e) =>
+                {
+                    Logging.Log(Logging.LogType.Warning, "TOSEC", $"Skipped potentially unsafe entry: {e}");
+                });
                 // delete the zip
                 File.Delete(tempZipPath);
 
