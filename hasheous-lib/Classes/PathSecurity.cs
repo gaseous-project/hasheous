@@ -95,13 +95,23 @@ namespace Classes
                     continue;
                 }
 
+                // Explicit fast-path traversal pattern checks (mirrors logic in IsZipSlipUnsafe for static analysis clarity)
+                var rawNormalized = entry.FullName.Replace('\\', '/');
+                if (rawNormalized.Contains("../", StringComparison.Ordinal) ||
+                    rawNormalized.StartsWith("../", StringComparison.Ordinal) ||
+                    rawNormalized.EndsWith("/..", StringComparison.Ordinal))
+                {
+                    onSkippedEntry?.Invoke(entry.FullName);
+                    continue;
+                }
+
                 if (IsZipSlipUnsafe(rootFull, entry.FullName))
                 {
                     onSkippedEntry?.Invoke(entry.FullName);
                     continue;
                 }
 
-                var normalized = entry.FullName.Replace('\\', '/');
+                var normalized = rawNormalized; // already normalized above
                 var destinationPath = Path.GetFullPath(Path.Combine(destinationDirectory, normalized.Replace('/', Path.DirectorySeparatorChar)));
 
                 var destDir = Path.GetDirectoryName(destinationPath);
