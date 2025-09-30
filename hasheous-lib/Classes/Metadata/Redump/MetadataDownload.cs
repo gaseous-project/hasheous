@@ -91,19 +91,13 @@ namespace Redump
                     using (var archive = System.IO.Compression.ZipFile.OpenRead(downloadPath))
                     {
                         // Safely get first entry name (may be absent)
-                        // datFileName = archive.Entries.FirstOrDefault()?.FullName ?? string.Empty;
                         string tempDatFileName = archive.Entries.FirstOrDefault()?.FullName ?? string.Empty;
-                        // check if tempDatFileName contains path traversal characters and sanitize - only remove those with directory separators, as some dat files may have valid instances of .. in their names
-                        tempDatFileName = tempDatFileName.Replace("../", "").Replace("..\\", "").Replace("./", "").Replace(".\\", "");
-                        // check if tempDatFileName contains directory separators and extract only the file name
-                        if (tempDatFileName.Contains("/") || tempDatFileName.Contains("\\"))
+                        if (PathSecurity.IsZipSlipUnsafe("", tempDatFileName))
                         {
-                            datFileName = System.IO.Path.GetFileName(tempDatFileName);
+                            Logging.Log(Logging.LogType.Warning, "Redump", $"First entry in datfile zip for platform {platformName} appears unsafe, skipping extraction.");
+                            continue;
                         }
-                        else
-                        {
-                            datFileName = tempDatFileName;
-                        }
+                        datFileName = Path.GetFileNameWithoutExtension(tempDatFileName);
                     }
                     // Secure extraction (Zip Slip protected)
                     Classes.PathSecurity.ExtractZipSafely(downloadPath, extractDir, renameOnCollision: true, onSkippedEntry: (e) =>

@@ -28,6 +28,16 @@ namespace Classes
             // Normalize separators
             var normalized = entryFullName.Replace('\\', '/');
 
+            // Explicit fast-path checks for directory traversal patterns to appease static analysis (GitHub Advanced Security).
+            // We only block when '..' is used as a path segment (preceded or followed by a separator or string boundary).
+            // This allows benign filenames like "My Game...dat" or "name..ext".
+            if (normalized.Contains("../", StringComparison.Ordinal) ||
+                normalized.StartsWith("../", StringComparison.Ordinal) ||
+                normalized.EndsWith("/..", StringComparison.Ordinal))
+            {
+                return true;
+            }
+
             // Detect traversal segment strictly when '..' is its own segment (preceded or followed by separator or string boundary)
             if (TraversalSegmentRegex.IsMatch(normalized))
             {
