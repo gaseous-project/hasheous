@@ -81,10 +81,29 @@ namespace Redump
                     Logging.Log(Logging.LogType.Information, "Redump", $"Extracting datfile for platform {platformName} to {extractDir}");
                     // get the name of the first entry in the zip file
                     string datFileName = "";
+                    if (File.Exists(downloadPath) == false)
+                    {
+                        Logging.Log(Logging.LogType.Warning, "Redump", $"Datfile zip for platform {platformName} not found at {downloadPath}, skipping extraction.");
+                        continue;
+                    }
+
+                    // Read the zip entries to get the first entry name to populate cuesheet directory name
                     using (var archive = System.IO.Compression.ZipFile.OpenRead(downloadPath))
                     {
                         // Safely get first entry name (may be absent)
-                        datFileName = archive.Entries.FirstOrDefault()?.FullName ?? string.Empty;
+                        // datFileName = archive.Entries.FirstOrDefault()?.FullName ?? string.Empty;
+                        string tempDatFileName = archive.Entries.FirstOrDefault()?.FullName ?? string.Empty;
+                        // check if tempDatFileName contains path traversal characters and sanitize - only remove those with directory separators, as some dat files may have valid instances of .. in their names
+                        tempDatFileName = tempDatFileName.Replace("../", "").Replace("..\\", "").Replace("./", "").Replace(".\\", "");
+                        // check if tempDatFileName contains directory separators and extract only the file name
+                        if (tempDatFileName.Contains("/") || tempDatFileName.Contains("\\"))
+                        {
+                            datFileName = System.IO.Path.GetFileName(tempDatFileName);
+                        }
+                        else
+                        {
+                            datFileName = tempDatFileName;
+                        }
                     }
                     System.IO.Compression.ZipFile.ExtractToDirectory(downloadPath, extractDir);
 
@@ -95,6 +114,7 @@ namespace Redump
 
                         string cuePlatformName = datFileName;
                         const string marker = " - Datfile (";
+                        Logging.Log(Logging.LogType.Information, "Redump", $"Initial cuePlatformName: {cuePlatformName}");
                         int markerIndex = cuePlatformName.IndexOf(marker, StringComparison.Ordinal);
                         if (markerIndex >= 0)
                         {
@@ -107,46 +127,53 @@ namespace Redump
                         if (!Directory.Exists(cueExtractDir)) { Directory.CreateDirectory(cueExtractDir); }
                         Logging.Log(Logging.LogType.Information, "Redump", $"Extracting cuesheet for platform {cuePlatformName} to {cueExtractDir}");
                         // loop through all zip entries and extract all files - check for presence of existing files and rename if necessary
-                        using (var archive = System.IO.Compression.ZipFile.OpenRead(cueDownloadPath))
+                        if (File.Exists(cueDownloadPath) == false)
                         {
-                            var baseDirFull = Path.GetFullPath(cueExtractDir) + Path.DirectorySeparatorChar;
-                            foreach (var entry in archive.Entries)
+                            Logging.Log(Logging.LogType.Warning, "Redump", $"Cuesheet zip file for platform {cuePlatformName} not found at {cueDownloadPath}, skipping extraction.");
+                        }
+                        else
+                        {
+                            using (var archive = System.IO.Compression.ZipFile.OpenRead(cueDownloadPath))
                             {
-                                // Skip directory entries
-                                if (string.IsNullOrEmpty(entry.Name) && (entry.FullName.EndsWith("/") || entry.FullName.EndsWith("\\")))
+                                var baseDirFull = Path.GetFullPath(cueExtractDir) + Path.DirectorySeparatorChar;
+                                foreach (var entry in archive.Entries)
                                 {
-                                    continue;
+                                    // Skip directory entries
+                                    if (string.IsNullOrEmpty(entry.Name) && (entry.FullName.EndsWith("/") || entry.FullName.EndsWith("\\")))
+                                    {
+                                        continue;
+                                    }
+
+                                    // Normalize separators and basic traversal rejection
+                                    var normalizedFullName = entry.FullName.Replace('\\', '/');
+
+                                    var destinationPath = Path.GetFullPath(
+                                        Path.Combine(cueExtractDir, normalizedFullName.Replace('/', Path.DirectorySeparatorChar))
+                                    );
+
+                                    // Ensure the destination stays within the extraction root (Zip Slip mitigation)
+                                    if (!destinationPath.StartsWith(baseDirFull, StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        Logging.Log(Logging.LogType.Warning, "Redump", $"Skipping zip entry outside target directory: {entry.FullName}");
+                                        continue;
+                                    }
+
+                                    // Ensure directory exists
+                                    var destDir = Path.GetDirectoryName(destinationPath);
+                                    if (!string.IsNullOrEmpty(destDir) && !Directory.Exists(destDir))
+                                    {
+                                        Directory.CreateDirectory(destDir);
+                                    }
+
+                                    // If file exists, rename to avoid overwrite
+                                    if (File.Exists(destinationPath))
+                                    {
+                                        var newFileName = $"{Path.GetFileNameWithoutExtension(entry.Name)}_{Guid.NewGuid()}{Path.GetExtension(entry.Name)}";
+                                        destinationPath = Path.Combine(destDir ?? cueExtractDir, newFileName);
+                                    }
+
+                                    entry.ExtractToFile(destinationPath);
                                 }
-
-                                // Normalize separators and basic traversal rejection
-                                var normalizedFullName = entry.FullName.Replace('\\', '/');
-
-                                var destinationPath = Path.GetFullPath(
-                                    Path.Combine(cueExtractDir, normalizedFullName.Replace('/', Path.DirectorySeparatorChar))
-                                );
-
-                                // Ensure the destination stays within the extraction root (Zip Slip mitigation)
-                                if (!destinationPath.StartsWith(baseDirFull, StringComparison.OrdinalIgnoreCase))
-                                {
-                                    Logging.Log(Logging.LogType.Warning, "Redump", $"Skipping zip entry outside target directory: {entry.FullName}");
-                                    continue;
-                                }
-
-                                // Ensure directory exists
-                                var destDir = Path.GetDirectoryName(destinationPath);
-                                if (!string.IsNullOrEmpty(destDir) && !Directory.Exists(destDir))
-                                {
-                                    Directory.CreateDirectory(destDir);
-                                }
-
-                                // If file exists, rename to avoid overwrite
-                                if (File.Exists(destinationPath))
-                                {
-                                    var newFileName = $"{Path.GetFileNameWithoutExtension(entry.Name)}_{Guid.NewGuid()}{Path.GetExtension(entry.Name)}";
-                                    destinationPath = Path.Combine(destDir ?? cueExtractDir, newFileName);
-                                }
-
-                                entry.ExtractToFile(destinationPath);
                             }
                         }
                     }
