@@ -83,7 +83,7 @@ namespace hasheous_server.Controllers.v1_0
         {
             SignatureManagement signature = new SignatureManagement();
 
-            object objects = signature.GetRomItemById(id);
+            object objects = await signature.GetRomItemById(id);
 
             return Ok(objects);
         }

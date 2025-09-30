@@ -79,18 +79,33 @@ namespace Redump
                     await DownloadTools.DownloadFile(new Uri(platformLink), downloadPath);
                     // Extract the datfile
                     Logging.Log(Logging.LogType.Information, "Redump", $"Extracting datfile for platform {platformName} to {extractDir}");
+                    // get the name of the first entry in the zip file
+                    string datFileName = "";
+                    using (var archive = System.IO.Compression.ZipFile.OpenRead(downloadPath))
+                    {
+                        // Safely get first entry name (may be absent)
+                        datFileName = archive.Entries.FirstOrDefault()?.FullName ?? string.Empty;
+                    }
                     System.IO.Compression.ZipFile.ExtractToDirectory(downloadPath, extractDir);
 
                     // If cueSheetLink is not empty, download the cuesheet
                     if (!string.IsNullOrEmpty(cueSheetLink))
                     {
                         Logging.Log(Logging.LogType.Information, "Redump", $"Downloading cuesheet for platform {platformName} from {cueSheetLink}");
-                        string cueDownloadPath = System.IO.Path.Combine(tempDir, $"{platformName}_cuesheets.zip");
+
+                        string cuePlatformName = datFileName;
+                        const string marker = " - Datfile (";
+                        int markerIndex = cuePlatformName.IndexOf(marker, StringComparison.Ordinal);
+                        if (markerIndex >= 0)
+                        {
+                            cuePlatformName = cuePlatformName[..markerIndex].TrimEnd();
+                        }
+                        string cueDownloadPath = System.IO.Path.Combine(tempDir, $"{cuePlatformName}_cuesheets.zip");
                         await DownloadTools.DownloadFile(new Uri(cueSheetLink), cueDownloadPath);
                         // Extract the cuesheet
-                        string cueExtractDir = System.IO.Path.Combine(extractDir, "cuesheets", platformName);
+                        string cueExtractDir = System.IO.Path.Combine(extractDir, "cuesheets", cuePlatformName);
                         if (!Directory.Exists(cueExtractDir)) { Directory.CreateDirectory(cueExtractDir); }
-                        Logging.Log(Logging.LogType.Information, "Redump", $"Extracting cuesheet for platform {platformName} to {cueExtractDir}");
+                        Logging.Log(Logging.LogType.Information, "Redump", $"Extracting cuesheet for platform {cuePlatformName} to {cueExtractDir}");
                         // loop through all zip entries and extract all files - check for presence of existing files and rename if necessary
                         using (var archive = System.IO.Compression.ZipFile.OpenRead(cueDownloadPath))
                         {
@@ -105,11 +120,6 @@ namespace Redump
 
                                 // Normalize separators and basic traversal rejection
                                 var normalizedFullName = entry.FullName.Replace('\\', '/');
-                                if (normalizedFullName.Contains(".."))
-                                {
-                                    Logging.Log(Logging.LogType.Warning, "Redump", $"Skipping suspicious zip entry (contains ..): {entry.FullName}");
-                                    continue;
-                                }
 
                                 var destinationPath = Path.GetFullPath(
                                     Path.Combine(cueExtractDir, normalizedFullName.Replace('/', Path.DirectorySeparatorChar))
