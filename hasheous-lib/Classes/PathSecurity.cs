@@ -114,6 +114,13 @@ namespace Classes
                 var normalized = rawNormalized; // already normalized above
                 var destinationPath = Path.GetFullPath(Path.Combine(destinationDirectory, normalized.Replace('/', Path.DirectorySeparatorChar)));
 
+                // Ensure the resolved path is still within extraction root (prevents traversal)
+                if (!destinationPath.StartsWith(rootFull, StringComparison.Ordinal))
+                {
+                    onSkippedEntry?.Invoke(entry.FullName + " (traversal detected)");
+                    continue;
+                }
+
                 var destDir = Path.GetDirectoryName(destinationPath);
                 if (!string.IsNullOrEmpty(destDir) && !Directory.Exists(destDir)) Directory.CreateDirectory(destDir);
 
