@@ -358,7 +358,7 @@ HAVING
                 romLanguages = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, string>>(strLanguages);
             }
 
-            return new Signatures_Games_2.RomItem
+            var retVal = new Signatures_Games_2.RomItem
             {
                 Id = ((long)sigDbRow["romid"]).ToString(),
                 Name = (string)sigDbRow["romname"],
@@ -369,7 +369,7 @@ HAVING
                 Sha256 = ((string)Common.ReturnValueIfNull(sigDbRow["SHA256"], "")).ToLower(),
                 Status = ((string)Common.ReturnValueIfNull(sigDbRow["Status"], "")).ToLower(),
                 DevelopmentStatus = (string)Common.ReturnValueIfNull((string)sigDbRow["DevelopmentStatus"], ""),
-                Attributes = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>((string)Common.ReturnValueIfNull(sigDbRow["Attributes"], "")),
+                Attributes = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>((string)Common.ReturnValueIfNull(sigDbRow["Attributes"], "")) ?? new Dictionary<string, object>(),
                 RomType = (Signatures_Games_2.RomItem.RomTypes)(int)sigDbRow["RomType"],
                 RomTypeMedia = (string)Common.ReturnValueIfNull((string)sigDbRow["RomTypeMedia"], ""),
                 MediaLabel = (string)Common.ReturnValueIfNull((string)sigDbRow["MediaLabel"], ""),
@@ -377,6 +377,29 @@ HAVING
                 Country = romCountries,
                 Language = romLanguages
             };
+
+            // if redump source, add cue sheet if it's available
+            if (retVal.SignatureSource == Signatures_Games_2.RomItem.SignatureSourceType.Redump)
+            {
+                // get the platform name from the database row
+                // we need this to find the cue sheet
+                if (sigDbRow.Table.Columns.Contains("Platform"))
+                {
+                    string platformName = (string)Common.ReturnValueIfNull(sigDbRow["Platform"], "");
+
+                    if (!string.IsNullOrEmpty(platformName))
+                    {
+                        // check if cue sheet is available
+                        string cueSheetPath = System.IO.Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_Redump, "cuesheets", platformName, Path.GetFileNameWithoutExtension(retVal.Name) + ".cue");
+                        if (System.IO.File.Exists(cueSheetPath))
+                        {
+                            retVal.Attributes.Add("cuesheet", System.IO.File.ReadAllText(cueSheetPath));
+                        }
+                    }
+                }
+            }
+
+            return retVal;
         }
 
         public Dictionary<string, string> GetLookup(LookupTypes LookupType, long GameId)
@@ -460,14 +483,16 @@ HAVING
             }).Rows[0]);
         }
 
-        public hasheous_server.Models.Signatures_Games_2.RomItem GetRomItemById(long id)
+        public async Task<hasheous_server.Models.Signatures_Games_2.RomItem> GetRomItemById(long id)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql = "SELECT `Id` AS romid, `Name` AS romname, Signatures_Roms.* FROM Signatures_Roms WHERE Id = @id;";
+            string sql = "SELECT Signatures_Roms.`Id` AS romid, Signatures_Roms.`Name` AS romname, Signatures_Roms.*, Signatures_Platforms.Platform FROM Signatures_Roms LEFT JOIN Signatures_Games ON Signatures_Roms.`GameId` = Signatures_Games.`Id` LEFT JOIN Signatures_Platforms ON Signatures_Games.`SystemId` = Signatures_Platforms.`Id` WHERE Signatures_Roms.`Id` = @id;";
 
-            return BuildRomItem(db.ExecuteCMD(sql, new Dictionary<string, object>{
+            var result = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>{
                 { "id", id }
-            }).Rows[0]);
+            });
+
+            return BuildRomItem(result.Rows[0]);
         }
     }
 }

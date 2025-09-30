@@ -7,9 +7,8 @@ fetch('/api/v1.0/Signatures/Rom/ById/' + romId, {
         throw new Error('Network response was not ok');
     }
     return response.json();
-}).then(success => {
-    console.log(success);
-
+}).then(async success => {
+    setPageTitle(success.name, true);
     let pageHeader = document.getElementById('dataObject_object_name');
     pageHeader.innerHTML = success.name;
 
@@ -100,7 +99,7 @@ fetch('/api/v1.0/Signatures/Rom/ById/' + romId, {
         )
     )
     if (jsonLoaded === true) {
-        postData('/api/v1.0/Lookup/ByHash?returnAllSources=true', 'POST', jsonModel, true)
+        await postData('/api/v1.0/Lookup/ByHash?returnAllSources=true', 'POST', jsonModel, true)
             .then(response => {
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
@@ -108,11 +107,11 @@ fetch('/api/v1.0/Signatures/Rom/ById/' + romId, {
                 return response.json();
             })
             .then(data => {
-                console.log(data);
                 let romJson = JSON.stringify(data, null, 2);
 
                 let jsonElement = document.createElement('pre');
-                jsonElement.innerHTML = romJson;
+                jsonElement.classList.add('language-json');
+                jsonElement.textContent = romJson;
                 document.getElementById('apiResponse').appendChild(jsonElement);
             })
             .catch((error) => {
@@ -125,12 +124,23 @@ fetch('/api/v1.0/Signatures/Rom/ById/' + romId, {
         document.getElementById('dataObjectAttributesSection').style.display = '';
         let attributeArray = [];
         for (const [key, value] of Object.entries(success.attributes)) {
-            attributeArray.push(
-                {
-                    "attribute": lang.getLang(success.signatureSource.toLowerCase() + "." + key),
-                    "value": value.trim().replace(/(?:\r\n|\r|\n)/g, '<br>').trim()
-                }
-            )
+            switch (key) {
+                case 'cuesheet':
+                    attributeArray.push(
+                        {
+                            "attribute": lang.getLang(success.signatureSource.toLowerCase() + "." + key),
+                            "value": '<pre>' + value.trim() + '</pre>'
+                        });
+                    break;
+
+                default:
+                    attributeArray.push(
+                        {
+                            "attribute": lang.getLang(success.signatureSource.toLowerCase() + "." + key),
+                            "value": value.trim().replace(/(?:\r\n|\r|\n)/g, '<br>').trim()
+                        });
+                    break;
+            }
         }
         document.getElementById('dataObjectAttributes').appendChild(
             new generateTable(
@@ -139,5 +149,10 @@ fetch('/api/v1.0/Signatures/Rom/ById/' + romId, {
             )
         )
     }
+
+    // highlight any code blocks
+    document.querySelectorAll('pre').forEach((block) => {
+        hljs.highlightElement(block);
+    });
 }
 );

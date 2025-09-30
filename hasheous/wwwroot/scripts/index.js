@@ -62,7 +62,6 @@ lang.Init(
     }
 );
 
-
 // set up banner UI elements
 function setUpUI() {
     let searchBox = document.getElementById('banner_search_field');

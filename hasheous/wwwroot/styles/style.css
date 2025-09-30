@@ -793,7 +793,7 @@ td {
     border-style: solid;
     border-width: 1px;
     border-color: var(--element-border-color);
-    background-color: var(--element-background-color);
+    /* background-color: var(--element-background-color); */
     margin: 0px;
     padding: 10px;
     height: 500px;
