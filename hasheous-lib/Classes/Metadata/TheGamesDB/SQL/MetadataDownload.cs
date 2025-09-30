@@ -82,9 +82,12 @@ namespace TheGamesDB.SQL
                     return null;
                 }
 
-                // extract the zip file
+                // extract the zip file securely
                 string extractedFolder = Path.Combine(downloadZipFileToPath, "tgdb_dump");
-                ZipFile.ExtractToDirectory(downloadZipFile, extractedFolder);
+                Classes.PathSecurity.ExtractZipSafely(downloadZipFile, extractedFolder, renameOnCollision: true, onSkippedEntry: (e) =>
+                {
+                    Logging.Log(Logging.LogType.Warning, "TheGamesDb", $"Skipped potentially unsafe entry: {e}");
+                });
 
                 // find the sql file
                 string sqlFile = Directory.GetFiles(extractedFolder, "*.sql", SearchOption.AllDirectories).FirstOrDefault();

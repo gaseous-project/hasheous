@@ -473,7 +473,7 @@ HAVING
         public hasheous_server.Models.Signatures_Games_2.RomItem GetRomItemByHash(hasheous_server.Models.HashLookupModel model)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql = "SELECT `Id` AS romid, `Name` AS romname, Signatures_Roms.* FROM Signatures_Roms WHERE MD5 = @md5 OR SHA1 = @sha1 OR SHA256 = @sha256 OR CRC = @crc;";
+            string sql = "SELECT Signatures_Roms.`Id` AS romid, Signatures_Roms.`Name` AS romname, Signatures_Roms.*, Signatures_Platforms.Platform FROM Signatures_Roms LEFT JOIN Signatures_Games ON Signatures_Roms.`GameId` = Signatures_Games.`Id` LEFT JOIN Signatures_Platforms ON Signatures_Games.`SystemId` = Signatures_Platforms.`Id` WHERE Signatures_Roms.MD5 = @md5 OR Signatures_Roms.SHA1 = @sha1 OR Signatures_Roms.SHA256 = @sha256 OR Signatures_Roms.CRC = @crc;";
 
             return BuildRomItem(db.ExecuteCMD(sql, new Dictionary<string, object>{
                 { "md5", model.MD5 },
