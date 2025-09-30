@@ -92,12 +92,13 @@ namespace Redump
                     {
                         // Safely get first entry name (may be absent)
                         string tempDatFileName = archive.Entries.FirstOrDefault()?.FullName ?? string.Empty;
-                        if (PathSecurity.IsZipSlipUnsafe("", tempDatFileName))
+                        string safeDatFileName = Path.GetFileName(tempDatFileName);
+                        if (string.IsNullOrEmpty(safeDatFileName) || PathSecurity.IsZipSlipUnsafe("", safeDatFileName))
                         {
                             Logging.Log(Logging.LogType.Warning, "Redump", $"First entry in datfile zip for platform {platformName} appears unsafe, skipping extraction.");
                             continue;
                         }
-                        datFileName = Path.GetFileNameWithoutExtension(tempDatFileName);
+                        datFileName = Path.GetFileNameWithoutExtension(safeDatFileName);
                     }
                     // Secure extraction (Zip Slip protected)
                     Classes.PathSecurity.ExtractZipSafely(downloadPath, extractDir, renameOnCollision: true, onSkippedEntry: (e) =>
