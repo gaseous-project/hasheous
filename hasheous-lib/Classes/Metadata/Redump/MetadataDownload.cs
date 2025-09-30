@@ -93,7 +93,7 @@ namespace Redump
                         // Safely get first entry name (may be absent)
                         string tempDatFileName = archive.Entries.FirstOrDefault()?.FullName ?? string.Empty;
                         string safeDatFileName = Path.GetFileName(tempDatFileName);
-                        if (string.IsNullOrEmpty(safeDatFileName) || PathSecurity.IsZipSlipUnsafe("", safeDatFileName))
+                        if (string.IsNullOrEmpty(safeDatFileName) || PathSecurity.IsZipSlipUnsafe(Path.Combine(extractDir), safeDatFileName))
                         {
                             Logging.Log(Logging.LogType.Warning, "Redump", $"First entry in datfile zip for platform {platformName} appears unsafe, skipping extraction.");
                             continue;
