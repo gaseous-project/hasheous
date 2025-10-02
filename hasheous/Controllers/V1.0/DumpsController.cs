@@ -25,7 +25,7 @@ namespace hasheous_server.Controllers.v1_0
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> GetMetadataMapDump()
         {
-            return await ReturnDumpFile(Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "MetadataMap.zip"));
+            return await ReturnDumpFile(Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "MetadataMap.zip"), true);
         }
 
         [HttpGet("platforms")]
@@ -89,21 +89,24 @@ namespace hasheous_server.Controllers.v1_0
                 return BadRequest("Invalid platform name.");
             }
 
-            return await ReturnDumpFile(Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "Platforms", $"{platformname}.zip"));
+            return await ReturnDumpFile(Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "Platforms", $"{platformname}.zip"), true);
         }
 
-        private async Task<IActionResult> ReturnDumpFile(string zipFilePath)
+        private async Task<IActionResult> ReturnDumpFile(string zipFilePath, bool bypassTraversalCheck = false)
         {
             try
             {
-                // Validate input: not null/empty, no path traversal, no invalid filename chars
-                if (string.IsNullOrWhiteSpace(zipFilePath) ||
-                    zipFilePath.IndexOfAny(System.IO.Path.GetInvalidFileNameChars()) >= 0 ||
-                    zipFilePath.Contains("..") ||
-                    zipFilePath.Contains("/") ||
-                    zipFilePath.Contains("\\"))
+                if (bypassTraversalCheck == false)
                 {
-                    return BadRequest("Invalid platform name.");
+                    // Validate input: not null/empty, no path traversal, no invalid filename chars
+                    if (string.IsNullOrWhiteSpace(zipFilePath) ||
+                        zipFilePath.IndexOfAny(System.IO.Path.GetInvalidFileNameChars()) >= 0 ||
+                        zipFilePath.Contains("..") ||
+                        zipFilePath.Contains("/") ||
+                        zipFilePath.Contains("\\"))
+                    {
+                        return BadRequest("Invalid platform name.");
+                    }
                 }
 
                 // Check if the zip file exists
