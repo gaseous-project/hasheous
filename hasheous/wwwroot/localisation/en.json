@@ -278,5 +278,6 @@
     "dumps": "Dumps",
     "dumpsdescription": "Dumps are collections of ROM hashes and metadata that can be downloaded and used in your local ROM manager. Dumps are generated weekly, and contain all the data in the Hasheous database.",
     "dumpsavailable": "Dumps are available for the following platforms:",
+    "dumpfile": "Dump File",
     "download": "Download"
 }

@@ -443,14 +443,35 @@ namespace hasheous_server.Classes
             {
                 signatureItems = await GetSignatures(ObjectType, id);
 
-                // get extra attributes if dataobjecttype is game
-                if (ObjectType == DataObjectType.Game)
+                // get extra attributes based on dataobjecttype
+                switch (ObjectType)
                 {
-                    if (GetChildRelations == true)
-                    {
-                        attributes.Add(await GetRoms(signatureItems));
-                        attributes.AddRange(GetCountriesAndLanguagesForGame(signatureItems));
-                    }
+                    case DataObjectType.Game:
+                        if (GetChildRelations == true)
+                        {
+                            attributes.Add(await GetRoms(signatureItems));
+                            attributes.AddRange(GetCountriesAndLanguagesForGame(signatureItems));
+                        }
+                        break;
+
+                    case DataObjectType.Platform:
+                        // check dumps directory for files named <platformname>.zip
+                        if (GetChildRelations == true)
+                        {
+                            string dumpFile = Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "Platforms", (string)row["Name"] + ".zip");
+                            if (File.Exists(dumpFile))
+                            {
+                                AttributeItem dumpAttribute = new AttributeItem
+                                {
+                                    attributeName = AttributeItem.AttributeName.DumpFile,
+                                    attributeType = AttributeItem.AttributeType.Link,
+                                    attributeRelationType = DataObjectType.None,
+                                    Value = "/api/v1/Dumps/platforms/" + (string)row["Name"] + ".zip"
+                                };
+                                attributes.Add(dumpAttribute);
+                            }
+                        }
+                        break;
                 }
             }
 
