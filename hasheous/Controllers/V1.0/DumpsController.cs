@@ -33,7 +33,7 @@ namespace hasheous_server.Controllers.v1_0
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public IActionResult GetAvailablePlatformDumps()
+        public IActionResult GetAvailablePlatformDumps([FromQuery] bool includeDetails = false)
         {
             try
             {
@@ -49,13 +49,30 @@ namespace hasheous_server.Controllers.v1_0
                 var zipFiles = Directory.GetFiles(platformsDir, "*.zip");
 
                 // Get the platform names from the file names
-                List<string> platformNames = zipFiles
-                    .Select(f => Path.GetFileName(f))
-                    .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-                    .ToList();
+                if (includeDetails == true)
+                {
+                    var platformDetails = zipFiles
+                        .Select(f => new
+                        {
+                            Name = Path.GetFileName(f),
+                            SizeBytes = new FileInfo(f).Length,
+                            LastModifiedUtc = System.IO.File.GetLastWriteTimeUtc(f)
+                        })
+                        .OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
+                        .ToList();
 
-                // Return the list of platform names
-                return Ok(platformNames);
+                    return Ok(platformDetails);
+                }
+                else
+                {
+                    List<string> platformNames = zipFiles
+                        .Select(f => Path.GetFileName(f))
+                        .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+
+                    // Return the list of platform names
+                    return Ok(platformNames);
+                }
             }
             catch (Exception ex)
             {
