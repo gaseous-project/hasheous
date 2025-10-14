@@ -38,8 +38,8 @@ jobs:
       - name: Build and push Hasheous Web Server image
         uses: docker/build-push-action@v6
         with:
-          context: ./hasheous
-          file: ./docker/Dockerfile
+          context: ./
+          file: ./hasheous/docker/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
@@ -48,8 +48,8 @@ jobs:
       - name: Build and push Hasheous Orchestration Server image
         uses: docker/build-push-action@v6
         with:
-          context: ./service-ochestrator
-          file: ./docker/Dockerfile
+          context: ./
+          file: ./service-orchestrator/docker/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
