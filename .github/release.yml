@@ -1,0 +1,23 @@
+changelog:
+  categories:
+    - title: What's New
+      labels:
+        - '*'
+      exclude:
+        labels:
+          - note
+          - bug
+          - dependencies
+          - experimental
+    - title: Notes
+      labels:
+        - note
+    - title: Bug Fixes
+      labels:
+        - bug
+    - title: Experimental Features
+      labels:
+        - experimental
+    - title: Dependencies
+      labels:
+        - dependencies
