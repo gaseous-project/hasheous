@@ -41,7 +41,7 @@
     <None Remove="Schema\hasheous-*.sql" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Build" Version="17.10.46" />
+    <PackageReference Include="Microsoft.Build" Version="17.11.48" />
     <EmbeddedResource Include="Support\Country.txt" />
     <EmbeddedResource Include="Support\Language.txt" />
     <EmbeddedResource Include="Schema\hasheous-*.sql" />
