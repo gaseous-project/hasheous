@@ -1,523 +1,84 @@
 using System.Reflection;
-using System.Text.Json.Serialization;
 using Classes;
 using Classes.ProcessQueue;
-using Microsoft.AspNetCore.Http.Features;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Versioning;
-using Microsoft.AspNetCore.Server.Kestrel.Core;
-using Microsoft.OpenApi.Models;
-using Authentication;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Identity.UI.Services;
 using static Classes.Common;
-using System.Net.Mail;
-using System.Net;
-using static Authentication.ApiKey;
-using static Authentication.ClientApiKey;
-using hasheous_server.Classes.Metadata.IGDB;
-using HasheousClient.Models.Metadata.IGDB;
-using System.Diagnostics;
-using StackExchange.Redis;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.HttpOverrides;
 using hasheous_server.Classes;
 using hasheous.Classes;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.UI.Services;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Authentication;
+using System.Net.Mail;
+using System.Net;
+using StackExchange.Redis;
+using Hasheous;
 
 Logging.WriteToDiskOnly = true;
 Logging.Log(Logging.LogType.Information, "Startup", "Starting Hasheous Server " + Assembly.GetExecutingAssembly().GetName().Version);
 
-// set up db
-Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionStringNoDatabase);
-
-// check db availability
-bool dbOnline = false;
-do
-{
-    Logging.Log(Logging.LogType.Information, "Startup", "Waiting for database...");
-    if (db.TestConnection() == true)
-    {
-        dbOnline = true;
-    }
-    else
-    {
-        Thread.Sleep(30000);
-    }
-} while (dbOnline == false);
-
-db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-
-await db.InitDB();
-Classes.Metadata.Utility.TableBuilder.BuildTables();
-
-// write updated settings back to the config file
-Config.UpdateConfig();
+// database initialization
+await WaitForAndInitializeDatabaseAsync();
 
 // set up server
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-builder.Services.AddControllers().AddJsonOptions(x =>
-{
-    // serialize enums as strings in api responses (e.g. Role)
-    x.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-
-    // suppress nulls
-    x.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
-
-    // set max depth
-    x.JsonSerializerOptions.MaxDepth = 64;
-});
-builder.Services.AddMvc().AddNewtonsoftJson(x =>
-{
-    // serialize enums as string in api responses
-    x.SerializerSettings.Converters.Add(new Newtonsoft.Json.Converters.StringEnumConverter());
-
-    // suppress nulls
-    x.SerializerSettings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-
-    // set max depth
-    x.SerializerSettings.MaxDepth = 64;
-
-    // indent all responses
-    x.SerializerSettings.Formatting = Newtonsoft.Json.Formatting.Indented;
-});
-builder.Services.AddResponseCaching();
-builder.Services.AddControllers(options =>
-{
-    options.CacheProfiles.Add("None",
-        new CacheProfile()
-        {
-            Duration = 1,
-            Location = ResponseCacheLocation.Any,
-            VaryByQueryKeys = new[] { "*" }
-        });
-    options.CacheProfiles.Add("Default30",
-        new CacheProfile()
-        {
-            Duration = 30,
-            Location = ResponseCacheLocation.Any,
-            VaryByQueryKeys = new[] { "*" }
-        });
-    options.CacheProfiles.Add("5Minute",
-        new CacheProfile()
-        {
-            Duration = 300,
-            Location = ResponseCacheLocation.Any,
-            VaryByQueryKeys = new[] { "*" }
-        });
-    options.CacheProfiles.Add("7Days",
-        new CacheProfile()
-        {
-            Duration = 604800,
-            Location = ResponseCacheLocation.Any,
-            VaryByQueryKeys = new[] { "*" }
-        });
-    options.CacheProfiles.Add("MaxDays",
-    new CacheProfile()
-    {
-        Duration = int.MaxValue,
-        Location = ResponseCacheLocation.Any,
-        VaryByQueryKeys = new[] { "*" }
-    });
-});
-
-// email configuration
-var smtpClient = new SmtpClient(Config.EmailSMTPConfiguration.Host)
-{
-    Port = Config.EmailSMTPConfiguration.Port,
-    Credentials = new NetworkCredential(Config.EmailSMTPConfiguration.UserName, Config.EmailSMTPConfiguration.Password),
-    EnableSsl = Config.EmailSMTPConfiguration.EnableSSL,
-};
-builder.Services.AddSingleton(smtpClient);
-builder.Services.AddTransient<IEmailSender, SmtpEmailSender>();
-
-// api versioning
-builder.Services.AddApiVersioning(config =>
-{
-    config.DefaultApiVersion = new ApiVersion(1, 0);
-    config.AssumeDefaultVersionWhenUnspecified = true;
-    config.ReportApiVersions = true;
-    config.ApiVersionReader = ApiVersionReader.Combine(new UrlSegmentApiVersionReader(),
-                                                    new HeaderApiVersionReader("x-api-version"),
-                                                    new MediaTypeApiVersionReader("x-api-version"));
-});
-builder.Services.AddVersionedApiExplorer(setup =>
-{
-    setup.GroupNameFormat = "'v'VVV";
-    setup.SubstituteApiVersionInUrl = true;
-});
-
-// set max upload size
-builder.Services.Configure<IISServerOptions>(options =>
-{
-    options.MaxRequestBodySize = int.MaxValue;
-});
-builder.Services.Configure<KestrelServerOptions>(options =>
-{
-    options.Limits.MaxRequestBodySize = int.MaxValue;
-});
-builder.Services.Configure<FormOptions>(options =>
-{
-    options.ValueLengthLimit = int.MaxValue;
-    options.MultipartBodyLengthLimit = int.MaxValue;
-    options.MultipartHeadersLengthLimit = int.MaxValue;
-});
-builder.Services.Configure<ForwardedHeadersOptions>(options =>
-{
-    options.RequireHeaderSymmetry = false;
-    options.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto;
-    options.KnownProxies.Clear();
-    options.KnownNetworks.Clear();
-});
-
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(options =>
-    {
-        options.AddSecurityDefinition("API Key", new OpenApiSecurityScheme
-        {
-            Name = ApiKey.ApiKeyHeaderName,
-            In = ParameterLocation.Header,
-            Type = SecuritySchemeType.ApiKey,
-            Description = "API Key Authentication",
-            Scheme = "ApiKeyScheme"
-        });
-
-        options.AddSecurityDefinition("Client API Key", new OpenApiSecurityScheme
-        {
-            Name = ClientApiKey.APIKeyHeaderName,
-            In = ParameterLocation.Header,
-            Type = SecuritySchemeType.ApiKey,
-            Description = "Client API Key",
-            Scheme = "ClientApiKeyScheme"
-        });
-
-        options.OperationFilter<AuthorizationOperationFilter>();
-        options.DocumentFilter<IGDBMetadataDocumentFilter>();
-
-        options.SwaggerDoc("v1", new OpenApiInfo
-        {
-            Version = "v1.0",
-            Title = "Hasheous API",
-            Description = "An API for querying game metadata",
-            TermsOfService = new Uri("https://github.com/gaseous-project/hasheous"),
-            Contact = new OpenApiContact
-            {
-                Name = "GitHub Repository",
-                Url = new Uri("https://github.com/gaseous-project/hasheous")
-            },
-            License = new OpenApiLicense
-            {
-                Name = "Hasheous License",
-                Url = new Uri("https://github.com/gaseous-project/hasheous/blob/main/LICENSE")
-            }
-        });
-
-        options.CustomSchemaIds(type =>
-        {
-            if (type.IsGenericType)
-            {
-                var genericTypeName = type.GetGenericTypeDefinition().Name;
-                genericTypeName = genericTypeName.Substring(0, genericTypeName.IndexOf('`'));
-                var genericArgs = string.Join("_", type.GetGenericArguments().Select(t => t.Name));
-                return genericTypeName + "_" + genericArgs;
-            }
-            return type.FullName?.Replace("+", "_") ?? type.Name;
-        });
-
-        // using System.Reflection;
-        var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
-        options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFilename));
-
-        // sort the endpoints
-        options.OrderActionsBy((apiDesc) => $"{apiDesc.RelativePath}_{apiDesc.HttpMethod}");
-    }
-);
-builder.Services.AddHostedService<TimedHostedService>();
-
-// caching
-if (Config.RedisConfiguration.Enabled)
-{
-    builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(Config.RedisConfiguration.HostName + ":" + Config.RedisConfiguration.Port));
-    builder.Services.AddHttpClient();
-}
-
-// CSRF protection
-builder.Services.AddAntiforgery(options =>
-{
-    options.HeaderName = "X-XSRF-TOKEN"; // Angular/SPA convention, can be any name
-});
-
-builder.Services.AddControllers(options =>
-{
-    options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute());
-});
-
-// identity
-builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
-        {
-            options.Password.RequireDigit = true;
-            options.Password.RequireLowercase = true;
-            options.Password.RequireNonAlphanumeric = true;
-            options.Password.RequireUppercase = true;
-            options.Password.RequiredLength = 10;
-            options.User.AllowedUserNameCharacters = null;
-            options.User.RequireUniqueEmail = true;
-            options.SignIn.RequireConfirmedPhoneNumber = false;
-            options.SignIn.RequireConfirmedEmail = false;
-            options.SignIn.RequireConfirmedAccount = false;
-        })
-    .AddUserStore<UserStore>()
-    .AddRoleStore<RoleStore>()
-    .AddDefaultTokenProviders()
-    .AddDefaultUI()
-    ;
-builder.Services.ConfigureApplicationCookie(options =>
-        {
-            options.Cookie.Name = "Hasheous.Identity";
-            options.ExpireTimeSpan = TimeSpan.FromDays(90);
-            options.SlidingExpiration = true;
-            options.Cookie.HttpOnly = true;
-            options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
-            options.Cookie.SameSite = SameSiteMode.None;
-        });
-builder.Services.AddScoped<UserStore>();
-builder.Services.AddScoped<RoleStore>();
-
-builder.Services.AddTransient<IUserStore<ApplicationUser>, UserStore>();
-builder.Services.AddTransient<IRoleStore<ApplicationRole>, RoleStore>();
-
-builder.Services.AddAuthorization(options =>
-{
-    options.AddPolicy("Admin", policy => policy.RequireRole("Admin"));
-    options.AddPolicy("Moderator", policy => policy.RequireRole("Moderator"));
-    options.AddPolicy("Member", policy => policy.RequireRole("Member"));
-    options.AddPolicy("VerifiedEmail", policy => policy.RequireRole("Verified Email"));
-});
-
-// setup api key
-builder.Services.AddSingleton<ApiKeyAuthorizationFilter>();
-builder.Services.AddSingleton<IApiKeyValidator, ApiKeyValidator>();
-builder.Services.AddSingleton<ClientApiKeyAuthorizationFilter>();
-builder.Services.AddSingleton<IClientApiKeyValidator, ClientApiKeyValidator>();
-
-// add social authentication
-builder.Services.AddAuthentication(o =>
-    {
-        o.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-    });
-builder.Services.AddAuthentication().AddCookie();
-if (Config.SocialAuthConfiguration.GoogleAuthEnabled == true)
-{
-    builder.Services.AddAuthentication().AddGoogle(options =>
-        {
-            options.ClientId = Config.SocialAuthConfiguration.GoogleClientId;
-            options.ClientSecret = Config.SocialAuthConfiguration.GoogleClientSecret;
-        });
-}
-if (Config.SocialAuthConfiguration.MicrosoftAuthEnabled == true)
-{
-    builder.Services.AddAuthentication().AddMicrosoftAccount(options =>
-        {
-            options.ClientId = Config.SocialAuthConfiguration.MicrosoftClientId;
-            options.ClientSecret = Config.SocialAuthConfiguration.MicrosoftClientSecret;
-            options.SaveTokens = true;
-            options.AuthorizationEndpoint = "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize";
-            options.TokenEndpoint = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
-        });
-}
+// service registrations (modularized)
+builder.Services
+    .AddHasheousJsonAndNewtonsoft()
+    .AddHasheousCacheProfiles()
+    .AddHasheousEmail()
+    .AddHasheousApiVersioning()
+    .AddHasheousUploadAndForwardingLimits()
+    .AddHasheousSwagger()
+    .AddHasheousRedis()
+    .AddHasheousCsrf()
+    .AddHasheousIdentityAndAuth()
+    .AddHasheousApiKeySupport()
+    .AddHostedService<TimedHostedService>();
 
 var app = builder.Build();
 
-// configure the server for use in development
-if (app.Environment.IsDevelopment())
-{
-    Config.RequireClientAPIKey = false;
-    app.UseHttpsRedirection();
-    app.UseDeveloperExceptionPage();
-}
-else
-{
-    // app.UseHsts();
-}
-
-app.UseSwagger();
-app.UseSwaggerUI(options =>
-    {
-        options.SwaggerEndpoint($"/swagger/v1/swagger.json", "v1.0");
-    }
-);
-
+await app.ConfigureDevelopmentModeAsync();
+app.UseHasheousSwaggerUI();
 app.UseResponseCaching();
 app.UseForwardedHeaders();
-
-// set up system roles
-using (var scope = app.Services.CreateScope())
-{
-    var roleManager = scope.ServiceProvider.GetRequiredService<RoleStore>();
-    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-    var roles = new[] { "Admin", "Moderator", "Member", "Verified Email" };
-
-    foreach (var role in roles)
-    {
-        if (await roleManager.FindByNameAsync(role, CancellationToken.None) == null)
-        {
-            ApplicationRole applicationRole = new ApplicationRole();
-            applicationRole.Name = role;
-            applicationRole.NormalizedName = role.ToUpper();
-            await roleManager.CreateAsync(applicationRole, CancellationToken.None);
-        }
-    }
-
-    // Update existing users to have the "Verified Email" role if their email is confirmed
-    const string verifiedEmailRole = "Verified Email";
-    var usersWithConfirmedEmails = userManager.Users.Where(u => u.EmailConfirmed).ToList();
-    foreach (var user in usersWithConfirmedEmails)
-    {
-        if (!await userManager.IsInRoleAsync(user, verifiedEmailRole))
-        {
-            await userManager.AddToRoleAsync(user, verifiedEmailRole);
-        }
-    }
-}
-
+await app.SeedRolesAndVerifiedEmailAsync();
 app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
-
-app.Use(async (context, next) =>
-{
-    var path = context.Request.Path.Value ?? string.Empty;
-    if (context.Request.Query.TryGetValue("page", out var pageVals)
-        && string.Equals(pageVals.FirstOrDefault(), "dataobjectdetail", StringComparison.OrdinalIgnoreCase)
-        && context.Request.Query.TryGetValue("id", out var idVals)
-        && long.TryParse(idVals.FirstOrDefault(), out var id)
-        && context.Request.Query.TryGetValue("type", out var typeVals))
-    {
-        // load the index.html file
-        var templatePath = Path.Combine(app.Environment.WebRootPath, "index.html");
-        var html = await File.ReadAllTextAsync(templatePath);
-
-        // if redis is enabled, check if the cache has been populated
-        string cacheKey = $"PageCache:{id}";
-        if (Config.RedisConfiguration.Enabled == true)
-        {
-            string? cachedData = hasheous.Classes.RedisConnection.GetDatabase(0).StringGet(cacheKey);
-            if (string.IsNullOrEmpty(cachedData) == false)
-            {
-                // if cached data is found, use it
-                html = html.Replace("<!--OG_INJECT-->", cachedData);
-                await context.Response.WriteAsync(html);
-                return;
-            }
-        }
-
-        // Fetch data object
-        DataObjects dataObjects = new hasheous_server.Classes.DataObjects();
-        var item = await dataObjects.GetDataObject(id);
-        if (item != null)
-        {
-            // generate the OG meta tags
-            var title = WebUtility.HtmlEncode($"Hasheous - {item.Name}" ?? $"Item {id}");
-            var desc = WebUtility.HtmlEncode(
-                item.Attributes?.FirstOrDefault(a => a.attributeName == hasheous_server.Models.AttributeItem.AttributeName.Description)?.Value.ToString() ?? ""
-            );
-            var dataobjectImage = WebUtility.HtmlDecode(
-                item.Attributes?.FirstOrDefault(a => a.attributeName == hasheous_server.Models.AttributeItem.AttributeName.Logo)?.Value.ToString() ?? ""
-            );
-            string image = "/images/logo.svg";
-            if (!string.IsNullOrEmpty(dataobjectImage))
-            {
-                // get the extension from the file name (stored in image)
-                if (Directory.Exists(Config.LibraryConfiguration.LibraryMetadataDirectory_HasheousImages))
-                {
-                    // search for the file in the metadata directory - ignore extensions
-                    var files = Directory.GetFiles(Config.LibraryConfiguration.LibraryMetadataDirectory_HasheousImages, $"{dataobjectImage}.*");
-                    if (files.Length > 0)
-                    {
-                        var file = files[0];
-                        var ext = Path.GetExtension(file).ToLower();
-                        if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".webp" || ext == ".avif" || ext == ".gif" || ext == ".svg" || ext == ".bmp" || ext == ".tiff" || ext == ".tif" || ext == ".ico" || ext == ".jfif" || ext == ".pjpeg" || ext == ".pjp")
-                        {
-                            image = $"{context.Request.Scheme}://{context.Request.Host}/api/v1/images/{dataobjectImage}{ext}";
-                        }
-                    }
-                }
-            }
-            var canonical = $"{context.Request.Scheme}://{context.Request.Host}{context.Request.Path}?page=dataobjectdetail&type={typeVals}&id={id}";
-            var og = $@"
-<meta property=""og:type"" content=""website"">
-<meta property=""og:title"" content=""{title}"">
-<meta property=""og:description"" content=""{desc}"">
-<meta property=""og:url"" content=""{canonical}"">
-<meta property=""og:image"" content=""{image}"">
-<meta name=""twitter:card"" content=""summary_large_image"">
-<meta name=""twitter:title"" content=""{title}"">
-<meta name=""twitter:description"" content=""{desc}"">
-<meta name=""twitter:image"" content=""{image}"">
-<link rel=""canonical"" href=""{canonical}"">";
-
-            // cache the generated data if redis is enabled
-            if (Config.RedisConfiguration.Enabled == true)
-            {
-                hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(cacheKey, og, TimeSpan.FromHours(1));
-            }
-
-            html = html.Replace("<!--OG_INJECT-->", og);
-
-            context.Response.ContentType = "text/html; charset=utf-8";
-            await context.Response.WriteAsync(html);
-            return;
-        }
-        // fallback to normal if not found (maybe 404 page with minimal OG)
-    }
-    await next();
-});
-
+app.UseDataObjectDetailMetaInjection();
 app.UseDefaultFiles();
-app.UseStaticFiles(new StaticFileOptions
+app.UseStaticFiles(new Microsoft.AspNetCore.Builder.StaticFileOptions
 {
-    ServeUnknownFileTypes = true, //allow unkown file types also to be served
-    DefaultContentType = "plain/text" //content type to returned if fileType is not known.
+    ServeUnknownFileTypes = true,
+    DefaultContentType = "plain/text"
 });
-
 app.MapControllers();
-
-app.Use(async (context, next) =>
-{
-    // set the correlation id
-    string correlationId = Guid.NewGuid().ToString();
-    CallContext.SetData("CorrelationId", correlationId);
-    CallContext.SetData("CallingProcess", context.Request.Method + ": " + context.Request.Path);
-
-    string userIdentity;
-    try
-    {
-        var nameIdentifierClaim = context.User.Claims.Where(x => x.Type == System.Security.Claims.ClaimTypes.NameIdentifier).FirstOrDefault();
-        userIdentity = nameIdentifierClaim != null ? nameIdentifierClaim.Value : "";
-    }
-    catch
-    {
-        userIdentity = "";
-    }
-    CallContext.SetData("CallingUser", userIdentity);
-
-    context.Response.Headers.Append("x-correlation-id", correlationId.ToString());
-    await next();
-});
-
-// configure the in-process cache warmer
-QueueProcessor.QueueItem cacheWarmerQueueItem = new QueueProcessor.QueueItem(
-    QueueItemType.CacheWarmer,
-    30,
-    true
-);
-cacheWarmerQueueItem.Task = new Classes.ProcessQueue.CacheWarmer();
-cacheWarmerQueueItem.ForceExecute();
-QueueProcessor.QueueItems.Add(cacheWarmerQueueItem);
-
+app.UseCorrelationId();
+app.ConfigureCacheWarmer();
 Logging.WriteToDiskOnly = false;
-
-// start the app
 app.Run();
+
+// local helper to keep database startup logic isolated
+static async Task WaitForAndInitializeDatabaseAsync()
+{
+    Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionStringNoDatabase);
+    bool dbOnline = false;
+    do
+    {
+        Logging.Log(Logging.LogType.Information, "Startup", "Waiting for database...");
+        if (db.TestConnection() == true)
+        {
+            dbOnline = true;
+        }
+        else
+        {
+            Thread.Sleep(30000);
+        }
+    } while (dbOnline == false);
+
+    db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+    await db.InitDB();
+    Classes.Metadata.Utility.TableBuilder.BuildTables();
+    Config.UpdateConfig();
+}
