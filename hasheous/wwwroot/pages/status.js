@@ -60,6 +60,7 @@ function LoadStatusPage() {
                             "SignatureIngestor",
                             "FetchTOSECMetadata",
                             "FetchRedumpMetadata",
+                            "FetchMAMERedumpMetadata",
                             "FetchWHDLoadMetadata",
                             "FetchFBNEOMetadata"
                         ],

@@ -450,13 +450,19 @@ function renderContent() {
                 case "game":
                     if (dataObject.signatureDataObjects[i].MetadataSource != null) {
                         // create metadata source span
-                        let sigSource = document.createElement('span');
-                        sigSource.classList.add('signatureMetadataSource');
-                        sigSource.innerHTML = signatureSources[Number(dataObject.signatureDataObjects[i].MetadataSource)];
-                        sigSource.setAttribute('data-source', signatureSources[Number(dataObject.signatureDataObjects[i].MetadataSource)]);
-                        sigItem.appendChild(sigSource);
+                        let sourceName = signatureSources[Number(dataObject.signatureDataObjects[i].MetadataSource)];
 
-                        sigItem.setAttribute('data-source', signatureSources[Number(dataObject.signatureDataObjects[i].MetadataSource)]);
+                        if (sourceName != null) {
+                            let sigSource = document.createElement('span');
+                            sigSource.classList.add('signatureMetadataSource');
+                            sigSource.classList.add('color-' + sourceName.toLowerCase());
+                            sigSource.innerHTML = sourceName;
+                            sigSource.setAttribute('data-source', sourceName);
+                            sigItem.appendChild(sigSource);
+                        }
+
+                        sigItem.setAttribute('data-source', sourceName);
+                        sigItem.setAttribute('data-source-id', Number(dataObject.signatureDataObjects[i].MetadataSource));
                     }
 
                     let sigLabelText = dataObject.signatureDataObjects[i].Name;

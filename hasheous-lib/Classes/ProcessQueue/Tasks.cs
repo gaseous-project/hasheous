@@ -66,6 +66,11 @@ namespace Classes.ProcessQueue
         FetchRedumpMetadata,
 
         /// <summary>
+        /// Fetch MAMERedump metadata
+        /// </summary>
+        FetchMAMERedumpMetadata,
+
+        /// <summary>
         /// Fetch TOSEC metadata
         /// </summary>
         FetchTOSECMetadata,

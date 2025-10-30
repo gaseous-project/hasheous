@@ -7,33 +7,30 @@ namespace WHDLoad
     {
         public static string GitUrl { get; } = "https://github.com/BlitterStudio/amiberry.git";
 
+        public static string GitBranch { get; } = "master";
+
+        public static string SourceName { get; } = "WHDLoad";
+
         public async Task Download()
         {
             try
             {
                 // setup output directory
                 string extractDir = System.IO.Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_WHDLoad);
-                if (Directory.Exists(extractDir)) { Directory.Delete(extractDir, true); }
-                Directory.CreateDirectory(extractDir);
 
                 // clone the repository
-                Logging.Log(Logging.LogType.Information, "WHDLoad", $"Cloning WHDLoad metadata repository to '{extractDir}'...");
-                var gitProcess = new System.Diagnostics.Process();
-                gitProcess.StartInfo.FileName = "git";
-                gitProcess.StartInfo.Arguments = $"clone {GitUrl} \"{extractDir}\"";
-                gitProcess.StartInfo.RedirectStandardOutput = true;
-                gitProcess.StartInfo.RedirectStandardError = true;
-                gitProcess.StartInfo.UseShellExecute = false;
-                gitProcess.StartInfo.CreateNoWindow = true;
-
-                gitProcess.Start();
-                string output = await gitProcess.StandardOutput.ReadToEndAsync();
-                string error = await gitProcess.StandardError.ReadToEndAsync();
-                await gitProcess.WaitForExitAsync();
-
-                if (gitProcess.ExitCode != 0)
+                try
                 {
-                    throw new Exception($"Git clone failed with exit code {gitProcess.ExitCode}: {error}");
+                    bool cloneSuccess = await DownloadTools.CloneOrRefreshRepoAsync(GitUrl, GitBranch, extractDir);
+                    if (!cloneSuccess)
+                    {
+                        Logging.Log(Logging.LogType.Warning, SourceName, $"{SourceName} repository is already up to date; no changes detected.");
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception($"Failed to clone or refresh {SourceName} repository from '{GitUrl}': {ex.Message}", ex);
                 }
 
                 // cleanup signature processed directory
@@ -50,18 +47,18 @@ namespace WHDLoad
                     string destFile = Path.Combine(destDir, "whdload_db.dat");
                     File.Copy(datFile, destFile);
 
-                    Logging.Log(Logging.LogType.Information, "WHDLoad", $"WHDLoad metadata file copied to processing directory: {destFile}");
+                    Logging.Log(Logging.LogType.Information, SourceName, $"{SourceName} metadata file copied to processing directory: {destFile}");
                 }
                 else
                 {
-                    throw new Exception($"WHDLoad metadata file not found in cloned repository: {datFile}");
+                    throw new Exception($"{SourceName} metadata file not found in cloned repository: {datFile}");
                 }
 
-                Logging.Log(Logging.LogType.Information, "WHDLoad", "WHDLoad metadata processing completed successfully.");
+                Logging.Log(Logging.LogType.Information, SourceName, $"{SourceName} metadata processing completed successfully.");
             }
             catch (Exception ex)
             {
-                Logging.Log(Logging.LogType.Critical, "WHDLoad", $"Error downloading WHDLoad metadata: {ex.Message}");
+                Logging.Log(Logging.LogType.Critical, SourceName, $"Error downloading {SourceName} metadata: {ex.Message}");
             }
         }
     }

@@ -501,5 +501,7 @@ let signatureSources = {
     5: "Redump",
     6: "WHDLoad",
     7: "RetroAchievements",
-    8: "FBNeo"
+    8: "FBNeo",
+    9: "PureDOSDAT",
+    11: "MAMERedump"
 }

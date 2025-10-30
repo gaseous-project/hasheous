@@ -553,6 +553,7 @@ function signatureSelectionFormatter(state) {
         let sourceLabel = document.createElement('span');
         sourceLabel.innerHTML = signatureSources[Number(data.metadataSource)];
         sourceLabel.classList.add('signatureMetadataSource');
+        sourceLabel.classList.add('color-' + signatureSources[Number(data.metadataSource)].toLowerCase());
         sourceLabel.setAttribute('data-source', signatureSources[Number(data.metadataSource)]);
         sourceLabelBox.appendChild(sourceLabel);
 
