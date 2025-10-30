@@ -46,7 +46,7 @@ await app.SeedRolesAndVerifiedEmailAsync();
 app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseDataObjectDetailMetaInjection();
+// app.UseDataObjectDetailMetaInjection();
 app.UseDefaultFiles();
 app.UseStaticFiles(new Microsoft.AspNetCore.Builder.StaticFileOptions
 {
