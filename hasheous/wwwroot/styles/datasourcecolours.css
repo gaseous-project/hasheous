@@ -1,0 +1,93 @@
+:root {
+    --signature-source-color-none: #7f7f7f;
+    --signature-source-color-tosec: #8080ff;
+    --signature-source-color-mamearcade: #ff0000;
+    --signature-source-color-mamemess: #00d100;
+    --signature-source-color-nointros: #ff00ff;
+    --signature-source-color-redump: #00d7d7;
+    --signature-source-color-whdload: #d7d700;
+    --signature-source-color-retroachievements: #ffc388;
+    --signature-source-color-fbneo: #ff7f00;
+    --signature-source-color-mameredump: #8b4513;
+    --signature-source-color-puredosdat: #00ff00;
+}
+
+.color-none {
+    background-color: var(--signature-source-color-none);
+}
+
+.color-tosec {
+    background-color: var(--signature-source-color-tosec);
+}
+
+.color-mamearcade {
+    background-color: var(--signature-source-color-mamearcade);
+}
+
+.color-mamemess {
+    background-color: var(--signature-source-color-mamemess);
+}
+
+.color-nointros {
+    background-color: var(--signature-source-color-nointros);
+}
+
+.color-redump {
+    background-color: var(--signature-source-color-redump);
+}
+
+.color-whdload {
+    background-color: var(--signature-source-color-whdload);
+}
+
+.color-retroachievements {
+    background-color: var(--signature-source-color-retroachievements);
+}
+
+.color-fbneo {
+    background-color: var(--signature-source-color-fbneo);
+}
+
+.color-mameredump {
+    background-color: var(--signature-source-color-mameredump);
+}
+
+/* .signatureMetadataSource[data-source="None"] {
+    background-color: var(--signature-source-color-none);
+}
+
+.signatureMetadataSource[data-source="TOSEC"] {
+    background-color: var(--signature-source-color-tosec);
+}
+
+.signatureMetadataSource[data-source="MAMEArcade"] {
+    background-color: var(--signature-source-color-mamearcade);
+}
+
+.signatureMetadataSource[data-source="MAMEMESS"] {
+    background-color: var(--signature-source-color-mamemess);
+}
+
+.signatureMetadataSource[data-source="NoIntros"] {
+    background-color: var(--signature-source-color-nointros);
+}
+
+.signatureMetadataSource[data-source="Redump"] {
+    background-color: var(--signature-source-color-redump);
+}
+
+.signatureMetadataSource[data-source="WHDLoad"] {
+    background-color: var(--signature-source-color-whdload);
+}
+
+.signatureMetadataSource[data-source="RetroAchievements"] {
+    background-color: var(--signature-source-color-retroachievements);
+}
+
+.signatureMetadataSource[data-source="FBNeo"] {
+    background-color: var(--signature-source-color-fbneo);
+}
+
+.signatureMetadataSource[data-source="MAMERedump"] {
+    background-color: var(--signature-source-color-mameredump);
+} */
