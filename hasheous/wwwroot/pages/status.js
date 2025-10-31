@@ -62,7 +62,8 @@ function LoadStatusPage() {
                             "FetchRedumpMetadata",
                             "FetchMAMERedumpMetadata",
                             "FetchWHDLoadMetadata",
-                            "FetchFBNEOMetadata"
+                            "FetchFBNEOMetadata",
+                            "FetchPureDOSDATMetadata"
                         ],
                         "metadataproxy": [
                             "FetchIGDBMetadata",

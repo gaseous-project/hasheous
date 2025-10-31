@@ -730,6 +730,14 @@ namespace Classes
                     }
                 }
 
+                public string LibraryMetadataDirectory_PureDOSDAT
+                {
+                    get
+                    {
+                        return Path.Combine(LibraryMetadataDirectory, "PureDOSDAT");
+                    }
+                }
+
                 public string LibraryMetadataDirectory_FBNEO
                 {
                     get

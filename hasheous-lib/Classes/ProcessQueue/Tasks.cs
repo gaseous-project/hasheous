@@ -86,6 +86,11 @@ namespace Classes.ProcessQueue
         FetchFBNEOMetadata,
 
         /// <summary>
+        /// Fetch PureDOSDAT metadata
+        /// </summary>
+        FetchPureDOSDATMetadata,
+
+        /// <summary>
         /// Runs daily maintenance tasks
         /// </summary>
         DailyMaintenance,

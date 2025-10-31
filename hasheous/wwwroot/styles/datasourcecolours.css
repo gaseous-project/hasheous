@@ -52,42 +52,6 @@
     background-color: var(--signature-source-color-mameredump);
 }
 
-/* .signatureMetadataSource[data-source="None"] {
-    background-color: var(--signature-source-color-none);
+.color-puredosdat {
+    background-color: var(--signature-source-color-puredosdat);
 }
-
-.signatureMetadataSource[data-source="TOSEC"] {
-    background-color: var(--signature-source-color-tosec);
-}
-
-.signatureMetadataSource[data-source="MAMEArcade"] {
-    background-color: var(--signature-source-color-mamearcade);
-}
-
-.signatureMetadataSource[data-source="MAMEMESS"] {
-    background-color: var(--signature-source-color-mamemess);
-}
-
-.signatureMetadataSource[data-source="NoIntros"] {
-    background-color: var(--signature-source-color-nointros);
-}
-
-.signatureMetadataSource[data-source="Redump"] {
-    background-color: var(--signature-source-color-redump);
-}
-
-.signatureMetadataSource[data-source="WHDLoad"] {
-    background-color: var(--signature-source-color-whdload);
-}
-
-.signatureMetadataSource[data-source="RetroAchievements"] {
-    background-color: var(--signature-source-color-retroachievements);
-}
-
-.signatureMetadataSource[data-source="FBNeo"] {
-    background-color: var(--signature-source-color-fbneo);
-}
-
-.signatureMetadataSource[data-source="MAMERedump"] {
-    background-color: var(--signature-source-color-mameredump);
-} */
