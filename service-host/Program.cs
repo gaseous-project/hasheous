@@ -132,6 +132,10 @@ switch (taskType)
         Task = new FetchMAMERedumpMetadata();
         break;
 
+    case QueueItemType.FetchPureDOSDATMetadata:
+        Task = new FetchPureDOSDATMetadata();
+        break;
+
     case QueueItemType.FetchTOSECMetadata:
         Task = new FetchTOSECMetadata();
         break;

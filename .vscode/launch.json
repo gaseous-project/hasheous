@@ -2,20 +2,15 @@
     "version": "0.2.0",
     "configurations": [
         {
-            // Use IntelliSense to find out which attributes exist for C# debugging
-            // Use hover for the description of the existing attributes
-            // For further information visit https://github.com/OmniSharp/omnisharp-vscode/blob/master/debugger-launchjson.md
             "name": "Frontend",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            // If you have changed target frameworks, make sure to update the program path.
             "program": "${workspaceFolder}/hasheous/bin/Debug/net8.0/hasheous.dll",
             "args": [],
             "cwd": "${workspaceFolder}/hasheous",
             "enableStepFiltering": false,
             "stopAtEntry": false,
-            // Enable launching a web browser when ASP.NET Core starts. For more information: https://aka.ms/VSCode-CS-LaunchJson-WebBrowser
             "serverReadyAction": {
                 "action": "openExternally",
                 "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
@@ -25,20 +20,15 @@
             }
         },
         {
-            // Use IntelliSense to find out which attributes exist for C# debugging
-            // Use hover for the description of the existing attributes
-            // For further information visit https://github.com/OmniSharp/omnisharp-vscode/blob/master/debugger-launchjson.md
             "name": "Service Orchestrator",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            // If you have changed target frameworks, make sure to update the program path.
             "program": "${workspaceFolder}/service-orchestrator/bin/Debug/net8.0/service-orchestrator.dll",
             "args": [],
             "cwd": "${workspaceFolder}/service-orchestrator",
             "enableStepFiltering": false,
             "stopAtEntry": false,
-            // Enable launching a web browser when ASP.NET Core starts. For more information: https://aka.ms/VSCode-CS-LaunchJson-WebBrowser
             "serverReadyAction": {
                 "action": "openExternally",
                 "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
@@ -55,13 +45,13 @@
             "program": "${workspaceFolder}/service-host/bin/Debug/net8.0/service-host.dll",
             "args": [
                 "--service",
-                "FetchMAMERedumpMetadata",
+                "SignatureIngestor",
                 "--reportingserver",
                 "https://localhost:5001"
             ],
             "cwd": "${workspaceFolder}/service-host",
             "stopAtEntry": false
-        }
+        },
     ],
     "compounds": [
         {
@@ -70,6 +60,6 @@
                 "Frontend",
                 "Service Orchestrator"
             ]
-        }
+        },
     ]
 }

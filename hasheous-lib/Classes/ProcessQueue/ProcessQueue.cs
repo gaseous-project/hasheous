@@ -100,6 +100,10 @@ namespace Classes.ProcessQueue
                         Task = new FetchRedumpMetadata();
                         break;
 
+                    case QueueItemType.FetchPureDOSDATMetadata:
+                        Task = new FetchPureDOSDATMetadata();
+                        break;
+
                     case QueueItemType.FetchMAMERedumpMetadata:
                         Task = new FetchMAMERedumpMetadata();
                         break;

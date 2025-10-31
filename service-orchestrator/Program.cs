@@ -240,6 +240,8 @@ Classes.ProcessQueue.QueueProcessor.QueueItems = new List<Classes.ProcessQueue.Q
     new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchRedumpMetadata, 10080, false),
     // fetch MAMERedump metadata
     new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchMAMERedumpMetadata, 10080, false),
+    // fetch PureDOSDAT metadata
+    new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchPureDOSDATMetadata, 10080, false),
     // fetch TOSEC metadata
     new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchTOSECMetadata, 10080, false),
     // fetch WHDLoad metadata
