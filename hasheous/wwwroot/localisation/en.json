@@ -287,5 +287,19 @@
     "dumpsdescription": "Dumps are collections of ROM hashes and metadata that can be downloaded and used in your local ROM manager. Dumps are generated weekly, and contain all the data in the Hasheous database.",
     "dumpsavailable": "Dumps are available for the following platforms:",
     "dumpfile": "Dump File",
-    "download": "Download"
+    "download": "Download",
+    "tags": "Tags",
+    "tagtypes.default": "Tags",
+    "tagtypes.platformtype": "Type",
+    "tagtypes.platformera": "Era",
+    "tagtypes.platformhardwaregeneration": "Hardware Generation",
+    "tagtypes.platformhardwarespecs": "Hardware Specs",
+    "tagtypes.platformconnectivity": "Connectivity",
+    "tagtypes.platforminputmethod": "Input Method",
+    "tagtypes.gamegenre": "Genres",
+    "tagtypes.gamegameplay": "Gameplay Styles",
+    "tagtypes.gamefeature": "Features",
+    "tagtypes.gametheme": "Themes",
+    "tagtypes.gameperspective": "Perspectives",
+    "tagtypes.gameartstyle": "Art Styles"
 }

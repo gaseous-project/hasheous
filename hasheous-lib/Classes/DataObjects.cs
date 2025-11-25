@@ -1,5 +1,6 @@
 using System.Data;
 using System.Reflection;
+using System.Security.Cryptography.Xml;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Authentication;
@@ -14,6 +15,7 @@ using Microsoft.AspNetCore.Razor.Language.Intermediate;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using NuGet.Common;
 using static hasheous_server.Classes.Metadata.Communications;
 using static hasheous_server.Models.DataObjectItem;
@@ -92,6 +94,12 @@ namespace hasheous_server.Classes
                         attributeName = AttributeItem.AttributeName.VIMMPlatformName,
                         attributeType = AttributeItem.AttributeType.ShortString,
                         attributeRelationType = DataObjectType.None
+                    },
+                    new AttributeItem
+                    {
+                        attributeName = AttributeItem.AttributeName.Tags,
+                        attributeType = AttributeItem.AttributeType.EmbeddedList,
+                        attributeRelationType = DataObjectType.None
                     }
                 }
             } },
@@ -128,6 +136,12 @@ namespace hasheous_server.Classes
                     new AttributeItem{
                         attributeName = AttributeItem.AttributeName.Wikipedia,
                         attributeType = AttributeItem.AttributeType.Link,
+                        attributeRelationType = DataObjectType.None
+                    },
+                    new AttributeItem
+                    {
+                        attributeName = AttributeItem.AttributeName.Tags,
+                        attributeType = AttributeItem.AttributeType.EmbeddedList,
                         attributeRelationType = DataObjectType.None
                     }
                 }
@@ -450,6 +464,7 @@ namespace hasheous_server.Classes
                         if (GetChildRelations == true)
                         {
                             attributes.Add(await GetRoms(signatureItems));
+                            attributes.Add(await GetTagAttribute(id));
                             attributes.AddRange(GetCountriesAndLanguagesForGame(signatureItems));
                         }
                         break;
@@ -458,6 +473,8 @@ namespace hasheous_server.Classes
                         // check dumps directory for files named <platformname>.zip
                         if (GetChildRelations == true)
                         {
+                            attributes.Add(await GetTagAttribute(id));
+
                             string dumpFile = Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "Platforms", (string)row["Name"] + ".zip");
                             if (File.Exists(dumpFile))
                             {
@@ -1045,6 +1062,156 @@ namespace hasheous_server.Classes
                 switch (newAttribute.attributeType)
                 {
                     case AttributeItem.AttributeType.EmbeddedList:
+                        switch (newAttribute.attributeName)
+                        {
+                            case AttributeItem.AttributeName.Tags:
+                                // handle tags updating
+                                // supplied value is a Dictionary<DataObjectItemTages.TagType, List<string>>
+
+                                // get existing tags for lookup
+                                Dictionary<DataObjectItemTags.TagType, DataObjectItemTags> existingTags = await GetTags();
+                                bool newTagsAdded = false;
+
+                                // new tags to add
+                                // scan all supplied tags and if they aren't in existing tags, add them
+                                Dictionary<DataObjectItemTags.TagType, List<string>> newTags = new Dictionary<DataObjectItemTags.TagType, List<string>>();
+                                var jObject = (JObject)newAttribute.Value;
+                                var newAttributeValue = jObject.ToObject<Dictionary<DataObjectItemTags.TagType, List<string>>>();
+                                // normalise tags in newAttributeValue to lowercase and trimmed
+                                foreach (KeyValuePair<DataObjectItemTags.TagType, List<string>> tagType in newAttributeValue)
+                                {
+                                    for (int i = 0; i < tagType.Value.Count; i++)
+                                    {
+                                        tagType.Value[i] = tagType.Value[i].Trim().ToLower();
+                                    }
+                                }
+
+                                // loop the keys in the supplied value dictionary<DataObjectItemTages.TagType, List<string>>
+                                foreach (KeyValuePair<DataObjectItemTags.TagType, List<string>> suppliedTagType in newAttributeValue)
+                                {
+                                    foreach (string suppliedTag in suppliedTagType.Value)
+                                    {
+                                        bool tagFound = false;
+                                        if (existingTags.ContainsKey(suppliedTagType.Key))
+                                        {
+                                            foreach (DataObjectItemTags.TagModel tagModel in existingTags[suppliedTagType.Key].Tags)
+                                            {
+                                                if (tagModel.Text == suppliedTag)
+                                                {
+                                                    tagFound = true;
+                                                }
+                                            }
+                                        }
+
+                                        if (tagFound == false)
+                                        {
+                                            // add to new tags
+                                            if (!newTags.ContainsKey(suppliedTagType.Key))
+                                            {
+                                                newTags.Add(suppliedTagType.Key, new List<string>());
+                                            }
+                                            newTags[suppliedTagType.Key].Add(suppliedTag);
+                                        }
+                                    }
+                                }
+
+                                // add new tags to database
+                                foreach (KeyValuePair<DataObjectItemTags.TagType, List<string>> tagTypeToAdd in newTags)
+                                {
+                                    foreach (string tagToAdd in tagTypeToAdd.Value)
+                                    {
+                                        sql = "INSERT INTO `Tags` (`type`, `name`) VALUES (@type, @name);";
+                                        await db.ExecuteCMDAsync(sql, new Dictionary<string, object>{
+                                            { "type", (int)tagTypeToAdd.Key },
+                                            { "name", tagToAdd }
+                                        });
+                                        newTagsAdded = true;
+                                    }
+                                }
+
+                                // refresh existing tags
+                                if (newTagsAdded == true)
+                                {
+                                    existingTags = await GetTags();
+                                }
+
+                                // now update the DataObject_Tags Map
+                                // get existing tag mappings for this data object
+                                Dictionary<DataObjectItemTags.TagType, DataObjectItemTags> existingTagMappings = await GetTags(id);
+                                // loop through supplied tags again and add any missing mappings
+                                foreach (KeyValuePair<DataObjectItemTags.TagType, List<string>> suppliedTagType in newAttributeValue)
+                                {
+                                    foreach (string suppliedTag in suppliedTagType.Value)
+                                    {
+                                        bool mappingFound = false;
+                                        if (existingTagMappings.ContainsKey(suppliedTagType.Key))
+                                        {
+                                            foreach (DataObjectItemTags.TagModel tagModel in existingTagMappings[suppliedTagType.Key].Tags)
+                                            {
+                                                if (tagModel.Text == suppliedTag)
+                                                {
+                                                    mappingFound = true;
+                                                }
+                                            }
+                                        }
+
+                                        if (mappingFound == false)
+                                        {
+                                            // add mapping
+                                            long tagIdToMap = -1;
+                                            if (existingTags.ContainsKey(suppliedTagType.Key))
+                                            {
+                                                foreach (DataObjectItemTags.TagModel tagModel in existingTags[suppliedTagType.Key].Tags)
+                                                {
+                                                    if (tagModel.Text == suppliedTag)
+                                                    {
+                                                        tagIdToMap = tagModel.Id;
+                                                    }
+                                                }
+                                            }
+
+                                            if (tagIdToMap != -1)
+                                            {
+                                                sql = "INSERT INTO DataObject_Tags (DataObjectId, TagId) VALUES (@dataobjectid, @tagid);";
+                                                await db.ExecuteCMDAsync(sql, new Dictionary<string, object>{
+                                                    { "dataobjectid", id },
+                                                    { "tagid", tagIdToMap }
+                                                });
+                                            }
+                                        }
+                                    }
+                                }
+                                // now remove any mappings that are not in the supplied value
+                                foreach (KeyValuePair<DataObjectItemTags.TagType, DataObjectItemTags> existingTagMapping in existingTagMappings)
+                                {
+                                    foreach (DataObjectItemTags.TagModel existingTagModel in existingTagMapping.Value.Tags)
+                                    {
+                                        bool mappingInSupplied = false;
+                                        if (newAttributeValue.ContainsKey(existingTagMapping.Key))
+                                        {
+                                            foreach (string suppliedTag in newAttributeValue[existingTagMapping.Key])
+                                            {
+                                                if (existingTagModel.Text == suppliedTag)
+                                                {
+                                                    mappingInSupplied = true;
+                                                }
+                                            }
+                                        }
+
+                                        if (mappingInSupplied == false)
+                                        {
+                                            // delete mapping
+                                            sql = "DELETE FROM DataObject_Tags WHERE DataObjectId=@dataobjectid AND TagId=@tagid;";
+                                            await db.ExecuteCMDAsync(sql, new Dictionary<string, object>{
+                                                { "dataobjectid", id },
+                                                { "tagid", existingTagModel.Id }
+                                            });
+                                        }
+                                    }
+                                }
+
+                                break;
+                        }
                         break;
 
                     default:
@@ -2407,6 +2574,57 @@ namespace hasheous_server.Classes
             List<Dictionary<string, object>> results = db.ExecuteCMDDict(sql, dbDict);
 
             return results;
+        }
+
+        public async Task<Dictionary<DataObjectItemTags.TagType, DataObjectItemTags>> GetTags(long? DataObjectId = null)
+        {
+            Dictionary<DataObjectItemTags.TagType, DataObjectItemTags> tags = new Dictionary<DataObjectItemTags.TagType, DataObjectItemTags>();
+
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql = "SELECT * FROM Tags ORDER BY `name`;";
+            Dictionary<string, object> dbDict = new Dictionary<string, object>();
+            if (DataObjectId != null)
+            {
+                sql = "SELECT Tags.id, Tags.`type`, Tags.`name` FROM `Tags` INNER JOIN `DataObject_Tags` ON `Tags`.`id` = `DataObject_Tags`.`TagId` WHERE `DataObject_Tags`.`DataObjectId`=@id ORDER BY `Tags`.`name`;";
+                dbDict.Add("id", DataObjectId);
+            }
+            DataTable data = await db.ExecuteCMDAsync(sql, dbDict);
+
+            foreach (DataRow row in data.Rows)
+            {
+                // convert type to enum
+                DataObjectItemTags.TagType tagType = (DataObjectItemTags.TagType)(int)row["type"];
+
+                if (!tags.ContainsKey(tagType))
+                {
+                    tags.Add(tagType, new DataObjectItemTags()
+                    {
+                        Type = tagType,
+                        Tags = new List<DataObjectItemTags.TagModel>()
+                    });
+                }
+
+                tags[tagType].Tags.Add(new DataObjectItemTags.TagModel()
+                {
+                    Id = (long)row["id"],
+                    Text = (string)row["name"]
+                });
+            }
+
+            return tags;
+        }
+
+        public async Task<AttributeItem> GetTagAttribute(long DataObjectId)
+        {
+            Dictionary<DataObjectItemTags.TagType, DataObjectItemTags> tags = await GetTags(DataObjectId);
+            AttributeItem tagAttribute = new AttributeItem()
+            {
+                attributeType = AttributeItem.AttributeType.EmbeddedList,
+                attributeName = AttributeItem.AttributeName.Tags,
+                attributeRelationType = DataObjectType.None,
+                Value = tags
+            };
+            return tagAttribute;
         }
 
         public DataObjectItem MergeObjects(DataObjectItem sourceObject, DataObjectItem targetObject, bool commit = false)

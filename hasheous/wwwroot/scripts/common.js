@@ -505,3 +505,19 @@ let signatureSources = {
     9: "PureDOSDAT",
     11: "MAMERedump"
 }
+
+let tagTypes = {
+    0: "GameGenre",
+    1: "GameGameplay",
+    2: "GameFeature",
+    3: "GameTheme",
+    4: "GamePerspective",
+    5: "GameArtStyle",
+    6: "PlatformType",
+    7: "PlatformEra",
+    8: "PlatformHardwareGeneration",
+    9: "PlatformHardwareSpecs",
+    10: "PlatformConnectivity",
+    11: "PlatformInputMethod",
+    1000: "Default"
+}
