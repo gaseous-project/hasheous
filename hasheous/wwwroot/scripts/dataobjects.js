@@ -1,9 +1,12 @@
 class dataObjectAttributes {
-    constructor(attribute) {
+    constructor(attribute, options = null) {
         this.attribute = attribute;
+        this.options = options;
 
         this.inputElement = null;
         this.endpoint = null;
+        this.dataObject = true;
+        this.paramName = null;
         this.isSelect2 = false;
 
         switch (attribute.attributeType) {
@@ -176,20 +179,38 @@ class dataObjectAttributes {
 
                 switch (attribute.attributeName) {
                     case "Platform":
-                        this.endpoint = 'Platform';
+                        this.endpoint = '/api/v1/DataObjects/Platform';
                         this.isSelect2 = true;
                         break;
 
                     case "Publisher":
                     case "Manufacturer":
                         this.isSelect2 = true;
-                        this.endpoint = 'Company';
+                        this.endpoint = '/api/v1/DataObjects/Company';
                         break;
 
                     default:
                         break;
                 }
 
+                break;
+
+            case "EmbeddedList":
+                switch (attribute.attributeName) {
+                    case "Tags":
+                        this.dataObject = false;
+                        let regex = new RegExp(pageType, 'i');
+                        this.paramName = this.options.replace(regex, '');
+
+                        this.inputElement = document.createElement('select');
+                        this.inputElement.id = 'attribute' + attribute.attributeName.toLowerCase() + 'select' + this.options;
+                        this.inputElement.classList.add('inputwide');
+                        this.inputElement.setAttribute('multiple', 'multiple');
+
+                        this.endpoint = '/api/v1/Tags/' + this.options;
+                        this.isSelect2 = true;
+                        break;
+                }
                 break;
 
             default:
@@ -201,43 +222,70 @@ class dataObjectAttributes {
 
     render() {
         if (this.isSelect2 == true) {
-            this.#SetupObjectMenus(this.inputElement, this.endpoint);
+            this.#SetupObjectMenus(this.inputElement, this.endpoint, this.dataObject, this.paramName);
         }
     }
 
-    #SetupObjectMenus(dropdown, endpoint) {
+    #SetupObjectMenus(dropdown, endpoint, isDataObject = true, searchParamName = null) {
         // $('body').on('DOMContentLoaded', 'select', function () {
+
+        let tags = false;
+        let tagSeparators = [','];
+        if (isDataObject === false) {
+            tags = true;
+        }
+
         $(dropdown).select2({
             minimumInputLength: 3,
             width: '95%',
+            tags: tags,
+            tokenSeparators: tagSeparators,
             ajax: {
                 allowClear: true,
                 placeholder: {
                     "id": "",
                     "text": "None"
                 },
-                url: '/api/v1/DataObjects/' + endpoint,
+                url: endpoint,
                 data: function (params) {
-                    var query = {
-                        search: params.term
+                    if (isDataObject === true) {
+                        return {
+                            search: params["term"]
+                        }
+                    } else {
+                        let query = {
+                            search: params.term
+                        };
+                        return query;
                     }
-
-                    return query;
                 },
                 processResults: function (data) {
-                    var arr = [];
+                    let arr = [];
 
-                    arr.push({
-                        id: "",
-                        text: "None"
-                    });
-
-                    for (var i = 0; i < data.objects.length; i++) {
+                    if (isDataObject === true) {
                         arr.push({
-                            id: data.objects[i].id,
-                            text: data.objects[i].name,
-                            fullObject: data.objects[i]
+                            id: "",
+                            text: "None"
                         });
+                    }
+
+                    if (isDataObject === true) {
+                        for (let i = 0; i < data.objects.length; i++) {
+                            arr.push({
+                                id: data.objects[i].id,
+                                text: data.objects[i].name,
+                                fullObject: data.objects[i]
+                            });
+                        }
+                    } else {
+                        {
+                            for (let i = 0; i < data.length; i++) {
+                                arr.push({
+                                    id: data[i].id,
+                                    text: data[i].text
+                                });
+                            }
+                        }
                     }
 
                     return {
@@ -277,6 +325,14 @@ class dataObjectAttributes {
 
             case "Boolean":
                 return this.inputElement.checked;
+
+            case "EmbeddedList":
+                switch (this.attribute.attributeName) {
+                    case "Tags":
+                        let selectedOptions = $(this.inputElement).val();
+                        return selectedOptions;
+                }
+                break;
 
             default:
                 return this.inputElement.value;

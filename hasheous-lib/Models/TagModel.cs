@@ -1,0 +1,92 @@
+namespace hasheous_server.Models
+{
+    /// <summary>
+    /// Represents a collection of tags associated with a data object item, grouped by tag type.
+    /// </summary>
+    public class DataObjectItemTags
+    {
+        /// <summary>
+        /// Gets or sets the type of tag associated with the data object item.
+        /// </summary>
+        public TagType Type { get; set; }
+        /// <summary>
+        /// Gets or sets the list of tags associated with the data object item.
+        /// </summary>
+        public List<TagModel> Tags { get; set; }
+
+        /// <summary>
+        /// Represents a tag with an identifier and a name.
+        /// </summary>
+        public class TagModel
+        {
+            /// <summary>
+            /// Gets or sets the unique identifier for the tag.
+            /// </summary>
+            public long Id { get; set; }
+            /// <summary>
+            /// Gets or sets the name of the tag.
+            /// </summary>
+            public string Text { get; set; }
+        }
+
+        /// <summary>
+        /// Represents the type of tag associated with a data object item.
+        /// </summary>
+        public enum TagType
+        {
+            /// <summary>
+            /// Genre tag type.
+            /// </summary>
+            GameGenre = 0,
+            /// <summary>
+            /// Gameplay tag type.
+            /// </summary>
+            GameGameplay = 1,
+            /// <summary>
+            /// Feature tag type.
+            /// </summary>
+            GameFeature = 2,
+            /// <summary>
+            /// Theme tag type.
+            /// </summary>
+            GameTheme = 3,
+            /// <summary>
+            /// Perspective tag type.
+            /// </summary>
+            GamePerspective = 4,
+            /// <summary>
+            /// Art style tag type.
+            /// </summary>
+            GameArtStyle = 5,
+            /// <summary>
+            /// Platform type tag type.
+            /// </summary>
+            PlatformType = 6,
+            /// <summary>
+            /// Era tag type.
+            /// </summary>
+            PlatformEra = 7,
+            /// <summary>
+            /// Hardware generation tag type.
+            /// </summary>
+            PlatformHardwareGeneration = 8,
+            /// <summary>
+            /// Hardware specs tag type.
+            /// </summary>
+            PlatformHardwareSpecs = 9,
+            /// <summary>
+            /// Connectivity tag type.
+            /// </summary>
+            PlatformConnectivity = 10,
+            /// <summary>
+            /// Input method tag type.
+            /// </summary>
+            PlatformInputMethod = 11,
+
+            /// <summary>
+            ///  Default tag type.
+            /// </summary>
+            Default = 1000
+        }
+    }
+}

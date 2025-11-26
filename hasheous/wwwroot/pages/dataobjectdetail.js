@@ -284,6 +284,34 @@ function renderContent() {
                 }
                 break;
 
+            case "Tags":
+                let tags = dataObject.attributes[i].value;
+
+                for (const tagType of Object.values(tagTypes)) {
+                    if (tags[tagType]) {
+                        let tagOutput = '<table>';
+                        const tagColour = `style="background-color: #${intToRGB(hashCode(tagType.toLowerCase()))};"`;
+
+                        for (const tag of tags[tagType].tags) {
+                            if (tagOutput != '') {
+                                tagOutput += ' ';
+                            }
+                            tagOutput += `<span class="badge badge-tag badge-tag-type-${tagType.toLowerCase()}" ${tagColour}>${tag.text}</span>`;
+                        }
+
+                        attributeValues.push(
+                            {
+                                "attribute": `tagtypes.${tagType}`,
+                                "value": tagOutput
+                            }
+                        );
+                        tagOutput += "</table>";
+                    }
+                }
+
+
+                break;
+
             default:
                 switch (dataObject.attributes[i].attributeType) {
                     case "ObjectRelationship":

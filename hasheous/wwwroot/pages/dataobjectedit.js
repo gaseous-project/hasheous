@@ -69,6 +69,21 @@ document.getElementById('dataObjectSave').addEventListener("click", function (e)
         }
     }
 
+    // get attributes - tags
+    let tagValues = {};
+    for (let i = 0; i < renderedAttributesTags.length; i++) {
+        let attribute = renderedAttributesTags[i];
+        let tagType = attribute.options;
+        let attributeValue = attribute.getValue();
+        if (!tagValues[tagType]) {
+            tagValues[tagType] = [];
+        }
+        tagValues[tagType].push(...attributeValue);
+    }
+    attributes.push(
+        newAttributeObject("EmbeddedList", "Tags", "None", tagValues)
+    );
+
     // get user access control list
     let userPermissions = {};
     if (pageType == "app") {
@@ -90,8 +105,6 @@ document.getElementById('dataObjectSave').addEventListener("click", function (e)
         permissions: [],
         userPermissions: userPermissions
     };
-
-    console.log(model);
 
     postData(
         '/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int') + '/FullObject',
@@ -139,6 +152,7 @@ fetch('/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int'), {
 });
 
 let renderedAttributes = [];
+let renderedAttributesTags = [];
 function renderContent() {
     setPageTitle(dataObject.name, true);
     let objectName = document.getElementById('dataObject_object_name');
@@ -168,10 +182,40 @@ function renderContent() {
         inputCell.classList.add("tablecell");
 
         // insert input fields
-        let dataObjectAttribute = new dataObjectAttributes(attribute);
-        renderedAttributes.push(dataObjectAttribute);
-        inputCell.appendChild(dataObjectAttribute.inputElement);
-        dataObjectAttribute.render();
+        if (attribute.attributeName !== "Tags") {
+            let dataObjectAttribute = new dataObjectAttributes(attribute);
+            renderedAttributes.push(dataObjectAttribute);
+            inputCell.appendChild(dataObjectAttribute.inputElement);
+            dataObjectAttribute.render();
+        } else {
+            // special case for tags
+            let firstLoop = true;
+            for (const tagTypeKey of Object.values(tagTypes)) {
+                if (tagTypeKey.toLowerCase().startsWith(pageType) || tagTypeKey == "Default") {
+                    let tagLabel = document.createElement('label');
+                    tagLabel.setAttribute('for', 'attributetags' + tagTypeKey.toLowerCase() + 'select');
+                    tagLabel.classList.add('attributetaglabel');
+                    tagLabel.setAttribute('data-lang', 'TagType' + tagTypeKey);
+                    tagLabel.innerHTML = lang.getLang('tagtypes.' + tagTypeKey) + ":";
+                    tagLabel.style.display = 'block';
+                    if (firstLoop == false) {
+                        // add a separator
+                        tagLabel.style.marginTop = '10px';
+                    } else {
+                        firstLoop = false;
+                    }
+                    inputCell.appendChild(tagLabel);
+
+                    let dataObjectAttribute = new dataObjectAttributes({
+                        attributeName: "Tags",
+                        attributeType: "EmbeddedList"
+                    }, tagTypeKey);
+                    renderedAttributesTags.push(dataObjectAttribute);
+                    inputCell.appendChild(dataObjectAttribute.inputElement);
+                    dataObjectAttribute.render();
+                }
+            }
+        }
 
         tableRow.appendChild(inputCell);
 
@@ -302,6 +346,25 @@ async function loadData() {
                     }
                 }
 
+            case "EmbeddedList":
+                switch (dataObject.attributes[i].attributeName) {
+                    case "Tags":
+                        let tagValues = dataObject.attributes[i].value;
+                        for (const tagTypeKey of Object.values(tagTypes)) {
+                            if (tagValues[tagTypeKey]) {
+                                let selectedElement = document.getElementById('attribute' + dataObject.attributes[i].attributeName.toLowerCase() + 'select' + tagTypeKey);
+                                for (let t = 0; t < tagValues[tagTypeKey].tags.length; t++) {
+                                    let tagOption = document.createElement('option');
+                                    tagOption.value = tagValues[tagTypeKey].tags[t].text;
+                                    tagOption.selected = 'selected';
+                                    tagOption.innerHTML = tagValues[tagTypeKey].tags[t].text;
+                                    selectedElement.appendChild(tagOption);
+                                }
+                                $(selectedElement).trigger('change');
+                            }
+                        }
+                        break;
+                }
                 break;
 
             default:
