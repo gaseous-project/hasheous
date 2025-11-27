@@ -1,5 +1,8 @@
 namespace hasheous_server.Models.Tasks
 {
+    /// <summary>
+    /// Represents a single item in the background task queue.
+    /// </summary>
     public class QueueItemModel
     {
         /// <summary>
