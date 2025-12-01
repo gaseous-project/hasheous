@@ -14,7 +14,7 @@ namespace TheGamesDB.SQL
         {
             get
             {
-                return "http://cdn.thegamesdb.net/tgdb_dump.zip";
+                return "https://cdn.thegamesdb.net/tgdb_dump.zip";
             }
         }
 
@@ -78,7 +78,7 @@ namespace TheGamesDB.SQL
                 // wait until result is completed
                 if (result == null || result == false)
                 {
-                    Logging.Log(Logging.LogType.Critical, "TheGamesDb", "Failed to download meadata database from TheGamesDb");
+                    Logging.Log(Logging.LogType.Critical, "TheGamesDb", "Failed to download metadata database from TheGamesDb");
                     return null;
                 }
 

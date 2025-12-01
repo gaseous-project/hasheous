@@ -50,7 +50,7 @@ namespace InternetGameDatabase
 
         private static AuthenticationToken AuthToken = new AuthenticationToken();
 
-        public Task Download()
+        public async Task Download()
         {
             // ensure target directory exists
             if (!Directory.Exists(LocalFilePath))
@@ -102,7 +102,7 @@ namespace InternetGameDatabase
                 var tokenUrl = $"https://id.twitch.tv/oauth2/token?client_id={Config.IGDB.ClientId}&client_secret={Config.IGDB.Secret}&grant_type=client_credentials";
 
                 // send the request
-                var response = client.PostAsync(tokenUrl, null).Result;
+                var response = await client.PostAsync(tokenUrl, null);
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -111,7 +111,7 @@ namespace InternetGameDatabase
 
                 // read the response content
                 // response is a JSON object - load it into the dictionary AuthToken
-                var content = response.Content.ReadAsStringAsync().Result;
+                var content = await response.Content.ReadAsStringAsync();
                 AuthToken = System.Text.Json.JsonSerializer.Deserialize<AuthenticationToken>(content);
 
                 if (AuthToken == null || AuthToken.access_token == null || AuthToken.access_token.Length == 0)
@@ -133,7 +133,7 @@ namespace InternetGameDatabase
                 client.DefaultRequestHeaders.Add("Client-ID", Config.IGDB.ClientId);
 
                 // send the request
-                var dumpsResponse = client.GetAsync(DumpsUrl).Result;
+                var dumpsResponse = await client.GetAsync(DumpsUrl);
 
                 if (!dumpsResponse.IsSuccessStatusCode)
                 {
@@ -141,7 +141,7 @@ namespace InternetGameDatabase
                 }
 
                 // read the response content
-                var dumpsContent = dumpsResponse.Content.ReadAsStringAsync().Result;
+                var dumpsContent = await dumpsResponse.Content.ReadAsStringAsync();
 
                 // dumpsContent is a JSON array of DumpsModel objects
                 dumps = System.Text.Json.JsonSerializer.Deserialize<List<InternetGameDatabase.Models.DumpsModel>>(dumpsContent);
@@ -184,6 +184,7 @@ namespace InternetGameDatabase
                 client.DefaultRequestHeaders.Clear();
                 client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthToken.access_token);
                 client.DefaultRequestHeaders.Add("Client-ID", Config.IGDB.ClientId);
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; curl/8.0; +https://curl.se/)");
 
                 Logging.Log(Logging.LogType.Information, "IGDB Dumps", $"Processing dump: {dump.endpoint} - {dump.file_name}");
 
@@ -222,7 +223,7 @@ namespace InternetGameDatabase
                     var dumpResponseUrl = $"https://api.igdb.com/v4/dumps/{dump.endpoint}";
 
                     // send the request
-                    var dumpResponse = client.GetAsync(dumpResponseUrl).Result;
+                    var dumpResponse = await client.GetAsync(dumpResponseUrl);
 
                     if (!dumpResponse.IsSuccessStatusCode)
                     {
@@ -231,7 +232,7 @@ namespace InternetGameDatabase
                     }
 
                     // read the response content
-                    var dumpContent = dumpResponse.Content.ReadAsStringAsync().Result;
+                    var dumpContent = await dumpResponse.Content.ReadAsStringAsync();
 
                     // store the dump response content in a file
                     File.WriteAllText(dumpFilePath, dumpContent);
@@ -257,11 +258,13 @@ namespace InternetGameDatabase
                         File.Delete(filePath);
                     }
 
-                    // The HttpClient headers are reset above for each dump; no need to clear here.
+                    // reset the headers for s3 download
+                    client.DefaultRequestHeaders.Clear();
+                    client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; curl/8.0; +https://curl.se/)");
                     System.Net.Http.HttpResponseMessage? dataResponse;
                     try
                     {
-                        dataResponse = client.GetAsync(s3Url).Result;
+                        dataResponse = await client.GetAsync(s3Url);
                     }
                     catch (Exception ex)
                     {
@@ -276,7 +279,7 @@ namespace InternetGameDatabase
                     }
 
                     // read the response content and save it to the file
-                    var dataContent = dataResponse.Content.ReadAsByteArrayAsync().Result;
+                    var dataContent = await dataResponse.Content.ReadAsByteArrayAsync();
                     File.WriteAllBytes(filePath, dataContent);
 
                     // update the existing dumps index with the new dump information
@@ -527,8 +530,6 @@ namespace InternetGameDatabase
 
             // log the completion of the download
             Logging.Log(Logging.LogType.Information, "IGDB Dumps", "Dumps download and import completed successfully.");
-
-            return null; // Assuming the method returns void, we return null here.
         }
 
         private string[] SplitCSVIntoLines(string csvContent)
