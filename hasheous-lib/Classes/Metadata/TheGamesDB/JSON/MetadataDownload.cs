@@ -52,7 +52,7 @@ namespace TheGamesDB.JSON
 
             if (IsLocalCopyOlderThanMaxAge() == true)
             {
-                Logging.Log(Logging.LogType.Information, "TheGamesDb", "Downloading meadata database from TheGamesDb");
+                Logging.Log(Logging.LogType.Information, "TheGamesDb", "Downloading metadata database from TheGamesDb");
                 using (var client = new WebClient())
                 {
                     var json = await client.DownloadStringTaskAsync(new Uri(Url));
