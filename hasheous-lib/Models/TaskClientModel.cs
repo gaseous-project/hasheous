@@ -49,8 +49,7 @@ namespace hasheous_server.Models.Tasks
             this._LastContactAt = DateTime.UtcNow;
 
             // Id will be set when saved to database
-            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            DataTable dt = db.ExecuteCMD("INSERT INTO Task_Clients (public_id, api_key, client_name, owner_id, created_at, last_contact_at, version) VALUES (@public_id, @api_key, @client_name, @owner_id, @created_at, @last_contact_at, @version); SELECT LAST_INSERT_ID();", new Dictionary<string, object>
+            DataTable dt = Config.database.ExecuteCMD("INSERT INTO Task_Clients (public_id, api_key, client_name, owner_id, created_at, last_contact_at, version) VALUES (@public_id, @api_key, @client_name, @owner_id, @created_at, @last_contact_at, @version); SELECT LAST_INSERT_ID();", new Dictionary<string, object>
             {
                 { "@public_id", this._PublicId.ToString() },
                 { "@api_key", this._APIKey ?? "" },
@@ -174,7 +173,7 @@ namespace hasheous_server.Models.Tasks
         /// <summary>
         /// Gets or sets the list of task types that the client is capable of handling.
         /// </summary>
-        public List<TaskType> Capabilities { get; set; } = new List<TaskType>();
+        public List<Capabilities> Capabilities { get; set; } = new List<Capabilities>();
 
         /// <summary>
         /// Refreshes the current client model instance with data from the specified DataRow or from the database if no row is provided.
@@ -185,8 +184,7 @@ namespace hasheous_server.Models.Tasks
         {
             if (row == null)
             {
-                Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-                DataTable dt = db.ExecuteCMD("SELECT * FROM Task_Clients WHERE id = @id", new Dictionary<string, object>
+                DataTable dt = Config.database.ExecuteCMD("SELECT * FROM Task_Clients WHERE id = @id", new Dictionary<string, object>
                 { { "@id", this.Id } });
 
                 if (dt.Rows.Count == 0)
@@ -207,8 +205,8 @@ namespace hasheous_server.Models.Tasks
             this.ClientVersion = row.Field<string>("version") ?? "";
             var capabilitiesJson = row.Field<string>("capabilities");
             this.Capabilities = string.IsNullOrEmpty(capabilitiesJson)
-                ? new List<TaskType>()
-                : System.Text.Json.JsonSerializer.Deserialize<List<TaskType>>(capabilitiesJson) ?? new List<TaskType>();
+                ? new List<Capabilities>()
+                : System.Text.Json.JsonSerializer.Deserialize<List<Capabilities>>(capabilitiesJson) ?? new List<Capabilities>();
 
             return this;
         }
@@ -219,8 +217,7 @@ namespace hasheous_server.Models.Tasks
         public void Unregister()
         {
             // update the database to remove this client
-            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            db.ExecuteCMD("DELETE FROM Task_Clients WHERE id = @id", new Dictionary<string, object>
+            Config.database.ExecuteCMD("DELETE FROM Task_Clients WHERE id = @id", new Dictionary<string, object>
             { { "@id", this.Id } });
 
             // clear this object
@@ -231,7 +228,7 @@ namespace hasheous_server.Models.Tasks
             this._CreatedAt = DateTime.MinValue;
             this._LastContactAt = DateTime.MinValue;
             this.ClientVersion = null;
-            this.Capabilities = new List<TaskType>();
+            this.Capabilities = new List<Capabilities>();
         }
 
         /// <summary>
@@ -241,8 +238,7 @@ namespace hasheous_server.Models.Tasks
         {
             this._LastContactAt = DateTime.UtcNow;
 
-            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            db.ExecuteCMD("UPDATE Task_Clients SET last_contact_at = @last_contact_at WHERE id = @id", new Dictionary<string, object>
+            Config.database.ExecuteCMD("UPDATE Task_Clients SET last_contact_at = @last_contact_at WHERE id = @id", new Dictionary<string, object>
             {
                 { "@last_contact_at", this._LastContactAt },
                 { "@id", this._Id }
@@ -259,8 +255,7 @@ namespace hasheous_server.Models.Tasks
                 throw new Exception("Cannot commit a client that has not been registered.");
             }
 
-            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            db.ExecuteCMD("UPDATE Task_Clients SET client_name = @client_name, api_key = @api_key, last_heartbeat = @last_heartbeat, version = @version, capabilities = @capabilities WHERE id = @id", new Dictionary<string, object>
+            Config.database.ExecuteCMD("UPDATE Task_Clients SET client_name = @client_name, api_key = @api_key, last_heartbeat = @last_heartbeat, version = @version, capabilities = @capabilities WHERE id = @id", new Dictionary<string, object>
             {
                 { "@client_name", this.ClientName },
                 { "@api_key", this._APIKey ?? "" },

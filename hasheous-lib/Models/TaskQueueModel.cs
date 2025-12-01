@@ -1,3 +1,6 @@
+using System.Data;
+using Classes;
+
 namespace hasheous_server.Models.Tasks
 {
     /// <summary>
@@ -6,19 +9,63 @@ namespace hasheous_server.Models.Tasks
     public class QueueItemModel
     {
         /// <summary>
-        /// Gets or sets the unique identifier for the queue item.
+        /// Initializes a new instance of the <see cref="QueueItemModel"/> class.
         /// </summary>
-        public long Id { get; set; }
+        public QueueItemModel() { }
 
         /// <summary>
-        /// Gets or sets the date and time when the queue item was created.
+        /// Initializes a new instance of the <see cref="QueueItemModel"/> class from a <see cref="DataRow"/>.
         /// </summary>
-        public DateTime CreatedAt { get; set; }
+        /// <param name="row">The <see cref="DataRow"/> containing the queue item data.</param>
+        /// <remarks>This constructor calls the <see cref="Refresh(DataRow)"/> method to populate the properties.</remarks>
+        public QueueItemModel(DataRow row)
+        {
+            Refresh(row);
+        }
 
         /// <summary>
-        /// Gets or sets the type of task to be performed.
+        /// Initializes a new instance of the <see cref="QueueItemModel"/> class with the specified task type, required capabilities, and optional parameters.
         /// </summary>
-        public TaskType TaskName { get; set; }
+        /// <param name="taskType">The type of task to be performed.</param>
+        /// <param name="requiredCapabilities">The list of required capabilities for this task.</param>
+        /// <param name="parameters">Optional parameters for the task, serialized as a string.</param>
+        public QueueItemModel(TaskType taskType, List<Capabilities> requiredCapabilities, string? parameters = null)
+        {
+            this._CreatedAt = DateTime.UtcNow;
+            this._TaskName = taskType;
+            this.Status = QueueItemStatus.Pending;
+            this.RequiredCapabilities = requiredCapabilities;
+            this.Parameters = parameters;
+
+            // Id will be set when saved to database
+            DataTable dt = Config.database.ExecuteCMD("INSERT INTO `Task_Queue` (`created_at`, `task_name`, `status`, `required_capabilities`, `parameters`) VALUES (@created_at, @task_name, @status, @required_capabilities, @parameters); SELECT LAST_INSERT_ID();", new Dictionary<string, object>
+            {
+                { "@created_at", this._CreatedAt },
+                { "@task_name", this._TaskName.ToString() },
+                { "@status", this.Status.ToString() },
+                { "@required_capabilities", System.Text.Json.JsonSerializer.Serialize(this.RequiredCapabilities) },
+                { "@parameters", this.Parameters }
+            });
+            this._Id = (long)dt.Rows[0][0];
+        }
+
+        /// <summary>
+        /// Gets the unique identifier for the queue item.
+        /// </summary>
+        public long Id { get; }
+        private long _Id { get; set; }
+
+        /// <summary>
+        /// Gets the date and time when the queue item was created.
+        /// </summary>
+        public DateTime CreatedAt { get; }
+        private DateTime _CreatedAt { get; set; }
+
+        /// <summary>
+        /// Gets the type of task to be performed.
+        /// </summary>
+        public TaskType TaskName { get; }
+        private TaskType _TaskName { get; set; }
 
         /// <summary>
         /// Gets or sets the current status of the queue item.
@@ -29,6 +76,12 @@ namespace hasheous_server.Models.Tasks
         /// Gets or sets the identifier of the client assigned to this task, if any.
         /// </summary>
         public long? ClientId { get; set; }
+
+        /// <summary>
+        /// Gets the list of required capabilities (task types) for this queue item.
+        /// </summary>
+        public List<Capabilities> RequiredCapabilities { get; } = new List<Capabilities>();
+        private List<Capabilities> _RequiredCapabilities { get; set; } = new List<Capabilities>();
 
         /// <summary>
         /// Gets or sets the parameters for the task, serialized as a string.
@@ -54,6 +107,72 @@ namespace hasheous_server.Models.Tasks
         /// Gets or sets the date and time when the task was completed, if available.
         /// </summary>
         public DateTime? CompletedAt { get; set; }
+
+        /// <summary>
+        /// Refreshes the properties of the queue item from the provided <see cref="DataRow"/>, or reloads from the database if no row is provided.
+        /// </summary>
+        /// <param name="row">The <see cref="DataRow"/> containing updated values, or null to reload from the database.</param>
+        /// <returns>The refreshed <see cref="QueueItemModel"/> instance.</returns>
+        public QueueItemModel Refresh(DataRow? row = null)
+        {
+            if (row == null)
+            {
+                DataTable dt = Config.database.ExecuteCMD("SELECT * FROM `Task_Queue` WHERE `id` = @id", new Dictionary<string, object>
+                {
+                    { "@id", this.Id }
+                });
+
+                if (dt.Rows.Count == 0)
+                {
+                    throw new Exception("Queue item not found in database.");
+                }
+
+                row = dt.Rows[0];
+            }
+
+            this._Id = (long)row.Field<long>("id");
+            this._CreatedAt = row.Field<DateTime>("created_at");
+            this._TaskName = (TaskType)Enum.Parse(typeof(TaskType), row.Field<string>("task_name"));
+            this.Status = (QueueItemStatus)Enum.Parse(typeof(QueueItemStatus), row.Field<string>("status"));
+            this.ClientId = row.IsNull("client_id") ? null : (long?)row.Field<long>("client_id");
+            this.Parameters = row.IsNull("parameters") ? null : row.Field<string>("parameters");
+            this.Result = row.IsNull("result") ? null : row.Field<string>("result");
+            this.ErrorMessage = row.IsNull("error_message") ? null : row.Field<string>("error_message");
+            this.StartedAt = row.IsNull("started_at") ? null : (DateTime?)row.Field<DateTime>("started_at");
+            this.CompletedAt = row.IsNull("completed_at") ? null : (DateTime?)row.Field<DateTime>("completed_at");
+
+            return this;
+        }
+
+        /// <summary>
+        /// Terminates the queue item by setting its status to 'Cancelled' in the database.
+        /// </summary>
+        public void Terminate()
+        {
+            Config.database.ExecuteCMD("UPDATE `Task_Queue` SET `status` = @status WHERE `id` = @id", new Dictionary<string, object>
+            {
+                { "@id", this.Id },
+                { "@status", QueueItemStatus.Cancelled }
+            });
+        }
+
+        /// <summary>
+        /// Commits the current state of the queue item to the database by updating its fields.
+        /// </summary>
+        public void Commit()
+        {
+            Config.database.ExecuteCMD("UPDATE `Task_Queue` SET `status` = @status, `client_id` = @client_id, `parameters` = @parameters, `result` = @result, `error_message` = @error_message, `started_at` = @started_at, `completed_at` = @completed_at WHERE `id` = @id", new Dictionary<string, object>
+            {
+                { "@id", this.Id },
+                { "@status", this.Status },
+                { "@client_id", this.ClientId },
+                { "@parameters", this.Parameters },
+                { "@result", this.Result },
+                { "@error_message", this.ErrorMessage },
+                { "@started_at", this.StartedAt },
+                { "@completed_at", this.CompletedAt }
+            });
+        }
     }
 
     /// <summary>
@@ -64,19 +183,23 @@ namespace hasheous_server.Models.Tasks
         /// <summary>
         /// The task is pending and has not started yet.
         /// </summary>
-        Pending,
+        Pending = 0,
         /// <summary>
         /// The task is currently in progress.
         /// </summary>
-        InProgress,
+        InProgress = 10,
         /// <summary>
         /// The task has completed successfully.
         /// </summary>
-        Completed,
+        Completed = 20,
         /// <summary>
         /// The task has failed.
         /// </summary>
-        Failed
+        Failed = 30,
+        /// <summary>
+        /// The task has been cancelled.
+        /// </summary>
+        Cancelled = 40
     }
 
     /// <summary>
@@ -85,8 +208,24 @@ namespace hasheous_server.Models.Tasks
     public enum TaskType
     {
         /// <summary>
-        /// Task for generating AI descriptions and tagging.
+        /// Task for AI description generation and tagging.
         /// </summary>
-        AIDescriptionsAndTagging
+        AIDescriptionAndTagging = 0
+    }
+
+    /// <summary>
+    /// Represents the capabilities that a client or worker can have for processing tasks.
+    /// </summary>
+    public enum Capabilities
+    {
+        /// <summary>
+        /// Capability for accessing the Internet.
+        /// </summary>
+        Internet = 0,
+
+        /// <summary>
+        /// Capability for handling AI tasks.
+        /// </summary>
+        AI = 1
     }
 }

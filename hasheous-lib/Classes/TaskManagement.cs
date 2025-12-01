@@ -169,9 +169,9 @@ namespace hasheous_server.Classes.Tasks.Clients
         /// <param name="publicId">The public client ID.</param>
         /// <param name="clientName">The new name of the client application (optional).</param>
         /// <param name="version">The new version of the client application (optional).</param>
-        /// <param name="capabilities">The new list of supported task types for the client (optional).</param>
+        /// <param name="capabilities">The new list of supported capabilities for the client (optional).</param>
         /// <exception cref="Exception">Thrown if the client API key or public ID is invalid.</exception>
-        public static void UpdateClient(string clientAPIKey, string publicId, string? clientName = null, string? version = null, List<TaskType>? capabilities = null)
+        public static void UpdateClient(string clientAPIKey, string publicId, string? clientName = null, string? version = null, List<Capabilities>? capabilities = null)
         {
             ClientModel? client = GetClientByAPIKeyAndPublicId(clientAPIKey, publicId);
             if (client == null)
@@ -252,7 +252,80 @@ namespace hasheous_server.Classes.Tasks.Clients
     /// </summary>
     public static class TaskManagement
     {
-        private static Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+        /// <summary>
+        /// Enqueues a new task of the specified type with the given capabilities and parameters.
+        /// </summary>
+        /// <param name="taskType">The type of the task to enqueue.</param>
+        /// <param name="capabilities">A list of capabilities required to process the task.</param>
+        /// <param name="parameters">A string containing task-specific parameters.</param>
+        /// <returns>The enqueued <see cref="QueueItemModel"/> instance.</returns>
+        public static QueueItemModel EnqueueTask(TaskType taskType, List<Capabilities> capabilities, string parameters)
+        {
+            QueueItemModel task = new QueueItemModel(taskType, capabilities, parameters);
+            return task;
+        }
 
+        /// <summary>
+        /// Dequeues (removes or terminates) the specified task by its ID.
+        /// </summary>
+        /// <param name="taskId">The ID of the task to dequeue.</param>
+        /// <exception cref="Exception">Thrown if the task is not found.</exception>
+        public static void DequeueTask(long taskId)
+        {
+            QueueItemModel? task = GetTask(taskId);
+            if (task == null)
+            {
+                throw new Exception("Task not found.");
+            }
+            task.Terminate();
+        }
+
+        /// <summary>
+        /// Retrieves a task from the queue by its ID.
+        /// </summary>
+        /// <param name="taskId">The ID of the task to retrieve.</param>
+        /// <returns>The <see cref="QueueItemModel"/> if found; otherwise, null.</returns>
+        public static QueueItemModel? GetTask(long taskId)
+        {
+            DataTable dt = Config.database.ExecuteCMD("SELECT * FROM `Task_Queue` WHERE `id` = @id LIMIT 1;", new Dictionary<string, object>
+            {
+                { "@id", taskId }
+            });
+            if (dt.Rows.Count == 0)
+            {
+                return null;
+            }
+            return new QueueItemModel(dt.Rows[0]);
+        }
+
+        /// <summary>
+        /// Retrieves all tasks currently in the task queue.
+        /// </summary>
+        /// <returns>A list of <see cref="QueueItemModel"/> representing all tasks in the queue.</returns>
+        public static List<QueueItemModel> GetAllTasks()
+        {
+            DataTable dt = Config.database.ExecuteCMD("SELECT * FROM `Task_Queue`;");
+            List<QueueItemModel> tasks = new List<QueueItemModel>();
+            foreach (DataRow row in dt.Rows)
+            {
+                tasks.Add(new QueueItemModel(row));
+            }
+            return tasks;
+        }
+
+        public static void AssignTaskToClient(long taskId, long clientId)
+        {
+            throw new NotImplementedException();
+        }
+
+        public static void UpdateTaskStatus(long taskId, QueueItemStatus status, string? result = null, string? errorMessage = null)
+        {
+            throw new NotImplementedException();
+        }
+
+        public static QueueItemModel? GetNextPendingTaskForClient(long clientId, List<TaskType> clientCapabilities)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

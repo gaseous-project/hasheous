@@ -77,8 +77,8 @@ static async Task WaitForAndInitializeDatabaseAsync()
         }
     } while (dbOnline == false);
 
-    db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-    await db.InitDB();
+    Config.database = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+    await Config.database.InitDB();
     Classes.Metadata.Utility.TableBuilder.BuildTables();
     Config.UpdateConfig();
 }
