@@ -4,6 +4,42 @@ namespace Classes
 {
     public class Maintenance
     {
+        public async Task RunHourlyMaintenance_Frontend()
+        {
+            // clean the bundle cache
+            // get the current bundle cache size
+            DirectoryInfo dirInfo = new DirectoryInfo(Config.LibraryConfiguration.LibraryMetadataBundlesDirectory);
+            FileInfo[] bundleFiles = dirInfo.GetFiles("*.bundle");
+            long totalSizeInBytes = bundleFiles.Sum(f => f.Length);
+            long maxSizeInBytes = Config.MetadataConfiguration.MetadataBundle_MaxStorageInMB * 1024 * 1024;
+
+            // delete old bundles if the total size exceeds the max size
+            if (totalSizeInBytes > maxSizeInBytes)
+            {
+                // order the files by last write time
+                var filesByAge = bundleFiles.OrderBy(f => f.LastWriteTime).ToList();
+                foreach (var file in filesByAge)
+                {
+                    System.IO.File.Delete(file.FullName);
+                    totalSizeInBytes -= file.Length;
+                    if (totalSizeInBytes <= maxSizeInBytes)
+                    {
+                        break;
+                    }
+                }
+            }
+
+            // delete bundles older than max age
+            DateTime thresholdDate = DateTime.Now.AddDays(-Config.MetadataConfiguration.MetadataBundle_MaxAgeInDays);
+            foreach (var file in bundleFiles)
+            {
+                if (file.LastWriteTime < thresholdDate)
+                {
+                    System.IO.File.Delete(file.FullName);
+                }
+            }
+        }
+
         public async Task RunDailyMaintenance()
         {
             await Logging.PurgeLogsAsync();

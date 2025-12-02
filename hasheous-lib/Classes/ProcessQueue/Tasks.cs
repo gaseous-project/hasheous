@@ -91,6 +91,11 @@ namespace Classes.ProcessQueue
         FetchPureDOSDATMetadata,
 
         /// <summary>
+        /// Runs hourly maintenance tasks for the frontend
+        /// </summary>
+        HourlyMaintenance_Frontend,
+
+        /// <summary>
         /// Runs daily maintenance tasks
         /// </summary>
         DailyMaintenance,
