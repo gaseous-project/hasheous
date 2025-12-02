@@ -658,6 +658,14 @@ namespace Classes
                     }
                 }
 
+                public string LibraryMetadataBundlesDirectory
+                {
+                    get
+                    {
+                        return Path.Combine(LibraryMetadataDirectory, "Bundles");
+                    }
+                }
+
                 public string LibraryMetadataDirectory_IGDB
                 {
                     get
@@ -868,6 +876,41 @@ namespace Classes
                         }
                     }
                 }
+
+                private static int _MetadataBundle_MaxAgeInDays
+                {
+                    get
+                    {
+                        string? envVar = Environment.GetEnvironmentVariable("metadatabundlemaxageindays");
+                        if (!String.IsNullOrEmpty(envVar))
+                        {
+                            return int.Parse(envVar);
+                        }
+                        else
+                        {
+                            return 7;
+                        }
+                    }
+                }
+
+                private static int _MetadataBundle_MaxStorageInMB
+                {
+                    get
+                    {
+                        string? envVar = Environment.GetEnvironmentVariable("metadatabundlemaxstorageinmb");
+                        if (!String.IsNullOrEmpty(envVar))
+                        {
+                            return int.Parse(envVar);
+                        }
+                        else
+                        {
+                            return 5000;
+                        }
+                    }
+                }
+
+                public int MetadataBundle_MaxAgeInDays = _MetadataBundle_MaxAgeInDays;
+                public int MetadataBundle_MaxStorageInMB = _MetadataBundle_MaxStorageInMB;
 
                 public Communications.MetadataSources Source = _Source;
             }

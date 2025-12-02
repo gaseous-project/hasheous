@@ -468,4 +468,14 @@ public static class StartupExtensions
         cacheWarmerQueueItem.ForceExecute();
         QueueProcessor.QueueItems.Add(cacheWarmerQueueItem);
     }
+
+    public static void ConfigureHourlyMaintenance(this WebApplication app)
+    {
+        QueueProcessor.QueueItem maintenanceQueueItem = new QueueProcessor.QueueItem(QueueItemType.HourlyMaintenance_Frontend, 60, true)
+        {
+            Task = new Classes.ProcessQueue.HourlyMaintenance_Frontend()
+        };
+        maintenanceQueueItem.ForceExecute();
+        QueueProcessor.QueueItems.Add(maintenanceQueueItem);
+    }
 }

@@ -56,6 +56,7 @@ app.UseStaticFiles(new Microsoft.AspNetCore.Builder.StaticFileOptions
 app.MapControllers();
 app.UseCorrelationId();
 app.ConfigureCacheWarmer();
+app.ConfigureHourlyMaintenance();
 Logging.WriteToDiskOnly = false;
 app.Run();
 

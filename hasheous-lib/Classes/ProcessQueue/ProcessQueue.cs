@@ -120,6 +120,10 @@ namespace Classes.ProcessQueue
                         Task = new FetchFBNEOMetadata();
                         break;
 
+                    case QueueItemType.HourlyMaintenance_Frontend:
+                        Task = new HourlyMaintenance_Frontend();
+                        break;
+
                     case QueueItemType.DailyMaintenance:
                         Task = new DailyMaintenance();
                         break;

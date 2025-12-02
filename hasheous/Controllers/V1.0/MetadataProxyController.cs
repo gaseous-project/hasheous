@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Data.SqlTypes;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.IO.Compression;
 using System.Net;
 using System.Web;
 using Classes;
@@ -1229,5 +1230,247 @@ namespace hasheous_server.Controllers.v1_0
             }
         }
         #endregion GiantBomb
+
+        #region MetadataBundles
+        /// <summary>
+        /// Get a metadata bundle by its ID. Bundles contain pre-packaged metadata and images for offline use.
+        /// </summary>
+        /// <param name="MetadataSourceName" example="IGDB" required="true">
+        /// The name of the metadata source (e.g., IGDB, TheGamesDB, GiantBomb)
+        /// </param>
+        /// <param name="GameID" example="12345" required="true">
+        /// The unique identifier of the game within the specified metadata source
+        /// </param>
+        /// <returns>
+        /// A metadata bundle file for the specified game
+        /// </returns>
+        /// <response code="200">Returns the metadata bundle file for the specified game</response>
+        /// <response code="400">If the MetadataSourceName is invalid</response>
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(typeof(PhysicalFileResult), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [Route("Bundles/{MetadataSourceName}/{GameID}.bundle")]
+        public async Task<IActionResult> GetMetadataBundle(string MetadataSourceName, string GameID)
+        {
+            // validate MetadataSourceName
+            var validSources = new List<string> { "IGDB", "TheGamesDB", "GiantBomb" };
+            if (!validSources.Contains(MetadataSourceName))
+            {
+                return BadRequest("Invalid metadata source");
+            }
+
+            // check the disk for a pre-built bundle
+            if (!Directory.Exists(Config.LibraryConfiguration.LibraryMetadataBundlesDirectory))
+            {
+                Directory.CreateDirectory(Config.LibraryConfiguration.LibraryMetadataBundlesDirectory);
+            }
+            string fileName = $"{MetadataSourceName}_{GameID}.bundle";
+            FileInfo? fileInfo;
+            string bundleFilePath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataBundlesDirectory, fileName);
+            bool buildNewBundle = true;
+            if (System.IO.File.Exists(bundleFilePath))
+            {
+                // check the file age
+                fileInfo = new FileInfo(bundleFilePath);
+                if ((DateTime.Now - fileInfo.LastWriteTime).TotalDays <= Config.MetadataConfiguration.MetadataBundle_MaxAgeInDays)
+                {
+                    // return the existing bundle
+                    buildNewBundle = false;
+                }
+            }
+
+            // build a new bundle
+            if (buildNewBundle)
+            {
+                // get the root game metadata based on GameID
+                switch (MetadataSourceName)
+                {
+                    case "IGDB":
+                        string[] imageProperties = new string[]
+                        {
+                            "artworks",
+                            "cover",
+                            "screenshots"
+                        };
+
+                        var igdbGameData = await GetMetadata("Game", long.Parse(GameID), "", "*");
+                        // extract the json response
+                        string? igdbGame = null;
+                        Dictionary<string, object>? igdbGameObj = null;
+                        if (igdbGameData is OkObjectResult okResult)
+                        {
+                            igdbGame = Newtonsoft.Json.JsonConvert.SerializeObject(okResult.Value, Newtonsoft.Json.Formatting.Indented, new Newtonsoft.Json.JsonSerializerSettings
+                            {
+                                NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore,
+                                MaxDepth = 64
+                            });
+                            igdbGameObj = okResult.Value as Dictionary<string, object>;
+                        }
+                        else
+                        {
+                            return BadRequest();
+                        }
+
+                        if (igdbGameData == null || igdbGame == null)
+                        {
+                            return NotFound();
+                        }
+
+                        // build the bundle
+                        // create a temporary working directory
+                        string tempWorkingDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+                        Directory.CreateDirectory(tempWorkingDir);
+
+                        // drop the game metadata json file
+                        await _AddMetadataToBundle(tempWorkingDir, "Game", igdbGame);
+
+                        // start adding images
+                        foreach (string imageProperty in imageProperties)
+                        {
+                            bool singleItemCheckCompleted = false;
+                            bool isSingleItem = true;
+
+                            if (igdbGameObj != null && igdbGameObj.ContainsKey(imageProperty))
+                            {
+                                // check if the property is a list
+                                if (igdbGameObj[imageProperty] is System.Collections.IEnumerable enumerable &&
+                                    !(igdbGameObj[imageProperty] is string))
+                                {
+                                    // check if the enumerable is a single item
+                                    if (singleItemCheckCompleted == false)
+                                    {
+                                        // if the key for the first item is a long, it's a list
+                                        var enumerator = enumerable.GetEnumerator();
+                                        if (enumerator.MoveNext())
+                                        {
+                                            var firstItem = enumerator.Current;
+                                            if (firstItem is KeyValuePair<string, object> kvp)
+                                            {
+                                                if (long.TryParse(kvp.Key, out long _))
+                                                {
+                                                    isSingleItem = false;
+                                                }
+                                            }
+                                        }
+
+                                        singleItemCheckCompleted = true;
+                                    }
+
+                                    if (isSingleItem == true)
+                                    {
+                                        // it's a single item - iterate over until we find the image_id
+                                        foreach (KeyValuePair<string, object> item in enumerable)
+                                        {
+                                            // item is a keyvaluepair<string, object> - the value is a Dictionary<string, object>
+                                            if (item.Key == "image_id")
+                                            {
+                                                string imageID = item.Value.ToString() ?? "";
+                                                PhysicalFileResult? imageFileData = (PhysicalFileResult?)await GetImage(imageID);
+                                                if (imageFileData != null)
+                                                {
+                                                    await _AddFileToBundle(tempWorkingDir, imageProperty, imageFileData);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    else
+                                    {
+                                        foreach (KeyValuePair<string, object> item in enumerable)
+                                        {
+                                            // item is a keyvaluepair<string, object> - the value is a Dictionary<string, object>
+                                            var imageObj = item.Value as Dictionary<string, object>;
+                                            if (imageObj != null && imageObj.ContainsKey("image_id"))
+                                            {
+                                                string imageID = imageObj["image_id"].ToString() ?? "";
+                                                PhysicalFileResult? imageFileData = (PhysicalFileResult?)await GetImage(imageID);
+                                                if (imageFileData != null)
+                                                {
+                                                    await _AddFileToBundle(tempWorkingDir, imageProperty, imageFileData);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // zip the bundle
+                        if (System.IO.File.Exists(bundleFilePath))
+                        {
+                            System.IO.File.Delete(bundleFilePath);
+                        }
+
+                        ZipFile.CreateFromDirectory(tempWorkingDir, bundleFilePath, CompressionLevel.Fastest, false);
+
+                        // clean up the temporary working directory
+                        Directory.Delete(tempWorkingDir, true);
+
+                        break;
+                }
+            }
+
+            if (System.IO.File.Exists(bundleFilePath) == false)
+            {
+                return NotFound();
+            }
+
+            fileInfo = new FileInfo(bundleFilePath);
+            return PhysicalFile(bundleFilePath, "application/octet-stream", fileName, fileInfo.LastWriteTimeUtc, new Microsoft.Net.Http.Headers.EntityTagHeaderValue($"\"{fileInfo.Length}-{fileInfo.LastWriteTimeUtc.Ticks}\""));
+        }
+
+        private async Task _AddMetadataToBundle(string tempBundleDir, string metadataType, object metadata)
+        {
+            // create a sub-directory for the metadata type
+            if (Directory.Exists(tempBundleDir) == false)
+            {
+                Directory.CreateDirectory(tempBundleDir);
+            }
+
+            // serialize the metadata to json
+            string metadataJson = Newtonsoft.Json.JsonConvert.SerializeObject(metadata, Newtonsoft.Json.Formatting.Indented);
+
+            // write the metadata json to a file
+            string metadataFilePath = Path.Combine(tempBundleDir, $"{metadataType}.json");
+            await System.IO.File.WriteAllTextAsync(metadataFilePath, metadataJson);
+        }
+
+        private async Task _AddFileToBundle(string tempBundleDir, string relativePathInBundle, PhysicalFileResult fileData)
+        {
+            // create the directory if it doesn't exist
+            string fileDir = Path.Combine(tempBundleDir, relativePathInBundle);
+
+            if (!Directory.Exists(fileDir))
+            {
+                Directory.CreateDirectory(fileDir);
+            }
+
+            // PhysicalFileResult provides a physical path via FileName; copy from disk
+            string? sourcePath = fileData.FileName;
+            // Only use the basename for the bundle, not the full source path
+            string destFileName = Path.GetFileName(sourcePath ?? string.Empty);
+            string filePathInBundle = Path.Combine(fileDir, destFileName);
+            if (string.IsNullOrWhiteSpace(sourcePath) || !System.IO.File.Exists(sourcePath))
+            {
+                throw new FileNotFoundException("Source file for bundle not found.", sourcePath ?? "<null>");
+            }
+
+            // Avoid copying a file onto itself
+            if (string.Equals(Path.GetFullPath(sourcePath), Path.GetFullPath(filePathInBundle), StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            // copy the file data to the bundle
+            // Use explicit streams with read sharing to minimize "file in use" issues
+            using (var sourceStream = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            using (var destStream = new FileStream(filePathInBundle, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                await sourceStream.CopyToAsync(destStream);
+            }
+        }
+
+        #endregion MetadataBundles
     }
 }
