@@ -553,7 +553,7 @@ namespace hasheous_server.Controllers.v1_0
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [Route("TheGamesDB/Images/{ImageSize}/{*FileName}")]
         [ResponseCache(CacheProfileName = "7Days")]
-        public IActionResult GetTheGamesDBImage(MetadataQuery.imageSize ImageSize, string FileName)
+        public async Task<IActionResult> GetTheGamesDBImage(MetadataQuery.imageSize ImageSize, string FileName)
         {
             FileName = System.Uri.UnescapeDataString(FileName);
             if (FileName.Contains("..") || FileName.Contains("\\"))
@@ -1284,6 +1284,10 @@ namespace hasheous_server.Controllers.v1_0
             // build a new bundle
             if (buildNewBundle)
             {
+                // create a temporary working directory
+                string tempWorkingDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+                Directory.CreateDirectory(tempWorkingDir);
+
                 // get the root game metadata based on GameID
                 switch (MetadataSourceName)
                 {
@@ -1301,12 +1305,12 @@ namespace hasheous_server.Controllers.v1_0
                         Dictionary<string, object>? igdbGameObj = null;
                         if (igdbGameData is OkObjectResult okResult)
                         {
-                            igdbGame = Newtonsoft.Json.JsonConvert.SerializeObject(okResult.Value, Newtonsoft.Json.Formatting.Indented, new Newtonsoft.Json.JsonSerializerSettings
+                            igdbGameObj = okResult.Value as Dictionary<string, object>;
+                            igdbGame = Newtonsoft.Json.JsonConvert.SerializeObject(igdbGameObj, Newtonsoft.Json.Formatting.Indented, new Newtonsoft.Json.JsonSerializerSettings
                             {
                                 NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore,
                                 MaxDepth = 64
                             });
-                            igdbGameObj = okResult.Value as Dictionary<string, object>;
                         }
                         else
                         {
@@ -1319,10 +1323,6 @@ namespace hasheous_server.Controllers.v1_0
                         }
 
                         // build the bundle
-                        // create a temporary working directory
-                        string tempWorkingDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-                        Directory.CreateDirectory(tempWorkingDir);
-
                         // drop the game metadata json file
                         await _AddMetadataToBundle(tempWorkingDir, "Game", igdbGame);
 
@@ -1396,31 +1396,73 @@ namespace hasheous_server.Controllers.v1_0
                             }
                         }
 
-                        // zip the bundle
-                        if (System.IO.File.Exists(bundleFilePath))
+                        break;
+
+                    case "TheGamesDB":
+                        var tgdbGameData = GetGamesByGameID(GameID, "*", "boxart, platform", 1, 10);
+                        // extract the json response
+                        string? tgdbGame = null;
+                        HasheousClient.Models.Metadata.TheGamesDb.GamesByGameID? tgdbGameObj = null;
+                        if (tgdbGameData is OkObjectResult okResult2)
                         {
-                            System.IO.File.Delete(bundleFilePath);
+                            tgdbGameObj = okResult2.Value as HasheousClient.Models.Metadata.TheGamesDb.GamesByGameID;
+                            tgdbGame = Newtonsoft.Json.JsonConvert.SerializeObject(tgdbGameObj, Newtonsoft.Json.Formatting.Indented, new Newtonsoft.Json.JsonSerializerSettings
+                            {
+                                NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore,
+                                MaxDepth = 64
+                            });
+                        }
+                        else
+                        {
+                            return BadRequest();
+                        }
+                        if (tgdbGameData == null || tgdbGame == null)
+                        {
+                            return NotFound();
                         }
 
-                        ZipFile.CreateFromDirectory(tempWorkingDir, bundleFilePath, CompressionLevel.Fastest, false);
+                        // build the bundle
+                        // drop the game metadata json file
+                        await _AddMetadataToBundle(tempWorkingDir, "Game", tgdbGame);
 
-                        // clean up the temporary working directory
-                        Directory.Delete(tempWorkingDir, true);
+                        // start adding images
+                        if (tgdbGameObj != null && tgdbGameObj.include != null && tgdbGameObj.include.boxart != null && tgdbGameObj.include.boxart.data != null)
+                        {
+                            foreach (var imageKv in tgdbGameObj.include.boxart.data)
+                            {
+                                var imageObj = imageKv.Value;
+                                foreach (var image in imageObj)
+                                {
+                                    string imagePath = image.filename ?? "";
+                                    PhysicalFileResult? imageFileData = (PhysicalFileResult?)await GetTheGamesDBImage(MetadataQuery.imageSize.original, imagePath);
+                                    if (imageFileData != null)
+                                    {
+                                        await _AddFileToBundle(tempWorkingDir, image.type, imageFileData);
+                                    }
+                                }
+                            }
+                        }
 
                         break;
                 }
-            }
 
-            if (System.IO.File.Exists(bundleFilePath) == false)
-            {
-                return NotFound();
+                // zip the bundle
+                if (System.IO.File.Exists(bundleFilePath))
+                {
+                    System.IO.File.Delete(bundleFilePath);
+                }
+
+                ZipFile.CreateFromDirectory(tempWorkingDir, bundleFilePath, CompressionLevel.Fastest, false);
+
+                // clean up the temporary working directory
+                Directory.Delete(tempWorkingDir, true);
             }
 
             fileInfo = new FileInfo(bundleFilePath);
             return PhysicalFile(bundleFilePath, "application/octet-stream", fileName, fileInfo.LastWriteTimeUtc, new Microsoft.Net.Http.Headers.EntityTagHeaderValue($"\"{fileInfo.Length}-{fileInfo.LastWriteTimeUtc.Ticks}\""));
         }
 
-        private async Task _AddMetadataToBundle(string tempBundleDir, string metadataType, object metadata)
+        private async Task _AddMetadataToBundle(string tempBundleDir, string metadataType, string metadata)
         {
             // create a sub-directory for the metadata type
             if (Directory.Exists(tempBundleDir) == false)
@@ -1428,12 +1470,9 @@ namespace hasheous_server.Controllers.v1_0
                 Directory.CreateDirectory(tempBundleDir);
             }
 
-            // serialize the metadata to json
-            string metadataJson = Newtonsoft.Json.JsonConvert.SerializeObject(metadata, Newtonsoft.Json.Formatting.Indented);
-
             // write the metadata json to a file
             string metadataFilePath = Path.Combine(tempBundleDir, $"{metadataType}.json");
-            await System.IO.File.WriteAllTextAsync(metadataFilePath, metadataJson);
+            await System.IO.File.WriteAllTextAsync(metadataFilePath, metadata);
         }
 
         private async Task _AddFileToBundle(string tempBundleDir, string relativePathInBundle, PhysicalFileResult fileData)
