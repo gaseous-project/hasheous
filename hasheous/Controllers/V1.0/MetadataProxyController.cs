@@ -1254,6 +1254,17 @@ namespace hasheous_server.Controllers.v1_0
         [Route("Bundles/{MetadataSourceName}/{GameID}.bundle")]
         public async Task<IActionResult> GetMetadataBundle(string MetadataSourceName, string GameID)
         {
+            // validate GameID
+            GameID = System.Uri.UnescapeDataString(GameID);
+            if (GameID.Contains("..") || GameID.Contains("\\"))
+            {
+                return BadRequest("Invalid game ID");
+            }
+            else if (GameID.Contains("/"))
+            {
+                return BadRequest("Invalid game ID");
+            }
+
             // validate MetadataSourceName
             var validSources = new List<string> { "IGDB", "TheGamesDB", "GiantBomb" };
             if (!validSources.Contains(MetadataSourceName))
