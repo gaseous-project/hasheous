@@ -52,10 +52,10 @@ namespace Classes
                 Config.LibraryConfiguration.LibraryTempDirectory,
                 Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_GiantBomb, "Images"),
                 Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB, "Images"),
-Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB, "Companies"),
-Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB, "Platforms"),
-Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB, "Games"),
-Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_TheGamesDb, "Images")
+                Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB, "Companies"),
+                Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB, "Platforms"),
+                Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB, "Games"),
+                Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_TheGamesDb, "Images")
             }, Config.MetadataConfiguration.MetadataCache_MaxStorageInMB);
         }
 
