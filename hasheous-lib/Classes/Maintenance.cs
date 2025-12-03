@@ -14,39 +14,42 @@ namespace Classes
         {
             // clean the bundle cache
             // get the current bundle cache size
-            DirectoryInfo dirInfo = new DirectoryInfo(Config.LibraryConfiguration.LibraryMetadataBundlesDirectory);
-            FileInfo[] bundleFiles = dirInfo.GetFiles("*.bundle");
-            long totalSizeInBytes = bundleFiles.Sum(f => f.Length);
-            long maxSizeInBytes = Config.MetadataConfiguration.MetadataBundle_MaxStorageInMB * 1024 * 1024;
-
-            // delete old bundles if the total size exceeds the max size
-            if (totalSizeInBytes > maxSizeInBytes)
+            if (Directory.Exists(Config.LibraryConfiguration.LibraryMetadataBundlesDirectory))
             {
-                // order the files by last write time
-                var filesByAge = bundleFiles.OrderBy(f => f.LastWriteTime).ToList();
-                foreach (var file in filesByAge)
+                DirectoryInfo dirInfo = new DirectoryInfo(Config.LibraryConfiguration.LibraryMetadataBundlesDirectory);
+                FileInfo[] bundleFiles = dirInfo.GetFiles("*.bundle");
+                long totalSizeInBytes = bundleFiles.Sum(f => f.Length);
+                long maxSizeInBytes = Config.MetadataConfiguration.MetadataBundle_MaxStorageInMB * 1024 * 1024;
+
+                // delete old bundles if the total size exceeds the max size
+                if (totalSizeInBytes > maxSizeInBytes)
                 {
-                    System.IO.File.Delete(file.FullName);
-                    totalSizeInBytes -= file.Length;
-                    if (totalSizeInBytes <= maxSizeInBytes)
+                    // order the files by last write time
+                    var filesByAge = bundleFiles.OrderBy(f => f.LastWriteTime).ToList();
+                    foreach (var file in filesByAge)
                     {
-                        break;
+                        System.IO.File.Delete(file.FullName);
+                        totalSizeInBytes -= file.Length;
+                        if (totalSizeInBytes <= maxSizeInBytes)
+                        {
+                            break;
+                        }
+                    }
+                }
+
+                // delete bundles older than max age
+                DateTime thresholdDate = DateTime.Now.AddDays(-Config.MetadataConfiguration.MetadataBundle_MaxAgeInDays);
+                foreach (var file in bundleFiles)
+                {
+                    if (file.LastWriteTime < thresholdDate)
+                    {
+                        System.IO.File.Delete(file.FullName);
                     }
                 }
             }
 
-            // delete bundles older than max age
-            DateTime thresholdDate = DateTime.Now.AddDays(-Config.MetadataConfiguration.MetadataBundle_MaxAgeInDays);
-            foreach (var file in bundleFiles)
-            {
-                if (file.LastWriteTime < thresholdDate)
-                {
-                    System.IO.File.Delete(file.FullName);
-                }
-            }
-
             // clean other caches if needed
-            await CleanupCachesBySize(new string[]
+            CleanupCachesBySize(new string[]
             {
                 Config.LibraryConfiguration.LibrarySignaturesProcessedDirectory,
                 Config.LibraryConfiguration.LibraryTempDirectory,
@@ -152,7 +155,7 @@ namespace Classes
         /// </summary>
         /// <param name="cachePaths">Array of cache directory paths to clean up.</param>
         /// <param name="maxCacheSizeMB">Maximum total cache size in MB.</param>
-        private async Task CleanupCachesBySize(string[]? cachePaths = null, int maxCacheSizeMB = 100)
+        private void CleanupCachesBySize(string[]? cachePaths = null, int maxCacheSizeMB = 100)
         {
             // If no paths provided, use an empty array
             cachePaths ??= Array.Empty<string>();
@@ -195,7 +198,6 @@ namespace Classes
             }
             // Optionally log cleanup summary
             Logging.Log(Logging.LogType.Information, "Maintenance", $"Cache cleanup: {removedCount} files removed, final size: {totalSize / (1024 * 1024)} MB");
-
         }
 
         /// <summary>

@@ -73,6 +73,7 @@ function LoadStatusPage() {
                             "FetchRetroAchievementsMetadata"
                         ],
                         "maintenance": [
+                            "HourlyMaintenance_Frontend",
                             "DailyMaintenance",
                             "WeeklyMaintenance",
                             "CacheWarmer"
