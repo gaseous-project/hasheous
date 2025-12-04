@@ -909,8 +909,25 @@ namespace Classes
                     }
                 }
 
+                private static int _MetadataCache_MaxStorageInMB
+                {
+                    get
+                    {
+                        string? envVar = Environment.GetEnvironmentVariable("metadatacachemaxstorageinmb");
+                        if (!String.IsNullOrEmpty(envVar))
+                        {
+                            return int.Parse(envVar);
+                        }
+                        else
+                        {
+                            return 10000;
+                        }
+                    }
+                }
+
                 public int MetadataBundle_MaxAgeInDays = _MetadataBundle_MaxAgeInDays;
                 public int MetadataBundle_MaxStorageInMB = _MetadataBundle_MaxStorageInMB;
+                public int MetadataCache_MaxStorageInMB = _MetadataCache_MaxStorageInMB;
 
                 public Communications.MetadataSources Source = _Source;
             }
