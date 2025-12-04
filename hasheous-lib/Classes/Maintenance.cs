@@ -69,6 +69,9 @@ namespace Classes
         {
             await Logging.PurgeLogsAsync();
 
+            // aggregate insights into daily summary table
+            await Classes.Insights.Insights.AggregateDailySummary();
+
             // delete insights older than 30 days
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "DELETE FROM Insights_API_Requests WHERE event_datetime < NOW() - INTERVAL 31 DAY;";
