@@ -131,6 +131,10 @@ namespace Classes
 										// run post-upgrade code
 										DatabaseMigration.PostUpgradeScript(i, _ConnectorType);
 									}
+									else
+									{
+										Logging.Log(Logging.LogType.Information, "Database", "Schema version is up to date. No update needed. " + SchemaVer + " >= " + i);
+									}
 								}
 							}
 						}
