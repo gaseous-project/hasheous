@@ -110,7 +110,7 @@ namespace Classes
 								}
 								else
 								{
-									int SchemaVer = (int)SchemaVersion.Rows[0][0];
+									int SchemaVer = Convert.ToInt32(SchemaVersion.Rows[0][0]);
 									Logging.Log(Logging.LogType.Information, "Database", "Schema version is " + SchemaVer);
 									if (SchemaVer < i)
 									{
