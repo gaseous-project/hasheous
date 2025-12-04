@@ -1560,8 +1560,7 @@ namespace hasheous_server.Classes
                             DataObject_MetadataMap GROUP BY DataObjectId ORDER BY LastSearched) DDMM ON DataObject.Id = DDMM.DataObjectId
                     WHERE
                         ObjectType = @objecttype AND DDMM.LastSearched < @lastsearched
-                    ORDER BY DataObject.`Name`
-                    LIMIT 10000;
+                    ORDER BY DataObject.`Name`;
                 ";
                 dbDict = new Dictionary<string, object>{
                     { "objecttype", objectType },
