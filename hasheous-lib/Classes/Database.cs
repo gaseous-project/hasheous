@@ -86,8 +86,6 @@ namespace Classes
 						string resourceName = "hasheous_lib.Schema.hasheous-" + i + ".sql";
 						string dbScript = "";
 
-						Logging.Log(Logging.LogType.Information, "Database", "Checking for schema update to version " + i);
-
 						string[] resources = Assembly.GetExecutingAssembly().GetManifestResourceNames();
 						if (resources.Contains(resourceName))
 						{
