@@ -170,29 +170,29 @@ namespace Classes.Insights
             report["total_requests"] = totalRequests;
             report["average_response_time"] = avgResponseTime;
 
-            // 1b. Unique visitors per day (last 30 days)
-            var uniqueVisitorsPerDay = new List<Dictionary<string, object>>();
-            for (int i = 0; i < 30; i++)
-            {
-                DateTime day = DateTime.UtcNow.Date.AddDays(-i);
-                string daySql = @"
-                    SELECT COUNT(DISTINCT remote_ip) AS unique_visitors
-                    FROM Insights_API_Requests
-                    WHERE DATE(event_datetime) = @day" + (appId > 0 ? " AND client_id = @appId" : "") + ";";
-                var dayParams = new Dictionary<string, object>(dbDict) { ["@day"] = day };
-                DataTable dayTable = await db.ExecuteCMDAsync(daySql, dayParams);
-                long dayCount = 0;
-                if (dayTable.Rows.Count > 0)
-                {
-                    dayCount = dayTable.Rows[0]["unique_visitors"] != DBNull.Value ? Convert.ToInt64(dayTable.Rows[0]["unique_visitors"]) : 0;
-                }
-                uniqueVisitorsPerDay.Add(new Dictionary<string, object>
-                {
-                    { "date", day.ToString("yyyy-MM-dd") },
-                    { "unique_visitors", dayCount }
-                });
-            }
-            report["unique_visitors_per_day"] = uniqueVisitorsPerDay;
+            // // 1b. Unique visitors per day (last 30 days)
+            // var uniqueVisitorsPerDay = new List<Dictionary<string, object>>();
+            // for (int i = 0; i < 30; i++)
+            // {
+            //     DateTime day = DateTime.UtcNow.Date.AddDays(-i);
+            //     string daySql = @"
+            //         SELECT COUNT(DISTINCT remote_ip) AS unique_visitors
+            //         FROM Insights_API_Requests
+            //         WHERE DATE(event_datetime) = @day" + (appId > 0 ? " AND client_id = @appId" : "") + ";";
+            //     var dayParams = new Dictionary<string, object>(dbDict) { ["@day"] = day };
+            //     DataTable dayTable = await db.ExecuteCMDAsync(daySql, dayParams);
+            //     long dayCount = 0;
+            //     if (dayTable.Rows.Count > 0)
+            //     {
+            //         dayCount = dayTable.Rows[0]["unique_visitors"] != DBNull.Value ? Convert.ToInt64(dayTable.Rows[0]["unique_visitors"]) : 0;
+            //     }
+            //     uniqueVisitorsPerDay.Add(new Dictionary<string, object>
+            //     {
+            //         { "date", day.ToString("yyyy-MM-dd") },
+            //         { "unique_visitors", dayCount }
+            //     });
+            // }
+            // report["unique_visitors_per_day"] = uniqueVisitorsPerDay;
 
             // 2. Country mapping
             sql = "SELECT Code, Value FROM Country;";
