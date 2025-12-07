@@ -185,7 +185,9 @@ namespace Classes.ProcessQueue
                                 new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString),
                                 hashesDict,
                                 true,
-                                "All"
+                                "All",
+                                null,
+                                false
                             );
                             await hashLookup.PerformLookup();
 

@@ -53,6 +53,10 @@ namespace Classes
         [System.Text.Json.Serialization.JsonIgnore]
         public string returnFields { get; set; } = "All";
 
+        [Newtonsoft.Json.JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
+        public bool ForceSearch { get; set; } = true;
+
         public enum ValidFields
         {
             All,
@@ -68,13 +72,14 @@ namespace Classes
 
         }
 
-        public HashLookup(Database db, hasheous_server.Models.HashLookupModel model, bool? returnAllSources = false, string? returnFields = "All", List<gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType>? returnSources = null)
+        public HashLookup(Database db, hasheous_server.Models.HashLookupModel model, bool? returnAllSources = false, string? returnFields = "All", List<gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType>? returnSources = null, bool? forceSearch = true)
         {
             this.db = db;
             this.model = model;
             this.returnAllSources = returnAllSources ?? false;
             this.returnFields = returnFields ?? "All";
             this.returnSources = returnSources ?? null;
+            this.ForceSearch = forceSearch ?? true;
         }
 
         public async Task PerformLookup()
@@ -161,7 +166,10 @@ namespace Classes
                             dataObjects.AddSignature(publisher.Id, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
 
                             // force metadata search
-                            await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Company, publisher.Id, true);
+                            if (this.ForceSearch)
+                            {
+                                await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Company, publisher.Id, true);
+                            }
 
                             // re-get the publisher
                             publisher = await dataObjects.GetDataObject(DataObjects.DataObjectType.Company, publisher.Id);
@@ -212,7 +220,10 @@ namespace Classes
                     dataObjects.AddSignature(platform.Id, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId);
 
                     // force metadata search
-                    await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Platform, platform.Id, true);
+                    if (this.ForceSearch)
+                    {
+                        await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Platform, platform.Id, true);
+                    }
 
                     // re-get the platform
                     platform = await dataObjects.GetDataObject(DataObjects.DataObjectType.Platform, platform.Id);
@@ -296,7 +307,10 @@ namespace Classes
                             });
                         }
                         // force metadata search
-                        await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true);
+                        if (this.ForceSearch)
+                        {
+                            await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true);
+                        }
                     }
 
                     // add signature mapping to game
