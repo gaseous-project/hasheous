@@ -383,20 +383,20 @@ namespace Classes.Insights
                         continue;
                     }
 
-                    // Delete raw data for this day using parameter
-                    string deleteSql = @"
-                        DELETE FROM Insights_API_Requests WHERE DATE(event_datetime) = @summary_date;
-                    ";
-                    var deleteParams = new Dictionary<string, object> { { "@summary_date", dayStr } };
-                    try
-                    {
-                        await db.ExecuteCMDAsync(deleteSql, deleteParams);
-                    }
-                    catch (Exception exDel)
-                    {
-                        Logging.Log(Logging.LogType.Warning, "Insights.AggregateDailySummary", $"Cleanup (delete) failed for {dayStr}", exDel);
-                        allSucceeded = false;
-                    }
+                    // // Delete raw data for this day using parameter
+                    // string deleteSql = @"
+                    //     DELETE FROM Insights_API_Requests WHERE DATE(event_datetime) = @summary_date;
+                    // ";
+                    // var deleteParams = new Dictionary<string, object> { { "@summary_date", dayStr } };
+                    // try
+                    // {
+                    //     await db.ExecuteCMDAsync(deleteSql, deleteParams);
+                    // }
+                    // catch (Exception exDel)
+                    // {
+                    //     Logging.Log(Logging.LogType.Warning, "Insights.AggregateDailySummary", $"Cleanup (delete) failed for {dayStr}", exDel);
+                    //     allSucceeded = false;
+                    // }
                 }
                 return allSucceeded;
             }
