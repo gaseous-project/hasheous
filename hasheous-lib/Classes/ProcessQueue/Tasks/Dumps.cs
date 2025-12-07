@@ -74,14 +74,20 @@ namespace Classes.ProcessQueue
 
                 // step 2: dump each game data object
                 Logging.Log(Logging.LogType.Information, "Metadata Dump", $"Processing {dataObjectsList.Objects.Count} game data objects from page {pageNumber}...");
+                long counter = 0;
                 foreach (var dataObjectItem in dataObjectsList.Objects)
                 {
+                    counter++;
+                    Logging.Log(Logging.LogType.Information, "Metadata Dump", $"Processing game {counter}/{dataObjectsList.Objects.Count} (ID: {dataObjectItem.Id})...");
+
                     string platformName = "Unknown Platform";
 
                     DataObjectItem? dataObject = await dataObjects.GetDataObject(dataObjectItem.Id);
 
                     if (dataObject == null)
                     {
+                        Logging.Log(Logging.LogType.Information, "Metadata Dump", $"Data object with ID {dataObjectItem.Id} not found. Skipping...");
+
                         continue; // Skip if the data object is not found
                     }
 
@@ -151,66 +157,73 @@ namespace Classes.ProcessQueue
                             new Newtonsoft.Json.Converters.StringEnumConverter()
                         }
                     });
+                    await File.WriteAllTextAsync(filePath, jsonContent);
 
                     // dump hashes data object
-                    string platformHashPath = Path.Combine(outputHashesPath, platformName, dataObject.Name + " (" + dataObject.Id + ")");
-                    if (!Directory.Exists(platformHashPath))
+                    try
                     {
-                        Directory.CreateDirectory(platformHashPath);
-                    }
-                    AttributeItem doRoms = dataObject.Attributes?.FirstOrDefault(attr => attr.attributeName == AttributeItem.AttributeName.ROMs);
-                    if (doRoms != null)
-                    {
-                        foreach (var rom in doRoms.Value as List<Signatures_Games_2.RomItem>)
+                        string platformHashPath = Path.Combine(outputHashesPath, platformName, dataObject.Name + " (" + dataObject.Id + ")");
+                        if (!Directory.Exists(platformHashPath))
                         {
-                            hasheous_server.Models.HashLookupModel hashesDict = new hasheous_server.Models.HashLookupModel();
-                            if (rom.Md5 != null)
+                            Directory.CreateDirectory(platformHashPath);
+                        }
+                        AttributeItem doRoms = dataObject.Attributes?.FirstOrDefault(attr => attr.attributeName == AttributeItem.AttributeName.ROMs);
+                        if (doRoms != null)
+                        {
+                            foreach (var rom in doRoms.Value as List<Signatures_Games_2.RomItem>)
                             {
-                                hashesDict.MD5 = rom.Md5;
-                            }
-                            if (rom.Sha1 != null)
-                            {
-                                hashesDict.SHA1 = rom.Sha1;
-                            }
-                            if (rom.Sha256 != null)
-                            {
-                                hashesDict.SHA256 = rom.Sha256;
-                            }
-                            if (rom.Crc != null)
-                            {
-                                hashesDict.CRC = rom.Crc;
-                            }
-                            // perform lookup
-                            HashLookup hashLookup = new HashLookup(
-                                new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString),
-                                hashesDict,
-                                true,
-                                "All",
-                                null,
-                                false
-                            );
-                            await hashLookup.PerformLookup();
-
-                            // write the hash lookup result to file - named for the first game and rom id found
-                            if (hashLookup.Signatures.Count > 0)
-                            {
-                                SignatureLookupItem.SignatureResult signature = hashLookup.Signatures.First().Value.First();
-                                string romFileName = $"{signature.Game.Id}-{signature.Rom.Id}-HashLookup.json";
-                                string romFilePath = Path.Combine(platformHashPath, romFileName);
-                                string romJsonContent = Newtonsoft.Json.JsonConvert.SerializeObject(hashLookup, new Newtonsoft.Json.JsonSerializerSettings
+                                hasheous_server.Models.HashLookupModel hashesDict = new hasheous_server.Models.HashLookupModel();
+                                if (rom.Md5 != null)
                                 {
-                                    Formatting = Newtonsoft.Json.Formatting.Indented,
-                                    NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore,
-                                    Converters = new List<Newtonsoft.Json.JsonConverter>
-                                                {
-                                                    new Newtonsoft.Json.Converters.StringEnumConverter()
-                                                }
-                                });
-                                await File.WriteAllTextAsync(romFilePath, romJsonContent);
+                                    hashesDict.MD5 = rom.Md5;
+                                }
+                                if (rom.Sha1 != null)
+                                {
+                                    hashesDict.SHA1 = rom.Sha1;
+                                }
+                                if (rom.Sha256 != null)
+                                {
+                                    hashesDict.SHA256 = rom.Sha256;
+                                }
+                                if (rom.Crc != null)
+                                {
+                                    hashesDict.CRC = rom.Crc;
+                                }
+                                // perform lookup
+                                HashLookup hashLookup = new HashLookup(
+                                    new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString),
+                                    hashesDict,
+                                    true,
+                                    "All",
+                                    null,
+                                    false
+                                );
+                                await hashLookup.PerformLookup();
+
+                                // write the hash lookup result to file - named for the first game and rom id found
+                                if (hashLookup.Signatures.Count > 0)
+                                {
+                                    SignatureLookupItem.SignatureResult signature = hashLookup.Signatures.First().Value.First();
+                                    string romFileName = $"{signature.Game.Id}-{signature.Rom.Id}-HashLookup.json";
+                                    string romFilePath = Path.Combine(platformHashPath, romFileName);
+                                    string romJsonContent = Newtonsoft.Json.JsonConvert.SerializeObject(hashLookup, new Newtonsoft.Json.JsonSerializerSettings
+                                    {
+                                        Formatting = Newtonsoft.Json.Formatting.Indented,
+                                        NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore,
+                                        Converters = new List<Newtonsoft.Json.JsonConverter>
+                                    {
+                                        new Newtonsoft.Json.Converters.StringEnumConverter()
+                                    }
+                                    });
+                                    await File.WriteAllTextAsync(romFilePath, romJsonContent);
+                                }
                             }
                         }
                     }
-                    await File.WriteAllTextAsync(filePath, jsonContent);
+                    catch (Exception ex)
+                    {
+                        Logging.Log(Logging.LogType.Warning, "Metadata Dump", $"Error dumping hashes for data object ID {dataObjectItem.Id}: {ex.Message}");
+                    }
                 }
             }
 
