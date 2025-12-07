@@ -155,7 +155,7 @@ namespace Classes
                     {
                         // redis is not enabled, so we will not use the cache
                         publisher = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
-                        if (publisher == null)
+                        if (publisher == null && this.ForceSearch)
                         {
                             // no returned publisher! create one
                             publisher = await dataObjects.NewDataObject(DataObjects.DataObjectType.Company, new DataObjectItemModel
@@ -166,10 +166,7 @@ namespace Classes
                             dataObjects.AddSignature(publisher.Id, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
 
                             // force metadata search
-                            if (this.ForceSearch)
-                            {
-                                await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Company, publisher.Id, true);
-                            }
+                            await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Company, publisher.Id, true);
 
                             // re-get the publisher
                             publisher = await dataObjects.GetDataObject(DataObjects.DataObjectType.Company, publisher.Id);
@@ -209,7 +206,7 @@ namespace Classes
                     }
                 }
 
-                if (platform == null)
+                if (platform == null && this.ForceSearch)
                 {
                     // no returned platform! create one
                     platform = await dataObjects.NewDataObject(DataObjects.DataObjectType.Platform, new DataObjectItemModel
@@ -220,10 +217,7 @@ namespace Classes
                     dataObjects.AddSignature(platform.Id, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId);
 
                     // force metadata search
-                    if (this.ForceSearch)
-                    {
-                        await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Platform, platform.Id, true);
-                    }
+                    await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Platform, platform.Id, true);
 
                     // re-get the platform
                     platform = await dataObjects.GetDataObject(DataObjects.DataObjectType.Platform, platform.Id);
@@ -280,7 +274,7 @@ namespace Classes
                             Value = platform.Id.ToString()
                         }
                     });
-                    if (game == null)
+                    if (game == null && this.ForceSearch)
                     {
                         game = await dataObjects.NewDataObject(DataObjects.DataObjectType.Game, new DataObjectItemModel
                         {
@@ -307,10 +301,7 @@ namespace Classes
                             });
                         }
                         // force metadata search
-                        if (this.ForceSearch)
-                        {
-                            await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true);
-                        }
+                        await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true);
                     }
 
                     // add signature mapping to game
