@@ -280,7 +280,7 @@ namespace Classes.ProcessQueue
                 File.Delete(zipFilePath);
             }
             Logging.Log(Logging.LogType.Information, "Metadata Dump", "Creating main metadata map zip file...");
-            System.IO.Compression.ZipFile.CreateFromDirectory(outputPath, zipFilePath);
+            System.IO.Compression.ZipFile.CreateFromDirectory(outputPath, zipFilePath, System.IO.Compression.CompressionLevel.SmallestSize, false);
 
             if (File.Exists(zipHashesFilePath))
             {
