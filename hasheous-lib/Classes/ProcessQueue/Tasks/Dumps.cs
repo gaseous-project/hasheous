@@ -170,8 +170,13 @@ namespace Classes.ProcessQueue
                         AttributeItem doRoms = dataObject.Attributes?.FirstOrDefault(attr => attr.attributeName == AttributeItem.AttributeName.ROMs);
                         if (doRoms != null)
                         {
+                            long romCounter = 0;
+                            long totalRoms = (doRoms.Value as List<Signatures_Games_2.RomItem>)?.Count ?? 0;
                             foreach (var rom in doRoms.Value as List<Signatures_Games_2.RomItem>)
                             {
+                                romCounter++;
+                                Logging.Log(Logging.LogType.Information, "Metadata Dump", $"{counter}/{dataObjectsList.Objects.Count}:   {romCounter}/{totalRoms}: Processing ROM for data object ID {dataObjectItem.Id}...");
+
                                 hasheous_server.Models.HashLookupModel hashesDict = new hasheous_server.Models.HashLookupModel();
                                 if (rom.Md5 != null)
                                 {
@@ -190,7 +195,7 @@ namespace Classes.ProcessQueue
                                     hashesDict.CRC = rom.Crc;
                                 }
                                 // perform lookup
-                                Logging.Log(Logging.LogType.Information, "Metadata Dump", $"{counter}/{dataObjectsList.Objects.Count}:   Performing hash lookup for data object ID {dataObjectItem.Id}, ROM ID {rom.Id}...");
+                                Logging.Log(Logging.LogType.Information, "Metadata Dump", $"{counter}/{dataObjectsList.Objects.Count}:   {romCounter}/{totalRoms}: Performing hash lookup for data object ID {dataObjectItem.Id}, ROM ID {rom.Id}...");
                                 HashLookup hashLookup = new HashLookup(
                                     new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString),
                                     hashesDict,
@@ -219,7 +224,7 @@ namespace Classes.ProcessQueue
                                     await File.WriteAllTextAsync(romFilePath, romJsonContent);
                                 }
 
-                                Logging.Log(Logging.LogType.Information, "Metadata Dump", $"{counter}/{dataObjectsList.Objects.Count}:   Completed hash lookup for data object ID {dataObjectItem.Id}, ROM ID {rom.Id}.");
+                                Logging.Log(Logging.LogType.Information, "Metadata Dump", $"{counter}/{dataObjectsList.Objects.Count}:   {romCounter}/{totalRoms}: Completed hash lookup for data object ID {dataObjectItem.Id}, ROM ID {rom.Id}.");
                             }
                         }
                     }
