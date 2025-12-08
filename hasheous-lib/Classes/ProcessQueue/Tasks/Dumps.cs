@@ -190,6 +190,7 @@ namespace Classes.ProcessQueue
                                     hashesDict.CRC = rom.Crc;
                                 }
                                 // perform lookup
+                                Logging.Log(Logging.LogType.Information, "Metadata Dump", $"Performing hash lookup for data object ID {dataObjectItem.Id}, ROM ID {rom.Id}...");
                                 HashLookup hashLookup = new HashLookup(
                                     new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString),
                                     hashesDict,
@@ -217,6 +218,8 @@ namespace Classes.ProcessQueue
                                     });
                                     await File.WriteAllTextAsync(romFilePath, romJsonContent);
                                 }
+
+                                Logging.Log(Logging.LogType.Information, "Metadata Dump", $"Completed hash lookup for data object ID {dataObjectItem.Id}, ROM ID {rom.Id}.");
                             }
                         }
                     }
