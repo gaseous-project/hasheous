@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Cryptography.Xml;
 using hasheous.Classes;
 using hasheous_server.Classes;
@@ -172,6 +173,8 @@ namespace Classes.ProcessQueue
                         {
                             long romCounter = 0;
                             long totalRoms = (doRoms.Value as List<Signatures_Games_2.RomItem>)?.Count ?? 0;
+                            Stopwatch romStopwatch = new Stopwatch();
+                            romStopwatch.Start();
                             foreach (var rom in doRoms.Value as List<Signatures_Games_2.RomItem>)
                             {
                                 romCounter++;
@@ -224,8 +227,31 @@ namespace Classes.ProcessQueue
                                     await File.WriteAllTextAsync(romFilePath, romJsonContent);
                                 }
 
+                                if (romStopwatch.Elapsed.TotalMinutes > 5)
+                                {
+                                    // this is taking a long time, abort
+                                    Logging.Log(Logging.LogType.Warning, "Metadata Dump", $"{counter}/{dataObjectsList.Objects.Count}:   {romCounter}/{totalRoms}: Aborting hash lookup for data object ID {dataObjectItem.Id}, ROM ID {rom.Id} due to timeout.");
+
+                                    // log the data object id for later review
+                                    string timeoutLogPath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "TimeoutLogs");
+                                    if (!Directory.Exists(timeoutLogPath))
+                                    {
+                                        Directory.CreateDirectory(timeoutLogPath);
+                                    }
+
+                                    string timeoutLogFilePath = Path.Combine(timeoutLogPath, "MetadataDumpTimeouts.log");
+
+                                    // append the data object id to the log file
+                                    await File.AppendAllTextAsync(timeoutLogFilePath, $"Data Object ID {dataObjectItem.Id.ToString().PadLeft(8)} timed out{Environment.NewLine}");
+
+                                    // exit the ROM loop
+                                    break;
+                                }
+
                                 Logging.Log(Logging.LogType.Information, "Metadata Dump", $"{counter}/{dataObjectsList.Objects.Count}:   {romCounter}/{totalRoms}: Completed hash lookup for data object ID {dataObjectItem.Id}, ROM ID {rom.Id}.");
                             }
+                            romStopwatch.Stop();
+                            Logging.Log(Logging.LogType.Information, "Metadata Dump", $"{counter}/{dataObjectsList.Objects.Count}:   Completed processing {totalRoms} ROMs for data object ID {dataObjectItem.Id} in {romStopwatch.Elapsed.TotalSeconds} seconds.");
                         }
                     }
                     catch (Exception ex)
