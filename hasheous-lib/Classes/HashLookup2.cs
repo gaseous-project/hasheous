@@ -53,6 +53,10 @@ namespace Classes
         [System.Text.Json.Serialization.JsonIgnore]
         public string returnFields { get; set; } = "All";
 
+        [Newtonsoft.Json.JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
+        public bool ForceSearch { get; set; } = true;
+
         public enum ValidFields
         {
             All,
@@ -68,13 +72,14 @@ namespace Classes
 
         }
 
-        public HashLookup(Database db, hasheous_server.Models.HashLookupModel model, bool? returnAllSources = false, string? returnFields = "All", List<gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType>? returnSources = null)
+        public HashLookup(Database db, hasheous_server.Models.HashLookupModel model, bool? returnAllSources = false, string? returnFields = "All", List<gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType>? returnSources = null, bool? forceSearch = true)
         {
             this.db = db;
             this.model = model;
             this.returnAllSources = returnAllSources ?? false;
             this.returnFields = returnFields ?? "All";
             this.returnSources = returnSources ?? null;
+            this.ForceSearch = forceSearch ?? true;
         }
 
         public async Task PerformLookup()
@@ -150,7 +155,7 @@ namespace Classes
                     {
                         // redis is not enabled, so we will not use the cache
                         publisher = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
-                        if (publisher == null)
+                        if (publisher == null && this.ForceSearch)
                         {
                             // no returned publisher! create one
                             publisher = await dataObjects.NewDataObject(DataObjects.DataObjectType.Company, new DataObjectItemModel
@@ -201,7 +206,7 @@ namespace Classes
                     }
                 }
 
-                if (platform == null)
+                if (platform == null && this.ForceSearch)
                 {
                     // no returned platform! create one
                     platform = await dataObjects.NewDataObject(DataObjects.DataObjectType.Platform, new DataObjectItemModel
@@ -244,7 +249,7 @@ namespace Classes
                     }
                 }
 
-                if (game == null)
+                if (game == null && this.ForceSearch)
                 {
                     // no returned game! trim up the name and check if one exists with the same name and platform
 
@@ -269,7 +274,7 @@ namespace Classes
                             Value = platform.Id.ToString()
                         }
                     });
-                    if (game == null)
+                    if (game == null && this.ForceSearch)
                     {
                         game = await dataObjects.NewDataObject(DataObjects.DataObjectType.Game, new DataObjectItemModel
                         {
@@ -297,6 +302,10 @@ namespace Classes
                         }
                         // force metadata search
                         await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true);
+                    }
+                    else if (game == null && !this.ForceSearch)
+                    {
+                        throw new HashNotFoundException("The provided hash was not found in any signature database.");
                     }
 
                     // add signature mapping to game

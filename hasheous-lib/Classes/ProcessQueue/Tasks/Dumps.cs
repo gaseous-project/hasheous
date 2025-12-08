@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Linq.Expressions;
 using System.Security.Cryptography.Xml;
 using hasheous.Classes;
 using hasheous_server.Classes;
@@ -18,24 +20,39 @@ namespace Classes.ProcessQueue
         public async Task<object?> ExecuteAsync()
         {
             string outputPath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "Content");
+            string outputHashesPath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "HashContent");
 
             // Ensure the output directory exists
             if (!Directory.Exists(outputPath))
             {
                 Directory.CreateDirectory(outputPath);
             }
+            // Ensure the output hashes directory exists
+            if (!Directory.Exists(outputHashesPath))
+            {
+                Directory.CreateDirectory(outputHashesPath);
+            }
 
             // Define the path for the zip file
             string zipFilePath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "MetadataMap.zip");
+            string zipHashesFilePath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "MetadataHashesMap.zip");
 
             // Define the path for the platform zip file
             string platformZipFilePath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "Platforms");
             string platformTempZipFilePath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "Platforms.Temp");
 
+            // Define the path for the platform hashes zip file
+            string platformHashesZipFilePath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "Platform Hashes");
+            string platformHashesTempZipFilePath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "Platform Hashes.Temp");
+
             // Delete any existing temporary platform directory
             if (Directory.Exists(platformTempZipFilePath))
             {
                 Directory.Delete(platformTempZipFilePath, true);
+            }
+            if (Directory.Exists(platformHashesTempZipFilePath))
+            {
+                Directory.Delete(platformHashesTempZipFilePath, true);
             }
 
             // Initialise the list of Platforms
@@ -59,14 +76,20 @@ namespace Classes.ProcessQueue
 
                 // step 2: dump each game data object
                 Logging.Log(Logging.LogType.Information, "Metadata Dump", $"Processing {dataObjectsList.Objects.Count} game data objects from page {pageNumber}...");
+                long counter = 0;
                 foreach (var dataObjectItem in dataObjectsList.Objects)
                 {
+                    counter++;
+                    Logging.Log(Logging.LogType.Information, "Metadata Dump", $"{counter}/{dataObjectsList.Objects.Count}: Processing game (ID: {dataObjectItem.Id})...");
+
                     string platformName = "Unknown Platform";
 
                     DataObjectItem? dataObject = await dataObjects.GetDataObject(dataObjectItem.Id);
 
                     if (dataObject == null)
                     {
+                        Logging.Log(Logging.LogType.Information, "Metadata Dump", $"{counter}/{dataObjectsList.Objects.Count}:   Data object with ID {dataObjectItem.Id} not found. Skipping...");
+
                         continue; // Skip if the data object is not found
                     }
 
@@ -137,6 +160,117 @@ namespace Classes.ProcessQueue
                         }
                     });
                     await File.WriteAllTextAsync(filePath, jsonContent);
+
+                    // dump hashes data object
+                    try
+                    {
+                        string platformHashPath = Path.Combine(outputHashesPath, platformName, dataObject.Name + " (" + dataObject.Id + ")");
+                        if (!Directory.Exists(platformHashPath))
+                        {
+                            Directory.CreateDirectory(platformHashPath);
+                        }
+                        AttributeItem doRoms = dataObject.Attributes?.FirstOrDefault(attr => attr.attributeName == AttributeItem.AttributeName.ROMs);
+                        if (doRoms != null)
+                        {
+                            long romCounter = 0;
+                            long totalRoms = (doRoms.Value as List<Signatures_Games_2.RomItem>)?.Count ?? 0;
+                            Stopwatch romStopwatch = new Stopwatch();
+                            romStopwatch.Start();
+                            Stopwatch romMessageStopwatch = new Stopwatch();
+                            romMessageStopwatch.Start();
+                            foreach (var rom in doRoms.Value as List<Signatures_Games_2.RomItem>)
+                            {
+                                romCounter++;
+                                Logging.Log(Logging.LogType.Information, "Metadata Dump", $"{counter}/{dataObjectsList.Objects.Count}:   {romCounter}/{totalRoms}: Processing ROM for data object ID {dataObjectItem.Id}...");
+
+                                hasheous_server.Models.HashLookupModel hashesDict = new hasheous_server.Models.HashLookupModel();
+                                if (rom.Md5 != null)
+                                {
+                                    hashesDict.MD5 = rom.Md5;
+                                }
+                                if (rom.Sha1 != null)
+                                {
+                                    hashesDict.SHA1 = rom.Sha1;
+                                }
+                                if (rom.Sha256 != null)
+                                {
+                                    hashesDict.SHA256 = rom.Sha256;
+                                }
+                                if (rom.Crc != null)
+                                {
+                                    hashesDict.CRC = rom.Crc;
+                                }
+                                // perform lookup
+                                HashLookup hashLookup = new HashLookup(
+                                    new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString),
+                                    hashesDict,
+                                    true,
+                                    "All",
+                                    null,
+                                    false
+                                );
+                                try
+                                {
+                                    await hashLookup.PerformLookup();
+
+                                    // write the hash lookup result to file - named for the first game and rom id found
+                                    if (hashLookup.Signatures.Count > 0)
+                                    {
+                                        SignatureLookupItem.SignatureResult signature = hashLookup.Signatures.First().Value.First();
+                                        string romFileName = $"{signature.Game.Id}-{signature.Rom.Id}-HashLookup.json";
+                                        string romFilePath = Path.Combine(platformHashPath, romFileName);
+                                        string romJsonContent = Newtonsoft.Json.JsonConvert.SerializeObject(hashLookup, new Newtonsoft.Json.JsonSerializerSettings
+                                        {
+                                            Formatting = Newtonsoft.Json.Formatting.Indented,
+                                            NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore,
+                                            Converters = new List<Newtonsoft.Json.JsonConverter>
+                                        {
+                                            new Newtonsoft.Json.Converters.StringEnumConverter()
+                                        }
+                                        });
+                                        await File.WriteAllTextAsync(romFilePath, romJsonContent);
+                                    }
+
+                                    if (romStopwatch.Elapsed.TotalMinutes > 5)
+                                    {
+                                        // this is taking a long time, abort
+                                        Logging.Log(Logging.LogType.Warning, "Metadata Dump", $"{counter}/{dataObjectsList.Objects.Count}:   {romCounter}/{totalRoms}: Aborting hash lookup for data object ID {dataObjectItem.Id}, ROM ID {rom.Id} due to timeout.");
+
+                                        // log the data object id for later review
+                                        string timeoutLogPath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "TimeoutLogs");
+                                        if (!Directory.Exists(timeoutLogPath))
+                                        {
+                                            Directory.CreateDirectory(timeoutLogPath);
+                                        }
+
+                                        string timeoutLogFilePath = Path.Combine(timeoutLogPath, "MetadataDumpTimeouts.log");
+
+                                        // append the data object id to the log file
+                                        await File.AppendAllTextAsync(timeoutLogFilePath, $"Data Object ID {dataObjectItem.Id.ToString().PadLeft(8)} timed out{Environment.NewLine}");
+
+                                        // exit the ROM loop
+                                        break;
+                                    }
+
+                                    if (romMessageStopwatch.Elapsed.TotalSeconds > 30)
+                                    {
+                                        Logging.Log(Logging.LogType.Information, "Metadata Dump", $"{counter}/{dataObjectsList.Objects.Count}:   {romCounter}/{totalRoms}: Still processing ROMs for data object ID {dataObjectItem.Id}...");
+                                        romMessageStopwatch.Restart();
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    Logging.Log(Logging.LogType.Warning, "Metadata Dump", $"{counter}/{dataObjectsList.Objects.Count}:   {romCounter}/{totalRoms}: Error during hash lookup for data object ID {dataObjectItem.Id}, ROM ID {rom.Id}: {ex.Message}");
+                                }
+                            }
+                            romStopwatch.Stop();
+                            Logging.Log(Logging.LogType.Information, "Metadata Dump", $"{counter}/{dataObjectsList.Objects.Count}:   Completed processing {totalRoms} ROMs for data object ID {dataObjectItem.Id} in {romStopwatch.Elapsed.TotalSeconds} seconds.");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logging.Log(Logging.LogType.Warning, "Metadata Dump", $"Error dumping hashes for data object ID {dataObjectItem.Id}: {ex.Message}");
+                    }
                 }
             }
 
@@ -146,17 +280,30 @@ namespace Classes.ProcessQueue
                 File.Delete(zipFilePath);
             }
             Logging.Log(Logging.LogType.Information, "Metadata Dump", "Creating main metadata map zip file...");
-            System.IO.Compression.ZipFile.CreateFromDirectory(outputPath, zipFilePath);
+            System.IO.Compression.ZipFile.CreateFromDirectory(outputPath, zipFilePath, System.IO.Compression.CompressionLevel.SmallestSize, false);
+
+            if (File.Exists(zipHashesFilePath))
+            {
+                File.Delete(zipHashesFilePath);
+            }
+            Logging.Log(Logging.LogType.Information, "Metadata Dump", "Creating main metadata hashes map zip file...");
+            System.IO.Compression.ZipFile.CreateFromDirectory(outputHashesPath, zipHashesFilePath, System.IO.Compression.CompressionLevel.SmallestSize, false);
 
             // step 4: loop the platforms list and create individual zips
             if (Directory.Exists(platformTempZipFilePath))
             {
                 Directory.Delete(platformTempZipFilePath, true);
             }
-            Logging.Log(Logging.LogType.Information, "Metadata Dump", "Creating individual platform zip files...");
             Directory.CreateDirectory(platformTempZipFilePath);
+            if (Directory.Exists(platformHashesTempZipFilePath))
+            {
+                Directory.Delete(platformHashesTempZipFilePath, true);
+            }
+            Directory.CreateDirectory(platformHashesTempZipFilePath);
+            Logging.Log(Logging.LogType.Information, "Metadata Dump", "Creating individual platform zip files...");
             foreach (string platform in platforms)
             {
+                // create a zip for the platform
                 string platformSourcePath = Path.Combine(outputPath, platform);
                 if (Directory.Exists(platformSourcePath))
                 {
@@ -166,7 +313,42 @@ namespace Classes.ProcessQueue
                         safePlatformName = safePlatformName.Replace(c, '_');
                     }
                     string platformZipPath = Path.Combine(platformTempZipFilePath, $"{safePlatformName}.zip");
-                    System.IO.Compression.ZipFile.CreateFromDirectory(platformSourcePath, platformZipPath);
+                    System.IO.Compression.ZipFile.CreateFromDirectory(platformSourcePath, platformZipPath, System.IO.Compression.CompressionLevel.SmallestSize, false);
+                    // generate md5 checksum for the zip
+                    using (var md5 = System.Security.Cryptography.MD5.Create())
+                    {
+                        using (var stream = File.OpenRead(platformZipPath))
+                        {
+                            var hash = md5.ComputeHash(stream);
+                            string md5String = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+                            string md5FilePath = platformZipPath + ".md5sum";
+                            await File.WriteAllTextAsync(md5FilePath, md5String);
+                        }
+                    }
+                }
+
+                // create a zip for the platform hashes
+                string platformHashesSourcePath = Path.Combine(outputHashesPath, platform);
+                if (Directory.Exists(platformHashesSourcePath))
+                {
+                    string safePlatformName = platform;
+                    foreach (char c in Path.GetInvalidFileNameChars())
+                    {
+                        safePlatformName = safePlatformName.Replace(c, '_');
+                    }
+                    string platformHashesZipPath = Path.Combine(platformHashesTempZipFilePath, $"{safePlatformName}.zip");
+                    System.IO.Compression.ZipFile.CreateFromDirectory(platformHashesSourcePath, platformHashesZipPath, System.IO.Compression.CompressionLevel.SmallestSize, false);
+                    // generate md5 checksum for the zip
+                    using (var md5 = System.Security.Cryptography.MD5.Create())
+                    {
+                        using (var stream = File.OpenRead(platformHashesZipPath))
+                        {
+                            var hash = md5.ComputeHash(stream);
+                            string md5String = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+                            string md5FilePath = platformHashesZipPath + ".md5sum";
+                            await File.WriteAllTextAsync(md5FilePath, md5String);
+                        }
+                    }
                 }
             }
             // delete the old platform zip if it exists
@@ -178,11 +360,23 @@ namespace Classes.ProcessQueue
             // move the temp platform directory to the final location
             Directory.Move(platformTempZipFilePath, platformZipFilePath);
 
+            // delete the old platform hashes zip if it exists
+            if (Directory.Exists(platformHashesZipFilePath))
+            {
+                Directory.Delete(platformHashesZipFilePath, true);
+            }
+            // move the temp platform hashes directory to the final location
+            Directory.Move(platformHashesTempZipFilePath, platformHashesZipFilePath);
+
             // clean up the build directory
             Logging.Log(Logging.LogType.Information, "Metadata Dump", "Cleaning up temporary files...");
             if (Directory.Exists(outputPath))
             {
                 Directory.Delete(outputPath, true);
+            }
+            if (Directory.Exists(outputHashesPath))
+            {
+                Directory.Delete(outputHashesPath, true);
             }
 
             Logging.Log(Logging.LogType.Information, "Metadata Dump", "Metadata dump process completed successfully.");

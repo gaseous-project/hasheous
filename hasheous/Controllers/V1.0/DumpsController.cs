@@ -5,6 +5,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace hasheous_server.Controllers.v1_0
 {
+    /// <summary>
+    /// Controller for serving metadata map dump files and platform-specific dumps.
+    /// </summary>
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]/")]
     [ApiVersion("1.0")]
@@ -28,16 +31,37 @@ namespace hasheous_server.Controllers.v1_0
             return await ReturnDumpFile(Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "MetadataMap.zip"), true);
         }
 
+        /// <summary>
+        /// Returns a zip file containing the metadata hashes dump.
+        /// </summary>
+        /// <returns>A zip file containing the metadata hashes dump.</returns>
+        /// <response code="200">Returns the zip file.</response>
+        /// <response code="404">If the metadata hashes dump is not found.</response>
+        /// <response code="500">If an error occurs while generating the dump.</response>
+        [HttpGet("MetadataHashesMap.zip")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> GetMetadataHashesMapDump()
+        {
+            return await ReturnDumpFile(Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "MetadataHashesMap.zip"), true);
+        }
+
         [HttpGet("platforms")]
         [ProducesResponseType(typeof(List<string>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public IActionResult GetAvailablePlatformDumps([FromQuery] bool includeDetails = false)
+        public IActionResult GetAvailablePlatformDumps([FromQuery] bool includeDetails = false, [FromQuery] string? mode = "metadata")
         {
             try
             {
                 string platformsDir = Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "Platforms");
+                if (mode != null && mode.Equals("hashes", StringComparison.OrdinalIgnoreCase))
+                {
+                    platformsDir = Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "Platform Hashes");
+                }
 
                 // Check if the platforms directory exists
                 if (!Directory.Exists(platformsDir))
@@ -56,7 +80,8 @@ namespace hasheous_server.Controllers.v1_0
                         {
                             Name = Path.GetFileName(f),
                             SizeBytes = new FileInfo(f).Length,
-                            LastModifiedUtc = System.IO.File.GetLastWriteTimeUtc(f)
+                            LastModifiedUtc = System.IO.File.GetLastWriteTimeUtc(f),
+                            md5hash = System.IO.File.Exists(f + ".md5sum") ? System.IO.File.ReadAllText(f + ".md5sum").Trim() : null
                         })
                         .OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
                         .ToList();
@@ -107,6 +132,33 @@ namespace hasheous_server.Controllers.v1_0
             }
 
             return await ReturnDumpFile(Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "Platforms", $"{platformname}.zip"), true);
+        }
+
+        /// <summary>
+        /// Returns a zip file containing the platform specific metadata hash dump.
+        /// </summary>
+        /// <returns>A zip file containing the metadata hash dump.</returns>
+        /// <response code="200">Returns the zip file.</response>
+        /// <response code="404">If the metadata hash dump is not found.</response>
+        /// <response code="500">If an error occurs while generating the dump.</response>
+        [HttpGet("hashes/{platformname}.zip")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> GetPlatformMetadataHashDump(string platformname)
+        {
+            // Validate input: not null/empty, no path traversal, no invalid filename chars
+            if (string.IsNullOrWhiteSpace(platformname) ||
+                platformname.IndexOfAny(System.IO.Path.GetInvalidFileNameChars()) >= 0 ||
+                platformname.Contains("..") ||
+                platformname.Contains("/") ||
+                platformname.Contains("\\"))
+            {
+                return BadRequest("Invalid platform name.");
+            }
+
+            return await ReturnDumpFile(Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "Platform Hashes", $"{platformname}.zip"), true);
         }
 
         private async Task<IActionResult> ReturnDumpFile(string zipFilePath, bool bypassTraversalCheck = false)
