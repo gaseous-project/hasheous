@@ -80,7 +80,8 @@ namespace hasheous_server.Controllers.v1_0
                         {
                             Name = Path.GetFileName(f),
                             SizeBytes = new FileInfo(f).Length,
-                            LastModifiedUtc = System.IO.File.GetLastWriteTimeUtc(f)
+                            LastModifiedUtc = System.IO.File.GetLastWriteTimeUtc(f),
+                            md5hash = System.IO.File.Exists(f + ".md5sum") ? System.IO.File.ReadAllText(f + ".md5sum").Trim() : null
                         })
                         .OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
                         .ToList();

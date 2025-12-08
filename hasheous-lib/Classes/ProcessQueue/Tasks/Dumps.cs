@@ -314,6 +314,17 @@ namespace Classes.ProcessQueue
                     }
                     string platformZipPath = Path.Combine(platformTempZipFilePath, $"{safePlatformName}.zip");
                     System.IO.Compression.ZipFile.CreateFromDirectory(platformSourcePath, platformZipPath, System.IO.Compression.CompressionLevel.SmallestSize, false);
+                    // generate md5 checksum for the zip
+                    using (var md5 = System.Security.Cryptography.MD5.Create())
+                    {
+                        using (var stream = File.OpenRead(platformZipPath))
+                        {
+                            var hash = md5.ComputeHash(stream);
+                            string md5String = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+                            string md5FilePath = platformZipPath + ".md5sum";
+                            await File.WriteAllTextAsync(md5FilePath, md5String);
+                        }
+                    }
                 }
 
                 // create a zip for the platform hashes
@@ -327,6 +338,17 @@ namespace Classes.ProcessQueue
                     }
                     string platformHashesZipPath = Path.Combine(platformHashesTempZipFilePath, $"{safePlatformName}.zip");
                     System.IO.Compression.ZipFile.CreateFromDirectory(platformHashesSourcePath, platformHashesZipPath, System.IO.Compression.CompressionLevel.SmallestSize, false);
+                    // generate md5 checksum for the zip
+                    using (var md5 = System.Security.Cryptography.MD5.Create())
+                    {
+                        using (var stream = File.OpenRead(platformHashesZipPath))
+                        {
+                            var hash = md5.ComputeHash(stream);
+                            string md5String = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+                            string md5FilePath = platformHashesZipPath + ".md5sum";
+                            await File.WriteAllTextAsync(md5FilePath, md5String);
+                        }
+                    }
                 }
             }
             // delete the old platform zip if it exists
