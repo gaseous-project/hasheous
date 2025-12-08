@@ -287,7 +287,7 @@ namespace Classes.ProcessQueue
                 File.Delete(zipHashesFilePath);
             }
             Logging.Log(Logging.LogType.Information, "Metadata Dump", "Creating main metadata hashes map zip file...");
-            System.IO.Compression.ZipFile.CreateFromDirectory(outputHashesPath, zipHashesFilePath);
+            System.IO.Compression.ZipFile.CreateFromDirectory(outputHashesPath, zipHashesFilePath, System.IO.Compression.CompressionLevel.SmallestSize, false);
 
             // step 4: loop the platforms list and create individual zips
             if (Directory.Exists(platformTempZipFilePath))
@@ -313,7 +313,7 @@ namespace Classes.ProcessQueue
                         safePlatformName = safePlatformName.Replace(c, '_');
                     }
                     string platformZipPath = Path.Combine(platformTempZipFilePath, $"{safePlatformName}.zip");
-                    System.IO.Compression.ZipFile.CreateFromDirectory(platformSourcePath, platformZipPath);
+                    System.IO.Compression.ZipFile.CreateFromDirectory(platformSourcePath, platformZipPath, System.IO.Compression.CompressionLevel.SmallestSize, false);
                 }
 
                 // create a zip for the platform hashes
@@ -326,7 +326,7 @@ namespace Classes.ProcessQueue
                         safePlatformName = safePlatformName.Replace(c, '_');
                     }
                     string platformHashesZipPath = Path.Combine(platformHashesTempZipFilePath, $"{safePlatformName}.zip");
-                    System.IO.Compression.ZipFile.CreateFromDirectory(platformHashesSourcePath, platformHashesZipPath);
+                    System.IO.Compression.ZipFile.CreateFromDirectory(platformHashesSourcePath, platformHashesZipPath, System.IO.Compression.CompressionLevel.SmallestSize, false);
                 }
             }
             // delete the old platform zip if it exists
