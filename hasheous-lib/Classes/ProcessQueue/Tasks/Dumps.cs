@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Linq.Expressions;
 using System.Security.Cryptography.Xml;
 using hasheous.Classes;
 using hasheous_server.Classes;
@@ -175,6 +176,8 @@ namespace Classes.ProcessQueue
                             long totalRoms = (doRoms.Value as List<Signatures_Games_2.RomItem>)?.Count ?? 0;
                             Stopwatch romStopwatch = new Stopwatch();
                             romStopwatch.Start();
+                            Stopwatch romMessageStopwatch = new Stopwatch();
+                            romMessageStopwatch.Start();
                             foreach (var rom in doRoms.Value as List<Signatures_Games_2.RomItem>)
                             {
                                 romCounter++;
@@ -198,7 +201,6 @@ namespace Classes.ProcessQueue
                                     hashesDict.CRC = rom.Crc;
                                 }
                                 // perform lookup
-                                Logging.Log(Logging.LogType.Information, "Metadata Dump", $"{counter}/{dataObjectsList.Objects.Count}:   {romCounter}/{totalRoms}: Performing hash lookup for data object ID {dataObjectItem.Id}, ROM ID {rom.Id}...");
                                 HashLookup hashLookup = new HashLookup(
                                     new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString),
                                     hashesDict,
@@ -207,48 +209,59 @@ namespace Classes.ProcessQueue
                                     null,
                                     false
                                 );
-                                await hashLookup.PerformLookup();
-
-                                // write the hash lookup result to file - named for the first game and rom id found
-                                if (hashLookup.Signatures.Count > 0)
+                                try
                                 {
-                                    SignatureLookupItem.SignatureResult signature = hashLookup.Signatures.First().Value.First();
-                                    string romFileName = $"{signature.Game.Id}-{signature.Rom.Id}-HashLookup.json";
-                                    string romFilePath = Path.Combine(platformHashPath, romFileName);
-                                    string romJsonContent = Newtonsoft.Json.JsonConvert.SerializeObject(hashLookup, new Newtonsoft.Json.JsonSerializerSettings
-                                    {
-                                        Formatting = Newtonsoft.Json.Formatting.Indented,
-                                        NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore,
-                                        Converters = new List<Newtonsoft.Json.JsonConverter>
-                                    {
-                                        new Newtonsoft.Json.Converters.StringEnumConverter()
-                                    }
-                                    });
-                                    await File.WriteAllTextAsync(romFilePath, romJsonContent);
-                                }
+                                    await hashLookup.PerformLookup();
 
-                                if (romStopwatch.Elapsed.TotalMinutes > 5)
-                                {
-                                    // this is taking a long time, abort
-                                    Logging.Log(Logging.LogType.Warning, "Metadata Dump", $"{counter}/{dataObjectsList.Objects.Count}:   {romCounter}/{totalRoms}: Aborting hash lookup for data object ID {dataObjectItem.Id}, ROM ID {rom.Id} due to timeout.");
-
-                                    // log the data object id for later review
-                                    string timeoutLogPath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "TimeoutLogs");
-                                    if (!Directory.Exists(timeoutLogPath))
+                                    // write the hash lookup result to file - named for the first game and rom id found
+                                    if (hashLookup.Signatures.Count > 0)
                                     {
-                                        Directory.CreateDirectory(timeoutLogPath);
+                                        SignatureLookupItem.SignatureResult signature = hashLookup.Signatures.First().Value.First();
+                                        string romFileName = $"{signature.Game.Id}-{signature.Rom.Id}-HashLookup.json";
+                                        string romFilePath = Path.Combine(platformHashPath, romFileName);
+                                        string romJsonContent = Newtonsoft.Json.JsonConvert.SerializeObject(hashLookup, new Newtonsoft.Json.JsonSerializerSettings
+                                        {
+                                            Formatting = Newtonsoft.Json.Formatting.Indented,
+                                            NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore,
+                                            Converters = new List<Newtonsoft.Json.JsonConverter>
+                                        {
+                                            new Newtonsoft.Json.Converters.StringEnumConverter()
+                                        }
+                                        });
+                                        await File.WriteAllTextAsync(romFilePath, romJsonContent);
                                     }
 
-                                    string timeoutLogFilePath = Path.Combine(timeoutLogPath, "MetadataDumpTimeouts.log");
+                                    if (romStopwatch.Elapsed.TotalMinutes > 5)
+                                    {
+                                        // this is taking a long time, abort
+                                        Logging.Log(Logging.LogType.Warning, "Metadata Dump", $"{counter}/{dataObjectsList.Objects.Count}:   {romCounter}/{totalRoms}: Aborting hash lookup for data object ID {dataObjectItem.Id}, ROM ID {rom.Id} due to timeout.");
 
-                                    // append the data object id to the log file
-                                    await File.AppendAllTextAsync(timeoutLogFilePath, $"Data Object ID {dataObjectItem.Id.ToString().PadLeft(8)} timed out{Environment.NewLine}");
+                                        // log the data object id for later review
+                                        string timeoutLogPath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "TimeoutLogs");
+                                        if (!Directory.Exists(timeoutLogPath))
+                                        {
+                                            Directory.CreateDirectory(timeoutLogPath);
+                                        }
 
-                                    // exit the ROM loop
-                                    break;
+                                        string timeoutLogFilePath = Path.Combine(timeoutLogPath, "MetadataDumpTimeouts.log");
+
+                                        // append the data object id to the log file
+                                        await File.AppendAllTextAsync(timeoutLogFilePath, $"Data Object ID {dataObjectItem.Id.ToString().PadLeft(8)} timed out{Environment.NewLine}");
+
+                                        // exit the ROM loop
+                                        break;
+                                    }
+
+                                    if (romMessageStopwatch.Elapsed.TotalSeconds > 30)
+                                    {
+                                        Logging.Log(Logging.LogType.Information, "Metadata Dump", $"{counter}/{dataObjectsList.Objects.Count}:   {romCounter}/{totalRoms}: Still processing ROMs for data object ID {dataObjectItem.Id}...");
+                                        romMessageStopwatch.Restart();
+                                    }
                                 }
-
-                                Logging.Log(Logging.LogType.Information, "Metadata Dump", $"{counter}/{dataObjectsList.Objects.Count}:   {romCounter}/{totalRoms}: Completed hash lookup for data object ID {dataObjectItem.Id}, ROM ID {rom.Id}.");
+                                catch (Exception ex)
+                                {
+                                    Logging.Log(Logging.LogType.Warning, "Metadata Dump", $"{counter}/{dataObjectsList.Objects.Count}:   {romCounter}/{totalRoms}: Error during hash lookup for data object ID {dataObjectItem.Id}, ROM ID {rom.Id}: {ex.Message}");
+                                }
                             }
                             romStopwatch.Stop();
                             Logging.Log(Logging.LogType.Information, "Metadata Dump", $"{counter}/{dataObjectsList.Objects.Count}:   Completed processing {totalRoms} ROMs for data object ID {dataObjectItem.Id} in {romStopwatch.Elapsed.TotalSeconds} seconds.");

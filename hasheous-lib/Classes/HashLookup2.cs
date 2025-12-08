@@ -249,7 +249,7 @@ namespace Classes
                     }
                 }
 
-                if (game == null)
+                if (game == null && this.ForceSearch)
                 {
                     // no returned game! trim up the name and check if one exists with the same name and platform
 
@@ -302,6 +302,10 @@ namespace Classes
                         }
                         // force metadata search
                         await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true);
+                    }
+                    else if (game == null && !this.ForceSearch)
+                    {
+                        throw new HashNotFoundException("The provided hash was not found in any signature database.");
                     }
 
                     // add signature mapping to game
