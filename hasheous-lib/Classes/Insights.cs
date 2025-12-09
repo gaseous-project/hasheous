@@ -393,7 +393,7 @@ namespace Classes.Insights
                         client_id, 
                         client_apikey_id, 
                         SUM(total_requests) AS total_requests, 
-                        AVG(average_response_time) AS average_response_time 
+                        AVG(average_execution_time_ms) AS average_response_time 
                     FROM 
                         Insights_API_Requests_Hourly 
                     WHERE 
@@ -493,7 +493,7 @@ namespace Classes.Insights
                         client_id, 
                         client_apikey_id, 
                         SUM(total_requests) AS total_requests, 
-                        AVG(average_response_time) AS average_response_time 
+                        AVG(average_execution_time_ms) AS average_response_time 
                     FROM 
                         Insights_API_Requests_Daily 
                     WHERE 
