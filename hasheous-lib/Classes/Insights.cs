@@ -15,12 +15,14 @@ using static Classes.Insights.Insights;
 namespace Classes.Insights
 {
     /// <summary>
-    /// Provides methods and attributes for collecting and reporting API usage insights, including opt-out handling and reporting.
+    /// Provides methods and types for generating and recording API usage insights, including reporting and opt-out mechanisms.
     /// </summary>
     public class Insights
     {
+        static bool pruneDatabase = true;
+
         /// <summary>
-        /// Specifies the source type for an insight event, such as hash lookup, submission, or metadata proxy.
+        /// Specifies the source type for an insight event, such as hash lookups, submissions, or metadata proxy actions.
         /// </summary>
         public enum InsightSourceType
         {
@@ -68,12 +70,12 @@ namespace Classes.Insights
         }
 
         /// <summary>
-        /// The HTTP header name used to indicate opt-out preferences for insights collection.
+        /// The HTTP header name used by clients to indicate opt-out preferences for API insights logging.
         /// </summary>
         public const string OptOutHeaderName = "X-Insight-Opt-Out";
 
         /// <summary>
-        /// Specifies the types of opt-out options available for insights collection.
+        /// Specifies the types of opt-out options available for API insights logging.
         /// </summary>
         public enum OptOutType
         {
@@ -140,61 +142,38 @@ namespace Classes.Insights
                 { "@enddate", DateTime.UtcNow  }
             };
 
-
-            // --- AGGREGATION-AWARE LOGIC ---
-            // We'll query the summary table for all days except today, and the raw table for today.
-            // Then, merge the results for each metric.
-
-            // 1. True unique visitors (distinct IPs across all days in last 30 days)
-            string monthIpSql = @"
-                SELECT DISTINCT remote_ip
-                FROM Insights_API_Requests
-                WHERE event_datetime >= @startdate AND event_datetime <= @enddate" + (appId > 0 ? " AND client_id = @appId" : "") + ";";
-            DataTable monthIpTable = await db.ExecuteCMDAsync(monthIpSql, dbDict);
-            long uniqueVisitorsMonth = monthIpTable.Rows.Count;
-
-            // Total requests and average response time (last 30 days)
-            string totalSql = @"
-                SELECT COUNT(*) AS total_requests, AVG(execution_time_ms) AS average_response_time
-                FROM Insights_API_Requests
-                WHERE event_datetime >= @startdate AND event_datetime <= @enddate" + (appId > 0 ? " AND client_id = @appId" : "") + ";";
-            DataTable totalTable = await db.ExecuteCMDAsync(totalSql, dbDict);
-            long totalRequests = 0;
-            double avgResponseTime = 0;
-            if (totalTable.Rows.Count > 0)
+            string appWhereClause = "";
+            if (appId > 0)
             {
-                totalRequests = totalTable.Rows[0]["total_requests"] != DBNull.Value ? Convert.ToInt64(totalTable.Rows[0]["total_requests"]) : 0;
-                avgResponseTime = totalTable.Rows[0]["average_response_time"] != DBNull.Value ? Convert.ToDouble(totalTable.Rows[0]["average_response_time"]) : 0;
+                appWhereClause = " AND client_id = @appId";
             }
-            report["unique_visitors"] = uniqueVisitorsMonth;
-            report["total_requests"] = totalRequests;
-            report["average_response_time"] = avgResponseTime;
 
-            // // 1b. Unique visitors per day (last 30 days)
-            // var uniqueVisitorsPerDay = new List<Dictionary<string, object>>();
-            // for (int i = 0; i < 30; i++)
-            // {
-            //     DateTime day = DateTime.UtcNow.Date.AddDays(-i);
-            //     string daySql = @"
-            //         SELECT COUNT(DISTINCT remote_ip) AS unique_visitors
-            //         FROM Insights_API_Requests
-            //         WHERE DATE(event_datetime) = @day" + (appId > 0 ? " AND client_id = @appId" : "") + ";";
-            //     var dayParams = new Dictionary<string, object>(dbDict) { ["@day"] = day };
-            //     DataTable dayTable = await db.ExecuteCMDAsync(daySql, dayParams);
-            //     long dayCount = 0;
-            //     if (dayTable.Rows.Count > 0)
-            //     {
-            //         dayCount = dayTable.Rows[0]["unique_visitors"] != DBNull.Value ? Convert.ToInt64(dayTable.Rows[0]["unique_visitors"]) : 0;
-            //     }
-            //     uniqueVisitorsPerDay.Add(new Dictionary<string, object>
-            //     {
-            //         { "date", day.ToString("yyyy-MM-dd") },
-            //         { "unique_visitors", dayCount }
-            //     });
-            // }
-            // report["unique_visitors_per_day"] = uniqueVisitorsPerDay;
+            // get unique visitors for the last 30 days
+            sql = @"
+                SELECT 
+                    COUNT(DISTINCT remote_ip) AS unique_visitors,
+                    SUM(total_requests) AS total_requests,
+                    ROUND(AVG(average_execution_time_ms), 2) AS average_response_time
+                FROM
+                    Insights_API_Requests_Daily
+                WHERE
+                    event_datetime >= @startdate AND event_datetime <= @enddate
+                        " + appWhereClause + ";";
+            DataTable uniqueVisitorsTable = await db.ExecuteCMDAsync(sql, dbDict, 90);
+            if (uniqueVisitorsTable.Rows.Count > 0)
+            {
+                report["unique_visitors"] = uniqueVisitorsTable.Rows[0]["unique_visitors"];
+                report["total_requests"] = uniqueVisitorsTable.Rows[0]["total_requests"];
+                report["average_response_time"] = uniqueVisitorsTable.Rows[0]["average_response_time"];
+            }
+            else
+            {
+                report["unique_visitors"] = 0;
+                report["total_requests"] = 0;
+                report["average_response_time"] = 0;
+            }
 
-            // 2. Country mapping
+            // load countries into a dictionary for mapping
             sql = "SELECT Code, Value FROM Country;";
             DataTable countryTable = await db.ExecuteCMDAsync(sql);
             Dictionary<string, string> countryDict = new Dictionary<string, string>();
@@ -203,121 +182,73 @@ namespace Classes.Insights
                 countryDict[row["Code"].ToString() ?? ""] = row["Value"].ToString() ?? "";
             }
 
-            // 3. Unique visitors per country (last 30 days)
-            // Summary table (excluding today)
-            string summaryWhere = appId > 0 ? " AND client_id = @appId" : "";
-            Dictionary<string, object> summaryParams = new Dictionary<string, object>(dbDict)
-            {
-                ["@today"] = DateTime.UtcNow.Date
-            };
-            string summaryCountrySql = @"
-                SELECT country, SUM(unique_visitors) AS unique_visitors
-                FROM Insights_API_Requests_DailySummary
-                WHERE summary_date >= @startdate AND summary_date < @today" + summaryWhere + @"
+            // get unique visitors per country for the last 30 days
+            sql = @"
+                SELECT 
+                    country,
+                    COUNT(DISTINCT remote_ip) AS unique_visitors
+                FROM
+                    Insights_API_Requests_Daily
+                WHERE
+                    event_datetime >= @startdate AND event_datetime <= @enddate
+                        " + appWhereClause + @"
                 GROUP BY country
                 ORDER BY unique_visitors DESC LIMIT 5;";
-            DataTable summaryCountryTable = await db.ExecuteCMDAsync(summaryCountrySql, summaryParams);
-
-            // Raw table (today only)
-            string rawWhere = appId > 0 ? " AND client_id = @appId" : "";
-            Dictionary<string, object> rawParams = new Dictionary<string, object>(dbDict)
+            DataTable uniqueVisitorsPerCountryTable = await db.ExecuteCMDAsync(sql, dbDict, 90);
+            List<Dictionary<string, object>> uniqueVisitorsPerCountry = new List<Dictionary<string, object>>();
+            foreach (DataRow row in uniqueVisitorsPerCountryTable.Rows)
             {
-                ["@today"] = DateTime.UtcNow.Date
-            };
-            string rawCountrySql = @"
-                SELECT country, COUNT(DISTINCT remote_ip) AS unique_visitors
-                FROM Insights_API_Requests
-                WHERE event_datetime >= @today AND event_datetime <= @enddate" + rawWhere + @"
-                GROUP BY country
-                ORDER BY unique_visitors DESC LIMIT 5;";
-            DataTable rawCountryTable = await db.ExecuteCMDAsync(rawCountrySql, rawParams);
-
-            // Merge per country
-            var countryCounts = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
-            foreach (DataRow row in summaryCountryTable.Rows)
-            {
-                string country = row["country"].ToString() ?? "Unknown";
-                long count = row["unique_visitors"] != DBNull.Value ? Convert.ToInt64(row["unique_visitors"]) : 0;
-                if (countryCounts.ContainsKey(country))
-                    countryCounts[country] += count;
-                else
-                    countryCounts[country] = count;
-            }
-            foreach (DataRow row in rawCountryTable.Rows)
-            {
-                string country = row["country"].ToString() ?? "Unknown";
-                long count = row["unique_visitors"] != DBNull.Value ? Convert.ToInt64(row["unique_visitors"]) : 0;
-                if (countryCounts.ContainsKey(country))
-                    countryCounts[country] += count;
-                else
-                    countryCounts[country] = count;
-            }
-            // Top 5
-            var uniqueVisitorsPerCountry = countryCounts
-                .OrderByDescending(kv => kv.Value)
-                .Take(5)
-                .Select(kv => new Dictionary<string, object>
+                string countryName = row["country"].ToString() ?? "Unknown";
+                if (countryDict.ContainsKey(countryName))
                 {
-                    { "country", countryDict.ContainsKey(kv.Key) ? countryDict[kv.Key] : "Unknown" },
-                    { "unique_visitors", kv.Value }
-                })
-                .ToList();
+                    countryName = countryDict[countryName];
+                }
+                else
+                {
+                    countryName = "Unknown";
+                }
+
+                uniqueVisitorsPerCountry.Add(new Dictionary<string, object>
+                {
+                    { "country", countryName },
+                    { "unique_visitors", row["unique_visitors"] }
+                });
+            }
             report["unique_visitors_per_country"] = uniqueVisitorsPerCountry;
 
-            // 4. Unique visitors per API key (last 30 days, only if appId > 0)
             if (appId > 0)
             {
-                // Summary table (excluding today)
-                string summaryApiKeySql = @"
-                    SELECT client_apikey_id, SUM(unique_visitors) AS unique_visitors
-                    FROM Insights_API_Requests_DailySummary
-                    WHERE summary_date >= @startdate AND summary_date < @today AND client_id = @appId
-                    GROUP BY client_apikey_id;";
-                DataTable summaryApiKeyTable = await db.ExecuteCMDAsync(summaryApiKeySql, summaryParams);
-
-                // Raw table (today only)
-                string rawApiKeySql = @"
-                    SELECT client_apikey_id, COUNT(DISTINCT remote_ip) AS unique_visitors
-                    FROM Insights_API_Requests
-                    WHERE event_datetime >= @today AND event_datetime <= @enddate AND client_id = @appId
-                    GROUP BY client_apikey_id;";
-                DataTable rawApiKeyTable = await db.ExecuteCMDAsync(rawApiKeySql, rawParams);
-
-                // Merge per API key
-                var apiKeyCounts = new Dictionary<long, long>();
-                foreach (DataRow row in summaryApiKeyTable.Rows)
+                // get unique visitors of each client api key for the last 30 days
+                sql = @"
+                SELECT 
+                    ClientAPIKeys.`Name`, apidata.unique_visitors
+                FROM
+                    ClientAPIKeys
+                        JOIN
+                    (SELECT 
+                        client_apikey_id,
+                            COUNT(DISTINCT remote_ip) AS unique_visitors
+                    FROM
+                        Insights_API_Requests_Daily
+                    WHERE
+                        event_datetime >= @startdate
+                            AND event_datetime <= @enddate
+                            AND client_apikey_id IN (SELECT 
+                                ClientIdIndex
+                            FROM
+                                ClientAPIKeys
+                            WHERE
+                                DataObjectId = @appId)) apidata ON ClientAPIKeys.ClientIdIndex = apidata.client_apikey_id";
+                DataTable uniqueVisitorsPerApiKeyTable = await db.ExecuteCMDAsync(sql, dbDict, 90);
+                List<Dictionary<string, object>> uniqueVisitorsPerApiKey = new List<Dictionary<string, object>>();
+                foreach (DataRow row in uniqueVisitorsPerApiKeyTable.Rows)
                 {
-                    long id = row["client_apikey_id"] != DBNull.Value ? Convert.ToInt64(row["client_apikey_id"]) : 0;
-                    long count = row["unique_visitors"] != DBNull.Value ? Convert.ToInt64(row["unique_visitors"]) : 0;
-                    if (apiKeyCounts.ContainsKey(id))
-                        apiKeyCounts[id] += count;
-                    else
-                        apiKeyCounts[id] = count;
+                    uniqueVisitorsPerApiKey.Add(new Dictionary<string, object>
+                {
+                    { "client_apikey_id", row["Name"] },
+                    { "unique_visitors", row["unique_visitors"] }
+                });
                 }
-                foreach (DataRow row in rawApiKeyTable.Rows)
-                {
-                    long id = row["client_apikey_id"] != DBNull.Value ? Convert.ToInt64(row["client_apikey_id"]) : 0;
-                    long count = row["unique_visitors"] != DBNull.Value ? Convert.ToInt64(row["unique_visitors"]) : 0;
-                    if (apiKeyCounts.ContainsKey(id))
-                        apiKeyCounts[id] += count;
-                    else
-                        apiKeyCounts[id] = count;
-                }
-                // Map API key IDs to names
-                var apiKeyNames = new Dictionary<long, string>();
-                string apiKeyNameSql = "SELECT ClientIdIndex, Name FROM ClientAPIKeys WHERE DataObjectId = @appId;";
-                DataTable apiKeyNameTable = await db.ExecuteCMDAsync(apiKeyNameSql, new Dictionary<string, object> { ["@appId"] = appId });
-                foreach (DataRow row in apiKeyNameTable.Rows)
-                {
-                    long id = row["ClientIdIndex"] != DBNull.Value ? Convert.ToInt64(row["ClientIdIndex"]) : 0;
-                    string name = row["Name"].ToString() ?? "";
-                    apiKeyNames[id] = name;
-                }
-                var uniqueVisitorsPerApiKey = apiKeyCounts.Select(kv => new Dictionary<string, object>
-                {
-                    { "client_apikey_id", apiKeyNames.ContainsKey(kv.Key) ? apiKeyNames[kv.Key] : kv.Key.ToString() },
-                    { "unique_visitors", kv.Value }
-                }).ToList();
                 report["unique_visitors_per_api_key"] = uniqueVisitorsPerApiKey;
             }
 
@@ -331,99 +262,332 @@ namespace Classes.Insights
         }
 
         /// <summary>
-        /// Aggregates the previous day's API request data into the daily summary table.
-        /// Should be called by a scheduled job (e.g., orchestrator) once per day.
+        /// Aggregates API request insights into hourly summary data. It processes the last 40 days of whole hours of data (example: 1am - 2am). If the data for an hour has already been aggregated to the Insights_API_Requests_Hourly table, it skips that hour.
         /// </summary>
-        /// <returns>True if aggregation succeeded, false otherwise.</returns>
-        public static async Task<bool> AggregateDailySummary()
+        /// <returns></returns>
+        public static async Task AggregateHourlySummary()
         {
-            try
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+
+            // find the time 24 hours ago, rounded down to the nearest hour
+            DateTime now = DateTime.UtcNow;
+
+            // loop through the last 40 days of whole hours
+            for (int i = 1; i <= 960; i++)
             {
-                var db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-                // Get all distinct dates in the table except today
-                string getDatesSql = @"SELECT DISTINCT DATE(event_datetime) AS summary_date FROM Insights_API_Requests WHERE event_datetime < CURDATE() ORDER BY summary_date ASC;";
-                DataTable datesTable = await db.ExecuteCMDAsync(getDatesSql);
-                bool allSucceeded = true;
-                foreach (DataRow row in datesTable.Rows)
+                // define the hour range
+                DateTime hourStart = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0, DateTimeKind.Utc).AddHours(-i);
+                DateTime hourEnd = hourStart.AddHours(1);
+                // make sure hourEnd is not in the future
+                if (hourEnd > now)
                 {
-                    DateTime day = (DateTime)row["summary_date"];
-                    string dayStr = day.ToString("yyyy-MM-dd");
-
-                    // Aggregate unique_visitors by counting distinct remote_ip per (date, client_id, insightType, country)
-                    // This ensures unique_visitors is not overcounted when multiple IPs exist per group
-                    string aggregateSql = @"
-                        INSERT INTO Insights_API_Requests_DailySummary (
-                            summary_date, client_id, insightType, country, unique_visitors, total_requests, average_response_time
-                        )
-                        SELECT
-                            @summary_date AS summary_date,
-                            client_id,
-                            insightType,
-                            country,
-                            COUNT(DISTINCT remote_ip) AS unique_visitors,
-                            COUNT(*) AS total_requests,
-                            AVG(execution_time_ms) AS average_response_time
-                        FROM Insights_API_Requests
-                        WHERE DATE(event_datetime) = @summary_date
-                        GROUP BY client_id, insightType, country
-                        ON DUPLICATE KEY UPDATE
-                            unique_visitors = VALUES(unique_visitors),
-                            total_requests = VALUES(total_requests),
-                            average_response_time = VALUES(average_response_time);
-                    ";
-                    var aggregateParams = new Dictionary<string, object> { { "@summary_date", dayStr } };
-                    try
-                    {
-                        _ = await db.ExecuteCMDAsync(aggregateSql, aggregateParams);
-                    }
-                    catch (Exception exAgg)
-                    {
-                        Logging.Log(Logging.LogType.Warning, "Insights.AggregateDailySummary", $"Aggregation failed for {dayStr}", exAgg);
-                        allSucceeded = false;
-                        continue;
-                    }
-
-                    // // Delete raw data for this day using parameter
-                    // string deleteSql = @"
-                    //     DELETE FROM Insights_API_Requests WHERE DATE(event_datetime) = @summary_date;
-                    // ";
-                    // var deleteParams = new Dictionary<string, object> { { "@summary_date", dayStr } };
-                    // try
-                    // {
-                    //     await db.ExecuteCMDAsync(deleteSql, deleteParams);
-                    // }
-                    // catch (Exception exDel)
-                    // {
-                    //     Logging.Log(Logging.LogType.Warning, "Insights.AggregateDailySummary", $"Cleanup (delete) failed for {dayStr}", exDel);
-                    //     allSucceeded = false;
-                    // }
+                    continue;
                 }
-                return allSucceeded;
+
+                // check if this hour has already been aggregated
+                string checkSql = @"
+                    SELECT COUNT(*) AS count
+                    FROM Insights_API_Requests_Hourly
+                    WHERE event_datetime = @hourStart;";
+                Dictionary<string, object> checkParams = new Dictionary<string, object>
+                {
+                    { "@hourStart", hourStart }
+                };
+                DataTable checkTable = await db.ExecuteCMDAsync(checkSql, checkParams);
+                if (checkTable.Rows.Count > 0 && Convert.ToInt32(checkTable.Rows[0]["count"]) > 0)
+                {
+                    // this hour has already been aggregated, skip it
+                    continue;
+                }
+
+                // aggregate data for this hour
+                string aggregateSql = @"
+                    SELECT 
+                        insightType, 
+                        remote_ip, 
+                        user_id, 
+                        country, 
+                        client_id, 
+                        client_apikey_id, 
+                        COUNT(*) AS total_requests, 
+                        AVG(execution_time_ms) AS average_response_time 
+                    FROM Insights_API_Requests 
+                    WHERE event_datetime >= @hourStart AND event_datetime < @hourEnd 
+                    GROUP BY insightType, remote_ip, user_id, country, client_id, client_apikey_id;";
+                Dictionary<string, object> aggregateParams = new Dictionary<string, object>
+                {
+                    { "hourStart", hourStart },
+                    { "hourEnd", hourEnd }
+                };
+                DataTable aggregateTable = await db.ExecuteCMDAsync(aggregateSql, aggregateParams);
+                // insert aggregated data into Insights_API_Requests_Hourly
+                foreach (DataRow row in aggregateTable.Rows)
+                {
+                    string insertSql = @"
+                        INSERT INTO Insights_API_Requests_Hourly
+                            (event_datetime, insightType, remote_ip, user_id, country, client_id, client_apikey_id, total_requests, average_execution_time_ms)
+                        VALUES
+                            (@hourStart, @insightType, @remote_ip, @user_id, @country, @client_id, @client_apikey_id, @total_requests, @average_response_time);";
+                    Dictionary<string, object> insertParams = new Dictionary<string, object>
+                    {
+                        { "@hourStart", hourStart },
+                        { "@insightType", row["insightType"] },
+                        { "@remote_ip", row["remote_ip"] },
+                        { "@user_id", row["user_id"] },
+                        { "@country", row["country"] },
+                        { "@client_id", row["client_id"] },
+                        { "@client_apikey_id", row["client_apikey_id"] },
+                        { "@total_requests", row["total_requests"] },
+                        { "@average_response_time", row["average_response_time"] }
+                    };
+                    _ = await db.ExecuteCMDAsync(insertSql, insertParams);
+                }
             }
-            catch (Exception ex)
+
+            if (pruneDatabase)
             {
-                Logging.Log(Logging.LogType.Warning, "Insights.AggregateDailySummary", "Aggregation failed", ex);
-                return false;
+                // drop aggregated data from Insights_API_Requests older than 40 days
+                string deleteSql = @"
+                DELETE FROM Insights_API_Requests
+                WHERE event_datetime < @deleteBefore LIMIT 1000;";
+                Dictionary<string, object> deleteParams = new Dictionary<string, object>
+                {
+                    { "@deleteBefore", now.AddDays(-40) }
+                };
+                // keep deleting in batches of 1000 until no more rows to delete
+                int rowsDeleted;
+                do
+                {
+                    Logging.Log(Logging.LogType.Information, "Insights", "Pruning old Insights_API_Requests data older than 40 days...");
+                    DataTable deleteResult = await db.ExecuteCMDAsync(deleteSql, deleteParams);
+                    rowsDeleted = deleteResult.Rows.Count;
+                } while (rowsDeleted > 0);
+            }
+        }
+
+        /// <summary>
+        /// Aggregates API request insights into daily summary data. Intended to process and summarize daily API usage statistics. Compiles data from the Insights_API_Requests_Hourly table into daily aggregates stored in the Insights_API_Requests_Daily table. Processes the last 35 days of hourly data. If the data for that day has already been aggregated to the Insights_API_Requests_Daily table, it skips that day. Does not process the current day.
+        /// </summary>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        public static async Task AggregateDailySummary()
+        {
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+
+            DateTime now = DateTime.UtcNow;
+
+            // loop through the last 35 days
+            for (int i = 1; i <= 35; i++)
+            {
+                DateTime dayStart = new DateTime(now.Year, now.Month, now.Day, 0, 0, 0, DateTimeKind.Utc).AddDays(-i);
+                DateTime dayEnd = dayStart.AddDays(1);
+                // make sure dayEnd is before 00:00 UTC of the current day
+                if (dayEnd >= new DateTime(now.Year, now.Month, now.Day, 0, 0, 0, DateTimeKind.Utc))
+                {
+                    continue;
+                }
+
+                // check if this day has already been aggregated
+                string checkSql = @"
+                    SELECT COUNT(*) AS count
+                    FROM Insights_API_Requests_Daily
+                    WHERE event_datetime = @dayStart;";
+                Dictionary<string, object> checkParams = new Dictionary<string, object>
+                {
+                    { "@dayStart", dayStart }
+                };
+                DataTable checkTable = await db.ExecuteCMDAsync(checkSql, checkParams);
+                if (checkTable.Rows.Count > 0 && Convert.ToInt32(checkTable.Rows[0]["count"]) > 0)
+                {
+                    // this day has already been aggregated, skip it
+                    continue;
+                }
+
+                // aggregate data for this day
+                string aggregateSql = @"
+                    SELECT 
+                        insightType, 
+                        remote_ip, 
+                        user_id,  
+                        country, 
+                        client_id, 
+                        client_apikey_id, 
+                        SUM(total_requests) AS total_requests, 
+                        AVG(average_execution_time_ms) AS average_response_time 
+                    FROM 
+                        Insights_API_Requests_Hourly 
+                    WHERE 
+                        event_datetime >= @dayStart 
+                        AND event_datetime < @dayEnd 
+                    GROUP BY insightType, remote_ip, user_id, country, client_id, client_apikey_id;";
+                Dictionary<string, object> aggregateParams = new Dictionary<string, object>
+                {
+                    { "dayStart", dayStart },
+                    { "dayEnd", dayEnd }
+                };
+                DataTable aggregateTable = await db.ExecuteCMDAsync(aggregateSql, aggregateParams);
+                // insert aggregated data into Insights_API_Requests_Daily
+                foreach (DataRow row in aggregateTable.Rows)
+                {
+                    string insertSql = @"
+                        INSERT INTO Insights_API_Requests_Daily
+                            (event_datetime, insightType, remote_ip, user_id, country, client_id, client_apikey_id, total_requests, average_execution_time_ms)
+                        VALUES
+                            (@dayStart, @insightType, @remote_ip, @user_id, @country, @client_id, @client_apikey_id, @total_requests, @average_response_time);";
+                    Dictionary<string, object> insertParams = new Dictionary<string, object>
+                    {
+                        { "@dayStart", dayStart },
+                        { "@insightType", row["insightType"] },
+                        { "@remote_ip", row["remote_ip"] },
+                        { "@user_id", row["user_id"] },
+                        { "@country", row["country"] },
+                        { "@client_id", row["client_id"] },
+                        { "@client_apikey_id", row["client_apikey_id"] },
+                        { "@total_requests", row["total_requests"] },
+                        { "@average_response_time", row["average_response_time"] }
+                    };
+                    _ = await db.ExecuteCMDAsync(insertSql, insertParams);
+                }
+            }
+
+            if (pruneDatabase)
+            {
+                // drop aggregated data from Insights_API_Requests_Hourly older than 40 days
+                string deleteSql = @"
+                DELETE FROM Insights_API_Requests_Hourly
+                WHERE event_datetime < @deleteBefore;";
+                Dictionary<string, object> deleteParams = new Dictionary<string, object>
+                {
+                    { "@deleteBefore", now.AddDays(-40) }
+                };
+                _ = await db.ExecuteCMDAsync(deleteSql, deleteParams);
+            }
+        }
+
+        /// <summary>
+        /// Aggregates API request insights into monthly summary data. Intended to process and summarize monthly API usage statistics.
+        /// This method should compile data from the Insights_API_Requests_Daily table into monthly aggregates stored in the Insights_API_Requests_Monthly table. Processes the last 12 months of daily data. If the data for that month has already been aggregated to the Insights_API_Requests_Monthly table, it skips that month. Does not process the current month.
+        /// </summary>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        public static async Task AggregateMonthlySummary()
+        {
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+
+            DateTime now = DateTime.UtcNow;
+
+            // loop through the last 12 months
+            for (int i = 1; i <= 12; i++)
+            {
+                DateTime monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(-i);
+                DateTime monthEnd = monthStart.AddMonths(1);
+                // make sure monthEnd is before the first day of the current month
+                if (monthEnd >= new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc))
+                {
+                    continue;
+                }
+
+                // check if this month has already been aggregated
+                string checkSql = @"
+                    SELECT COUNT(*) AS count
+                    FROM Insights_API_Requests_Monthly
+                    WHERE event_datetime = @monthStart;";
+                Dictionary<string, object> checkParams = new Dictionary<string, object>
+                {
+                    { "@monthStart", monthStart }
+                };
+                DataTable checkTable = await db.ExecuteCMDAsync(checkSql, checkParams);
+                if (checkTable.Rows.Count > 0 && Convert.ToInt32(checkTable.Rows[0]["count"]) > 0)
+                {
+                    // this month has already been aggregated, skip it
+                    continue;
+                }
+
+                // aggregate data for this month
+                string aggregateSql = @"
+                    SELECT 
+                        insightType, 
+                        remote_ip, 
+                        user_id,  
+                        country, 
+                        client_id, 
+                        client_apikey_id, 
+                        SUM(total_requests) AS total_requests, 
+                        AVG(average_execution_time_ms) AS average_response_time 
+                    FROM 
+                        Insights_API_Requests_Daily 
+                    WHERE 
+                        event_datetime >= @monthStart 
+                        AND event_datetime < @monthEnd 
+                    GROUP BY insightType, remote_ip, user_id, country, client_id, client_apikey_id;";
+                Dictionary<string, object> aggregateParams = new Dictionary<string, object>
+                {
+                    { "monthStart", monthStart },
+                    { "monthEnd", monthEnd }
+                };
+                DataTable aggregateTable = await db.ExecuteCMDAsync(aggregateSql, aggregateParams);
+                // insert aggregated data into Insights_API_Requests_Monthly
+                foreach (DataRow row in aggregateTable.Rows)
+                {
+                    string insertSql = @"
+                        INSERT INTO Insights_API_Requests_Monthly
+                            (event_datetime, insightType, remote_ip, user_id, country, client_id, client_apikey_id, total_requests, average_execution_time_ms)
+                        VALUES
+                            (@monthStart, @insightType, @remote_ip, @user_id, @country, @client_id, @client_apikey_id, @total_requests, @average_response_time);";
+                    Dictionary<string, object> insertParams = new Dictionary<string, object>
+                    {
+                        { "@monthStart", monthStart },
+                        { "@insightType", row["insightType"] },
+                        { "@remote_ip", row["remote_ip"] },
+                        { "@user_id", row["user_id"] },
+                        { "@country", row["country"] },
+                        { "@client_id", row["client_id"] },
+                        { "@client_apikey_id", row["client_apikey_id"] },
+                        { "@total_requests", row["total_requests"] },
+                        { "@average_response_time", row["average_response_time"] }
+                    };
+                    _ = await db.ExecuteCMDAsync(insertSql, insertParams);
+                }
+            }
+
+            if (pruneDatabase)
+            {
+                // drop aggregated data from Insights_API_Requests_Daily older than 6 months
+                string deleteSql = @"
+                DELETE FROM Insights_API_Requests_Daily
+                WHERE event_datetime < @deleteBefore;";
+                Dictionary<string, object> deleteParams = new Dictionary<string, object>
+                {
+                    { "@deleteBefore", now.AddMonths(-6) }
+                };
+                _ = await db.ExecuteCMDAsync(deleteSql, deleteParams);
+
+                // drop aggregated data from Insights_API_Requests_Monthly older than 1 year
+                deleteSql = @"
+                DELETE FROM Insights_API_Requests_Monthly
+                WHERE event_datetime < @deleteBefore;";
+                deleteParams = new Dictionary<string, object>
+                {
+                    { "@deleteBefore", now.AddYears(-1) }
+                };
+                _ = await db.ExecuteCMDAsync(deleteSql, deleteParams);
             }
         }
     }
 
     /// <summary>
     /// Attribute for logging API usage insights on controller actions or classes.
-    /// Applies insight collection logic, including opt-out handling, for decorated endpoints.
     /// </summary>
     [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class)]
     public class InsightAttribute : Attribute, IAsyncActionFilter
     {
         /// <summary>
-        /// Gets the source type for the insight event, such as hash lookup, submission, or metadata proxy.
+        /// Gets the type of insight source for this attribute, indicating the context in which the insight is logged.
         /// </summary>
         public InsightSourceType InsightSource { get; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="InsightAttribute"/> class with the specified insight source type.
         /// </summary>
-        /// <param name="insightSource">The source type for the insight event, such as hash lookup, submission, or metadata proxy.</param>
+        /// <param name="insightSource">The type of insight source for this attribute, indicating the context in which the insight is logged.</param>
         public InsightAttribute(InsightSourceType insightSource = InsightSourceType.Undefined)
         {
             InsightSource = insightSource;

@@ -124,6 +124,10 @@ namespace Classes.ProcessQueue
                         Task = new HourlyMaintenance_Frontend();
                         break;
 
+                    case QueueItemType.HourlyMaintenance:
+                        Task = new HourlyMaintenance();
+                        break;
+
                     case QueueItemType.DailyMaintenance:
                         Task = new DailyMaintenance();
                         break;

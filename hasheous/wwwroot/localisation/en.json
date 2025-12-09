@@ -258,6 +258,7 @@
     "servicefetchfbneometadata": "Fetch FBNEO Signatures",
     "servicefetchpuredosdatmetadata": "Fetch PureDOSDAT Signatures",
     "servicehourlymaintenance_frontend": "Frontend Hourly Maintenance",
+    "servicehourlymaintenance": "Hourly Maintenance",
     "servicedailymaintenance": "Daily Maintenance",
     "serviceweeklymaintenance": "Weekly Maintenance",
     "servicecachewarmer": "Cache Warmer",
