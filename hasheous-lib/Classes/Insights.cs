@@ -153,7 +153,7 @@ namespace Classes.Insights
                 SELECT 
                     COUNT(DISTINCT remote_ip) AS unique_visitors,
                     COUNT(*) AS total_requests,
-                    AVG(average_execution_time_ms) AS average_response_time
+                    ROUND(AVG(average_execution_time_ms), 2) AS average_response_time
                 FROM
                     Insights_API_Requests_Daily
                 WHERE
