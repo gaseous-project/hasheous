@@ -19,7 +19,7 @@ namespace Classes.Insights
     /// </summary>
     public class Insights
     {
-        static bool pruneDatabase = true;
+        static bool pruneDatabase = false;
 
         /// <summary>
         /// Specifies the source type for an insight event, such as hash lookups, submissions, or metadata proxy actions.
@@ -153,9 +153,9 @@ namespace Classes.Insights
                 SELECT 
                     COUNT(DISTINCT remote_ip) AS unique_visitors,
                     COUNT(*) AS total_requests,
-                    AVG(execution_time_ms) AS average_response_time
+                    AVG(average_execution_time_ms) AS average_response_time
                 FROM
-                    Insights_API_Requests
+                    Insights_API_Requests_Daily
                 WHERE
                     event_datetime >= @startdate AND event_datetime <= @enddate
                         " + appWhereClause + ";";
@@ -188,7 +188,7 @@ namespace Classes.Insights
                     country,
                     COUNT(DISTINCT remote_ip) AS unique_visitors
                 FROM
-                    Insights_API_Requests
+                    Insights_API_Requests_Daily
                 WHERE
                     event_datetime >= @startdate AND event_datetime <= @enddate
                         " + appWhereClause + @"
@@ -229,7 +229,7 @@ namespace Classes.Insights
                         client_apikey_id,
                             COUNT(DISTINCT remote_ip) AS unique_visitors
                     FROM
-                        Insights_API_Requests
+                        Insights_API_Requests_Daily
                     WHERE
                         event_datetime >= @startdate
                             AND event_datetime <= @enddate
