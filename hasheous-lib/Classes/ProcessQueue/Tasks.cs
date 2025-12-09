@@ -96,6 +96,11 @@ namespace Classes.ProcessQueue
         HourlyMaintenance_Frontend,
 
         /// <summary>
+        /// Runs hourly maintenance tasks
+        /// </summary>
+        HourlyMaintenance,
+
+        /// <summary>
         /// Runs daily maintenance tasks
         /// </summary>
         DailyMaintenance,

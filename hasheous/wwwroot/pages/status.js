@@ -74,6 +74,7 @@ function LoadStatusPage() {
                         ],
                         "maintenance": [
                             "HourlyMaintenance_Frontend",
+                            "HourlyMaintenance",
                             "DailyMaintenance",
                             "WeeklyMaintenance",
                             "CacheWarmer"

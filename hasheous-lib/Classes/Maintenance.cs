@@ -63,22 +63,29 @@ namespace Classes
         }
 
         /// <summary>
+        /// Performs hourly maintenance tasks such as aggregating insights into summary tables.
+        /// </summary>
+        public async Task RunHourlyMaintenance()
+        {
+            // aggregate insights into summary tables
+            await Classes.Insights.Insights.AggregateHourlySummary();
+        }
+
+        /// <summary>
         /// Performs daily maintenance tasks such as purging logs, deleting old insights, and migrating images from the database to the filesystem.
         /// </summary>
         public async Task RunDailyMaintenance()
         {
             await Logging.PurgeLogsAsync();
 
-            // aggregate insights into daily summary table
-            await Classes.Insights.Insights.AggregateDailySummary();
-
-            // delete insights older than 30 days
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql = "DELETE FROM Insights_API_Requests WHERE event_datetime < NOW() - INTERVAL 31 DAY;";
-            await db.ExecuteCMDAsync(sql);
+
+            // aggregate insights into summary tables
+            await Classes.Insights.Insights.AggregateDailySummary();
+            await Classes.Insights.Insights.AggregateMonthlySummary();
 
             // migrate images from database to filesystem
-            sql = "SELECT * FROM Images LIMIT 1000;";
+            string sql = "SELECT * FROM Images LIMIT 1000;";
             DataTable images = await db.ExecuteCMDAsync(sql);
             if (images.Rows.Count > 0)
             {
