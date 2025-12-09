@@ -301,7 +301,19 @@ namespace Classes.Insights
                 }
 
                 // aggregate data for this hour
-                string aggregateSql = "SELECT insightType, remote_ip, user_id, country, client_id, client_apikey_id, COUNT(*) AS total_requests, AVG(execution_time_ms) AS average_response_time FROM Insights_API_Requests WHERE event_datetime >= @hourStart AND event_datetime < @hourEnd GROUP BY insightType, remote_ip;";
+                string aggregateSql = @"
+                    SELECT 
+                        insightType, 
+                        remote_ip, 
+                        user_id, 
+                        country, 
+                        client_id, 
+                        client_apikey_id, 
+                        COUNT(*) AS total_requests, 
+                        AVG(execution_time_ms) AS average_response_time 
+                    FROM Insights_API_Requests 
+                    WHERE event_datetime >= @hourStart AND event_datetime < @hourEnd 
+                    GROUP BY insightType, remote_ip, user_id, country, client_id, client_apikey_id;";
                 Dictionary<string, object> aggregateParams = new Dictionary<string, object>
                 {
                     { "hourStart", hourStart },
@@ -399,8 +411,7 @@ namespace Classes.Insights
                     WHERE 
                         event_datetime >= @dayStart 
                         AND event_datetime < @dayEnd 
-                    GROUP BY 
-                        insightType, remote_ip;";
+                    GROUP BY insightType, remote_ip, user_id, country, client_id, client_apikey_id;";
                 Dictionary<string, object> aggregateParams = new Dictionary<string, object>
                 {
                     { "dayStart", dayStart },
@@ -499,8 +510,7 @@ namespace Classes.Insights
                     WHERE 
                         event_datetime >= @monthStart 
                         AND event_datetime < @monthEnd 
-                    GROUP BY 
-                        insightType, remote_ip;";
+                    GROUP BY insightType, remote_ip, user_id, country, client_id, client_apikey_id;";
                 Dictionary<string, object> aggregateParams = new Dictionary<string, object>
                 {
                     { "monthStart", monthStart },
