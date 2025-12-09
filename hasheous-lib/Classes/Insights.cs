@@ -152,7 +152,7 @@ namespace Classes.Insights
             sql = @"
                 SELECT 
                     COUNT(DISTINCT remote_ip) AS unique_visitors,
-                    COUNT(*) AS total_requests,
+                    SUM(total_requests) AS total_requests,
                     ROUND(AVG(average_execution_time_ms), 2) AS average_response_time
                 FROM
                     Insights_API_Requests_Daily
