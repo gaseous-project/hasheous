@@ -262,7 +262,7 @@ namespace Classes.Insights
         }
 
         /// <summary>
-        /// Aggregates API request insights into hourly summary data. It processes the last 24 whole hours of data (example: 1am - 2am). If the data for an hour has already been aggregated to the Insights_API_Requests_Hourly table, it skips that hour.
+        /// Aggregates API request insights into hourly summary data. It processes the last 168 whole hours of data (example: 1am - 2am). If the data for an hour has already been aggregated to the Insights_API_Requests_Hourly table, it skips that hour.
         /// </summary>
         /// <returns></returns>
         public static async Task AggregateHourlySummary()
@@ -272,8 +272,8 @@ namespace Classes.Insights
             // find the time 24 hours ago, rounded down to the nearest hour
             DateTime now = DateTime.UtcNow;
 
-            // loop through the last 24 whole hours
-            for (int i = 1; i <= 24; i++)
+            // loop through the last 48 whole hours
+            for (int i = 1; i <= 168; i++)
             {
                 // define the hour range
                 DateTime hourStart = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0, DateTimeKind.Utc).AddHours(-i);
@@ -288,7 +288,7 @@ namespace Classes.Insights
                 string checkSql = @"
                     SELECT COUNT(*) AS count
                     FROM Insights_API_Requests_Hourly
-                    WHERE hour_start = @hourStart;";
+                    WHERE event_datetime = @hourStart;";
                 Dictionary<string, object> checkParams = new Dictionary<string, object>
                 {
                     { "@hourStart", hourStart }
@@ -301,7 +301,7 @@ namespace Classes.Insights
                 }
 
                 // aggregate data for this hour
-                string aggregateSql = "SELECT insightType, remote_ip, user_id, user_agent, country, client_id, client_apikey_id, COUNT(*) AS total_requests, AVG(execution_time_ms) AS average_response_time FROM Insights_API_Requests WHERE event_datetime >= @hourStart AND event_datetime < @hourEnd GROUP BY insightType, remote_ip;";
+                string aggregateSql = "SELECT insightType, remote_ip, user_id, country, client_id, client_apikey_id, COUNT(*) AS total_requests, AVG(execution_time_ms) AS average_response_time FROM Insights_API_Requests WHERE event_datetime >= @hourStart AND event_datetime < @hourEnd GROUP BY insightType, remote_ip;";
                 Dictionary<string, object> aggregateParams = new Dictionary<string, object>
                 {
                     { "hourStart", hourStart },
@@ -313,16 +313,15 @@ namespace Classes.Insights
                 {
                     string insertSql = @"
                         INSERT INTO Insights_API_Requests_Hourly
-                            (hour_start, insightType, remote_ip, user_id, user_agent, country, client_id, client_apikey_id, total_requests, average_response_time)
+                            (event_datetime, insightType, remote_ip, user_id, country, client_id, client_apikey_id, total_requests, average_execution_time_ms)
                         VALUES
-                            (@hourStart, @insightType, @remote_ip, @user_id, @user_agent, @country, @client_id, @client_apikey_id, @total_requests, @average_response_time);";
+                            (@hourStart, @insightType, @remote_ip, @user_id, @country, @client_id, @client_apikey_id, @total_requests, @average_response_time);";
                     Dictionary<string, object> insertParams = new Dictionary<string, object>
                     {
                         { "@hourStart", hourStart },
                         { "@insightType", row["insightType"] },
                         { "@remote_ip", row["remote_ip"] },
                         { "@user_id", row["user_id"] },
-                        { "@user_agent", row["user_agent"] },
                         { "@country", row["country"] },
                         { "@client_id", row["client_id"] },
                         { "@client_apikey_id", row["client_apikey_id"] },
@@ -372,7 +371,7 @@ namespace Classes.Insights
                 string checkSql = @"
                     SELECT COUNT(*) AS count
                     FROM Insights_API_Requests_Daily
-                    WHERE day_start = @dayStart;";
+                    WHERE event_datetime = @dayStart;";
                 Dictionary<string, object> checkParams = new Dictionary<string, object>
                 {
                     { "@dayStart", dayStart }
@@ -389,8 +388,7 @@ namespace Classes.Insights
                     SELECT 
                         insightType, 
                         remote_ip, 
-                        user_id, 
-                        user_agent, 
+                        user_id,  
                         country, 
                         client_id, 
                         client_apikey_id, 
@@ -399,8 +397,8 @@ namespace Classes.Insights
                     FROM 
                         Insights_API_Requests_Hourly 
                     WHERE 
-                        hour_start >= @dayStart 
-                        AND hour_start < @dayEnd 
+                        event_datetime >= @dayStart 
+                        AND event_datetime < @dayEnd 
                     GROUP BY 
                         insightType, remote_ip;";
                 Dictionary<string, object> aggregateParams = new Dictionary<string, object>
@@ -414,16 +412,15 @@ namespace Classes.Insights
                 {
                     string insertSql = @"
                         INSERT INTO Insights_API_Requests_Daily
-                            (day_start, insightType, remote_ip, user_id, user_agent, country, client_id, client_apikey_id, total_requests, average_response_time)
+                            (event_datetime, insightType, remote_ip, user_id, country, client_id, client_apikey_id, total_requests, average_execution_time_ms)
                         VALUES
-                            (@dayStart, @insightType, @remote_ip, @user_id, @user_agent, @country, @client_id, @client_apikey_id, @total_requests, @average_response_time);";
+                            (@dayStart, @insightType, @remote_ip, @user_id, @country, @client_id, @client_apikey_id, @total_requests, @average_response_time);";
                     Dictionary<string, object> insertParams = new Dictionary<string, object>
                     {
                         { "@dayStart", dayStart },
                         { "@insightType", row["insightType"] },
                         { "@remote_ip", row["remote_ip"] },
                         { "@user_id", row["user_id"] },
-                        { "@user_agent", row["user_agent"] },
                         { "@country", row["country"] },
                         { "@client_id", row["client_id"] },
                         { "@client_apikey_id", row["client_apikey_id"] },
@@ -439,7 +436,7 @@ namespace Classes.Insights
                 // drop aggregated data from Insights_API_Requests_Hourly older than 30 days
                 string deleteSql = @"
                 DELETE FROM Insights_API_Requests_Hourly
-                WHERE hour_start < @deleteBefore;";
+                WHERE event_datetime < @deleteBefore;";
                 Dictionary<string, object> deleteParams = new Dictionary<string, object>
                 {
                     { "@deleteBefore", now.AddDays(-30) }
@@ -474,7 +471,7 @@ namespace Classes.Insights
                 string checkSql = @"
                     SELECT COUNT(*) AS count
                     FROM Insights_API_Requests_Monthly
-                    WHERE month_start = @monthStart;";
+                    WHERE event_datetime = @monthStart;";
                 Dictionary<string, object> checkParams = new Dictionary<string, object>
                 {
                     { "@monthStart", monthStart }
@@ -491,8 +488,7 @@ namespace Classes.Insights
                     SELECT 
                         insightType, 
                         remote_ip, 
-                        user_id, 
-                        user_agent, 
+                        user_id,  
                         country, 
                         client_id, 
                         client_apikey_id, 
@@ -501,8 +497,8 @@ namespace Classes.Insights
                     FROM 
                         Insights_API_Requests_Daily 
                     WHERE 
-                        day_start >= @monthStart 
-                        AND day_start < @monthEnd 
+                        event_datetime >= @monthStart 
+                        AND event_datetime < @monthEnd 
                     GROUP BY 
                         insightType, remote_ip;";
                 Dictionary<string, object> aggregateParams = new Dictionary<string, object>
@@ -516,16 +512,15 @@ namespace Classes.Insights
                 {
                     string insertSql = @"
                         INSERT INTO Insights_API_Requests_Monthly
-                            (month_start, insightType, remote_ip, user_id, user_agent, country, client_id, client_apikey_id, total_requests, average_response_time)
+                            (event_datetime, insightType, remote_ip, user_id, country, client_id, client_apikey_id, total_requests, average_execution_time_ms)
                         VALUES
-                            (@monthStart, @insightType, @remote_ip, @user_id, @user_agent, @country, @client_id, @client_apikey_id, @total_requests, @average_response_time);";
+                            (@monthStart, @insightType, @remote_ip, @user_id, @country, @client_id, @client_apikey_id, @total_requests, @average_response_time);";
                     Dictionary<string, object> insertParams = new Dictionary<string, object>
                     {
                         { "@monthStart", monthStart },
                         { "@insightType", row["insightType"] },
                         { "@remote_ip", row["remote_ip"] },
                         { "@user_id", row["user_id"] },
-                        { "@user_agent", row["user_agent"] },
                         { "@country", row["country"] },
                         { "@client_id", row["client_id"] },
                         { "@client_apikey_id", row["client_apikey_id"] },
@@ -541,7 +536,7 @@ namespace Classes.Insights
                 // drop aggregated data from Insights_API_Requests_Daily older than 6 months
                 string deleteSql = @"
                 DELETE FROM Insights_API_Requests_Daily
-                WHERE hour_start < @deleteBefore;";
+                WHERE event_datetime < @deleteBefore;";
                 Dictionary<string, object> deleteParams = new Dictionary<string, object>
                 {
                     { "@deleteBefore", now.AddMonths(-6) }
@@ -551,7 +546,7 @@ namespace Classes.Insights
                 // drop aggregated data from Insights_API_Requests_Monthly older than 1 year
                 deleteSql = @"
                 DELETE FROM Insights_API_Requests_Monthly
-                WHERE month_start < @deleteBefore;";
+                WHERE event_datetime < @deleteBefore;";
                 deleteParams = new Dictionary<string, object>
                 {
                     { "@deleteBefore", now.AddYears(-1) }
@@ -559,206 +554,207 @@ namespace Classes.Insights
                 _ = await db.ExecuteCMDAsync(deleteSql, deleteParams);
             }
         }
+    }
+
+    /// <summary>
+    /// Attribute for logging API usage insights on controller actions or classes.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class)]
+    public class InsightAttribute : Attribute, IAsyncActionFilter
+    {
+        /// <summary>
+        /// Gets the type of insight source for this attribute, indicating the context in which the insight is logged.
+        /// </summary>
+        public InsightSourceType InsightSource { get; }
 
         /// <summary>
-        /// Attribute for logging API usage insights on controller actions or classes.
+        /// Initializes a new instance of the <see cref="InsightAttribute"/> class with the specified insight source type.
         /// </summary>
-        [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class)]
-        public class InsightAttribute : Attribute, IAsyncActionFilter
+        /// <param name="insightSource">The type of insight source for this attribute, indicating the context in which the insight is logged.</param>
+        public InsightAttribute(InsightSourceType insightSource = InsightSourceType.Undefined)
         {
-            /// <summary>
-            /// Gets the type of insight source for this attribute, indicating the context in which the insight is logged.
-            /// </summary>
-            public InsightSourceType InsightSource { get; }
+            InsightSource = insightSource;
+        }
 
-            /// <summary>
-            /// Initializes a new instance of the <see cref="InsightAttribute"/> class with the specified insight source type.
-            /// </summary>
-            /// <param name="insightSource">The type of insight source for this attribute, indicating the context in which the insight is logged.</param>
-            public InsightAttribute(InsightSourceType insightSource = InsightSourceType.Undefined)
+        /// <summary>
+        /// Called asynchronously before and after the action executes, allowing you to log or modify the request/response.
+        /// </summary>
+        /// <param name="context">The context for the action executing.</param>
+        /// <param name="next">The delegate to execute the next action filter or the action itself.</param>
+        public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
+        {
+            var httpContext = context.HttpContext;
+
+            // Check if the user has opted out of insights
+            List<OptOutType> optOutTypes = new List<OptOutType>();
+            if (httpContext.Request.Headers.TryGetValue(OptOutHeaderName, out var optOutValue))
             {
-                InsightSource = insightSource;
+                // Parse the opt-out value
+                string[] optOutValues = optOutValue.ToString().Split(',');
+                foreach (string value in optOutValues)
+                {
+                    if (Enum.TryParse(value.Trim(), true, out OptOutType optOutType))
+                    {
+                        optOutTypes.Add(optOutType);
+                    }
+                }
             }
 
-            /// <summary>
-            /// Called asynchronously before and after the action executes, allowing you to log or modify the request/response.
-            /// </summary>
-            /// <param name="context">The context for the action executing.</param>
-            /// <param name="next">The delegate to execute the next action filter or the action itself.</param>
-            public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
+            // If the user has opted out of all insights, skip logging
+            if (optOutTypes.Contains(OptOutType.BlockAll))
             {
-                var httpContext = context.HttpContext;
-
-                // Check if the user has opted out of insights
-                List<OptOutType> optOutTypes = new List<OptOutType>();
-                if (httpContext.Request.Headers.TryGetValue(OptOutHeaderName, out var optOutValue))
-                {
-                    // Parse the opt-out value
-                    string[] optOutValues = optOutValue.ToString().Split(',');
-                    foreach (string value in optOutValues)
-                    {
-                        if (Enum.TryParse(value.Trim(), true, out OptOutType optOutType))
-                        {
-                            optOutTypes.Add(optOutType);
-                        }
-                    }
-                }
-
-                // If the user has opted out of all insights, skip logging
-                if (optOutTypes.Contains(OptOutType.BlockAll))
-                {
-                    await next();
-                    return;
-                }
-
-                // Get HTTP method (GET, POST, etc.)
-                string httpMethod = httpContext.Request.Method;
-
-                // Get remote IP
-                string remoteIp = "";
-                if (optOutTypes.Contains(OptOutType.BlockIP))
-                {
-                    // If the user has opted out of storing IP addresses, set it to "unknown"
-                    remoteIp = "unknown";
-                }
-                else if (httpContext.Request.Headers.ContainsKey("true-client-ip"))
-                {
-                    // If behind a proxy, use the X-Forwarded-For header
-                    remoteIp = httpContext.Request.Headers["true-client-ip"].ToString();
-                }
-                else if (httpContext.Request.Headers.ContainsKey("CF-Connecting-IPv6"))
-                {
-                    // If behind a proxy, use the X-Forwarded-For header
-                    remoteIp = httpContext.Request.Headers["CF-Connecting-IPv6"].ToString();
-                }
-                else if (httpContext.Request.Headers.ContainsKey("cf-connecting-ip"))
-                {
-                    // If behind a proxy, use the X-Forwarded-For header
-                    remoteIp = httpContext.Request.Headers["cf-connecting-ip"].ToString();
-                }
-                else if (httpContext.Request.Headers.ContainsKey("X-Forwarded-For"))
-                {
-                    // If behind a proxy, use the X-Forwarded-For header
-                    remoteIp = httpContext.Request.Headers["X-Forwarded-For"].ToString();
-                }
-                else if (httpContext.Connection.RemoteIpAddress != null)
-                {
-                    // Otherwise, use the RemoteIpAddress from the connection
-                    remoteIp = httpContext.Connection.RemoteIpAddress.ToString();
-                }
-                // If the remote IP is still empty, set it to "unknown"
-                if (string.IsNullOrEmpty(remoteIp) && !optOutTypes.Contains(OptOutType.BlockIP))
-                    // If the user has not opted out of storing IP addresses, set it to "unknown"
-                    remoteIp = "unknown";
-
-                // hash the remote IP address for privacy
-                if (!optOutTypes.Contains(OptOutType.BlockIP) && remoteIp != "unknown")
-                {
-                    // Hash the remote IP address using SHA1
-                    using (var sha1 = System.Security.Cryptography.SHA1.Create())
-                    {
-                        byte[] bytes = sha1.ComputeHash(System.Text.Encoding.UTF8.GetBytes(remoteIp));
-                        remoteIp = BitConverter.ToString(bytes).Replace("-", "").ToLowerInvariant();
-                    }
-                }
-
-                // If the user has opted out of storing location information, skip the location lookup
-                string country = "";
-                if (!optOutTypes.Contains(OptOutType.BlockLocation))
-                {
-                    if (httpContext.Request.Headers.TryGetValue("cf-ipcountry", out var countryHeader))
-                    {
-                        // If the request contains a cf-ipcountry header, use it
-                        country = countryHeader.ToString();
-                    }
-                }
-
-                // Get endpoint address (path)
-                string endpoint = httpContext.Request.Path;
-
-                // Start timing
-                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-
                 await next();
+                return;
+            }
 
-                stopwatch.Stop();
-                long executionTimeMs = stopwatch.ElapsedMilliseconds;
+            // Get HTTP method (GET, POST, etc.)
+            string httpMethod = httpContext.Request.Method;
 
-                // Get client ID and API key ID from headers
-                // This could be a time consuming operation, so it needs to be done after the action execution
-                string clientAPIKey = "";
-                long clientAPIKeyId = 0;
-                long clientId = 0;
-                if (httpContext.Request.Headers.TryGetValue(ClientApiKey.APIKeyHeaderName, out var apiKeyValue))
+            // Get remote IP
+            string remoteIp = "";
+            if (optOutTypes.Contains(OptOutType.BlockIP))
+            {
+                // If the user has opted out of storing IP addresses, set it to "unknown"
+                remoteIp = "unknown";
+            }
+            else if (httpContext.Request.Headers.ContainsKey("true-client-ip"))
+            {
+                // If behind a proxy, use the X-Forwarded-For header
+                remoteIp = httpContext.Request.Headers["true-client-ip"].ToString();
+            }
+            else if (httpContext.Request.Headers.ContainsKey("CF-Connecting-IPv6"))
+            {
+                // If behind a proxy, use the X-Forwarded-For header
+                remoteIp = httpContext.Request.Headers["CF-Connecting-IPv6"].ToString();
+            }
+            else if (httpContext.Request.Headers.ContainsKey("cf-connecting-ip"))
+            {
+                // If behind a proxy, use the X-Forwarded-For header
+                remoteIp = httpContext.Request.Headers["cf-connecting-ip"].ToString();
+            }
+            else if (httpContext.Request.Headers.ContainsKey("X-Forwarded-For"))
+            {
+                // If behind a proxy, use the X-Forwarded-For header
+                remoteIp = httpContext.Request.Headers["X-Forwarded-For"].ToString();
+            }
+            else if (httpContext.Connection.RemoteIpAddress != null)
+            {
+                // Otherwise, use the RemoteIpAddress from the connection
+                remoteIp = httpContext.Connection.RemoteIpAddress.ToString();
+            }
+            // If the remote IP is still empty, set it to "unknown"
+            if (string.IsNullOrEmpty(remoteIp) && !optOutTypes.Contains(OptOutType.BlockIP))
+                // If the user has not opted out of storing IP addresses, set it to "unknown"
+                remoteIp = "unknown";
+
+            // hash the remote IP address for privacy
+            if (!optOutTypes.Contains(OptOutType.BlockIP) && remoteIp != "unknown")
+            {
+                // Hash the remote IP address using SHA1
+                using (var sha1 = System.Security.Cryptography.SHA1.Create())
                 {
-                    clientAPIKey = apiKeyValue.ToString();
-                    ClientApiKey clientApiKeyResolver = new ClientApiKey();
-                    ClientApiKeyItem? clientApiKeyItem = clientApiKeyResolver.GetAppFromApiKey(clientAPIKey);
-                    if (clientApiKeyItem != null)
+                    byte[] bytes = sha1.ComputeHash(System.Text.Encoding.UTF8.GetBytes(remoteIp));
+                    remoteIp = BitConverter.ToString(bytes).Replace("-", "").ToLowerInvariant();
+                }
+            }
+
+            // If the user has opted out of storing location information, skip the location lookup
+            string country = "";
+            if (!optOutTypes.Contains(OptOutType.BlockLocation))
+            {
+                if (httpContext.Request.Headers.TryGetValue("cf-ipcountry", out var countryHeader))
+                {
+                    // If the request contains a cf-ipcountry header, use it
+                    country = countryHeader.ToString();
+                }
+            }
+
+            // Get endpoint address (path)
+            string endpoint = httpContext.Request.Path;
+
+            // Start timing
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+            await next();
+
+            stopwatch.Stop();
+            long executionTimeMs = stopwatch.ElapsedMilliseconds;
+
+            // Get client ID and API key ID from headers
+            // This could be a time consuming operation, so it needs to be done after the action execution
+            string clientAPIKey = "";
+            long clientAPIKeyId = 0;
+            long clientId = 0;
+            if (httpContext.Request.Headers.TryGetValue(ClientApiKey.APIKeyHeaderName, out var apiKeyValue))
+            {
+                clientAPIKey = apiKeyValue.ToString();
+                ClientApiKey clientApiKeyResolver = new ClientApiKey();
+                ClientApiKeyItem? clientApiKeyItem = clientApiKeyResolver.GetAppFromApiKey(clientAPIKey);
+                if (clientApiKeyItem != null)
+                {
+                    clientAPIKeyId = (long)clientApiKeyItem.KeyId;
+                    clientId = (long)clientApiKeyItem.ClientAppId;
+                }
+            }
+
+            // lookup user id from user name if available
+            // first check if the user is providing an API key, if not, we will use the UserManager to get the user ID
+            string userId = String.Empty;
+            // Check if the user has opted out of storing user information
+            if (optOutTypes.Contains(OptOutType.BlockUser))
+            {
+                // If the user has opted out of storing user information, set userId to "unknown"
+                userId = "unknown";
+            }
+            else
+            {
+                // If the user has not opted out of storing user information, we will try to get the user ID
+                if (httpContext.Request.Headers.TryGetValue(ApiKey.ApiKeyHeaderName, out var userIdHeader))
+                {
+                    ApplicationUser? user = new ApiKey().GetUserFromApiKey(userIdHeader.ToString());
+                    if (user != null)
                     {
-                        clientAPIKeyId = (long)clientApiKeyItem.KeyId;
-                        clientId = (long)clientApiKeyItem.ClientAppId;
+                        userId = user.Id;
                     }
                 }
-
-                // lookup user id from user name if available
-                // first check if the user is providing an API key, if not, we will use the UserManager to get the user ID
-                string userId = String.Empty;
-                // Check if the user has opted out of storing user information
-                if (optOutTypes.Contains(OptOutType.BlockUser))
+                else if (httpContext.User?.Identity?.IsAuthenticated == true)
                 {
-                    // If the user has opted out of storing user information, set userId to "unknown"
-                    userId = "unknown";
-                }
-                else
-                {
-                    // If the user has not opted out of storing user information, we will try to get the user ID
-                    if (httpContext.Request.Headers.TryGetValue(ApiKey.ApiKeyHeaderName, out var userIdHeader))
+                    // check the cache first
+                    if (Config.RedisConfiguration.Enabled)
                     {
-                        ApplicationUser? user = new ApiKey().GetUserFromApiKey(userIdHeader.ToString());
-                        if (user != null)
+                        string? cachedUserId = hasheous.Classes.RedisConnection.GetDatabase(0).StringGet("Insights:User:" + httpContext.User.Identity.Name);
+                        if (cachedUserId != null)
                         {
-                            userId = user.Id;
+                            userId = cachedUserId;
                         }
                     }
-                    else if (httpContext.User?.Identity?.IsAuthenticated == true)
+
+                    // if not cached, use UserManager to get the user ID
+                    // This is a more reliable way to get the user ID, especially if the user is authenticated
+                    // Note: This requires the UserManager to be registered in the service collection
+                    if (string.IsNullOrEmpty(userId))
                     {
-                        // check the cache first
-                        if (Config.RedisConfiguration.Enabled)
+                        var userManager = httpContext.RequestServices.GetService<UserManager<ApplicationUser>>();
+                        if (userManager != null)
                         {
-                            string? cachedUserId = hasheous.Classes.RedisConnection.GetDatabase(0).StringGet("Insights:User:" + httpContext.User.Identity.Name);
-                            if (cachedUserId != null)
+                            userId = userManager.GetUserId(httpContext.User);
+
+                            // Cache the user ID for future requests
+                            if (Config.RedisConfiguration.Enabled)
                             {
-                                userId = cachedUserId;
+                                hasheous.Classes.RedisConnection.GetDatabase(0).StringSet("Insights:User:" + httpContext.User.Identity.Name, userId, TimeSpan.FromHours(1));
                             }
                         }
-
-                        // if not cached, use UserManager to get the user ID
-                        // This is a more reliable way to get the user ID, especially if the user is authenticated
-                        // Note: This requires the UserManager to be registered in the service collection
-                        if (string.IsNullOrEmpty(userId))
-                        {
-                            var userManager = httpContext.RequestServices.GetService<UserManager<ApplicationUser>>();
-                            if (userManager != null)
-                            {
-                                userId = userManager.GetUserId(httpContext.User);
-
-                                // Cache the user ID for future requests
-                                if (Config.RedisConfiguration.Enabled)
-                                {
-                                    hasheous.Classes.RedisConnection.GetDatabase(0).StringSet("Insights:User:" + httpContext.User.Identity.Name, userId, TimeSpan.FromHours(1));
-                                }
-                            }
-                        }
                     }
                 }
+            }
 
-                // Insert into DB
-                try
-                {
-                    Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            // Insert into DB
+            try
+            {
+                Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
 
-                    string sql = @"
+                string sql = @"
                     INSERT INTO Insights_API_Requests 
                         (
                             event_datetime,
@@ -789,7 +785,7 @@ namespace Classes.Insights
                             @client_id,
                             @client_apikey_id
                         );";
-                    Dictionary<string, object> parameters = new Dictionary<string, object>
+                Dictionary<string, object> parameters = new Dictionary<string, object>
                     {
                         { "@insightType", (int)InsightSource },
                         { "@remoteip", remoteIp },
@@ -804,12 +800,11 @@ namespace Classes.Insights
                         { "@client_apikey_id", clientAPIKeyId }
                     };
 
-                    _ = await db.ExecuteCMDAsync(sql, parameters);
-                }
-                catch (Exception ex)
-                {
-                    Logging.Log(Logging.LogType.Warning, "InsightAttribute", "An error occurred while storing insights.", ex);
-                }
+                _ = await db.ExecuteCMDAsync(sql, parameters);
+            }
+            catch (Exception ex)
+            {
+                Logging.Log(Logging.LogType.Warning, "InsightAttribute", "An error occurred while storing insights.", ex);
             }
         }
     }
