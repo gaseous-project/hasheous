@@ -262,7 +262,7 @@ namespace Classes.Insights
         }
 
         /// <summary>
-        /// Aggregates API request insights into hourly summary data. It processes the last 168 whole hours of data (example: 1am - 2am). If the data for an hour has already been aggregated to the Insights_API_Requests_Hourly table, it skips that hour.
+        /// Aggregates API request insights into hourly summary data. It processes the last 40 days of whole hours of data (example: 1am - 2am). If the data for an hour has already been aggregated to the Insights_API_Requests_Hourly table, it skips that hour.
         /// </summary>
         /// <returns></returns>
         public static async Task AggregateHourlySummary()
@@ -272,8 +272,8 @@ namespace Classes.Insights
             // find the time 24 hours ago, rounded down to the nearest hour
             DateTime now = DateTime.UtcNow;
 
-            // loop through the last 48 whole hours
-            for (int i = 1; i <= 168; i++)
+            // loop through the last 40 days of whole hours
+            for (int i = 1; i <= 960; i++)
             {
                 // define the hour range
                 DateTime hourStart = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0, DateTimeKind.Utc).AddHours(-i);
@@ -346,20 +346,27 @@ namespace Classes.Insights
 
             if (pruneDatabase)
             {
-                // drop aggregated data from Insights_API_Requests older than 7 days
+                // drop aggregated data from Insights_API_Requests older than 40 days
                 string deleteSql = @"
                 DELETE FROM Insights_API_Requests
-                WHERE event_datetime < @deleteBefore;";
+                WHERE event_datetime < @deleteBefore LIMIT 1000;";
                 Dictionary<string, object> deleteParams = new Dictionary<string, object>
                 {
-                    { "@deleteBefore", now.AddDays(-7) }
+                    { "@deleteBefore", now.AddDays(-40) }
                 };
-                _ = await db.ExecuteCMDAsync(deleteSql, deleteParams);
+                // keep deleting in batches of 1000 until no more rows to delete
+                int rowsDeleted;
+                do
+                {
+                    Logging.Log(Logging.LogType.Information, "Insights", "Pruning old Insights_API_Requests data older than 40 days...");
+                    DataTable deleteResult = await db.ExecuteCMDAsync(deleteSql, deleteParams);
+                    rowsDeleted = deleteResult.Rows.Count;
+                } while (rowsDeleted > 0);
             }
         }
 
         /// <summary>
-        /// Aggregates API request insights into daily summary data. Intended to process and summarize daily API usage statistics. Compiles data from the Insights_API_Requests_Hourly table into daily aggregates stored in the Insights_API_Requests_Daily table. Processes the last 5 days of hourly data. If the data for that day has already been aggregated to the Insights_API_Requests_Daily table, it skips that day. Does not process the current day.
+        /// Aggregates API request insights into daily summary data. Intended to process and summarize daily API usage statistics. Compiles data from the Insights_API_Requests_Hourly table into daily aggregates stored in the Insights_API_Requests_Daily table. Processes the last 35 days of hourly data. If the data for that day has already been aggregated to the Insights_API_Requests_Daily table, it skips that day. Does not process the current day.
         /// </summary>
         /// <returns>A task representing the asynchronous operation.</returns>
         public static async Task AggregateDailySummary()
@@ -368,8 +375,8 @@ namespace Classes.Insights
 
             DateTime now = DateTime.UtcNow;
 
-            // loop through the last 5 days
-            for (int i = 1; i <= 5; i++)
+            // loop through the last 35 days
+            for (int i = 1; i <= 35; i++)
             {
                 DateTime dayStart = new DateTime(now.Year, now.Month, now.Day, 0, 0, 0, DateTimeKind.Utc).AddDays(-i);
                 DateTime dayEnd = dayStart.AddDays(1);
@@ -444,13 +451,13 @@ namespace Classes.Insights
 
             if (pruneDatabase)
             {
-                // drop aggregated data from Insights_API_Requests_Hourly older than 30 days
+                // drop aggregated data from Insights_API_Requests_Hourly older than 40 days
                 string deleteSql = @"
                 DELETE FROM Insights_API_Requests_Hourly
                 WHERE event_datetime < @deleteBefore;";
                 Dictionary<string, object> deleteParams = new Dictionary<string, object>
                 {
-                    { "@deleteBefore", now.AddDays(-30) }
+                    { "@deleteBefore", now.AddDays(-40) }
                 };
                 _ = await db.ExecuteCMDAsync(deleteSql, deleteParams);
             }
