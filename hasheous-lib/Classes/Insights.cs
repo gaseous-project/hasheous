@@ -19,7 +19,7 @@ namespace Classes.Insights
     /// </summary>
     public class Insights
     {
-        static bool pruneDatabase = false;
+        static bool pruneDatabase = true;
 
         /// <summary>
         /// Specifies the source type for an insight event, such as hash lookups, submissions, or metadata proxy actions.
