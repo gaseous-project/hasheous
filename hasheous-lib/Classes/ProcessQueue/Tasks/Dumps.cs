@@ -22,7 +22,7 @@ namespace Classes.ProcessQueue
         {
             Logging.Log(Logging.LogType.Information, "Metadata Dump", "Starting metadata dump processes...");
 
-            // await DumpMetadataAsync();
+            await DumpMetadataAsync();
             await DumpMetadataHashAsync();
 
             return null;
@@ -283,6 +283,8 @@ namespace Classes.ProcessQueue
                         hasGames = true;
 
                         // Step 3: Dump each game's hash to metadata source mapping
+                        Stopwatch sw = Stopwatch.StartNew();
+                        Logging.Log(Logging.LogType.Information, "Metadata Dump", $"Processing {platformGames.Objects.Count} games for platform {platformName} (Page {gamePageNumber})...");
                         foreach (var game in platformGames.Objects)
                         {
                             string gameMetadataPath = Path.Combine(platformPath, game.Name.Trim() + $" ({game.Id})");
@@ -298,8 +300,26 @@ namespace Classes.ProcessQueue
                                         {
                                             continue;
                                         }
+                                        Stopwatch romSw = Stopwatch.StartNew();
+                                        int romCounter = 0;
                                         foreach (var rom in romList)
                                         {
+                                            romCounter++;
+
+                                            // check stopwatch - if over 5 minutes, break the loop to avoid long running tasks
+                                            if (sw.Elapsed.TotalMinutes > 5)
+                                            {
+                                                Logging.Log(Logging.LogType.Information, "Metadata Dump", "Time limit reached for this batch, moving to next platform/game...");
+                                                break;
+                                            }
+
+                                            // check stopwatch - if over 30 seconds, log progress
+                                            if (romSw.Elapsed.TotalSeconds > 30)
+                                            {
+                                                Logging.Log(Logging.LogType.Information, "Metadata Dump", $"  Processed {romCounter}/{romList.Count} ROMs for game {game.Name} ({game.Id})...");
+                                                romSw.Restart();
+                                            }
+
                                             // build lookup model
                                             var model = new HashLookupModel
                                             {
@@ -338,10 +358,12 @@ namespace Classes.ProcessQueue
                                             string romOutputPath = Path.Combine(gameMetadataPath, $"{hashString}.json");
                                             await File.WriteAllTextAsync(romOutputPath, romJsonContent);
                                         }
+                                        romSw.Stop();
                                     }
                                 }
                             }
                         }
+                        sw.Stop();
                     }
 
                     // If the platform has no games, skip zipping
