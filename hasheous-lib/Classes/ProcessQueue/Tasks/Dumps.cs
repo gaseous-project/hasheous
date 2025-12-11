@@ -268,6 +268,11 @@ namespace Classes.ProcessQueue
                 foreach (var platform in allPlatforms.Objects)
                 {
                     string platformName = platform.Name;
+                    // sanitize platform name for file system
+                    foreach (char c in Path.GetInvalidFileNameChars())
+                    {
+                        platformName = platformName.Replace(c, '_');
+                    }
                     string platformPath = Path.Combine(outputHashesPath, platformName);
 
                     // loop through all game pages for the platform
