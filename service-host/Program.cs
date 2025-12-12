@@ -148,6 +148,10 @@ switch (taskType)
         Task = new FetchFBNEOMetadata();
         break;
 
+    case QueueItemType.HourlyMaintenance:
+        Task = new HourlyMaintenance();
+        break;
+
     case QueueItemType.DailyMaintenance:
         Task = new DailyMaintenance();
         break;

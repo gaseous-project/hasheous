@@ -89,10 +89,14 @@ namespace Classes
 						string[] resources = Assembly.GetExecutingAssembly().GetManifestResourceNames();
 						if (resources.Contains(resourceName))
 						{
+							Logging.Log(Logging.LogType.Information, "Database", "Found schema update script for version " + i);
+
 							using (Stream stream = assembly.GetManifestResourceStream(resourceName))
 							using (StreamReader reader = new StreamReader(stream))
 							{
 								dbScript = reader.ReadToEnd();
+
+								Logging.Log(Logging.LogType.Information, "Database", "Read schema update script for version " + i);
 
 								// apply script
 								sql = "SELECT schema_version FROM schema_version;";
@@ -106,7 +110,7 @@ namespace Classes
 								}
 								else
 								{
-									int SchemaVer = (int)SchemaVersion.Rows[0][0];
+									int SchemaVer = Convert.ToInt32(SchemaVersion.Rows[0][0]);
 									Logging.Log(Logging.LogType.Information, "Database", "Schema version is " + SchemaVer);
 									if (SchemaVer < i)
 									{
@@ -124,6 +128,10 @@ namespace Classes
 
 										// run post-upgrade code
 										DatabaseMigration.PostUpgradeScript(i, _ConnectorType);
+									}
+									else
+									{
+										Logging.Log(Logging.LogType.Information, "Database", "Schema version is up to date. No update needed. " + SchemaVer + " >= " + i);
 									}
 								}
 							}

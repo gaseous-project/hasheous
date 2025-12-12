@@ -827,6 +827,14 @@ namespace Classes
                     }
                 }
 
+                public string LibraryMetadataBundlesDirectory
+                {
+                    get
+                    {
+                        return Path.Combine(LibraryMetadataDirectory, "Bundles");
+                    }
+                }
+
                 /// <summary>
                 /// Gets the directory path for IGDB metadata within the library metadata directory.
                 /// </summary>
@@ -1094,6 +1102,58 @@ namespace Classes
                         }
                     }
                 }
+
+                private static int _MetadataBundle_MaxAgeInDays
+                {
+                    get
+                    {
+                        string? envVar = Environment.GetEnvironmentVariable("metadatabundlemaxageindays");
+                        if (!String.IsNullOrEmpty(envVar))
+                        {
+                            return int.Parse(envVar);
+                        }
+                        else
+                        {
+                            return 7;
+                        }
+                    }
+                }
+
+                private static int _MetadataBundle_MaxStorageInMB
+                {
+                    get
+                    {
+                        string? envVar = Environment.GetEnvironmentVariable("metadatabundlemaxstorageinmb");
+                        if (!String.IsNullOrEmpty(envVar))
+                        {
+                            return int.Parse(envVar);
+                        }
+                        else
+                        {
+                            return 5000;
+                        }
+                    }
+                }
+
+                private static int _MetadataCache_MaxStorageInMB
+                {
+                    get
+                    {
+                        string? envVar = Environment.GetEnvironmentVariable("metadatacachemaxstorageinmb");
+                        if (!String.IsNullOrEmpty(envVar))
+                        {
+                            return int.Parse(envVar);
+                        }
+                        else
+                        {
+                            return 10000;
+                        }
+                    }
+                }
+
+                public int MetadataBundle_MaxAgeInDays = _MetadataBundle_MaxAgeInDays;
+                public int MetadataBundle_MaxStorageInMB = _MetadataBundle_MaxStorageInMB;
+                public int MetadataCache_MaxStorageInMB = _MetadataCache_MaxStorageInMB;
 
                 /// <summary>
                 /// Gets or sets the metadata source to use for the API (e.g., IGDB, GiantBomb, etc.).
