@@ -47,12 +47,12 @@ namespace hasheous_server.Classes.Tasks.Clients
         /// <remarks>
         /// This method is intended for communication with the user.
         /// </remarks>
-        public static ClientModel? GetClient(string userAPIKey, string publicId)
+        public async static Task<ClientModel?> GetClient(string userAPIKey, string publicId)
         {
             // resolve userAPIKey to user account
             var user = GetUserObjectFromAPIKey(userAPIKey);
 
-            DataTable dt = db.ExecuteCMD("SELECT * FROM Task_Clients WHERE public_id = @public_id AND owner_id = @owner_id LIMIT 1;", new Dictionary<string, object>
+            DataTable dt = await db.ExecuteCMDAsync("SELECT * FROM Task_Clients WHERE public_id = @public_id AND owner_id = @owner_id LIMIT 1;", new Dictionary<string, object>
             {
                 { "@public_id", publicId },
                 { "@owner_id", user.Id }
@@ -73,9 +73,9 @@ namespace hasheous_server.Classes.Tasks.Clients
         /// <remarks>
         /// This method is intended for internal system use only, such as during client heartbeats.
         /// </remarks>
-        public static ClientModel? GetClientByAPIKeyAndPublicId(string clientAPIKey, string publicId)
+        public async static Task<ClientModel?> GetClientByAPIKeyAndPublicId(string clientAPIKey, string publicId)
         {
-            DataTable dt = db.ExecuteCMD("SELECT * FROM Task_Clients WHERE api_key = @api_key AND public_id = @public_id LIMIT 1;", new Dictionary<string, object>
+            DataTable dt = await db.ExecuteCMDAsync("SELECT * FROM Task_Clients WHERE api_key = @api_key AND public_id = @public_id LIMIT 1;", new Dictionary<string, object>
             {
                 { "@api_key", clientAPIKey },
                 { "@public_id", publicId }
@@ -95,13 +95,13 @@ namespace hasheous_server.Classes.Tasks.Clients
         /// <remarks>
         /// This method fetches all clients registered under the user account associated with the provided API key. This should be used for communication with the user.
         /// </remarks>
-        public static List<ClientModel> GetAllClientsForUser(string userAPIKey)
+        public async static Task<List<ClientModel>> GetAllClientsForUser(string userAPIKey)
         {
             // resolve userAPIKey to user account
             var user = GetUserObjectFromAPIKey(userAPIKey);
 
             List<ClientModel> clients = new List<ClientModel>();
-            DataTable dt = db.ExecuteCMD("SELECT * FROM Task_Clients WHERE owner_id = @owner_id;", new Dictionary<string, object>
+            DataTable dt = await db.ExecuteCMDAsync("SELECT * FROM Task_Clients WHERE owner_id = @owner_id;", new Dictionary<string, object>
             {
                 { "@owner_id", user.Id }
             });
@@ -119,10 +119,10 @@ namespace hasheous_server.Classes.Tasks.Clients
         /// <remarks>
         /// This method fetches all clients in the system, regardless of ownership. This should be used for internal system operations only.
         /// </remarks>
-        public static List<ClientModel> GetAllClients()
+        public async static Task<List<ClientModel>> GetAllClients()
         {
             List<ClientModel> clients = new List<ClientModel>();
-            DataTable dt = db.ExecuteCMD("SELECT * FROM Task_Clients;");
+            DataTable dt = await db.ExecuteCMDAsync("SELECT * FROM Task_Clients;");
             foreach (DataRow row in dt.Rows)
             {
                 clients.Add(new ClientModel(row));
@@ -135,11 +135,11 @@ namespace hasheous_server.Classes.Tasks.Clients
         /// </summary>
         /// <param name="userAPIKey">The user's API key.</param>
         /// <param name="publicId">The public client ID to unregister.</param>
-        public static void UnregisterClient(string userAPIKey, string publicId)
+        public async static Task UnregisterClient(string userAPIKey, string publicId)
         {
             var user = GetUserObjectFromAPIKey(userAPIKey);
 
-            db.ExecuteCMD("DELETE FROM Task_Clients WHERE owner_id = @owner_id AND public_id = @public_id;", new Dictionary<string, object>
+            await db.ExecuteCMDAsync("DELETE FROM Task_Clients WHERE owner_id = @owner_id AND public_id = @public_id;", new Dictionary<string, object>
             {
                 { "@owner_id", user.Id },
                 { "@public_id", publicId }
@@ -152,14 +152,14 @@ namespace hasheous_server.Classes.Tasks.Clients
         /// <param name="clientAPIKey">The API key of the client.</param>
         /// <param name="publicId">The public client ID.</param>
         /// <exception cref="Exception">Thrown if the client API key or public ID is invalid.</exception>
-        public static void Heartbeat(string clientAPIKey, string publicId)
+        public async static Task Heartbeat(string clientAPIKey, string publicId)
         {
-            ClientModel? client = GetClientByAPIKeyAndPublicId(clientAPIKey, publicId);
+            ClientModel? client = await GetClientByAPIKeyAndPublicId(clientAPIKey, publicId);
             if (client == null)
             {
                 throw new Exception("Invalid client API key or public ID.");
             }
-            client.Heartbeat();
+            await client.Heartbeat();
         }
 
         /// <summary>
@@ -171,9 +171,9 @@ namespace hasheous_server.Classes.Tasks.Clients
         /// <param name="version">The new version of the client application (optional).</param>
         /// <param name="capabilities">The new list of supported capabilities for the client (optional).</param>
         /// <exception cref="Exception">Thrown if the client API key or public ID is invalid.</exception>
-        public static void UpdateClient(string clientAPIKey, string publicId, string? clientName = null, string? version = null, List<Capabilities>? capabilities = null)
+        public async static Task UpdateClient(string clientAPIKey, string publicId, string? clientName = null, string? version = null, List<Capabilities>? capabilities = null)
         {
-            ClientModel? client = GetClientByAPIKeyAndPublicId(clientAPIKey, publicId);
+            ClientModel? client = await GetClientByAPIKeyAndPublicId(clientAPIKey, publicId);
             if (client == null)
             {
                 throw new Exception("Invalid client API key or public ID.");
@@ -192,7 +192,7 @@ namespace hasheous_server.Classes.Tasks.Clients
                 client.Capabilities = capabilities;
             }
 
-            client.Commit();
+            await client.Commit();
         }
 
         /// <summary>
@@ -200,9 +200,9 @@ namespace hasheous_server.Classes.Tasks.Clients
         /// </summary>
         /// <param name="clientAPIKey">The API key of the client.</param>
         /// <param name="publicId">The public client ID.</param>
-        public static void ClientGetTask(string clientAPIKey, string publicId)
+        public async static Task ClientGetTask(string clientAPIKey, string publicId)
         {
-            ClientModel? client = GetClientByAPIKeyAndPublicId(clientAPIKey, publicId);
+            ClientModel? client = await GetClientByAPIKeyAndPublicId(clientAPIKey, publicId);
             if (client == null)
             {
                 throw new Exception("Invalid client API key or public ID.");
@@ -218,9 +218,9 @@ namespace hasheous_server.Classes.Tasks.Clients
         /// <param name="taskId">The ID of the task being reported.</param>
         /// <param name="result">The result or status of the task.</param>
         /// <param name="errorMessage">An optional error message if the task failed.</param>
-        public static void ClientSubmitTaskStatusOrResult(string clientAPIKey, string publicId, string taskId, string result, string? errorMessage = null)
+        public async static Task ClientSubmitTaskStatusOrResult(string clientAPIKey, string publicId, string taskId, string result, string? errorMessage = null)
         {
-            ClientModel? client = GetClientByAPIKeyAndPublicId(clientAPIKey, publicId);
+            ClientModel? client = await GetClientByAPIKeyAndPublicId(clientAPIKey, publicId);
             if (client == null)
             {
                 throw new Exception("Invalid client API key or public ID.");
@@ -277,7 +277,7 @@ namespace hasheous_server.Classes.Tasks.Clients
             {
                 throw new Exception("Task not found.");
             }
-            task.Terminate();
+            _ = task.Terminate();
         }
 
         /// <summary>
@@ -313,19 +313,47 @@ namespace hasheous_server.Classes.Tasks.Clients
             return tasks;
         }
 
+        /// <summary>
+        /// Assigns a task to a specific client by their IDs.
+        /// </summary>
+        /// <param name="taskId">The ID of the task to assign.</param>
+        /// <param name="clientId">The ID of the client to assign the task to.</param>
         public static void AssignTaskToClient(long taskId, long clientId)
         {
-            throw new NotImplementedException();
+            var task = GetTask(taskId);
+            if (task == null)
+            {
+                throw new Exception("Task not found.");
+            }
+            task.ClientId = clientId;
+            _ = task.Commit();
         }
 
+        /// <summary>
+        /// Updates the status, result, and error message of a specified task.
+        /// </summary>
+        /// <param name="taskId">The ID of the task to update.</param>
+        /// <param name="status">The new status to set for the task.</param>
+        /// <param name="result">The result of the task, if applicable (optional).</param>
+        /// <param name="errorMessage">An error message if the task failed (optional).</param>
+        /// <exception cref="Exception">Thrown if the task is not found.</exception>
         public static void UpdateTaskStatus(long taskId, QueueItemStatus status, string? result = null, string? errorMessage = null)
         {
-            throw new NotImplementedException();
-        }
-
-        public static QueueItemModel? GetNextPendingTaskForClient(long clientId, List<TaskType> clientCapabilities)
-        {
-            throw new NotImplementedException();
+            var task = GetTask(taskId);
+            if (task == null)
+            {
+                throw new Exception("Task not found.");
+            }
+            task.Status = status;
+            if (result != null)
+            {
+                task.Result = result;
+            }
+            if (errorMessage != null)
+            {
+                task.ErrorMessage = errorMessage;
+            }
+            _ = task.Commit();
         }
     }
 }

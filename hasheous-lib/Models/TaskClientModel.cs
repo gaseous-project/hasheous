@@ -214,10 +214,10 @@ namespace hasheous_server.Models.Tasks
         /// <summary>
         /// Unregisters the client by removing it from the database and clearing its properties.
         /// </summary>
-        public void Unregister()
+        public async Task Unregister()
         {
             // update the database to remove this client
-            Config.database.ExecuteCMD("DELETE FROM Task_Clients WHERE id = @id", new Dictionary<string, object>
+            await Config.database.ExecuteCMDAsync("DELETE FROM Task_Clients WHERE id = @id", new Dictionary<string, object>
             { { "@id", this.Id } });
 
             // clear this object
@@ -234,11 +234,11 @@ namespace hasheous_server.Models.Tasks
         /// <summary>
         /// Updates the client's last contact time to the current UTC time and persists the change to the database.
         /// </summary>
-        public void Heartbeat()
+        public async Task Heartbeat()
         {
             this._LastContactAt = DateTime.UtcNow;
 
-            Config.database.ExecuteCMD("UPDATE Task_Clients SET last_contact_at = @last_contact_at WHERE id = @id", new Dictionary<string, object>
+            await Config.database.ExecuteCMDAsync("UPDATE Task_Clients SET last_contact_at = @last_contact_at WHERE id = @id", new Dictionary<string, object>
             {
                 { "@last_contact_at", this._LastContactAt },
                 { "@id", this._Id }
@@ -248,14 +248,14 @@ namespace hasheous_server.Models.Tasks
         /// <summary>
         /// Commits any changes made to the client model to the database.
         /// </summary>
-        public void Commit()
+        public async Task Commit()
         {
             if (this._Id == 0)
             {
                 throw new Exception("Cannot commit a client that has not been registered.");
             }
 
-            Config.database.ExecuteCMD("UPDATE Task_Clients SET client_name = @client_name, api_key = @api_key, last_heartbeat = @last_heartbeat, version = @version, capabilities = @capabilities WHERE id = @id", new Dictionary<string, object>
+            await Config.database.ExecuteCMDAsync("UPDATE Task_Clients SET client_name = @client_name, api_key = @api_key, last_heartbeat = @last_heartbeat, version = @version, capabilities = @capabilities WHERE id = @id", new Dictionary<string, object>
             {
                 { "@client_name", this.ClientName },
                 { "@api_key", this._APIKey ?? "" },

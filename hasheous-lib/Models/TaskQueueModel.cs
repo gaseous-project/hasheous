@@ -147,9 +147,9 @@ namespace hasheous_server.Models.Tasks
         /// <summary>
         /// Terminates the queue item by setting its status to 'Cancelled' in the database.
         /// </summary>
-        public void Terminate()
+        public async Task Terminate()
         {
-            Config.database.ExecuteCMD("UPDATE `Task_Queue` SET `status` = @status WHERE `id` = @id", new Dictionary<string, object>
+            await Config.database.ExecuteCMDAsync("UPDATE `Task_Queue` SET `status` = @status WHERE `id` = @id", new Dictionary<string, object>
             {
                 { "@id", this.Id },
                 { "@status", QueueItemStatus.Cancelled }
@@ -159,18 +159,17 @@ namespace hasheous_server.Models.Tasks
         /// <summary>
         /// Commits the current state of the queue item to the database by updating its fields.
         /// </summary>
-        public void Commit()
+        public async Task Commit()
         {
-            Config.database.ExecuteCMD("UPDATE `Task_Queue` SET `status` = @status, `client_id` = @client_id, `parameters` = @parameters, `result` = @result, `error_message` = @error_message, `started_at` = @started_at, `completed_at` = @completed_at WHERE `id` = @id", new Dictionary<string, object>
+            await Config.database.ExecuteCMDAsync("UPDATE `Task_Queue` SET `status` = @status, `client_id` = @client_id, `result` = @result, `error_message` = @error_message, `started_at` = @started_at, `completed_at` = @completed_at WHERE `id` = @id", new Dictionary<string, object>
             {
                 { "@id", this.Id },
                 { "@status", this.Status },
-                { "@client_id", this.ClientId },
-                { "@parameters", this.Parameters },
-                { "@result", this.Result },
-                { "@error_message", this.ErrorMessage },
-                { "@started_at", this.StartedAt },
-                { "@completed_at", this.CompletedAt }
+                { "@client_id", this.ClientId ?? (object)DBNull.Value },
+                { "@result", this.Result ?? (object)DBNull.Value },
+                { "@error_message", this.ErrorMessage ?? (object)DBNull.Value },
+                { "@started_at", this.StartedAt ?? (object)DBNull.Value },
+                { "@completed_at", this.CompletedAt?? (object)DBNull.Value }
             });
         }
     }
