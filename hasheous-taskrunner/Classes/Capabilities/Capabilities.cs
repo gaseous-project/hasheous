@@ -15,6 +15,11 @@ namespace hasheous_taskrunner.Classes.Capabilities
             { 20, "AI" }
         };
 
+        private static readonly Dictionary<int, object> CapabilityDefaults = new Dictionary<int, object>
+        {
+            { 20, new Dictionary<string, object> { { "ollama_url", "http://host.docker.internal:11434" }, { "model", "llama2" }, { "prompt", "Just checking if you're working" } } } // AI default config
+        };
+
         /// <summary>
         /// Checks the provided capabilities, internal capabilities, and returns their statuses.
         /// </summary>
@@ -48,6 +53,10 @@ namespace hasheous_taskrunner.Classes.Capabilities
                 {
                     Console.WriteLine($"Checking capability: {CapabilityNames[capability.CapabilityId]}");
                     // test capability
+                    if (CapabilityDefaults.ContainsKey(capability.CapabilityId))
+                    {
+                        capability.Configuration = CapabilityDefaults[capability.CapabilityId] as Dictionary<string, object>;
+                    }
                     bool testResult = await capability.TestAsync();
                     if (testResult)
                     {
