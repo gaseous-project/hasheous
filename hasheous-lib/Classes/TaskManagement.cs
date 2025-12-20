@@ -20,21 +20,46 @@ namespace hasheous_server.Classes.Tasks.Clients
         /// <param name="userAPIKey">The user's API key.</param>
         /// <param name="clientName">The name of the client application.</param>
         /// <param name="version">The version of the client application.</param>
+        /// <param name="capabilities">The list of supported capabilities for the client (optional).</param>
+        /// <param name="publicId">The public client ID (optional). Used for existing clients.</param>
         /// <returns>A dictionary containing the client API key and public client ID.</returns>
-        public static async Task<Dictionary<string, string>> RegisterClient(string userAPIKey, string clientName, string version)
+        public static async Task<Dictionary<string, string>> RegisterClient(string userAPIKey, string clientName, string version, List<Capabilities>? capabilities = null, Guid? publicId = null)
         {
             // resolve userAPIKey to user account
             var user = GetUserObjectFromAPIKey(userAPIKey);
 
             // create new client
             string clientAPIKey = GenerateClientAPIKey();
-            ClientModel client = new ClientModel(clientAPIKey, clientName, user.Id.ToString(), version);
+            ClientModel client = new ClientModel(clientAPIKey, clientName, user.Id.ToString(), version, capabilities, publicId);
             Dictionary<string, string> response = new Dictionary<string, string>
             {
                 { "client_api_key", clientAPIKey },
                 { "client_id", client.PublicId.ToString() }
             };
 
+            // build required capabilities list - this also provides basic configuration for each capability
+            Dictionary<Capabilities, object> requiredCapabilities = new Dictionary<Capabilities, object>
+            {
+                { Capabilities.Internet, new Dictionary<string, object>
+                    {
+                        { "test_addresses", new List<string>{
+                            "hasheous.org",
+                            "1.1.1.1", "8.8.8.8"
+                            }},
+                        { "ping_attempts", 4 }
+                    }
+                },
+                { Capabilities.DiskSpace, new Dictionary<string, object>
+                    {
+                        { "minimum_free_space_mb", 1024 } // require at least 1024 MB free space
+                    }
+                }
+            };
+
+            // encode required capabilities as JSON and return to the client
+            response.Add("required_capabilities", System.Text.Json.JsonSerializer.Serialize(requiredCapabilities));
+
+            // respond to the client
             return response;
         }
 
@@ -228,9 +253,34 @@ namespace hasheous_server.Classes.Tasks.Clients
             throw new NotImplementedException();
         }
 
+        /// <summary>
+        /// Generates a new unique client API key.
+        /// </summary>
+        /// <returns>
+        /// A 128 character hexadecimal string representing the client API key.
+        /// </returns>
         private static string GenerateClientAPIKey()
         {
-            return Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Substring(0, 128);
+            const int maxAttempts = 10;
+            for (int attempt = 0; attempt < maxAttempts; attempt++)
+            {
+                // 64 random bytes -> 128 hex characters
+                byte[] bytes = System.Security.Cryptography.RandomNumberGenerator.GetBytes(64);
+                string key = Convert.ToHexString(bytes).ToLowerInvariant();
+
+                var exists = db.ExecuteCMD(
+                    "SELECT 1 FROM Task_Clients WHERE api_key = @api_key LIMIT 1;",
+                    new Dictionary<string, object> { { "@api_key", key } }
+                );
+
+                if (exists.Rows.Count == 0)
+                {
+                    return key;
+                }
+            }
+
+            // Extremely unlikely fallback
+            throw new Exception("Unable to generate a unique client API key after multiple attempts.");
         }
 
         private static Authentication.ApplicationUser GetUserObjectFromAPIKey(string userAPIKey)

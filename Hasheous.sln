@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "hasheous-lib", "hasheous-li
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "service-host", "service-host\service-host.csproj", "{EE31901D-72C9-48DF-B6A6-FDDBABE1F01C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "hasheous-taskrunner", "hasheous-taskrunner\hasheous-taskrunner.csproj", "{061AC3D5-D809-42B1-A7DD-1A5BF7F37D1F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -42,5 +44,9 @@ Global
 		{EE31901D-72C9-48DF-B6A6-FDDBABE1F01C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EE31901D-72C9-48DF-B6A6-FDDBABE1F01C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EE31901D-72C9-48DF-B6A6-FDDBABE1F01C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{061AC3D5-D809-42B1-A7DD-1A5BF7F37D1F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{061AC3D5-D809-42B1-A7DD-1A5BF7F37D1F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{061AC3D5-D809-42B1-A7DD-1A5BF7F37D1F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{061AC3D5-D809-42B1-A7DD-1A5BF7F37D1F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

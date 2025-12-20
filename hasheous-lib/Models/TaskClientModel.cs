@@ -35,31 +35,54 @@ namespace hasheous_server.Models.Tasks
         /// <param name="clientName">The name of the client.</param>
         /// <param name="ownerId">The unique identifier of the owner for the client.</param>
         /// <param name="version">The version string of the client application (optional).</param>
+        /// <param name="capabilities">The list of task types that the client is capable of handling (optional).</param>
+        /// <param name="publicId">The public unique identifier for the client (optional). If not provided, a new GUID will be generated. Used for existing clients that are re-registering.</param>
         /// <remarks>
         /// This constructor is typically used when registering a new client.
         /// </remarks>
-        public ClientModel(string clientAPIKey, string clientName, string ownerId, string? version = null)
+        public ClientModel(string clientAPIKey, string clientName, string ownerId, string? version = null, List<Capabilities>? capabilities = null, Guid? publicId = null)
         {
-            this._PublicId = Guid.NewGuid();
+            this._PublicId = publicId ?? Guid.NewGuid();
             this.APIKey = clientAPIKey;
             this.ClientName = clientName;
             this._OwnerId = ownerId;
             this.ClientVersion = version;
             this._CreatedAt = DateTime.UtcNow;
             this._LastContactAt = DateTime.UtcNow;
+            this.Capabilities = capabilities ?? new List<Capabilities>();
 
-            // Id will be set when saved to database
-            DataTable dt = Config.database.ExecuteCMD("INSERT INTO Task_Clients (public_id, api_key, client_name, owner_id, created_at, last_contact_at, version) VALUES (@public_id, @api_key, @client_name, @owner_id, @created_at, @last_contact_at, @version); SELECT LAST_INSERT_ID();", new Dictionary<string, object>
+            // Check if the client already exists in the database
+            DataTable dt = Config.database.ExecuteCMD("SELECT * FROM Task_Clients WHERE public_id = @public_id AND owner_id = @owner_id", new Dictionary<string, object>
             {
                 { "@public_id", this._PublicId.ToString() },
-                { "@api_key", this._APIKey ?? "" },
-                { "@client_name", this.ClientName },
-                { "@owner_id", this.OwnerId },
-                { "@created_at", this._CreatedAt },
-                { "@last_contact_at", this._LastContactAt },
-                { "@version", this._Version ?? "" }
+                { "@owner_id", this._OwnerId }
             });
-            this._Id = Convert.ToInt64(dt.Rows[0][0]);
+            if (dt.Rows.Count > 0)
+            {
+                // Client already exists, update existing record instead of creating a new one
+                this._Id = Convert.ToInt64(dt.Rows[0]["id"]);
+                this._CreatedAt = Convert.ToDateTime(dt.Rows[0]["created_at"]);
+                this._LastContactAt = DateTime.UtcNow;
+                // Update existing record
+                this.Commit().GetAwaiter().GetResult();
+            }
+            else
+            {
+                // new client, proceed to insert
+                // Id will be set when saved to database
+                dt = Config.database.ExecuteCMD("INSERT INTO Task_Clients (public_id, api_key, client_name, owner_id, created_at, last_heartbeat, version, capabilities) VALUES (@public_id, @api_key, @client_name, @owner_id, @created_at, @last_heartbeat, @version, @capabilities); SELECT LAST_INSERT_ID();", new Dictionary<string, object>
+                {
+                    { "@public_id", this._PublicId.ToString() },
+                    { "@api_key", this._APIKey ?? "" },
+                    { "@client_name", this.ClientName },
+                    { "@owner_id", this.OwnerId },
+                    { "@created_at", this._CreatedAt },
+                    { "@last_heartbeat", this._LastContactAt },
+                    { "@version", this._Version ?? "" },
+                    { "@capabilities", System.Text.Json.JsonSerializer.Serialize(capabilities ?? new List<Capabilities>()) }
+                });
+                this._Id = Convert.ToInt64(dt.Rows[0][0]);
+            }
         }
 
         /// <summary>
@@ -201,7 +224,7 @@ namespace hasheous_server.Models.Tasks
             this._OwnerId = row.Field<string>("owner_id") ?? "";
             this._APIKey = row.Field<string>("api_key") ?? "";
             this._CreatedAt = row.Field<DateTime>("created_at");
-            this._LastContactAt = row.Field<DateTime>("last_contact_at");
+            this._LastContactAt = row.Field<DateTime>("last_heartbeat");
             this.ClientVersion = row.Field<string>("version") ?? "";
             var capabilitiesJson = row.Field<string>("capabilities");
             this.Capabilities = string.IsNullOrEmpty(capabilitiesJson)
@@ -238,9 +261,9 @@ namespace hasheous_server.Models.Tasks
         {
             this._LastContactAt = DateTime.UtcNow;
 
-            await Config.database.ExecuteCMDAsync("UPDATE Task_Clients SET last_contact_at = @last_contact_at WHERE id = @id", new Dictionary<string, object>
+            await Config.database.ExecuteCMDAsync("UPDATE Task_Clients SET last_heartbeat = @last_heartbeat WHERE id = @id", new Dictionary<string, object>
             {
-                { "@last_contact_at", this._LastContactAt },
+                { "@last_heartbeat", this._LastContactAt },
                 { "@id", this._Id }
             });
         }

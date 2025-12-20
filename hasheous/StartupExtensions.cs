@@ -1,27 +1,27 @@
-using System.Reflection;
 using System.Linq;
-using Microsoft.OpenApi.Models;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Versioning;
-using System.Text.Json.Serialization;
-using Microsoft.AspNetCore.Http.Features;
-using Microsoft.AspNetCore.Server.Kestrel.Core;
-using Microsoft.AspNetCore.HttpOverrides;
-using Microsoft.AspNetCore.Identity.UI.Services;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Authentication;
-using StackExchange.Redis;
-using Classes;
-using hasheous_server.Classes;
-using hasheous.Classes;
-using Microsoft.AspNetCore.Mvc.Filters;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using System.Net;
 using System.Net.Mail;
+using System.Reflection;
+using System.Text.Json.Serialization;
+using Authentication;
+using Classes;
 using Classes.ProcessQueue;
+using hasheous.Classes;
+using hasheous_server.Classes;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.UI.Services;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.AspNetCore.Mvc.Versioning;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.OpenApi.Models;
+using StackExchange.Redis;
 using static Classes.Common;
 
 namespace Hasheous;
@@ -153,6 +153,14 @@ public static class StartupExtensions
                 Type = SecuritySchemeType.ApiKey,
                 Description = "Client API Key",
                 Scheme = "ClientApiKeyScheme"
+            });
+            options.AddSecurityDefinition("Task Worker API Key", new OpenApiSecurityScheme
+            {
+                Name = TaskWorkerAPIKey.APIKeyHeaderName,
+                In = ParameterLocation.Header,
+                Type = SecuritySchemeType.ApiKey,
+                Description = "Task Worker API Key",
+                Scheme = "TaskWorkerApiKeyScheme"
             });
             options.OperationFilter<AuthorizationOperationFilter>();
             options.DocumentFilter<IGDBMetadataDocumentFilter>();
@@ -289,7 +297,11 @@ public static class StartupExtensions
         services.AddSingleton<Authentication.ApiKey.ApiKeyAuthorizationFilter>();
         services.AddSingleton<Authentication.ApiKey.IApiKeyValidator, Authentication.ApiKey.ApiKeyValidator>();
         services.AddSingleton<Authentication.ClientApiKey.ClientApiKeyAuthorizationFilter>();
-        services.AddSingleton<Authentication.ClientApiKey.IClientApiKeyValidator, Authentication.ClientApiKey.ClientApiKeyValidator>();
+        services.AddSingleton<Authentication.ClientApiKey.IClientApiKeyValidator, Authentication.ClientApiKey.ClientApiKeyValidator>
+        ();
+        services.AddSingleton<Authentication.TaskWorkerAPIKey.TaskWorkerAPIKeyAuthorizationFilter>();
+        services.AddSingleton<Authentication.TaskWorkerAPIKey.ITaskWorkerAPIKeyValidator, Authentication.TaskWorkerAPIKey.TaskWorkerAPIKeyValidator>
+        ();
         return services;
     }
 

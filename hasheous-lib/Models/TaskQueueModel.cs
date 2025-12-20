@@ -218,13 +218,18 @@ namespace hasheous_server.Models.Tasks
     public enum Capabilities
     {
         /// <summary>
-        /// Capability for accessing the Internet.
+        /// Capability for accessing the Internet. All clients have this capability by default.
         /// </summary>
         Internet = 0,
 
         /// <summary>
+        /// Capability for ensuring sufficient disk space is available.
+        /// </summary>
+        DiskSpace = 10,
+
+        /// <summary>
         /// Capability for handling AI tasks.
         /// </summary>
-        AI = 1
+        AI = 20
     }
 }
