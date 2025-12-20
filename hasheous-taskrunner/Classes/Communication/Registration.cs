@@ -57,13 +57,11 @@ namespace hasheous_taskrunner.Classes.Communication
                     // checking registration requirements
                     if (registrationInfo.ContainsKey("required_capabilities"))
                     {
-                        Console.WriteLine("Checking required capabilities...");
                         string requiredCapabilitiesJson = registrationInfo["required_capabilities"];
                         var requiredCapabilities = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(requiredCapabilitiesJson);
                         if (requiredCapabilities != null)
                         {
                             var capabilityResults = await Capabilities.Capabilities.CheckCapabilitiesAsync(requiredCapabilities);
-                            Console.WriteLine("Capability check results: " + string.Join(", ", capabilityResults));
                             Config.RegistrationParameters["capabilities"] = capabilityResults;
                             await UpdateRegistrationInfo();
                         }

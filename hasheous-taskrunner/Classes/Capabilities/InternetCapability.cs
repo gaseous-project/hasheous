@@ -109,40 +109,8 @@ namespace hasheous_taskrunner.Classes.Capabilities
         /// <inheritdoc/>
         public async Task<Dictionary<string, object>?> ExecuteAsync(Dictionary<string, object> parameters)
         {
-            // Example implementation: perform an internet-related task
-            if (parameters.ContainsKey("url"))
-            {
-                string url = parameters["url"].ToString() ?? "";
-                try
-                {
-                    using (var client = new HttpClient())
-                    {
-                        var response = await client.GetAsync(url);
-                        if (response.IsSuccessStatusCode)
-                        {
-                            var content = await response.Content.ReadAsStringAsync();
-                            return new Dictionary<string, object>
-                            {
-                                { "status", "success" },
-                                { "content", content }
-                            };
-                        }
-                        else
-                        {
-                            return new Dictionary<string, object>
-                            {
-                                { "status", "error" },
-                                { "message", $"Failed to fetch URL. Status code: {response.StatusCode}" }
-                            };
-                        }
-                    }
-                }
-                catch
-                {
-                    return null;
-                }
-            }
-            return null;
+            bool result = await TestAsync();
+            return new Dictionary<string, object> { { "result", result } };
         }
     }
 }

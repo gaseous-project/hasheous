@@ -44,7 +44,7 @@ namespace hasheous_taskrunner.Classes.Capabilities
                     continue;
                 }
 
-                if (capabilitiesToCheck.ContainsKey(capability.CapabilityId.ToString()))
+                if (capability.IsInternalCapability == true)
                 {
                     Console.WriteLine($"Checking capability: {CapabilityNames[capability.CapabilityId]}");
                     // test capability
