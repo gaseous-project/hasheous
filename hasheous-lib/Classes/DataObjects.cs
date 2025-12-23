@@ -8,6 +8,7 @@ using Classes;
 using hasheous.Classes;
 using hasheous_server.Classes.Metadata;
 using hasheous_server.Classes.Metadata.IGDB;
+using hasheous_server.Classes.Tasks.Clients;
 using hasheous_server.Models;
 using IGDB;
 using IGDB.Models;
@@ -443,6 +444,29 @@ namespace hasheous_server.Classes
             if (Config.RedisConfiguration.Enabled)
             {
                 RedisConnection.PurgeCache("DataObject");
+            }
+
+            // enqueue an AI tagging task
+            if (TaskManagement.GetAllTasks((long)DataObjectId).Find(x => x.TaskName == Models.Tasks.TaskType.AIDescriptionAndTagging) == null)
+            {
+                // queue a new task
+
+                Dictionary<string, string> taskParameters = new Dictionary<string, string>
+                {
+                    { "model", "gemma3" },
+                    { "prompt", "Generate a concise description and relevant tags for the following item based on its existing metadata and attributes." }
+                };
+                TaskManagement.EnqueueTask((long)DataObjectId, Models.Tasks.TaskType.AIDescriptionAndTagging, new List<Models.Tasks.Capabilities> { Models.Tasks.Capabilities.Internet, Models.Tasks.Capabilities.AI }, taskParameters);
+            }
+            else
+            {
+                // reset existing task to pending
+                List<Models.Tasks.QueueItemModel> existingTasks = TaskManagement.GetAllTasks((long)DataObjectId).FindAll(x => x.TaskName == Models.Tasks.TaskType.AIDescriptionAndTagging);
+                foreach (var task in existingTasks)
+                {
+                    task.Status = Models.Tasks.QueueItemStatus.Pending;
+                    _ = task.Commit();
+                }
             }
         }
 
@@ -2292,7 +2316,7 @@ namespace hasheous_server.Classes
             return SearchCandidates;
         }
 
-        private async Task<MatchItem> GetDataObject<T>(MetadataSources Source, string Endpoint, string Fields, string Query)
+        public async Task<MatchItem> GetDataObject<T>(MetadataSources Source, string Endpoint, string Fields, string Query)
         {
             Communications communications = new Communications(Source);
             T[]? results;

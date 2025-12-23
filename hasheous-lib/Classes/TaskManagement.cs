@@ -305,13 +305,14 @@ namespace hasheous_server.Classes.Tasks.Clients
         /// <summary>
         /// Enqueues a new task of the specified type with the given capabilities and parameters.
         /// </summary>
+        /// <param name="dataObjectId">The identifier of the associated data object.</param>
         /// <param name="taskType">The type of the task to enqueue.</param>
         /// <param name="capabilities">A list of capabilities required to process the task.</param>
-        /// <param name="parameters">A string containing task-specific parameters.</param>
+        /// <param name="parameters">A dictionary containing task-specific parameters.</param>
         /// <returns>The enqueued <see cref="QueueItemModel"/> instance.</returns>
-        public static QueueItemModel EnqueueTask(TaskType taskType, List<Capabilities> capabilities, string parameters)
+        public static QueueItemModel EnqueueTask(long dataObjectId, TaskType taskType, List<Capabilities> capabilities, Dictionary<string, string>? parameters)
         {
-            QueueItemModel task = new QueueItemModel(taskType, capabilities, parameters);
+            QueueItemModel task = new QueueItemModel(dataObjectId, taskType, capabilities, parameters);
             return task;
         }
 
@@ -354,8 +355,26 @@ namespace hasheous_server.Classes.Tasks.Clients
         /// <returns>A list of <see cref="QueueItemModel"/> representing all tasks in the queue.</returns>
         public static List<QueueItemModel> GetAllTasks()
         {
-            DataTable dt = Config.database.ExecuteCMD("SELECT * FROM `Task_Queue`;");
+            return GetAllTasksInternal("SELECT * FROM `Task_Queue`;", new Dictionary<string, object>());
+        }
+
+        /// <summary>
+        /// Retrieves all tasks in the queue for the specified data object.
+        /// </summary>
+        /// <param name="dataObjectId">The identifier of the data object whose tasks should be returned.</param>
+        /// <returns>A list of <see cref="QueueItemModel"/> instances associated with the specified data object.</returns>
+        public static List<QueueItemModel> GetAllTasks(long dataObjectId)
+        {
+            return GetAllTasksInternal("SELECT * FROM `Task_Queue` WHERE `dataobjectid` = @dataobjectid;", new Dictionary<string, object>
+            {
+                { "@dataobjectid", dataObjectId }
+            });
+        }
+
+        private static List<QueueItemModel> GetAllTasksInternal(string query, Dictionary<string, object> parameters)
+        {
             List<QueueItemModel> tasks = new List<QueueItemModel>();
+            DataTable dt = Config.database.ExecuteCMD(query, parameters);
             foreach (DataRow row in dt.Rows)
             {
                 tasks.Add(new QueueItemModel(row));

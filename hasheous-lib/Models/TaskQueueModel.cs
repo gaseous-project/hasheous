@@ -26,27 +26,30 @@ namespace hasheous_server.Models.Tasks
         /// <summary>
         /// Initializes a new instance of the <see cref="QueueItemModel"/> class with the specified task type, required capabilities, and optional parameters.
         /// </summary>
+        /// <param name="dataObjectId">The identifier of the associated data object.</param>
         /// <param name="taskType">The type of task to be performed.</param>
         /// <param name="requiredCapabilities">The list of required capabilities for this task.</param>
-        /// <param name="parameters">Optional parameters for the task, serialized as a string.</param>
-        public QueueItemModel(TaskType taskType, List<Capabilities> requiredCapabilities, string? parameters = null)
+        /// <param name="parameters">Optional parameters for the task.</param>
+        public QueueItemModel(long dataObjectId, TaskType taskType, List<Capabilities> requiredCapabilities, Dictionary<string, string>? parameters = null)
         {
             this._CreatedAt = DateTime.UtcNow;
+            this._DataObjectId = dataObjectId;
             this._TaskName = taskType;
             this.Status = QueueItemStatus.Pending;
             this.RequiredCapabilities = requiredCapabilities;
             this.Parameters = parameters;
 
             // Id will be set when saved to database
-            DataTable dt = Config.database.ExecuteCMD("INSERT INTO `Task_Queue` (`created_at`, `task_name`, `status`, `required_capabilities`, `parameters`) VALUES (@created_at, @task_name, @status, @required_capabilities, @parameters); SELECT LAST_INSERT_ID();", new Dictionary<string, object>
+            DataTable dt = Config.database.ExecuteCMD("INSERT INTO `Task_Queue` (`create_time`, `dataobjectid`, `task_name`, `status`, `required_capabilities`, `parameters`) VALUES (@created_at, @dataobjectid, @task_name, @status, @required_capabilities, @parameters); SELECT LAST_INSERT_ID();", new Dictionary<string, object>
             {
                 { "@created_at", this._CreatedAt },
-                { "@task_name", this._TaskName.ToString() },
-                { "@status", this.Status.ToString() },
+                { "@dataobjectid", this._DataObjectId },
+                { "@task_name", (int)this._TaskName },
+                { "@status", (int)this.Status },
                 { "@required_capabilities", System.Text.Json.JsonSerializer.Serialize(this.RequiredCapabilities) },
-                { "@parameters", this.Parameters }
+                { "@parameters", System.Text.Json.JsonSerializer.Serialize(this.Parameters) ?? "{}"}
             });
-            this._Id = (long)dt.Rows[0][0];
+            this._Id = Convert.ToInt64(dt.Rows[0][0]);
         }
 
         /// <summary>
@@ -60,6 +63,12 @@ namespace hasheous_server.Models.Tasks
         /// </summary>
         public DateTime CreatedAt { get; }
         private DateTime _CreatedAt { get; set; }
+
+        /// <summary>
+        /// Gets the identifier of the associated data object.
+        /// </summary>
+        public long DataObjectId { get; }
+        private long _DataObjectId { get; set; }
 
         /// <summary>
         /// Gets the type of task to be performed.
@@ -84,9 +93,9 @@ namespace hasheous_server.Models.Tasks
         private List<Capabilities> _RequiredCapabilities { get; set; } = new List<Capabilities>();
 
         /// <summary>
-        /// Gets or sets the parameters for the task, serialized as a string.
+        /// Gets or sets the parameters for the task.
         /// </summary>
-        public string? Parameters { get; set; }
+        public Dictionary<string, string>? Parameters { get; set; }
 
         /// <summary>
         /// Gets or sets the result of the task, if available.
@@ -132,10 +141,11 @@ namespace hasheous_server.Models.Tasks
 
             this._Id = (long)row.Field<long>("id");
             this._CreatedAt = row.Field<DateTime>("created_at");
+            this._DataObjectId = (long)row.Field<long>("dataobjectid");
             this._TaskName = (TaskType)Enum.Parse(typeof(TaskType), row.Field<string>("task_name"));
             this.Status = (QueueItemStatus)Enum.Parse(typeof(QueueItemStatus), row.Field<string>("status"));
             this.ClientId = row.IsNull("client_id") ? null : (long?)row.Field<long>("client_id");
-            this.Parameters = row.IsNull("parameters") ? null : row.Field<string>("parameters");
+            this.Parameters = row.IsNull("parameters") ? null : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(row.Field<string>("parameters") ?? "{}");
             this.Result = row.IsNull("result") ? null : row.Field<string>("result");
             this.ErrorMessage = row.IsNull("error_message") ? null : row.Field<string>("error_message");
             this.StartedAt = row.IsNull("started_at") ? null : (DateTime?)row.Field<DateTime>("started_at");
