@@ -1329,6 +1329,7 @@ namespace hasheous_server.Classes
             }
 
             // update metadata map
+            bool metadataChangeDetected = false;
             switch (objectType)
             {
                 case DataObjectType.Company:
@@ -1413,6 +1414,8 @@ namespace hasheous_server.Classes
                                 metadataFound = true;
                                 if (newMetadataId.ToString() != existingMetadataItem.Id)
                                 {
+                                    metadataChangeDetected = true;
+
                                     // change to manually set
                                     sql = "UPDATE DataObject_MetadataMap SET MatchMethod=@match, MetadataId=@metaid, WinningVoteCount=@winningvotecount, TotalVoteCount=@totalvotecount WHERE DataObjectId=@id AND SourceId=@source;";
                                     db.ExecuteNonQuery(sql, new Dictionary<string, object>{
@@ -1429,6 +1432,8 @@ namespace hasheous_server.Classes
 
                         if (metadataFound == false)
                         {
+                            metadataChangeDetected = true;
+
                             sql = "INSERT INTO DataObject_MetadataMap (DataObjectId, MetadataId, SourceId, MatchMethod, LastSearched, NextSearch) VALUES (@id, @metaid, @source, @match, @last, @next);";
                             db.ExecuteNonQuery(sql, new Dictionary<string, object>{
                                 { "id", id },
@@ -1444,6 +1449,28 @@ namespace hasheous_server.Classes
 
                 default:
                     break;
+            }
+
+            if (metadataChangeDetected == true)
+            {
+                // metadata map change detected - reset associated tagging task
+                var tasks = TaskManagement.GetAllTasks(id);
+                if (tasks != null && tasks.Count > 0)
+                {
+                    foreach (var task in tasks)
+                    {
+                        if (task.TaskName == Models.Tasks.TaskType.AIDescriptionAndTagging)
+                        {
+                            task.Status = Models.Tasks.QueueItemStatus.Pending;
+                            await task.Commit();
+                        }
+                    }
+                }
+                else
+                {
+                    // no tagging task exists - create one
+                    
+                }
             }
 
             // signatures
