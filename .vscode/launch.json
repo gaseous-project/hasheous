@@ -52,6 +52,13 @@
             "cwd": "${workspaceFolder}/service-host",
             "stopAtEntry": false
         },
+        {
+            "name": "Task Runner",
+            "type": "dotnet",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "projectPath": "${workspaceFolder}/hasheous-taskrunner/hasheous-taskrunner.csproj"
+        }
     ],
     "compounds": [
         {
@@ -61,5 +68,12 @@
                 "Service Orchestrator"
             ]
         },
+        {
+            "name": "Task Runner and Frontend",
+            "configurations": [
+                "Task Runner",
+                "Frontend"
+            ]
+        }
     ]
 }
