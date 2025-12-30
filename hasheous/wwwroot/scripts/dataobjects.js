@@ -272,7 +272,7 @@ class dataObjectAttributes {
                     if (isDataObject === true) {
                         for (let i = 0; i < data.objects.length; i++) {
                             arr.push({
-                                id: data.objects[i].id,
+                                id: "",
                                 text: data.objects[i].name,
                                 fullObject: data.objects[i]
                             });
@@ -281,7 +281,7 @@ class dataObjectAttributes {
                         {
                             for (let i = 0; i < data.length; i++) {
                                 arr.push({
-                                    id: data[i].id,
+                                    id: data[i].text,
                                     text: data[i].text
                                 });
                             }

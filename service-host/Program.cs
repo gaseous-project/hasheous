@@ -176,6 +176,7 @@ switch (taskType)
 // start the task
 try
 {
+    Config.database = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
     await Task.ExecuteAsync();
 }
 catch (Exception ex)

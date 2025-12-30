@@ -1,3 +1,6 @@
+using System.Data;
+using Classes;
+
 namespace hasheous_server.Classes.MetadataLib
 {
     /// <summary>
@@ -67,65 +70,63 @@ namespace hasheous_server.Classes.MetadataLib
 
                     foreach (string candidate in searchCandidates)
                     {
-                        TheGamesDB.SQL.QueryModel queryModel = new TheGamesDB.SQL.QueryModel
+                        DataTable games = await Config.database.ExecuteCMDAsync("SELECT `id`, `game_title` FROM `thegamesdb`.`games` WHERE `platform` = @platformId", new Dictionary<string, object>
                         {
-                            query = platformId.ToString(),
-                            queryField = TheGamesDB.SQL.QueryModel.QueryFieldName.platform_id,
-                            fieldList = "",
-                            includeList = "",
-                            page = 1,
-                            pageSize = 100
-                        };
-
-                        TheGamesDB.SQL.MetadataQuery query = new TheGamesDB.SQL.MetadataQuery();
-                        HasheousClient.Models.Metadata.TheGamesDb.GamesByGameID? games = query.GetMetadata<HasheousClient.Models.Metadata.TheGamesDb.GamesByGameID>(queryModel);
+                            { "@platformId", platformId }
+                        });
 
                         // no data returned
-                        if (games == null || games.data == null || games.data.games == null)
+                        if (games == null || games.Rows == null || games.Rows.Count == 0)
                         {
                             continue;
                         }
 
                         // search results
-                        if (games.data.games.Count == 1)
+                        if (games.Rows.Count == 1)
                         {
                             // exact match found
-                            var game = games.data.games.First();
+                            var game = games.Rows[0];
                             DataObjectSearchResults = new hasheous_server.Classes.DataObjects.MatchItem
                             {
                                 MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic,
-                                MetadataId = game.id.ToString()
+                                MetadataId = game["id"]?.ToString() ?? ""
                             };
                             break;
                         }
-                        else if (games.data.games.Count > 1)
+                        else if (games.Rows.Count > 1)
                         {
                             // multiple matches found - try and narrow it down a bit more
-                            foreach (var game in games.data.games)
+                            foreach (DataRow game in games.Rows)
                             {
                                 // check for exact name match
-                                if (string.Equals(game.game_title, candidate, StringComparison.OrdinalIgnoreCase))
+                                if (string.Equals(game["game_title"]?.ToString() ?? "", candidate, StringComparison.OrdinalIgnoreCase))
                                 {
                                     DataObjectSearchResults = new hasheous_server.Classes.DataObjects.MatchItem
                                     {
                                         MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic,
-                                        MetadataId = game.id.ToString()
+                                        MetadataId = game["id"]?.ToString() ?? ""
                                     };
                                     break;
                                 }
                                 else
                                 {
                                     // check alternate titles
-                                    if (game.alternates != null)
+                                    DataTable altDt = await Config.database.ExecuteCMDAsync("SELECT `games_id`, `name` FROM `thegamesdb`.`games_alts` WHERE `games_id` = @gameId", new Dictionary<string, object>
                                     {
-                                        foreach (var altTitle in game.alternates)
+                                        { "@gameId", game["id"]?.ToString() ?? "" }
+                                    });
+
+                                    if (altDt != null)
+                                    {
+                                        foreach (DataRow altRow in altDt.Rows)
                                         {
+                                            var altTitle = altRow["name"]?.ToString() ?? "";
                                             if (string.Equals(altTitle, candidate, StringComparison.OrdinalIgnoreCase))
                                             {
                                                 DataObjectSearchResults = new hasheous_server.Classes.DataObjects.MatchItem
                                                 {
                                                     MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic,
-                                                    MetadataId = game.id.ToString()
+                                                    MetadataId = game["id"]?.ToString() ?? ""
                                                 };
                                                 break;
                                             }

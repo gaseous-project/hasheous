@@ -188,6 +188,7 @@ function renderContent() {
     });
 
     let descriptionElement = document.getElementById('dataObjectDescription');
+    let aiDescriptionElement = document.getElementById('dataObjectAIDescription');
     let attributeValues = [];
 
     for (let i = 0; i < dataObject.attributes.length; i++) {
@@ -199,6 +200,16 @@ function renderContent() {
                 descBody.classList.add('descriptionspan');
                 descBody.innerHTML = dataObject.attributes[i].value;
                 descriptionElement.appendChild(descBody);
+
+                break;
+
+            case "AIDescription":
+                document.getElementById('dataObjectAIDescriptionSection').style.display = '';
+
+                let aiDescBody = document.createElement('span');
+                aiDescBody.classList.add('descriptionspan');
+                aiDescBody.innerHTML = dataObject.attributes[i].value;
+                aiDescriptionElement.appendChild(aiDescBody);
 
                 break;
 
@@ -290,13 +301,20 @@ function renderContent() {
                 for (const tagType of Object.values(tagTypes)) {
                     if (tags[tagType]) {
                         let tagOutput = '<table>';
-                        const tagColour = `style="background-color: #${intToRGB(hashCode(tagType.toLowerCase()))};"`;
+                        let tagColourValue = `#${intToRGB(hashCode(tagType.toLowerCase()))}`;
+                        let tagColour = `style="background-color: ${tagColourValue};"`;
 
                         for (const tag of tags[tagType].tags) {
+                            let aiImage = '';
+                            if (tag.aiGenerated) {
+                                aiImage = ' <img src="/images/ai.svg" class="banner_button_image aigeneratedicon" title="' + lang.getLang('aigeneratedtag') + '">';
+                                tagColour = ` style="background: linear-gradient(156deg,rgba(255, 0, 217, 1) 0px, rgba(255, 0, 208, 1) 10px, ${tagColourValue} 40px, ${tagColourValue} 100%);" `;
+                            }
+
                             if (tagOutput != '') {
                                 tagOutput += ' ';
                             }
-                            tagOutput += `<span class="badge badge-tag badge-tag-type-${tagType.toLowerCase()}" ${tagColour}>${tag.text}</span>`;
+                            tagOutput += `<span class="badge badge-tag badge-tag-type-${tagType.toLowerCase()}" ${tagColour}>${aiImage} ${tag.text}</span>`;
                         }
 
                         attributeValues.push(

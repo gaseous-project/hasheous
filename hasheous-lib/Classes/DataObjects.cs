@@ -445,29 +445,6 @@ namespace hasheous_server.Classes
             {
                 RedisConnection.PurgeCache("DataObject");
             }
-
-            // enqueue an AI tagging task
-            if (TaskManagement.GetAllTasks((long)DataObjectId).Find(x => x.TaskName == Models.Tasks.TaskType.AIDescriptionAndTagging) == null)
-            {
-                // queue a new task
-
-                Dictionary<string, string> taskParameters = new Dictionary<string, string>
-                {
-                    { "model", "gemma3" },
-                    { "prompt", "Generate a concise description and relevant tags for the following item based on its existing metadata and attributes." }
-                };
-                TaskManagement.EnqueueTask((long)DataObjectId, Models.Tasks.TaskType.AIDescriptionAndTagging, new List<Models.Tasks.Capabilities> { Models.Tasks.Capabilities.Internet, Models.Tasks.Capabilities.AI }, taskParameters);
-            }
-            else
-            {
-                // reset existing task to pending
-                List<Models.Tasks.QueueItemModel> existingTasks = TaskManagement.GetAllTasks((long)DataObjectId).FindAll(x => x.TaskName == Models.Tasks.TaskType.AIDescriptionAndTagging);
-                foreach (var task in existingTasks)
-                {
-                    task.Status = Models.Tasks.QueueItemStatus.Pending;
-                    _ = task.Commit();
-                }
-            }
         }
 
         private async Task<Models.DataObjectItem> BuildDataObject(DataObjectType ObjectType, long id, DataRow row, bool GetChildRelations = false, bool GetMetadata = true, bool GetSignatureData = true)
@@ -1022,7 +999,7 @@ namespace hasheous_server.Classes
             return await GetDataObject(objectType, (long)(ulong)data.Rows[0][0]);
         }
 
-        public async Task<Models.DataObjectItem> EditDataObject(DataObjectType objectType, long id, Models.DataObjectItemModel model)
+        public async Task<Models.DataObjectItem> EditDataObject(DataObjectType objectType, long id, Models.DataObjectItemModel model, bool allowSearch = true)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "UPDATE DataObject SET `Name`=@name, `UpdatedDate`=@updateddate WHERE ObjectType=@objecttype AND Id=@id";
@@ -1035,7 +1012,10 @@ namespace hasheous_server.Classes
 
             db.ExecuteNonQuery(sql, dbDict);
 
-            await DataObjectMetadataSearch(objectType, id);
+            if (allowSearch)
+            {
+                await DataObjectMetadataSearch(objectType, id);
+            }
 
             // purge redis cache of all keys for this object type
             if (Config.RedisConfiguration.Enabled)
@@ -1065,7 +1045,7 @@ namespace hasheous_server.Classes
             }
         }
 
-        public async Task<Models.DataObjectItem> EditDataObject(DataObjectType objectType, long id, Models.DataObjectItem model)
+        public async Task<Models.DataObjectItem> EditDataObject(DataObjectType objectType, long id, Models.DataObjectItem model, bool trustModelMetadataSearchType = false)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "UPDATE DataObject SET `Name`=@name, `UpdatedDate`=@updateddate WHERE ObjectType=@objecttype AND Id=@id";
@@ -1099,42 +1079,69 @@ namespace hasheous_server.Classes
                                 // new tags to add
                                 // scan all supplied tags and if they aren't in existing tags, add them
                                 Dictionary<DataObjectItemTags.TagType, List<string>> newTags = new Dictionary<DataObjectItemTags.TagType, List<string>>();
-                                var jObject = (JObject)newAttribute.Value;
-                                var newAttributeValue = jObject.ToObject<Dictionary<DataObjectItemTags.TagType, List<string>>>();
-                                // normalise tags in newAttributeValue to lowercase and trimmed
-                                foreach (KeyValuePair<DataObjectItemTags.TagType, List<string>> tagType in newAttributeValue)
+                                Dictionary<DataObjectItemTags.TagType, List<string>>? newAttributeValue = null;
+
+                                if (newAttribute.Value is JObject)
                                 {
-                                    for (int i = 0; i < tagType.Value.Count; i++)
+                                    var jObject = (JObject)newAttribute.Value;
+                                    newAttributeValue = jObject.ToObject<Dictionary<DataObjectItemTags.TagType, List<string>>>();
+                                }
+                                else if (newAttribute.Value is Dictionary<DataObjectItemTags.TagType, hasheous_server.Models.DataObjectItemTags>)
+                                {
+                                    var dict = (Dictionary<DataObjectItemTags.TagType, hasheous_server.Models.DataObjectItemTags>)newAttribute.Value;
+                                    newAttributeValue = new Dictionary<DataObjectItemTags.TagType, List<string>>();
+                                    foreach (KeyValuePair<DataObjectItemTags.TagType, hasheous_server.Models.DataObjectItemTags> kvp in dict)
                                     {
-                                        tagType.Value[i] = tagType.Value[i].Trim().ToLower();
+                                        List<string> tagList = new List<string>();
+                                        foreach (DataObjectItemTags.TagModel tagModel in kvp.Value.Tags)
+                                        {
+                                            tagList.Add(tagModel.Text);
+                                        }
+                                        newAttributeValue.Add(kvp.Key, tagList);
                                     }
                                 }
-
-                                // loop the keys in the supplied value dictionary<DataObjectItemTages.TagType, List<string>>
-                                foreach (KeyValuePair<DataObjectItemTags.TagType, List<string>> suppliedTagType in newAttributeValue)
+                                else
                                 {
-                                    foreach (string suppliedTag in suppliedTagType.Value)
+                                    newAttributeValue = (Dictionary<DataObjectItemTags.TagType, List<string>>)newAttribute.Value;
+                                }
+
+                                if (newAttributeValue != null && newAttributeValue.Count > 0)
+                                {
+                                    // normalise tags in newAttributeValue to lowercase and trimmed
+                                    foreach (KeyValuePair<DataObjectItemTags.TagType, List<string>> tagType in newAttributeValue)
                                     {
-                                        bool tagFound = false;
-                                        if (existingTags.ContainsKey(suppliedTagType.Key))
+                                        for (int i = 0; i < tagType.Value.Count; i++)
                                         {
-                                            foreach (DataObjectItemTags.TagModel tagModel in existingTags[suppliedTagType.Key].Tags)
+                                            tagType.Value[i] = tagType.Value[i].Trim().ToLower();
+                                        }
+                                    }
+
+                                    // loop the keys in the supplied value dictionary<DataObjectItemTages.TagType, List<string>>
+                                    foreach (KeyValuePair<DataObjectItemTags.TagType, List<string>> suppliedTagType in newAttributeValue)
+                                    {
+                                        foreach (string suppliedTag in suppliedTagType.Value)
+                                        {
+                                            bool tagFound = false;
+                                            if (existingTags.ContainsKey(suppliedTagType.Key))
                                             {
-                                                if (tagModel.Text == suppliedTag)
+                                                foreach (DataObjectItemTags.TagModel tagModel in existingTags[suppliedTagType.Key].Tags)
                                                 {
-                                                    tagFound = true;
+                                                    if (tagModel.Text == suppliedTag && tagModel.AIGenerated == false)
+                                                    {
+                                                        tagFound = true;
+                                                    }
                                                 }
                                             }
-                                        }
 
-                                        if (tagFound == false)
-                                        {
-                                            // add to new tags
-                                            if (!newTags.ContainsKey(suppliedTagType.Key))
+                                            if (tagFound == false)
                                             {
-                                                newTags.Add(suppliedTagType.Key, new List<string>());
+                                                // add to new tags
+                                                if (!newTags.ContainsKey(suppliedTagType.Key))
+                                                {
+                                                    newTags.Add(suppliedTagType.Key, new List<string>());
+                                                }
+                                                newTags[suppliedTagType.Key].Add(suppliedTag);
                                             }
-                                            newTags[suppliedTagType.Key].Add(suppliedTag);
                                         }
                                     }
                                 }
@@ -1172,7 +1179,7 @@ namespace hasheous_server.Classes
                                         {
                                             foreach (DataObjectItemTags.TagModel tagModel in existingTagMappings[suppliedTagType.Key].Tags)
                                             {
-                                                if (tagModel.Text == suppliedTag)
+                                                if (tagModel.Text == suppliedTag && tagModel.AIGenerated == false)
                                                 {
                                                     mappingFound = true;
                                                 }
@@ -1187,7 +1194,7 @@ namespace hasheous_server.Classes
                                             {
                                                 foreach (DataObjectItemTags.TagModel tagModel in existingTags[suppliedTagType.Key].Tags)
                                                 {
-                                                    if (tagModel.Text == suppliedTag)
+                                                    if (tagModel.Text == suppliedTag && tagModel.AIGenerated == false)
                                                     {
                                                         tagIdToMap = tagModel.Id;
                                                     }
@@ -1196,10 +1203,11 @@ namespace hasheous_server.Classes
 
                                             if (tagIdToMap != -1)
                                             {
-                                                sql = "INSERT INTO DataObject_Tags (DataObjectId, TagId) VALUES (@dataobjectid, @tagid);";
+                                                sql = "INSERT INTO DataObject_Tags (DataObjectId, TagId, AIAssigned) VALUES (@dataobjectid, @tagid, @aiassigned);";
                                                 await db.ExecuteCMDAsync(sql, new Dictionary<string, object>{
                                                     { "dataobjectid", id },
-                                                    { "tagid", tagIdToMap }
+                                                    { "tagid", tagIdToMap },
+                                                    { "aiassigned", false }
                                                 });
                                             }
                                         }
@@ -1215,7 +1223,7 @@ namespace hasheous_server.Classes
                                         {
                                             foreach (string suppliedTag in newAttributeValue[existingTagMapping.Key])
                                             {
-                                                if (existingTagModel.Text == suppliedTag)
+                                                if (existingTagModel.Text == suppliedTag && existingTagModel.AIGenerated == false)
                                                 {
                                                     mappingInSupplied = true;
                                                 }
@@ -1225,10 +1233,11 @@ namespace hasheous_server.Classes
                                         if (mappingInSupplied == false)
                                         {
                                             // delete mapping
-                                            sql = "DELETE FROM DataObject_Tags WHERE DataObjectId=@dataobjectid AND TagId=@tagid;";
+                                            sql = "DELETE FROM DataObject_Tags WHERE DataObjectId=@dataobjectid AND TagId=@tagid AND AIAssigned=@aiassigned;";
                                             await db.ExecuteCMDAsync(sql, new Dictionary<string, object>{
                                                 { "dataobjectid", id },
-                                                { "tagid", existingTagModel.Id }
+                                                { "tagid", existingTagModel.Id },
+                                                { "aiassigned", false }
                                             });
                                         }
                                     }
@@ -1251,6 +1260,7 @@ namespace hasheous_server.Classes
 
                                 string sqlField;
                                 bool isMatch = false;
+                                string matchValue = "";
                                 switch (existingAttribute.attributeType)
                                 {
                                     case AttributeItem.AttributeType.ObjectRelationship:
@@ -1263,14 +1273,25 @@ namespace hasheous_server.Classes
                                                 if (tempCompare.Id == newCompareLong)
                                                 {
                                                     isMatch = true;
+                                                    matchValue = newCompareLong.ToString();
                                                 }
                                             }
                                             else
                                             {
-                                                DataObjectItem newCompare = (DataObjectItem)newAttribute.Value;
+                                                DataObjectItem? newCompare = null;
+                                                if (newAttribute.Value is hasheous_server.Models.RelationItem)
+                                                {
+                                                    newCompare = await GetDataObject((newAttribute.Value as hasheous_server.Models.RelationItem).relationId);
+                                                }
+                                                else
+                                                {
+                                                    newCompare = (DataObjectItem)newAttribute.Value;
+                                                }
+
                                                 if (tempCompare.Name == newCompare.Name)
                                                 {
                                                     isMatch = true;
+                                                    matchValue = newCompare.Id.ToString();
                                                 }
                                             }
                                         }
@@ -1299,10 +1320,10 @@ namespace hasheous_server.Classes
                                         // update existing value
                                         sql = "UPDATE DataObject_Attributes SET " + sqlField + "=@value WHERE DataObjectId=@id AND AttributeId=@attrid;";
                                         db.ExecuteNonQuery(sql, new Dictionary<string, object>{
-                                    { "id", id },
-                                    { "attrid", existingAttribute.Id },
-                                    { "value", newAttribute.Value }
-                                });
+                                            { "id", id },
+                                            { "attrid", existingAttribute.Id },
+                                            { "value", newAttribute.Value }
+                                        });
                                     }
                                 }
                                 else
@@ -1407,6 +1428,12 @@ namespace hasheous_server.Classes
                         }
 
                         bool metadataFound = false;
+                        BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod? matchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin;
+                        if (trustModelMetadataSearchType == true)
+                        {
+                            matchMethod = newMetadataItem.MatchMethod;
+                        }
+
                         foreach (DataObjectItem.MetadataItem existingMetadataItem in EditedObject.Metadata)
                         {
                             if (newMetadataItem.Source == existingMetadataItem.Source)
@@ -1420,7 +1447,7 @@ namespace hasheous_server.Classes
                                     sql = "UPDATE DataObject_MetadataMap SET MatchMethod=@match, MetadataId=@metaid, WinningVoteCount=@winningvotecount, TotalVoteCount=@totalvotecount WHERE DataObjectId=@id AND SourceId=@source;";
                                     db.ExecuteNonQuery(sql, new Dictionary<string, object>{
                                         { "id", id },
-                                        { "match", BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin },
+                                        { "match", matchMethod ?? BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin },
                                         { "metaid", newMetadataId },
                                         { "source", existingMetadataItem.Source },
                                         { "winningvotecount", 0 },
@@ -1437,7 +1464,7 @@ namespace hasheous_server.Classes
                             sql = "INSERT INTO DataObject_MetadataMap (DataObjectId, MetadataId, SourceId, MatchMethod, LastSearched, NextSearch) VALUES (@id, @metaid, @source, @match, @last, @next);";
                             db.ExecuteNonQuery(sql, new Dictionary<string, object>{
                                 { "id", id },
-                                { "match", BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin },
+                                { "match", matchMethod ?? BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin },
                                 { "metaid", newMetadataId },
                                 { "source", newMetadataItem.Source },
                                 { "last", DateTime.UtcNow },
@@ -1461,15 +1488,14 @@ namespace hasheous_server.Classes
                     {
                         if (task.TaskName == Models.Tasks.TaskType.AIDescriptionAndTagging)
                         {
-                            task.Status = Models.Tasks.QueueItemStatus.Pending;
-                            await task.Commit();
+                            await task.Reset();
                         }
                     }
                 }
                 else
                 {
                     // no tagging task exists - create one
-                    
+                    TaskManagement.EnqueueTask((long)id, Models.Tasks.TaskType.AIDescriptionAndTagging);
                 }
             }
 
@@ -1547,6 +1573,8 @@ namespace hasheous_server.Classes
                 RedisConnection.PurgeCache("DataObject");
             }
 
+            UpdateDataObjectDate(id);
+
             return await GetDataObject(objectType, id);
         }
 
@@ -1555,7 +1583,7 @@ namespace hasheous_server.Classes
         /// </summary>
         public async Task DataObjectMetadataSearch(DataObjectType objectType, bool ForceSearch = false)
         {
-            await _DataObjectMetadataSearch(objectType, null, ForceSearch);
+            await _DataObjectMetadataSearch2(objectType, null, ForceSearch);
         }
 
         /// <summary>
@@ -1569,7 +1597,7 @@ namespace hasheous_server.Classes
                 case DataObjectType.Company:
                 case DataObjectType.Platform:
                 case DataObjectType.Game:
-                    await _DataObjectMetadataSearch(objectType, id, ForceSearch);
+                    await _DataObjectMetadataSearch2(objectType, id, ForceSearch);
                     break;
 
                 default:
@@ -2337,6 +2365,35 @@ namespace hasheous_server.Classes
             {
                 processedObjectCount++;
 
+                // if item is a game type, we need to first determine if a platform is mapped
+                DataObjectItem? itemPlatform = null;
+                if (item.ObjectType == DataObjectType.Game)
+                {
+                    if (item.Attributes != null && item.Attributes.Count > 0)
+                    {
+                        AttributeItem? platformAttribute = item.Attributes.Find(x => x.attributeName == AttributeItem.AttributeName.Platform && x.attributeType == AttributeItem.AttributeType.ObjectRelationship);
+                        if (platformAttribute != null)
+                        {
+                            // get the associated platform dataobject
+                            if (platformAttribute.Value.GetType() == typeof(DataObjectItem))
+                            {
+                                itemPlatform = (DataObjectItem)platformAttribute.Value;
+                            }
+                            else
+                            {
+                                RelationItem relationItem = (RelationItem)platformAttribute.Value;
+                                itemPlatform = await GetDataObject(DataObjectType.Platform, relationItem.relationId);
+                            }
+                        }
+                    }
+
+                    if (itemPlatform == null)
+                    {
+                        Logging.Log(Logging.LogType.Warning, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Skipping game " + item.Name + " as no platform is mapped.");
+                        continue;
+                    }
+                }
+
                 // generate a list of search candidates
                 List<string> SearchCandidates = GetSearchCandidates(item.Name);
 
@@ -2351,6 +2408,34 @@ namespace hasheous_server.Classes
                     if (!ProcessSources.Contains(metadataSource))
                     {
                         continue;
+                    }
+
+                    // setup search options
+                    Dictionary<string, object> searchOptions = new Dictionary<string, object>();
+
+                    // if item type is game, search platformItem for an metadata source that equals metadataSource - if not found, skip
+                    DataObjectItem.MetadataItem? platformMetadata = null;
+                    if (item.ObjectType == DataObjectType.Game && itemPlatform != null)
+                    {
+                        if (itemPlatform != null && itemPlatform.Metadata != null && itemPlatform.Metadata.Count > 0)
+                        {
+                            // check if platform has metadata for this source
+                            platformMetadata = itemPlatform.Metadata.Find(x => x.Source == metadataSource);
+                            if (!String.IsNullOrEmpty(platformMetadata?.ImmutableId))
+                            {
+                                searchOptions.Add("platformId", long.Parse(platformMetadata.ImmutableId ?? "0"));
+                            }
+                            else
+                            {
+                                platformMetadata = null;
+                            }
+                        }
+
+                        if (platformMetadata == null)
+                        {
+                            Logging.Log(Logging.LogType.Warning, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Skipping metadata source " + metadataSource + " for game " + item.Name + " as no platform metadata is mapped.");
+                            continue;
+                        }
                     }
 
                     // find the class that implements IMetadata for this source in the namespace hasheous_server.Classes.MetadataLib where the property MetadataSource = metadataSource
@@ -2417,7 +2502,7 @@ namespace hasheous_server.Classes
                             try
                             {
                                 // perform the search
-                                DataObjects.MatchItem searchResult = await metadataHandler.FindMatchItemAsync(item, SearchCandidates, null);
+                                DataObjects.MatchItem searchResult = await metadataHandler.FindMatchItemAsync(item, SearchCandidates, searchOptions);
 
                                 // update the metadata item with the search results
                                 metadata.Id = searchResult.MetadataId;
@@ -2495,7 +2580,23 @@ namespace hasheous_server.Classes
                     }
 
                     // save updated data object
-                    await EditDataObject(updatedDataObject.ObjectType, updatedDataObject.Id, updatedDataObject);
+                    await EditDataObject(updatedDataObject.ObjectType, updatedDataObject.Id, (DataObjectItem)updatedDataObject, true);
+                }
+
+                // ensure there are tasks for this item
+                var tasks = TaskManagement.GetAllTasks(item.Id);
+                bool aiTaskPresent = false;
+                foreach (var task in tasks)
+                {
+                    if (task.TaskName == Models.Tasks.TaskType.AIDescriptionAndTagging)
+                    {
+                        aiTaskPresent = true;
+                        break;
+                    }
+                }
+                if (aiTaskPresent == false)
+                {
+                    TaskManagement.EnqueueTask(item.Id, Models.Tasks.TaskType.AIDescriptionAndTagging);
                 }
             }
         }
@@ -2870,7 +2971,7 @@ namespace hasheous_server.Classes
             Dictionary<string, object> dbDict = new Dictionary<string, object>();
             if (DataObjectId != null)
             {
-                sql = "SELECT Tags.id, Tags.`type`, Tags.`name` FROM `Tags` INNER JOIN `DataObject_Tags` ON `Tags`.`id` = `DataObject_Tags`.`TagId` WHERE `DataObject_Tags`.`DataObjectId`=@id ORDER BY `Tags`.`name`;";
+                sql = "SELECT Tags.id, Tags.`type`, Tags.`name`, DataObject_Tags.`AIAssigned` FROM `Tags` INNER JOIN `DataObject_Tags` ON `Tags`.`id` = `DataObject_Tags`.`TagId` WHERE `DataObject_Tags`.`DataObjectId`=@id ORDER BY `Tags`.`name`;";
                 dbDict.Add("id", DataObjectId);
             }
             DataTable data = await db.ExecuteCMDAsync(sql, dbDict);
@@ -2892,7 +2993,8 @@ namespace hasheous_server.Classes
                 tags[tagType].Tags.Add(new DataObjectItemTags.TagModel()
                 {
                     Id = (long)row["id"],
-                    Text = (string)row["name"]
+                    Text = (string)row["name"],
+                    AIGenerated = row.Table.Columns.Contains("AIAssigned") && row["AIAssigned"] != DBNull.Value ? (bool)row["AIAssigned"] : false
                 });
             }
 

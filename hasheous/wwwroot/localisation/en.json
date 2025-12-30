@@ -303,5 +303,7 @@
     "tagtypes.gamefeature": "Features",
     "tagtypes.gametheme": "Themes",
     "tagtypes.gameperspective": "Perspectives",
-    "tagtypes.gameartstyle": "Art Styles"
+    "tagtypes.gameartstyle": "Art Styles",
+    "aigeneratedtag": "AI Generated Tag",
+    "aidescription": "AI Generated Description"
 }

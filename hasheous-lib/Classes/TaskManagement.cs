@@ -1,6 +1,8 @@
 using System.Data;
 using Classes;
+using hasheous_server.Models;
 using hasheous_server.Models.Tasks;
+using static hasheous_server.Classes.DataObjects;
 
 /// <summary>
 /// Manages task orchestration and client interactions.
@@ -317,6 +319,48 @@ namespace hasheous_server.Classes.Tasks.Clients
         }
 
         /// <summary>
+        /// Enqueues a new task using default capabilities for Internet and DiskSpace and optional task-specific parameters.
+        /// This overload will augment the provided parameters and capabilities based on the TaskType before delegating to the main EnqueueTask implementation.
+        /// </summary>
+        /// <param name="dataObjectId">The identifier of the associated data object.</param>
+        /// <param name="taskType">The type of the task to enqueue.</param>
+        /// <param name="parameters">Optional dictionary of task-specific parameters that may be modified or extended by the method.</param>
+        /// <returns>The enqueued <see cref="QueueItemModel"/> instance.</returns>
+        public static QueueItemModel? EnqueueTask(long dataObjectId, TaskType taskType, Dictionary<string, string>? parameters = null)
+        {
+            // default capabilities to Internet and DiskSpace
+            List<Capabilities> capabilities = new List<Capabilities>
+            {
+                Capabilities.Internet,
+                Capabilities.DiskSpace
+            };
+
+            if (parameters == null)
+            {
+                parameters = new Dictionary<string, string>();
+            }
+
+            switch (taskType)
+            {
+                case TaskType.AIDescriptionAndTagging:
+                    capabilities.Add(Capabilities.AI);
+                    Dictionary<string, string>? aiParams = BuildTaskParams(dataObjectId, taskType, parameters);
+                    if (aiParams != null)
+                    {
+                        if (String.IsNullOrEmpty(aiParams["prompt"]))
+                        {
+                            // nothing to do
+                            return null;
+                        }
+                        parameters = aiParams;
+                    }
+                    break;
+            }
+
+            return EnqueueTask(dataObjectId, taskType, capabilities, parameters);
+        }
+
+        /// <summary>
         /// Dequeues (removes or terminates) the specified task by its ID.
         /// </summary>
         /// <param name="taskId">The ID of the task to dequeue.</param>
@@ -423,6 +467,195 @@ namespace hasheous_server.Classes.Tasks.Clients
                 task.ErrorMessage = errorMessage;
             }
             _ = task.Commit();
+        }
+
+        public static Dictionary<string, string>? BuildTaskParams(long dataObjectId, TaskType taskType, Dictionary<string, string>? parameters = null)
+        {
+            if (parameters == null)
+            {
+                parameters = new Dictionary<string, string>();
+            }
+
+            switch (taskType)
+            {
+                case TaskType.AIDescriptionAndTagging:
+                    parameters.Add("model", "gemma3");
+                    string prompt = "";
+
+                    // get the data object for use in prompt generation
+                    var dataObjects = new DataObjects();
+                    var dataObject = dataObjects.GetDataObject(dataObjectId).Result;
+                    if (dataObject == null)
+                    {
+                        throw new Exception("Data object not found.");
+                    }
+
+                    switch (dataObject.ObjectType)
+                    {
+                        case DataObjectType.Game:
+                            prompt = "Generate a detailed description and relevant tags for the game <DATA_OBJECT_NAME> for <DATA_OBJECT_PLATFORM>.\n\nThe description should be engaging and informative, highlighting key features and gameplay elements. Keep the description concise, ideally between 150 to 200 words.\n\nFor tags, compile a list of relevant keywords that accurately represent the game in the following categories: Genre, Gameplay, Features, Theme, Perspective, and Art Style. Ensure the tags are specific and commonly used within the gaming community, but avoid overly broad or generic terms.\n\nThe description and tags should be built from the following:\n\n<METADATA_SOURCE_DESCRIPTIONS>\n\nFormat the output as a JSON object with two properties: 'description' containing the generated description, and 'tags' containing an object with the specified categories as keys and arrays of corresponding tags as values.\n\nMake sure the JSON is properly structured and valid. Example output: {\"description\": \"<Generated Description>\", \"tags\": {\"Genre\": [\"Action\", \"Adventure\"], \"Gameplay\": [\"Open World\", \"Multiplayer\"], \"Features\": [\"Crafting\", \"Character Customization\"], \"Theme\": [\"Sci-Fi\", \"Fantasy\"], \"Perspective\": [\"First-Person\", \"Third-Person\"], \"Art Style\": [\"Realistic\", \"Pixel Art\"]}}.\n\nDo not include any additional text outside of the JSON object.";
+
+                            // populate the prompt
+                            prompt = prompt.Replace("<DATA_OBJECT_NAME>", dataObject.Name);
+                            // get platform from metadata
+                            DataObjectItem? itemPlatform = null;
+                            if (dataObject.Attributes != null && dataObject.Attributes.Count > 0)
+                            {
+                                AttributeItem? platformAttribute = dataObject.Attributes.Find(x => x.attributeName == AttributeItem.AttributeName.Platform && x.attributeType == AttributeItem.AttributeType.ObjectRelationship);
+                                if (platformAttribute != null)
+                                {
+                                    // get the associated platform dataobject
+                                    if (platformAttribute.Value.GetType() == typeof(DataObjectItem))
+                                    {
+                                        itemPlatform = (DataObjectItem)platformAttribute.Value;
+                                    }
+                                    else
+                                    {
+                                        RelationItem relationItem = (RelationItem)platformAttribute.Value;
+                                        itemPlatform = dataObjects.GetDataObject(DataObjectType.Platform, relationItem.relationId).Result;
+                                    }
+                                }
+                            }
+                            if (itemPlatform != null)
+                            {
+                                prompt = prompt.Replace("<DATA_OBJECT_PLATFORM>", itemPlatform.Name);
+                            }
+                            else
+                            {
+                                prompt = prompt.Replace("<DATA_OBJECT_PLATFORM>", "Unknown Platform");
+                            }
+                            // get metadata source descriptions
+                            string metadataGameSourceDescriptions = "";
+                            if (dataObject.Metadata != null && dataObject.Metadata.Count > 0)
+                            {
+                                string? sql = "";
+                                DataTable? dt = null;
+                                foreach (var metadataItem in dataObject.Metadata)
+                                {
+                                    switch (metadataItem.Source)
+                                    {
+                                        case Metadata.Communications.MetadataSources.IGDB:
+                                            sql = "SELECT `summary` FROM `igdb`.`games` WHERE `id` = @id LIMIT 1;";
+                                            dt = Config.database.ExecuteCMD(sql, new Dictionary<string, object>
+                                            {
+                                                { "@id", metadataItem.ImmutableId}
+                                            });
+                                            if (dt.Rows.Count > 0)
+                                            {
+                                                if (dt.Rows[0]["summary"] != DBNull.Value && dt.Rows[0]["summary"].ToString() != "")
+                                                {
+                                                    metadataGameSourceDescriptions += $"- IGDB: {dt.Rows[0]["summary"].ToString()}\n\n";
+                                                }
+                                            }
+                                            break;
+                                        case Metadata.Communications.MetadataSources.TheGamesDb:
+                                            sql = "SELECT `overview` FROM `thegamesdb`.`games` WHERE `id` = @id LIMIT 1;";
+                                            dt = Config.database.ExecuteCMD(sql, new Dictionary<string, object>
+                                            {
+                                                { "@id", metadataItem.ImmutableId}
+                                            });
+                                            if (dt.Rows.Count > 0)
+                                            {
+                                                if (dt.Rows[0]["overview"] != DBNull.Value && dt.Rows[0]["overview"].ToString() != "")
+                                                {
+                                                    metadataGameSourceDescriptions += $"- TheGamesDb: {dt.Rows[0]["overview"].ToString()}\n\n";
+                                                }
+                                            }
+                                            break;
+                                        case Metadata.Communications.MetadataSources.GiantBomb:
+                                            sql = "SELECT `description` FROM `giantbomb`.`Game` WHERE `id` = @id LIMIT 1;";
+                                            dt = Config.database.ExecuteCMD(sql, new Dictionary<string, object>
+                                            {
+                                                { "@id", metadataItem.ImmutableId}
+                                            });
+                                            if (dt.Rows.Count > 0)
+                                            {
+                                                if (dt.Rows[0]["description"] != DBNull.Value && dt.Rows[0]["description"].ToString() != "")
+                                                {
+                                                    metadataGameSourceDescriptions += $"- GiantBomb: {dt.Rows[0]["description"].ToString()}\n\n";
+                                                }
+                                            }
+                                            break;
+                                    }
+                                }
+                            }
+                            prompt = prompt.Replace("<METADATA_SOURCE_DESCRIPTIONS>", metadataGameSourceDescriptions);
+                            break;
+
+                        case DataObjectType.Platform:
+                            prompt = "Generate a detailed description for the gaming platform <DATA_OBJECT_NAME>.\n\nThe description should be engaging and informative, highlighting key features and historical significance. Keep the description concise, ideally between 100 to 150 words.\n\nFor tags, compile a list of relevant keywords that accurately represent the game in the following categories: Type, Era, Hardware Generation, Hardware Specs, Connectivity, Input Methods.\n\nEnsure the tags are specific and commonly used within the gaming community, but avoid overly broad or generic terms.\n\nThe description and tags should be built from the following:\n\n<METADATA_SOURCE_DESCRIPTIONS>\n\nFormat the output as a JSON object with two properties: 'description' containing the generated description, and 'tags' containing an object with the specified categories as keys and arrays of corresponding tags as values.\n\nMake sure the JSON is properly structured and valid. Example output: {\"description\": \"<Generated Description>\", \"tags\": {\"Type\": [\"Console\", \"Handheld\"], \"Era\": [\"Retro\", \"Modern\"], \"Hardware Generation\": [\"8th Gen\", \"9th Gen\"], \"Hardware Specs\": [\"4K Support\", \"VR Ready\"], \"Connectivity\": [\"Wi-Fi\", \"Bluetooth\"], \"Input Methods\": [\"Controller\", \"Touchscreen\"]}}.\n\nDo not include any additional text outside of the JSON object.";
+
+                            // populate the prompt
+                            prompt = prompt.Replace("<DATA_OBJECT_NAME>", dataObject.Name);
+                            // get metadata source descriptions
+                            string metadataSourcePlatformDescriptions = "";
+                            if (dataObject.Metadata != null && dataObject.Metadata.Count > 0)
+                            {
+                                string? sql = "";
+                                DataTable? dt = null;
+                                foreach (var metadataItem in dataObject.Metadata)
+                                {
+                                    switch (metadataItem.Source)
+                                    {
+                                        case Metadata.Communications.MetadataSources.IGDB:
+                                            sql = "SELECT `summary` FROM `igdb`.`platforms` WHERE `id` = @id LIMIT 1;";
+                                            dt = Config.database.ExecuteCMD(sql, new Dictionary<string, object>
+                                            {
+                                                { "@id", metadataItem.ImmutableId}
+                                            });
+                                            if (dt.Rows.Count > 0)
+                                            {
+                                                if (dt.Rows[0]["summary"] != DBNull.Value && dt.Rows[0]["summary"].ToString() != "")
+                                                {
+                                                    {
+                                                        metadataSourcePlatformDescriptions += $"- IGDB: {dt.Rows[0]["summary"].ToString()}\n\n";
+                                                    }
+                                                }
+                                            }
+                                            break;
+                                        case Metadata.Communications.MetadataSources.TheGamesDb:
+                                            sql = "SELECT `overview` FROM `thegamesdb`.`games` WHERE `id` = @id LIMIT 1;";
+                                            dt = Config.database.ExecuteCMD(sql, new Dictionary<string, object>
+                                            {
+                                                { "@id", metadataItem.ImmutableId}
+                                            });
+                                            if (dt.Rows.Count > 0)
+                                            {
+                                                if (dt.Rows[0]["overview"] != DBNull.Value && dt.Rows[0]["overview"].ToString() != "")
+                                                {
+                                                    metadataSourcePlatformDescriptions += $"- TheGamesDb: {dt.Rows[0]["overview"].ToString()}\n\n";
+                                                }
+                                            }
+                                            break;
+                                        case Metadata.Communications.MetadataSources.GiantBomb:
+                                            sql = "SELECT `description` FROM `giantbomb`.`Game` WHERE `id` = @id LIMIT 1;";
+                                            dt = Config.database.ExecuteCMD(sql, new Dictionary<string, object>
+                                            {
+                                                { "@id", metadataItem.ImmutableId}
+                                            });
+                                            if (dt.Rows.Count > 0)
+                                            {
+                                                if (dt.Rows[0]["description"] != DBNull.Value && dt.Rows[0]["description"].ToString() != "")
+                                                {
+                                                    metadataSourcePlatformDescriptions += $"- GiantBomb: {dt.Rows[0]["description"].ToString()}\n\n";
+                                                }
+                                            }
+                                            break;
+                                    }
+                                }
+                            }
+                            prompt = prompt.Replace("<METADATA_SOURCE_DESCRIPTIONS>", metadataSourcePlatformDescriptions);
+                            break;
+
+                        default:
+                            prompt = "";
+                            break;
+                    }
+                    parameters.Add("prompt", prompt);
+                    break;
+            }
+
+            return parameters;
         }
     }
 }

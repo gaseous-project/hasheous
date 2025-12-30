@@ -1,5 +1,7 @@
 using System.Data;
+using System.Threading.Tasks;
 using Classes;
+using hasheous_server.Classes.Tasks.Clients;
 
 namespace hasheous_server.Models.Tasks
 {
@@ -49,6 +51,14 @@ namespace hasheous_server.Models.Tasks
                 { "@required_capabilities", System.Text.Json.JsonSerializer.Serialize(this.RequiredCapabilities) },
                 { "@parameters", System.Text.Json.JsonSerializer.Serialize(this.Parameters) ?? "{}"}
             });
+            foreach (Capabilities capability in requiredCapabilities)
+            {
+                Config.database.ExecuteCMD("INSERT INTO `Task_Queue_Capabilities` (`task_queue_id`, `capability_id`) VALUES (@task_queue_id, @capability_id);", new Dictionary<string, object>
+                {
+                    { "@task_queue_id", dt.Rows[0][0] },
+                    { "@capability_id", (int)capability }
+                });
+            }
             this._Id = Convert.ToInt64(dt.Rows[0][0]);
         }
 
@@ -118,6 +128,34 @@ namespace hasheous_server.Models.Tasks
         public DateTime? CompletedAt { get; set; }
 
         /// <summary>
+        /// Resets transient runtime fields on the queue item so it can be re-queued or retried.
+        /// </summary>
+        public async Task Reset()
+        {
+            this.Status = QueueItemStatus.Pending;
+            this.ClientId = null;
+            this.Result = null;
+            this.ErrorMessage = null;
+            this.StartedAt = null;
+            this.CompletedAt = null;
+
+            this.Parameters = TaskManagement.BuildTaskParams(this.DataObjectId, this.TaskName);
+
+            switch (this.TaskName)
+            {
+                case TaskType.AIDescriptionAndTagging:
+                    if (string.IsNullOrEmpty(this.Parameters?["prompt"]))
+                    {
+                        // nothing to do - terminate the task
+                        await this.Terminate();
+                    }
+                    break;
+            }
+
+            await this.Commit();
+        }
+
+        /// <summary>
         /// Refreshes the properties of the queue item from the provided <see cref="DataRow"/>, or reloads from the database if no row is provided.
         /// </summary>
         /// <param name="row">The <see cref="DataRow"/> containing updated values, or null to reload from the database.</param>
@@ -140,16 +178,28 @@ namespace hasheous_server.Models.Tasks
             }
 
             this._Id = (long)row.Field<long>("id");
-            this._CreatedAt = row.Field<DateTime>("created_at");
+            this._CreatedAt = row.Field<DateTime>("create_time");
             this._DataObjectId = (long)row.Field<long>("dataobjectid");
-            this._TaskName = (TaskType)Enum.Parse(typeof(TaskType), row.Field<string>("task_name"));
-            this.Status = (QueueItemStatus)Enum.Parse(typeof(QueueItemStatus), row.Field<string>("status"));
+            this._TaskName = (TaskType)row.Field<int>("task_name");
+            this.Status = (QueueItemStatus)row.Field<int>("status");
             this.ClientId = row.IsNull("client_id") ? null : (long?)row.Field<long>("client_id");
             this.Parameters = row.IsNull("parameters") ? null : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(row.Field<string>("parameters") ?? "{}");
             this.Result = row.IsNull("result") ? null : row.Field<string>("result");
             this.ErrorMessage = row.IsNull("error_message") ? null : row.Field<string>("error_message");
-            this.StartedAt = row.IsNull("started_at") ? null : (DateTime?)row.Field<DateTime>("started_at");
-            this.CompletedAt = row.IsNull("completed_at") ? null : (DateTime?)row.Field<DateTime>("completed_at");
+            this.StartedAt = row.IsNull("start_time") ? null : (DateTime?)row.Field<DateTime>("start_time");
+            this.CompletedAt = row.IsNull("completion_time") ? null : (DateTime?)row.Field<DateTime>("completion_time");
+
+            // Load required capabilities from the database
+            DataTable capabilitiesDt = Config.database.ExecuteCMD("SELECT `capability_id` FROM `Task_Queue_Capabilities` WHERE `task_queue_id` = @task_queue_id", new Dictionary<string, object>
+            {
+                { "@task_queue_id", this.Id }
+            });
+
+            this._RequiredCapabilities = new List<Capabilities>();
+            foreach (DataRow capabilityRow in capabilitiesDt.Rows)
+            {
+                this.RequiredCapabilities.Add((Capabilities)(int)capabilityRow["capability_id"]);
+            }
 
             return this;
         }
@@ -171,7 +221,7 @@ namespace hasheous_server.Models.Tasks
         /// </summary>
         public async Task Commit()
         {
-            await Config.database.ExecuteCMDAsync("UPDATE `Task_Queue` SET `status` = @status, `client_id` = @client_id, `result` = @result, `error_message` = @error_message, `started_at` = @started_at, `completed_at` = @completed_at WHERE `id` = @id", new Dictionary<string, object>
+            await Config.database.ExecuteCMDAsync("UPDATE `Task_Queue` SET `status` = @status, `client_id` = @client_id, `result` = @result, `error_message` = @error_message, `start_time` = @started_at, `completion_time` = @completed_at WHERE `id` = @id", new Dictionary<string, object>
             {
                 { "@id", this.Id },
                 { "@status", this.Status },

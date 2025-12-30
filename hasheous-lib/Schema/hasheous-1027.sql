@@ -34,3 +34,21 @@ CREATE TABLE `Task_Queue` (
     CONSTRAINT `fk_task_queue_client_id` FOREIGN KEY (`client_id`) REFERENCES `Task_Clients` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_task_queue_dataobjectid` FOREIGN KEY (`dataobjectid`) REFERENCES `DataObject` (`Id`) ON DELETE CASCADE
 );
+
+CREATE TABLE `Task_Queue_Capabilities` (
+    `task_queue_id` BIGINT NOT NULL,
+    `capability_id` INT NOT NULL,
+    PRIMARY KEY (
+        `task_queue_id`,
+        `capability_id`
+    ),
+    CONSTRAINT `fk_tqc_task_queue_id` FOREIGN KEY (`task_queue_id`) REFERENCES `Task_Queue` (`id`) ON DELETE CASCADE
+);
+
+ALTER TABLE `hasheous`.`DataObject_Tags`
+DROP PRIMARY KEY,
+ADD PRIMARY KEY (
+    `DataObjectId`,
+    `TagId`,
+    `AIAssigned`
+);
