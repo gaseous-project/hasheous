@@ -2594,6 +2594,17 @@ namespace hasheous_server.Classes
                         break;
                     }
                 }
+                // get metadata cover if new object is a game
+                if (objectType == DataObjectType.Game)
+                {
+                    BackgroundMetadataMatcher.BackgroundMetadataMatcher metadataMatcher = new BackgroundMetadataMatcher.BackgroundMetadataMatcher();
+                    await metadataMatcher.GetGameArtwork((long)item.Id, ForceSearch);
+                }
+
+                // update date
+                UpdateDataObjectDate((long)item.Id);
+
+                // enqueue AI description and tagging task if not already present
                 if (aiTaskPresent == false)
                 {
                     TaskManagement.EnqueueTask(item.Id, Models.Tasks.TaskType.AIDescriptionAndTagging);

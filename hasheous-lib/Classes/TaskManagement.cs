@@ -673,7 +673,7 @@ namespace hasheous_server.Classes.Tasks.Clients
                                             }
                                             break;
                                         case Metadata.Communications.MetadataSources.TheGamesDb:
-                                            sql = "SELECT `overview` FROM `thegamesdb`.`games` WHERE `id` = @id LIMIT 1;";
+                                            sql = "SELECT `overview` FROM `thegamesdb`.`platforms` WHERE `id` = @id LIMIT 1;";
                                             dt = Config.database.ExecuteCMD(sql, new Dictionary<string, object>
                                             {
                                                 { "@id", metadataItem.ImmutableId}
@@ -687,7 +687,7 @@ namespace hasheous_server.Classes.Tasks.Clients
                                             }
                                             break;
                                         case Metadata.Communications.MetadataSources.GiantBomb:
-                                            sql = "SELECT `description` FROM `giantbomb`.`Game` WHERE `id` = @id LIMIT 1;";
+                                            sql = "SELECT `description` FROM `giantbomb`.`Platform` WHERE `id` = @id LIMIT 1;";
                                             dt = Config.database.ExecuteCMD(sql, new Dictionary<string, object>
                                             {
                                                 { "@id", metadataItem.ImmutableId}
