@@ -168,6 +168,10 @@ switch (taskType)
         Task = new Dumps();
         break;
 
+    case QueueItemType.TaskResultParser:
+        Task = new TaskResultParser();
+        break;
+
     default:
         Console.WriteLine($"Error: Unsupported service type '{serviceName}'.");
         return;

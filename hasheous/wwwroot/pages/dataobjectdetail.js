@@ -208,7 +208,7 @@ function renderContent() {
 
                 let aiDescBody = document.createElement('span');
                 aiDescBody.classList.add('descriptionspan');
-                aiDescBody.innerHTML = dataObject.attributes[i].value;
+                aiDescBody.innerHTML = "<p>" + dataObject.attributes[i].value.replace("\\n\\n", "</p><p>") + "</p>";
                 aiDescriptionElement.appendChild(aiDescBody);
 
                 break;

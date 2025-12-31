@@ -45,7 +45,7 @@
             "program": "${workspaceFolder}/service-host/bin/Debug/net8.0/service-host.dll",
             "args": [
                 "--service",
-                "MetadataMatchSearch",
+                "TaskResultParser",
                 "--reportingserver",
                 "https://localhost:5001"
             ],
