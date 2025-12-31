@@ -223,18 +223,58 @@ namespace hasheous_server.Classes.Tasks.Clients
         }
 
         /// <summary>
-        /// Retrieves the next available task for the specified client.
+        /// Retrieves the next available task for the specified client, or the currently assigned one if it exists.
         /// </summary>
         /// <param name="clientAPIKey">The API key of the client.</param>
         /// <param name="publicId">The public client ID.</param>
-        public async static Task ClientGetTask(string clientAPIKey, string publicId)
+        public async static Task<QueueItemModel?> ClientGetTask(string clientAPIKey, string publicId)
         {
             ClientModel? client = await GetClientByAPIKeyAndPublicId(clientAPIKey, publicId);
             if (client == null)
             {
                 throw new Exception("Invalid client API key or public ID.");
             }
-            throw new NotImplementedException();
+
+            // find the next task suitable for this client - the task must match the client's capabilities
+            string sql = @"SELECT tq.id AS id, tq.create_time AS create_time, tq.dataobjectid AS dataobjectid, tq.task_name AS task_name, tq.status AS status, tq.client_id AS client_id, tq.parameters AS parameters, tq.result AS result, tq.error_message AS error_message, tq.start_time AS start_time, tq.completion_time AS completion_time
+                FROM Task_Queue tq
+                LEFT JOIN Task_Queue_Capabilities tqc ON tq.id = tqc.task_queue_id
+                WHERE tq.status = 0
+                AND (tq.client_id IS NULL OR tq.client_id = @client_id)
+                AND NOT EXISTS (
+                    SELECT 1 
+                    FROM Task_Queue_Capabilities tqc_required
+                    WHERE tqc_required.task_queue_id = tq.id
+                    AND tqc_required.capability_id NOT IN (" + string.Join(", ", client.Capabilities.Select(c => ((int)c).ToString())) + @")
+                )
+                GROUP BY tq.id
+                ORDER BY tq.create_time ASC
+                LIMIT 1;";
+            DataTable dt = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>
+            {
+                { "@client_id", client.Id }
+            });
+            if (dt.Rows.Count == 0)
+            {
+                // no task available
+                return null;
+            }
+
+            QueueItemModel task = new QueueItemModel(dt.Rows[0]);
+
+            // assign the task to this client if not already assigned
+            if (task.ClientId == null || task.ClientId != client.Id)
+            {
+                task.ClientId = client.Id;
+                task.Status = QueueItemStatus.Assigned;
+                task.StartedAt = null;
+                task.CompletedAt = null;
+                task.Result = "";
+                task.ErrorMessage = "";
+                await task.Commit();
+            }
+
+            return task;
         }
 
         /// <summary>
@@ -243,16 +283,42 @@ namespace hasheous_server.Classes.Tasks.Clients
         /// <param name="clientAPIKey">The API key of the client.</param>
         /// <param name="publicId">The public client ID.</param>
         /// <param name="taskId">The ID of the task being reported.</param>
+        /// <param name="status">The status of the task.</param>
         /// <param name="result">The result or status of the task.</param>
         /// <param name="errorMessage">An optional error message if the task failed.</param>
-        public async static Task ClientSubmitTaskStatusOrResult(string clientAPIKey, string publicId, string taskId, string result, string? errorMessage = null)
+        public async static Task ClientSubmitTaskStatusOrResult(string clientAPIKey, string publicId, string taskId, QueueItemStatus status, string result, string? errorMessage = null)
         {
             ClientModel? client = await GetClientByAPIKeyAndPublicId(clientAPIKey, publicId);
             if (client == null)
             {
                 throw new Exception("Invalid client API key or public ID.");
             }
-            throw new NotImplementedException();
+
+            QueueItemModel? task = TaskManagement.GetTask(long.Parse(taskId));
+            if (task == null)
+            {
+                throw new Exception("Task not found.");
+            }
+            if (task.ClientId != client.Id)
+            {
+                throw new Exception("Task is not assigned to this client.");
+            }
+            task.Status = status;
+            if (task.Status == QueueItemStatus.InProgress && task.StartedAt == null)
+            {
+                task.StartedAt = DateTime.UtcNow;
+                task.CompletedAt = null;
+            }
+            task.Result = result;
+            if (errorMessage != null)
+            {
+                task.ErrorMessage = errorMessage;
+            }
+            else
+            {
+                task.ErrorMessage = "";
+            }
+            await task.Commit();
         }
 
         /// <summary>
@@ -354,6 +420,11 @@ namespace hasheous_server.Classes.Tasks.Clients
                         }
                         parameters = aiParams;
                     }
+                    else
+                    {
+                        // nothing to do
+                        return null;
+                    }
                     break;
             }
 
@@ -427,22 +498,6 @@ namespace hasheous_server.Classes.Tasks.Clients
         }
 
         /// <summary>
-        /// Assigns a task to a specific client by their IDs.
-        /// </summary>
-        /// <param name="taskId">The ID of the task to assign.</param>
-        /// <param name="clientId">The ID of the client to assign the task to.</param>
-        public static void AssignTaskToClient(long taskId, long clientId)
-        {
-            var task = GetTask(taskId);
-            if (task == null)
-            {
-                throw new Exception("Task not found.");
-            }
-            task.ClientId = clientId;
-            _ = task.Commit();
-        }
-
-        /// <summary>
         /// Updates the status, result, and error message of a specified task.
         /// </summary>
         /// <param name="taskId">The ID of the task to update.</param>
@@ -493,7 +548,7 @@ namespace hasheous_server.Classes.Tasks.Clients
                     switch (dataObject.ObjectType)
                     {
                         case DataObjectType.Game:
-                            prompt = "Generate a detailed description and relevant tags for the game <DATA_OBJECT_NAME> for <DATA_OBJECT_PLATFORM>.\n\nThe description should be engaging and informative, highlighting key features and gameplay elements. Keep the description concise, ideally between 150 to 200 words.\n\nFor tags, compile a list of relevant keywords that accurately represent the game in the following categories: Genre, Gameplay, Features, Theme, Perspective, and Art Style. Ensure the tags are specific and commonly used within the gaming community, but avoid overly broad or generic terms.\n\nThe description and tags should be built from the following:\n\n<METADATA_SOURCE_DESCRIPTIONS>\n\nFormat the output as a JSON object with two properties: 'description' containing the generated description, and 'tags' containing an object with the specified categories as keys and arrays of corresponding tags as values.\n\nMake sure the JSON is properly structured and valid. Example output: {\"description\": \"<Generated Description>\", \"tags\": {\"Genre\": [\"Action\", \"Adventure\"], \"Gameplay\": [\"Open World\", \"Multiplayer\"], \"Features\": [\"Crafting\", \"Character Customization\"], \"Theme\": [\"Sci-Fi\", \"Fantasy\"], \"Perspective\": [\"First-Person\", \"Third-Person\"], \"Art Style\": [\"Realistic\", \"Pixel Art\"]}}.\n\nDo not include any additional text outside of the JSON object.";
+                            prompt = "Generate a detailed description and relevant tags for the game <DATA_OBJECT_NAME> for <DATA_OBJECT_PLATFORM>.\n\nThe description should be engaging and informative, highlighting key features and gameplay elements. Keep the description concise, ideally between 150 to 200 words.\n\nFor tags, compile a list of relevant keywords that accurately represent the game in the following categories: Genre, Gameplay, Features, Theme, Perspective, and Art Style. Ensure the tags are specific and commonly used within the gaming community, but avoid overly broad or generic terms.\n\nThe description and tags should be built from the following:\n\n<METADATA_SOURCE_DESCRIPTIONS>\n\nFormat the output as a raw JSON object with two properties: 'description' containing the generated description, and 'tags' containing an object with the specified categories as keys and arrays of corresponding tags as values.\n\nMake sure the JSON is properly structured and valid. Example output: {\"description\": \"<Generated Description>\", \"tags\": {\"Genre\": [\"Action\", \"Adventure\"], \"Gameplay\": [\"Open World\", \"Multiplayer\"], \"Features\": [\"Crafting\", \"Character Customization\"], \"Theme\": [\"Sci-Fi\", \"Fantasy\"], \"Perspective\": [\"First-Person\", \"Third-Person\"], \"Art Style\": [\"Realistic\", \"Pixel Art\"]}}.\n\nDo not include any additional text outside of the JSON object. Do not include any markdown formatting.";
 
                             // populate the prompt
                             prompt = prompt.Replace("<DATA_OBJECT_NAME>", dataObject.Name);
@@ -583,7 +638,7 @@ namespace hasheous_server.Classes.Tasks.Clients
                             break;
 
                         case DataObjectType.Platform:
-                            prompt = "Generate a detailed description for the gaming platform <DATA_OBJECT_NAME>.\n\nThe description should be engaging and informative, highlighting key features and historical significance. Keep the description concise, ideally between 100 to 150 words.\n\nFor tags, compile a list of relevant keywords that accurately represent the game in the following categories: Type, Era, Hardware Generation, Hardware Specs, Connectivity, Input Methods.\n\nEnsure the tags are specific and commonly used within the gaming community, but avoid overly broad or generic terms.\n\nThe description and tags should be built from the following:\n\n<METADATA_SOURCE_DESCRIPTIONS>\n\nFormat the output as a JSON object with two properties: 'description' containing the generated description, and 'tags' containing an object with the specified categories as keys and arrays of corresponding tags as values.\n\nMake sure the JSON is properly structured and valid. Example output: {\"description\": \"<Generated Description>\", \"tags\": {\"Type\": [\"Console\", \"Handheld\"], \"Era\": [\"Retro\", \"Modern\"], \"Hardware Generation\": [\"8th Gen\", \"9th Gen\"], \"Hardware Specs\": [\"4K Support\", \"VR Ready\"], \"Connectivity\": [\"Wi-Fi\", \"Bluetooth\"], \"Input Methods\": [\"Controller\", \"Touchscreen\"]}}.\n\nDo not include any additional text outside of the JSON object.";
+                            prompt = "Generate a detailed description for the gaming platform <DATA_OBJECT_NAME>.\n\nThe description should be engaging and informative, highlighting key features and historical significance. Keep the description concise, ideally between 100 to 150 words.\n\nFor tags, compile a list of relevant keywords that accurately represent the game in the following categories: Type, Era, Hardware Generation, Hardware Specs, Connectivity, Input Methods.\n\nEnsure the tags are specific and commonly used within the gaming community, but avoid overly broad or generic terms.\n\nThe description and tags should be built from the following:\n\n<METADATA_SOURCE_DESCRIPTIONS>\n\nFormat the output as a JSON object with two properties: 'description' containing the generated description, and 'tags' containing an object with the specified categories as keys and arrays of corresponding tags as values.\n\nMake sure the JSON is properly structured and valid. Example output: {\"description\": \"<Generated Description>\", \"tags\": {\"Type\": [\"Console\", \"Handheld\"], \"Era\": [\"Retro\", \"Modern\"], \"Hardware Generation\": [\"8th Gen\", \"9th Gen\"], \"Hardware Specs\": [\"4K Support\", \"VR Ready\"], \"Connectivity\": [\"Wi-Fi\", \"Bluetooth\"], \"Input Methods\": [\"Controller\", \"Touchscreen\"]}}.\n\nDo not include any additional text outside of the JSON object. Do not include any markdown formatting.";
 
                             // populate the prompt
                             prompt = prompt.Replace("<DATA_OBJECT_NAME>", dataObject.Name);
@@ -643,6 +698,11 @@ namespace hasheous_server.Classes.Tasks.Clients
                                             break;
                                     }
                                 }
+                            }
+                            if (metadataSourcePlatformDescriptions == "")
+                            {
+                                // no descriptions found - nothing to do
+                                return null;
                             }
                             prompt = prompt.Replace("<METADATA_SOURCE_DESCRIPTIONS>", metadataSourcePlatformDescriptions);
                             break;

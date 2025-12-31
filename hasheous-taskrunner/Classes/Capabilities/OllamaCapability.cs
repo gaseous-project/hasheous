@@ -240,7 +240,8 @@ namespace hasheous_taskrunner.Classes.Capabilities
         {
             var http = new HttpClient
             {
-                BaseAddress = new Uri(baseUrl)
+                BaseAddress = new Uri(baseUrl),
+                Timeout = TimeSpan.FromMinutes(5)
             };
             return http;
         }

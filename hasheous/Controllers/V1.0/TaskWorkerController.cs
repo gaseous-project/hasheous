@@ -167,7 +167,7 @@ namespace hasheous_server.Controllers.v1_0
         }
 
         /// <summary>
-        /// Retrieves the next job assigned to the specified task worker client.
+        /// Retrieves the next job assigned to the specified task worker client. If a job is already assigned, it returns that job.
         /// </summary>
         /// <param name="publicid">The public identifier of the client requesting a job.</param>
         /// <returns>An IActionResult containing the job details or null if no job is available.</returns>
@@ -186,16 +186,54 @@ namespace hasheous_server.Controllers.v1_0
                 return Unauthorized("API key is missing.");
             }
 
-            // TODO: Implement job retrieval logic here
-            // Example placeholder:
-            var job = await Task.FromResult<object?>(null); // Replace with actual job fetching logic
-
-            if (job == null)
-            {
-                return NotFound("No job available for this client.");
-            }
+            var job = await ClientManagement.ClientGetTask(apiKey, publicid);
 
             return Ok(job);
+        }
+
+        /// <summary>
+        /// Submits the result or status update for a job processed by a task worker client.
+        /// </summary>
+        /// <param name="publicid">The public identifier of the client submitting the job result.</param>
+        /// <param name="body">A dictionary containing required keys: "task_id", "status", and "result", and optional "error_message".</param>
+        /// <returns>An IActionResult indicating success or the appropriate error response.</returns>
+        [MapToApiVersion("1.0")]
+        [HttpPost]
+        [Authentication.TaskWorkerAPIKey.TaskWorkerAPIKey()]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [Route("clients/{publicid}/job")]
+        public async Task<IActionResult> SubmitJobResultForClient(string publicid, [FromBody] Dictionary<string, object> body)
+        {
+            // get the api key from the header
+            string? apiKey = Request.Headers.TryGetValue(Authentication.TaskWorkerAPIKey.APIKeyHeaderName, out var headerValue) ? headerValue.FirstOrDefault() : null;
+            if (apiKey == null)
+            {
+                return Unauthorized("API key is missing.");
+            }
+            if (!body.ContainsKey("task_id") || !body.ContainsKey("status") || !body.ContainsKey("result"))
+            {
+                return BadRequest("Missing required fields: task_id, status, result.");
+            }
+            string taskId = body["task_id"].ToString() ?? "";
+            if (!Enum.TryParse<Models.Tasks.QueueItemStatus>(body["status"].ToString() ?? "", out var status))
+            {
+                return BadRequest("Invalid status value.");
+            }
+            if (status != Models.Tasks.QueueItemStatus.InProgress &&
+                status != Models.Tasks.QueueItemStatus.Submitted &&
+                status != Models.Tasks.QueueItemStatus.Failed)
+            {
+                return BadRequest("Status must be one of: InProgress, Submitted, Failed.");
+            }
+            string result = body["result"].ToString() ?? "";
+            string? errorMessage = null;
+            if (body.ContainsKey("error_message"))
+            {
+                errorMessage = body["error_message"].ToString();
+            }
+            await ClientManagement.ClientSubmitTaskStatusOrResult(apiKey, publicid, taskId, status, result, errorMessage);
+            return Ok();
         }
 
         #endregion "Clients"

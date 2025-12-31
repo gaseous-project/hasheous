@@ -88,7 +88,7 @@ namespace hasheous_server.Models.Tasks
         /// <summary>
         /// Gets the unique identifier for the client.
         /// </summary>
-        public long Id { get; }
+        public long Id { get { return _Id; } }
         private long _Id { get; set; }
 
         /// <summary>
@@ -141,13 +141,13 @@ namespace hasheous_server.Models.Tasks
         /// <summary>
         /// Gets the date and time when the client was created.
         /// </summary>
-        public DateTime CreatedAt { get; }
+        public DateTime CreatedAt { get { return _CreatedAt; } }
         private DateTime _CreatedAt { get; set; }
 
         /// <summary>
         /// Gets the date and time when the client last contacted the server.
         /// </summary>
-        public DateTime LastContactAt { get; }
+        public DateTime LastContactAt { get { return _LastContactAt; } }
         private DateTime _LastContactAt { get; set; }
 
         /// <summary>

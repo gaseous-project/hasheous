@@ -38,7 +38,7 @@ namespace hasheous_server.Models.Tasks
             this._DataObjectId = dataObjectId;
             this._TaskName = taskType;
             this.Status = QueueItemStatus.Pending;
-            this.RequiredCapabilities = requiredCapabilities;
+            this._RequiredCapabilities = requiredCapabilities;
             this.Parameters = parameters;
 
             // Id will be set when saved to database
@@ -65,25 +65,25 @@ namespace hasheous_server.Models.Tasks
         /// <summary>
         /// Gets the unique identifier for the queue item.
         /// </summary>
-        public long Id { get; }
+        public long Id { get { return _Id; } }
         private long _Id { get; set; }
 
         /// <summary>
         /// Gets the date and time when the queue item was created.
         /// </summary>
-        public DateTime CreatedAt { get; }
+        public DateTime CreatedAt { get { return _CreatedAt; } }
         private DateTime _CreatedAt { get; set; }
 
         /// <summary>
         /// Gets the identifier of the associated data object.
         /// </summary>
-        public long DataObjectId { get; }
+        public long DataObjectId { get { return _DataObjectId; } }
         private long _DataObjectId { get; set; }
 
         /// <summary>
         /// Gets the type of task to be performed.
         /// </summary>
-        public TaskType TaskName { get; }
+        public TaskType TaskName { get { return _TaskName; } }
         private TaskType _TaskName { get; set; }
 
         /// <summary>
@@ -99,7 +99,7 @@ namespace hasheous_server.Models.Tasks
         /// <summary>
         /// Gets the list of required capabilities (task types) for this queue item.
         /// </summary>
-        public List<Capabilities> RequiredCapabilities { get; } = new List<Capabilities>();
+        public List<Capabilities> RequiredCapabilities { get { return _RequiredCapabilities; } }
         private List<Capabilities> _RequiredCapabilities { get; set; } = new List<Capabilities>();
 
         /// <summary>
@@ -244,21 +244,29 @@ namespace hasheous_server.Models.Tasks
         /// </summary>
         Pending = 0,
         /// <summary>
+        /// The task has been assigned to a client.
+        /// </summary>
+        Assigned = 10,
+        /// <summary>
         /// The task is currently in progress.
         /// </summary>
-        InProgress = 10,
+        InProgress = 20,
+        /// <summary>
+        /// The task has been submitted.
+        /// </summary>
+        Submitted = 30,
         /// <summary>
         /// The task has completed successfully.
         /// </summary>
-        Completed = 20,
+        Completed = 40,
         /// <summary>
         /// The task has failed.
         /// </summary>
-        Failed = 30,
+        Failed = 50,
         /// <summary>
         /// The task has been cancelled.
         /// </summary>
-        Cancelled = 40
+        Cancelled = 60
     }
 
     /// <summary>

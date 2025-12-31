@@ -156,5 +156,36 @@ namespace hasheous_taskrunner.Classes.Capabilities
 
             return results;
         }
+    
+        /// <summary>
+        /// Retrieves a capability instance by its ID.
+        /// </summary>
+        /// <typeparam name="T">The type of the capability implementing ICapability.</typeparam>
+        /// <param name="capabilityId">The ID of the capability to retrieve.</param>
+        /// <returns>An instance of the capability if found; otherwise, default.</returns>
+        public static T? GetCapabilityById<T>(int capabilityId) where T : ICapability
+        {
+            // get all available capability types that implement ICapability
+            List<Type> availableCapabilityTypes = AppDomain.CurrentDomain.GetAssemblies()
+                        .SelectMany(assembly => assembly.GetTypes())
+                        .Where(type => typeof(ICapability).IsAssignableFrom(type) &&
+                                      type.IsClass &&
+                                      !type.IsAbstract &&
+                                      type.Namespace == "hasheous_taskrunner.Classes.Capabilities")
+                        .ToList();
+
+            // find the matching capability type and create instance only when found
+            foreach (var capabilityType in availableCapabilityTypes)
+            {
+                var tempCapability = (ICapability?)Activator.CreateInstance(capabilityType);
+                if (tempCapability != null && tempCapability.CapabilityId == capabilityId)
+                {
+                    tempCapability.Configuration = CapabilityDefaults[tempCapability.CapabilityId] as Dictionary<string, object>;
+                    return (T)tempCapability;
+                }
+            }
+
+            return default;
+        }
     }
 }

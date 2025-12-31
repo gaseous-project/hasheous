@@ -25,14 +25,20 @@ if (hasheous_taskrunner.Classes.Communication.Common.IsRegistered())
         cts.Cancel();     // Signal the loop to break
     };
 
-    // Main processing loop
+    // Main processing loop - each task run in the loop should be run as a background task
     while (!cts.Token.IsCancellationRequested)
     {
         // Send heartbeat if due
         await hasheous_taskrunner.Classes.Communication.Heartbeat.SendHeartbeatIfDue();
 
-        // Wait before next iteration
-        await Task.Delay(5000);
+        // Fetch and execute tasks if due
+        if (!hasheous_taskrunner.Classes.Communication.Tasks.IsRunningTask)
+        {
+            await hasheous_taskrunner.Classes.Communication.Tasks.FetchAndExecuteTasksIfDue();
+        }
+
+        // Wait 10 before next iteration
+        await Task.Delay(10000);
     }
 
     // Cleanup: OS task kill commands

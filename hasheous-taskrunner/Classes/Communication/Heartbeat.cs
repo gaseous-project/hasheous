@@ -1,5 +1,8 @@
 namespace hasheous_taskrunner.Classes.Communication
 {
+    /// <summary>
+    /// Sends periodic heartbeat signals to the configured host to indicate the client is alive.
+    /// </summary>
     public static class Heartbeat
     {
         private static DateTime lastHeartbeatTime = DateTime.MinValue;
