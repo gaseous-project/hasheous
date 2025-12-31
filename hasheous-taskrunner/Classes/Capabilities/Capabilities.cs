@@ -17,7 +17,7 @@ namespace hasheous_taskrunner.Classes.Capabilities
 
         private static readonly Dictionary<int, object> CapabilityDefaults = new Dictionary<int, object>
         {
-            { 20, new Dictionary<string, object> { { "ollama_url", "http://host.docker.internal:11434" }, { "model", "llama2" }, { "prompt", "Just checking if you're working" } } } // AI default config
+            { 20, new Dictionary<string, object> { { "ollama_url", Config.Configuration.ContainsKey("ollama_url") ? Config.Configuration["ollama_url"] : "" }, { "model", "llama2" }, { "prompt", "Just checking if you're working" } } } // AI default config
         };
 
         /// <summary>
@@ -53,10 +53,19 @@ namespace hasheous_taskrunner.Classes.Capabilities
                 {
                     Console.WriteLine($"Checking capability: {CapabilityNames[capability.CapabilityId]}");
                     // test capability
+                    // load default configuration if available
+                    Dictionary<string, object> configDict = new Dictionary<string, object>();
                     if (CapabilityDefaults.ContainsKey(capability.CapabilityId))
                     {
-                        capability.Configuration = CapabilityDefaults[capability.CapabilityId] as Dictionary<string, object>;
+                        // clone the default config
+                        foreach (var kvp in (CapabilityDefaults[capability.CapabilityId] as Dictionary<string, object>)!)
+                        {
+                            configDict[kvp.Key] = kvp.Value;
+                        }
                     }
+                    configDict["ollama_url"] = Config.Configuration.ContainsKey("ollama_url") ? Config.Configuration["ollama_url"] : "";
+                    capability.Configuration = configDict;
+
                     bool testResult = await capability.TestAsync();
                     if (testResult)
                     {
@@ -156,7 +165,7 @@ namespace hasheous_taskrunner.Classes.Capabilities
 
             return results;
         }
-    
+
         /// <summary>
         /// Retrieves a capability instance by its ID.
         /// </summary>

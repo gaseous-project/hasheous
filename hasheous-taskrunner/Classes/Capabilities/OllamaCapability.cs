@@ -28,7 +28,7 @@ namespace hasheous_taskrunner.Classes.Capabilities
                 {
                     Dictionary<string, object> configDict = value ?? new Dictionary<string, object>();
 
-                    string ollamaUrl = "http://host.docker.internal:11434";
+                    string ollamaUrl = "";
                     string model = string.Empty;
                     string prompt = string.Empty;
 
@@ -38,11 +38,14 @@ namespace hasheous_taskrunner.Classes.Capabilities
                         {
                             try
                             {
-                                ollamaUrl = Convert.ToString(value["ollama_url"]) ?? "http://host.docker.internal:11434";
+                                ollamaUrl = Convert.ToString(value["ollama_url"]) ?? "";
+                                // ensure ollamaUrl is a valid URL
+                                var uri = new Uri(ollamaUrl);
+                                ollamaUrl = uri.ToString();
                             }
                             catch
                             {
-                                ollamaUrl = "http://host.docker.internal:11434";
+                                ollamaUrl = "";
                             }
                         }
 
