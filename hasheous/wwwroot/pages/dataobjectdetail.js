@@ -206,9 +206,14 @@ function renderContent() {
             case "AIDescription":
                 document.getElementById('dataObjectAIDescriptionSection').style.display = '';
 
+                // render AI description - content is markdown
+                let markdownText = dataObject.attributes[i].value;
+                // convert markdown to HTML using marked
+                let htmlContent = marked.parse(markdownText);
+
                 let aiDescBody = document.createElement('span');
                 aiDescBody.classList.add('descriptionspan');
-                aiDescBody.innerHTML = "<p>" + dataObject.attributes[i].value.replace("\\n\\n", "</p><p>") + "</p>";
+                aiDescBody.innerHTML = htmlContent;
                 aiDescriptionElement.appendChild(aiDescBody);
 
                 break;

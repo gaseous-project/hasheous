@@ -24,15 +24,15 @@ namespace hasheous_taskrunner.Classes.Tasks
                 return await Task.FromResult(verificationResults);
             }
 
-            if (!parameters.ContainsKey("model"))
+            if (!parameters.ContainsKey("model_description") && !parameters.ContainsKey("model_tags"))
             {
-                verificationResults.Details.Add("model", "Missing required parameter: model");
+                verificationResults.Details.Add("model", "Missing required parameter: model_description or model_tags");
                 verificationResults.Status = TaskVerificationResult.VerificationStatus.Failure;
             }
 
-            if (!parameters.ContainsKey("prompt"))
+            if (!parameters.ContainsKey("prompt_description") && !parameters.ContainsKey("prompt_tags"))
             {
-                verificationResults.Details.Add("prompt", "Missing required parameter: prompt");
+                verificationResults.Details.Add("prompt", "Missing required parameter: prompt_description or prompt_tags");
                 verificationResults.Status = TaskVerificationResult.VerificationStatus.Failure;
             }
 
@@ -49,9 +49,41 @@ namespace hasheous_taskrunner.Classes.Tasks
                 throw new InvalidOperationException("AI capability is not available.");
             }
 
-            var response = await ai.ExecuteAsync(parameters?.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value) ?? new Dictionary<string, object>());
+            // get sources from parameters
+            string sourceData = "";
+            foreach (string sourceKey in parameters["sources"].Split(';'))
+            {
+                if (parameters.ContainsKey("Source_" + sourceKey.Trim()))
+                {
+                    sourceData += "---TEXT [\"" + sourceKey.Trim() + "\"]---\n" + parameters["Source_" + sourceKey.Trim()] + "\n\n";
+                }
+            }
 
-            if (response == null)
+            // append source data to prompts
+            if (parameters != null && parameters.ContainsKey("prompt_description"))
+            {
+                parameters["prompt_description"] = parameters["prompt_description"].Replace("<METADATA_SOURCE_DESCRIPTIONS>", sourceData);
+            }
+            if (parameters != null && parameters.ContainsKey("prompt_tags"))
+            {
+                parameters["prompt_tags"] = parameters["prompt_tags"].Replace("<METADATA_SOURCE_DESCRIPTIONS>", sourceData);
+            }
+
+            // generate the description
+            var descriptionResult = await ai.ExecuteAsync(new Dictionary<string, object>
+            {
+                { "model", parameters != null && parameters.ContainsKey("model_description") ? parameters["model_description"] : "" },
+                { "prompt", parameters != null && parameters.ContainsKey("prompt_description") ? parameters["prompt_description"] : "" }
+            });
+
+            var tagsResult = await ai.ExecuteAsync(new Dictionary<string, object>
+            {
+                { "model", parameters != null && parameters.ContainsKey("model_tags") ? parameters["model_tags"] : "" },
+                { "prompt", parameters != null && parameters.ContainsKey("prompt_tags") ? parameters["prompt_tags"] : "" }
+            });
+
+            Dictionary<string, object> response = new Dictionary<string, object>();
+            if (descriptionResult == null || tagsResult == null)
             {
                 response = new Dictionary<string, object>
                 {
@@ -59,6 +91,44 @@ namespace hasheous_taskrunner.Classes.Tasks
                     { "error", "No response from AI capability." }
                 };
             }
+
+            // merge results
+            Dictionary<string, object> responseVars = new Dictionary<string, object>();
+            if (descriptionResult != null && descriptionResult.ContainsKey("result") && (bool)descriptionResult["result"])
+            {
+                responseVars["description"] = descriptionResult.ContainsKey("response") ? descriptionResult["response"] : "";
+            }
+            else
+            {
+                responseVars["description"] = "";
+            }
+            if (tagsResult != null && tagsResult.ContainsKey("result") && (bool)tagsResult["result"])
+            {
+                responseVars["tags"] = tagsResult.ContainsKey("response") ? tagsResult["response"].ToString() : "";
+                responseVars["tags"] = ollamaPrune(responseVars["tags"].ToString());
+                // deserialise tags into a dictionary<string, string[]> if possible
+                try
+                {
+                    var deserializedTags = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string[]>>(responseVars["tags"].ToString() ?? "");
+                    if (deserializedTags != null)
+                    {
+                        responseVars["tags"] = deserializedTags;
+                    }
+                }
+                catch
+                {
+                    // ignore deserialization errors
+                }
+            }
+            else
+            {
+                responseVars["tags"] = "";
+            }
+            response = new Dictionary<string, object>
+            {
+                { "result", true },
+                { "response", responseVars }
+            };
 
             if (response.ContainsKey("result") && response["result"] is bool resultBool && resultBool)
             {
@@ -87,6 +157,21 @@ namespace hasheous_taskrunner.Classes.Tasks
             }
 
             return await Task.FromResult(response ?? new Dictionary<string, object>());
+        }
+
+        private string ollamaPrune(string input)
+        {
+            input = input.Trim();
+            if ((input.StartsWith("```") || input.StartsWith("```json")) && input.EndsWith("```"))
+            {
+                int firstLineEnd = input.IndexOf('\n');
+                int lastLineStart = input.LastIndexOf("```");
+                if (firstLineEnd >= 0 && lastLineStart > firstLineEnd)
+                {
+                    input = input.Substring(firstLineEnd + 1, lastLineStart - firstLineEnd - 1).Trim();
+                }
+            }
+            return input;
         }
     }
 }

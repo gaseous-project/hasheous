@@ -1,0 +1,13 @@
+Generate a detailed description for the platform <DATA_OBJECT_NAME>. 
+
+Here are the texts to use as a basis for the description and tags, each source is delimited by "---TEXT [SOURCE]---":
+
+<METADATA_SOURCE_DESCRIPTIONS>
+
+---END OF SOURCES---
+
+If present; use the Wikipedia source as context for the other provided sources.
+
+You MUST respond only with the description.
+
+The description should be engaging and informative, highlighting key features and historical significance. If available, highlight any popular games for the platform. Keep the description concise, ideally between 100 to 150 words, but no more than 200 words. The output should be in markdown format.

@@ -82,6 +82,7 @@ function LoadStatusPage() {
                         "servicemanagement": [
                             "TallyVotes",
                             "MetadataMatchSearch",
+                            "TaskResultParser",
                             "GetMissingArtwork",
                             "MetadataMapDump"
                         ]

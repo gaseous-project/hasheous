@@ -1,0 +1,49 @@
+Generate detailed tags for the platform <DATA_OBJECT_NAME>.
+
+Here are the texts to use as a basis for the tags, each source is delimited by "---TEXT [SOURCE]---", with "---END OF SOURCES---" to denote the end of the source texts.
+
+<METADATA_SOURCE_DESCRIPTIONS>
+
+---END OF SOURCES---
+
+If present; use the Wikipedia source as context for the other provided sources.
+
+The tags should accurately represent the platform. Only generate tags in the following categories: Type, Era, Console Generation (only relevant for consoles - leave blank for computers), Hardware Specs, Connectivity, Input Methods.
+
+Each tag should be no more than three words long. Ensure each tag is specific and commonly used within the gaming community, but avoid overly broad or generic terms. If you are unable to generate tags relevant to the category, leave it empty.
+
+Aim for a minimum of two tags and a maximum of ten tags per category.
+
+Format the output as a raw JSON object, containing an array of tags for each category.
+
+Make sure the JSON is properly structured and valid.
+
+Example output:
+{
+    "Type": [
+        "Console",
+        "Handheld"
+    ],
+    "Era": [
+        "Retro",
+        "Modern"
+    ],
+    "Hardware Generation": [
+        "8th Gen",
+        "9th Gen"
+    ],
+    "Hardware Specs": [
+        "4K Support",
+        "VR Ready"
+    ],
+    "Connectivity": [
+        "Wi-Fi",
+        "Bluetooth"
+    ],
+    "Input Methods": [
+        "Controller",
+        "Touchscreen"
+    ]
+}
+
+Do not include any additional text or content outside of the JSON object.

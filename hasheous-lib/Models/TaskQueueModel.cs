@@ -144,7 +144,7 @@ namespace hasheous_server.Models.Tasks
             switch (this.TaskName)
             {
                 case TaskType.AIDescriptionAndTagging:
-                    if (string.IsNullOrEmpty(this.Parameters?["prompt"]))
+                    if (string.IsNullOrEmpty(this.Parameters?["prompt_description"]) && string.IsNullOrEmpty(this.Parameters?["prompt_tagging"]))
                     {
                         // nothing to do - terminate the task
                         await this.Terminate();

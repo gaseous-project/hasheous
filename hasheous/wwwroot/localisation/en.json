@@ -266,6 +266,7 @@
     "servicemetadatamatchsearch": "Metadata Match Search",
     "servicegetmissingartwork": "Get Missing Artwork",
     "servicemetadatamapdump": "Metadata Map Dump",
+    "servicetaskresultparser": "Task Result Parser",
     "servicestopped": "Stopped",
     "servicerunning": "Running",
     "serviceneverstarted": "Stopped",

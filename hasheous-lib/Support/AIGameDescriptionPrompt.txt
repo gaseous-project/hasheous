@@ -1,0 +1,13 @@
+Generate a detailed description/synopsis for the game <DATA_OBJECT_NAME> for <DATA_OBJECT_PLATFORM>. 
+
+Here are the texts to use as a basis for the description, each source is delimited by "---TEXT [SOURCE]---":
+
+<METADATA_SOURCE_DESCRIPTIONS>
+
+---END OF SOURCES---
+
+If present; use the Wikipedia source as context for the other provided sources.
+
+You MUST respond only with the description/synopsis.
+
+The description should be engaging and informative, highlighting plot, key features, and gameplay. Keep the description concise, ideally between 150 to 200 words, but no more than 250 words. The output should be in markdown format.
