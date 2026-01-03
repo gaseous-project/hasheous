@@ -141,6 +141,28 @@ namespace hasheous_server.Classes.Tasks.Clients
         }
 
         /// <summary>
+        /// Retrieves all registered clients for the specified user ID.
+        /// </summary>
+        /// <param name="userId">The user's ID.</param>
+        /// <returns>A list of <see cref="ClientModel"/> objects associated with the user.</returns>
+        /// <remarks>
+        /// This method fetches all clients registered under the specified user ID.
+        /// </remarks>
+        public async static Task<List<ClientModel>> GetAllClientsForUserId(string userId)
+        {
+            List<ClientModel> clients = new List<ClientModel>();
+            DataTable dt = await db.ExecuteCMDAsync("SELECT * FROM Task_Clients WHERE owner_id = @owner_id;", new Dictionary<string, object>
+            {
+                { "@owner_id", userId }
+            });
+            foreach (DataRow row in dt.Rows)
+            {
+                clients.Add(new ClientModel(row));
+            }
+            return clients;
+        }
+
+        /// <summary>
         /// Retrieves all registered clients in the system.
         /// </summary>
         /// <returns>A list of all <see cref="ClientModel"/> objects.</returns>

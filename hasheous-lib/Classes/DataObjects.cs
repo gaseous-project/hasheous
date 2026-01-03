@@ -2546,28 +2546,35 @@ namespace hasheous_server.Classes
                         // {
                         // no wikipedia metadata present, try to get it from IGDB
                         var wiki = new MetadataLib.MetadataWikipedia();
-                        var wikiMetadataResults = await wiki.FindMatchItemAsync(item, SearchCandidates, new Dictionary<string, object>
+                        try
+                        {
+                            var wikiMetadataResults = await wiki.FindMatchItemAsync(item, SearchCandidates, new Dictionary<string, object>
                             {
                                 { "igdbGameId", long.Parse(metadata.ImmutableId) }
                             });
-                        if (wikiMetadataResults != null && wikiMetadataResults.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic)
-                        {
-                            // update the metadata item with the search results
-                            DataObjectItem.MetadataItem wikiMetadata = new DataObjectItem.MetadataItem(objectType)
+                            if (wikiMetadataResults != null && wikiMetadataResults.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic)
                             {
-                                Id = wikiMetadataResults.MetadataId,
-                                MatchMethod = wikiMetadataResults.MatchMethod,
-                                Source = MetadataSources.Wikipedia,
-                                LastSearch = DateTime.UtcNow,
-                                NextSearch = DateTime.UtcNow.AddMonths(6),
-                                WinningVoteCount = 0,
-                                TotalVoteCount = 0
-                            };
+                                // update the metadata item with the search results
+                                DataObjectItem.MetadataItem wikiMetadata = new DataObjectItem.MetadataItem(objectType)
+                                {
+                                    Id = wikiMetadataResults.MetadataId,
+                                    MatchMethod = wikiMetadataResults.MatchMethod,
+                                    Source = MetadataSources.Wikipedia,
+                                    LastSearch = DateTime.UtcNow,
+                                    NextSearch = DateTime.UtcNow.AddMonths(6),
+                                    WinningVoteCount = 0,
+                                    TotalVoteCount = 0
+                                };
 
-                            // add to updates list
-                            metadataUpdates.Add(wikiMetadata);
+                                // add to updates list
+                                metadataUpdates.Add(wikiMetadata);
 
-                            Logging.Log(Logging.LogType.Information, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - " + item.ObjectType + " " + item.Name + " " + wikiMetadata.MatchMethod + " to " + wikiMetadata.Source + " metadata: " + wikiMetadata.Id);
+                                Logging.Log(Logging.LogType.Information, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - " + item.ObjectType + " " + item.Name + " " + wikiMetadata.MatchMethod + " to " + wikiMetadata.Source + " metadata: " + wikiMetadata.Id);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Logging.Log(Logging.LogType.Warning, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Error processing Wikipedia metadata search", ex);
                         }
                         // }
                     }
