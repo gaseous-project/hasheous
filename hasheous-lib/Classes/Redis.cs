@@ -71,5 +71,55 @@ namespace hasheous.Classes
                 GetDatabase(0).KeyDelete(key);
             }
         }
+
+        public static bool CacheItemExists(string cacheKey)
+        {
+            if (Config.RedisConfiguration.Enabled)
+            {
+                return RedisConnection.GetDatabase(0).KeyExists(cacheKey);
+            }
+            return false;
+        }
+
+        public static T? GetCacheItem<T>(string cacheKey)
+        {
+            // check redis cache first
+            if (Config.RedisConfiguration.Enabled)
+            {
+                if (RedisConnection.GetDatabase(0).KeyExists(cacheKey))
+                {
+                    string? cachedData = RedisConnection.GetDatabase(0).StringGet(cacheKey);
+                    if (cachedData != null)
+                    {
+                        // if cached data is found, deserialize it and return
+                        var settings = new Newtonsoft.Json.JsonSerializerSettings
+                        {
+                            TypeNameHandling = Newtonsoft.Json.TypeNameHandling.All,
+                            TypeNameAssemblyFormatHandling = Newtonsoft.Json.TypeNameAssemblyFormatHandling.Simple
+                        };
+                        var deserializedData = Newtonsoft.Json.JsonConvert.DeserializeObject<T>(cachedData, settings);
+                        if (deserializedData != null)
+                        {
+                            return deserializedData;
+                        }
+                    }
+                }
+            }
+            return default(T);
+        }
+
+        public static void SetCacheItem<T>(string cacheKey, T data, TimeSpan? expiry = null)
+        {
+            if (Config.RedisConfiguration.Enabled)
+            {
+                var settings = new Newtonsoft.Json.JsonSerializerSettings
+                {
+                    TypeNameHandling = Newtonsoft.Json.TypeNameHandling.All,
+                    NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore
+                };
+                string serializedData = Newtonsoft.Json.JsonConvert.SerializeObject(data, settings);
+                RedisConnection.GetDatabase(0).StringSet(cacheKey, serializedData, expiry);
+            }
+        }
     }
 }

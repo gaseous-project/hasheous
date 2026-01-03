@@ -221,11 +221,12 @@ namespace hasheous_server.Models.Tasks
         /// </summary>
         public async Task Commit()
         {
-            await Config.database.ExecuteCMDAsync("UPDATE `Task_Queue` SET `status` = @status, `client_id` = @client_id, `result` = @result, `error_message` = @error_message, `start_time` = @started_at, `completion_time` = @completed_at WHERE `id` = @id", new Dictionary<string, object>
+            await Config.database.ExecuteCMDAsync("UPDATE `Task_Queue` SET `status` = @status, `client_id` = @client_id, `parameters` = @parameters, `result` = @result, `error_message` = @error_message, `start_time` = @started_at, `completion_time` = @completed_at WHERE `id` = @id", new Dictionary<string, object>
             {
                 { "@id", this.Id },
                 { "@status", this.Status },
                 { "@client_id", this.ClientId ?? (object)DBNull.Value },
+                { "@parameters", this.Parameters != null ? System.Text.Json.JsonSerializer.Serialize(this.Parameters) : (object)DBNull.Value },
                 { "@result", this.Result ?? (object)DBNull.Value },
                 { "@error_message", this.ErrorMessage ?? (object)DBNull.Value },
                 { "@started_at", this.StartedAt ?? (object)DBNull.Value },

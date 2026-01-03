@@ -540,8 +540,8 @@ namespace hasheous_server.Classes.Tasks.Clients
             switch (taskType)
             {
                 case TaskType.AIDescriptionAndTagging:
-                    parameters.Add("model_description", "gemma3");
-                    parameters.Add("model_tags", "gemma3");
+                    parameters.Add("model_description", "gemma3:12b");
+                    parameters.Add("model_tags", "gemma3:12b");
                     parameters.Add("sources", "");  // will be populated with actual sources used
 
                     string prompt_description = "";
@@ -899,8 +899,44 @@ namespace hasheous_server.Classes.Tasks.Clients
                             }
                         }
 
+                        // get the infobox table and convert it to a markdown table
+                        string markdownTable = "";
+                        var infoboxNodeForTable = htmlDoc.DocumentNode.SelectSingleNode("//table[contains(@class, 'infobox')]");
+                        if (infoboxNodeForTable != null)
+                        {
+                            var rows = infoboxNodeForTable.SelectNodes(".//tr");
+                            if (rows != null)
+                            {
+                                List<string> tableLines = new List<string>();
+                                foreach (var row in rows)
+                                {
+                                    var headerCell = row.SelectSingleNode(".//th");
+                                    var dataCell = row.SelectSingleNode(".//td");
+                                    if (headerCell != null && dataCell != null)
+                                    {
+                                        string headerText = headerCell.InnerText.Trim().Replace("\n", " ");
+                                        string dataText = dataCell.InnerText.Trim().Replace("\n", " ");
+                                        tableLines.Add($"| **{headerText}** | {dataText} |");
+                                    }
+                                }
+                                if (tableLines.Count > 0)
+                                {
+                                    // add header separator
+                                    tableLines.Insert(1, "| --- | --- |");
+                                    markdownTable = string.Join("\n", tableLines);
+                                }
+                            }
+                        }
+
                         // remove the infobox table and everything before it in the first section - infobox is a "table" element with class "infobox"
+                        // replace the infobox with the markdown table if it exists
                         var infoboxNode = htmlDoc.DocumentNode.SelectSingleNode("//table[contains(@class, 'infobox')]");
+                        if (markdownTable != "" && infoboxNode != null)
+                        {
+                            var markdownNode = htmlDoc.CreateTextNode(markdownTable + "\n\n");
+                            infoboxNode.ParentNode.ReplaceChild(markdownNode, infoboxNode);
+                        }
+
                         if (infoboxNode != null)
                         {
                             var firstSection = infoboxNode.ParentNode; ;

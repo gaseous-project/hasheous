@@ -1012,15 +1012,15 @@ namespace hasheous_server.Classes
 
             db.ExecuteNonQuery(sql, dbDict);
 
-            if (allowSearch)
-            {
-                await DataObjectMetadataSearch(objectType, id);
-            }
-
             // purge redis cache of all keys for this object type
             if (Config.RedisConfiguration.Enabled)
             {
                 RedisConnection.PurgeCache("DataObject");
+            }
+
+            if (allowSearch)
+            {
+                await DataObjectMetadataSearch(objectType, id);
             }
 
             return await GetDataObject(objectType, id);
@@ -1057,6 +1057,12 @@ namespace hasheous_server.Classes
             };
 
             db.ExecuteNonQuery(sql, dbDict);
+
+            // purge redis cache of all keys for this object type
+            if (Config.RedisConfiguration.Enabled)
+            {
+                RedisConnection.PurgeCache("DataObject");
+            }
 
             DataObjectItem EditedObject = await GetDataObject(objectType, id);
 
@@ -1478,27 +1484,6 @@ namespace hasheous_server.Classes
                     break;
             }
 
-            if (metadataChangeDetected == true)
-            {
-                // metadata map change detected - reset associated tagging task
-                var tasks = TaskManagement.GetAllTasks(id);
-                if (tasks != null && tasks.Count > 0)
-                {
-                    foreach (var task in tasks)
-                    {
-                        if (task.TaskName == Models.Tasks.TaskType.AIDescriptionAndTagging)
-                        {
-                            await task.Reset();
-                        }
-                    }
-                }
-                else
-                {
-                    // no tagging task exists - create one
-                    TaskManagement.EnqueueTask((long)id, Models.Tasks.TaskType.AIDescriptionAndTagging);
-                }
-            }
-
             // signatures
             sql = "DELETE FROM DataObject_SignatureMap WHERE DataObjectId=@id";
             db.ExecuteNonQuery(sql, new Dictionary<string, object>{
@@ -1567,13 +1552,28 @@ namespace hasheous_server.Classes
                 }
             }
 
-            // purge redis cache of all keys for this object type
-            if (Config.RedisConfiguration.Enabled)
-            {
-                RedisConnection.PurgeCache("DataObject");
-            }
-
             UpdateDataObjectDate(id);
+
+            if (metadataChangeDetected == true)
+            {
+                // metadata map change detected - reset associated tagging task
+                var tasks = TaskManagement.GetAllTasks(id);
+                if (tasks != null && tasks.Count > 0)
+                {
+                    foreach (var task in tasks)
+                    {
+                        if (task.TaskName == Models.Tasks.TaskType.AIDescriptionAndTagging)
+                        {
+                            await task.Reset();
+                        }
+                    }
+                }
+                else
+                {
+                    // no tagging task exists - create one
+                    TaskManagement.EnqueueTask((long)id, Models.Tasks.TaskType.AIDescriptionAndTagging);
+                }
+            }
 
             return await GetDataObject(objectType, id);
         }
@@ -2307,6 +2307,12 @@ namespace hasheous_server.Classes
                 MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
                 MetadataId = ""
             };
+
+            // purge redis cache of all keys for this object type
+            if (Config.RedisConfiguration.Enabled)
+            {
+                RedisConnection.PurgeCache("DataObject");
+            }
 
             // set up the list of objects that need to be processed
             List<DataObjectItem> DataObjectsToProcess = new List<DataObjectItem>();

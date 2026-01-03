@@ -12,7 +12,7 @@ The tags should accurately represent the platform. Only generate tags in the fol
 
 Each tag should be no more than three words long. Ensure each tag is specific and commonly used within the gaming community, but avoid overly broad or generic terms. If you are unable to generate tags relevant to the category, leave it empty.
 
-Aim for a minimum of two tags and a maximum of ten tags per category.
+Generate a minimum of three tags and a maximum of ten tags per category.
 
 Format the output as a raw JSON object, containing an array of tags for each category.
 
@@ -28,10 +28,7 @@ Example output:
         "Retro",
         "Modern"
     ],
-    "Hardware Generation": [
-        "8th Gen",
-        "9th Gen"
-    ],
+    "Hardware Generation": [],
     "Hardware Specs": [
         "4K Support",
         "VR Ready"
