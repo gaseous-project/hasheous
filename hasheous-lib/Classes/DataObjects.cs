@@ -2642,8 +2642,15 @@ namespace hasheous_server.Classes
                 // get metadata cover if new object is a game
                 if (objectType == DataObjectType.Game)
                 {
-                    BackgroundMetadataMatcher.BackgroundMetadataMatcher metadataMatcher = new BackgroundMetadataMatcher.BackgroundMetadataMatcher();
-                    await metadataMatcher.GetGameArtwork((long)item.Id, ForceSearch);
+                    try
+                    {
+                        BackgroundMetadataMatcher.BackgroundMetadataMatcher metadataMatcher = new BackgroundMetadataMatcher.BackgroundMetadataMatcher();
+                        await metadataMatcher.GetGameArtwork((long)item.Id, ForceSearch);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logging.Log(Logging.LogType.Warning, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Error processing game artwork metadata search", ex);
+                    }
                 }
 
                 // update date
