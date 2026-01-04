@@ -23,7 +23,7 @@ namespace hasheous_server.Classes.MetadataLib
             {
                 case DataObjects.DataObjectType.Platform:
                     string platformJsonPath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_RetroAchievements, "platforms.json");
-                    if (!File.Exists(platformJsonPath))
+                    if (File.Exists(platformJsonPath))
                     {
                         string platformsJson = File.ReadAllText(platformJsonPath);
                         List<RetroAchievements.Models.PlatformModel>? platforms = Newtonsoft.Json.JsonConvert.DeserializeObject<List<RetroAchievements.Models.PlatformModel>>(platformsJson);
