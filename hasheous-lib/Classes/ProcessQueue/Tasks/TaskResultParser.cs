@@ -140,43 +140,46 @@ namespace Classes.ProcessQueue
                                         {
                                             foreach (string tagString in suppliedTagCategory.Value)
                                             {
-                                                // check if the tag exists
-                                                hasheous_server.Models.DataObjectItemTags.TagModel? matchingTag = null;
-                                                if (existingTags.ContainsKey((hasheous_server.Models.DataObjectItemTags.TagType)tagType))
+                                                if (tagString.Length > 0)
                                                 {
-                                                    matchingTag = existingTags[(hasheous_server.Models.DataObjectItemTags.TagType)tagType].Tags
-                                                    .FirstOrDefault(t => t.Text.Equals(tagString, StringComparison.OrdinalIgnoreCase));
-                                                }
-                                                long tagId;
-                                                if (matchingTag != null)
-                                                {
-                                                    // tag exists, map it to the data object
-                                                    tagId = matchingTag.Id;
-                                                    await Config.database.ExecuteCMDAsync("INSERT INTO DataObject_Tags (DataObjectId, TagId, AIAssigned) VALUES (@dataObjectId, @tagId, @aiAssigned);",
-                                                        new Dictionary<string, object>
-                                                        {
+                                                    // check if the tag exists
+                                                    hasheous_server.Models.DataObjectItemTags.TagModel? matchingTag = null;
+                                                    if (existingTags.ContainsKey((hasheous_server.Models.DataObjectItemTags.TagType)tagType))
+                                                    {
+                                                        matchingTag = existingTags[(hasheous_server.Models.DataObjectItemTags.TagType)tagType].Tags
+                                                        .FirstOrDefault(t => t.Text.Equals(tagString, StringComparison.OrdinalIgnoreCase));
+                                                    }
+                                                    long tagId;
+                                                    if (matchingTag != null)
+                                                    {
+                                                        // tag exists, map it to the data object
+                                                        tagId = matchingTag.Id;
+                                                        await Config.database.ExecuteCMDAsync("INSERT INTO DataObject_Tags (DataObjectId, TagId, AIAssigned) VALUES (@dataObjectId, @tagId, @aiAssigned);",
+                                                            new Dictionary<string, object>
+                                                            {
                                                             { "@dataObjectId", dataObject.Id },
                                                             { "@tagId", tagId },
                                                             { "@aiAssigned", true }
-                                                        });
-                                                }
-                                                else
-                                                {
-                                                    // tag does not exist, create it and map it
-                                                    DataTable newTagDt = await Config.database.ExecuteCMDAsync("INSERT INTO Tags (`type`, `name`) VALUES (@tagType, @name); SELECT LAST_INSERT_ID() AS NewTagId;",
-                                                        new Dictionary<string, object>
-                                                        {
+                                                            });
+                                                    }
+                                                    else
+                                                    {
+                                                        // tag does not exist, create it and map it
+                                                        DataTable newTagDt = await Config.database.ExecuteCMDAsync("INSERT INTO Tags (`type`, `name`) VALUES (@tagType, @name); SELECT LAST_INSERT_ID() AS NewTagId;",
+                                                            new Dictionary<string, object>
+                                                            {
                                                             { "@tagType", (int)tagType },
                                                             { "@name", tagString.ToLower() }
-                                                        });
-                                                    tagId = Convert.ToInt64(newTagDt.Rows[0]["NewTagId"]);
-                                                    await Config.database.ExecuteCMDAsync("INSERT INTO DataObject_Tags (DataObjectId, TagId, AIAssigned) VALUES (@dataObjectId, @tagId, @aiAssigned);",
-                                                        new Dictionary<string, object>
-                                                        {
+                                                            });
+                                                        tagId = Convert.ToInt64(newTagDt.Rows[0]["NewTagId"]);
+                                                        await Config.database.ExecuteCMDAsync("INSERT INTO DataObject_Tags (DataObjectId, TagId, AIAssigned) VALUES (@dataObjectId, @tagId, @aiAssigned);",
+                                                            new Dictionary<string, object>
+                                                            {
                                                             { "@dataObjectId", dataObject.Id },
                                                             { "@tagId", tagId },
                                                             { "@aiAssigned", true }
-                                                        });
+                                                            });
+                                                    }
                                                 }
                                             }
                                         }
