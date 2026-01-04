@@ -45,13 +45,20 @@
             "program": "${workspaceFolder}/service-host/bin/Debug/net8.0/service-host.dll",
             "args": [
                 "--service",
-                "MetadataMapDump",
+                "MetadataMatchSearch",
                 "--reportingserver",
                 "https://localhost:5001"
             ],
             "cwd": "${workspaceFolder}/service-host",
             "stopAtEntry": false
         },
+        {
+            "name": "Task Runner",
+            "type": "dotnet",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "projectPath": "${workspaceFolder}/hasheous-taskrunner/hasheous-taskrunner.csproj"
+        }
     ],
     "compounds": [
         {
@@ -61,5 +68,12 @@
                 "Service Orchestrator"
             ]
         },
+        {
+            "name": "Task Runner and Frontend",
+            "configurations": [
+                "Task Runner",
+                "Frontend"
+            ]
+        }
     ]
 }

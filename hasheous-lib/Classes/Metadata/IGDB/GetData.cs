@@ -4,6 +4,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Classes;
 using Classes.Metadata;
+using hasheous.Classes;
 using IGDB;
 using IGDB.Models;
 

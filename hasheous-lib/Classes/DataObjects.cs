@@ -8,6 +8,7 @@ using Classes;
 using hasheous.Classes;
 using hasheous_server.Classes.Metadata;
 using hasheous_server.Classes.Metadata.IGDB;
+using hasheous_server.Classes.Tasks.Clients;
 using hasheous_server.Models;
 using IGDB;
 using IGDB.Models;
@@ -998,7 +999,7 @@ namespace hasheous_server.Classes
             return await GetDataObject(objectType, (long)(ulong)data.Rows[0][0]);
         }
 
-        public async Task<Models.DataObjectItem> EditDataObject(DataObjectType objectType, long id, Models.DataObjectItemModel model)
+        public async Task<Models.DataObjectItem> EditDataObject(DataObjectType objectType, long id, Models.DataObjectItemModel model, bool allowSearch = true)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "UPDATE DataObject SET `Name`=@name, `UpdatedDate`=@updateddate WHERE ObjectType=@objecttype AND Id=@id";
@@ -1011,12 +1012,15 @@ namespace hasheous_server.Classes
 
             db.ExecuteNonQuery(sql, dbDict);
 
-            await DataObjectMetadataSearch(objectType, id);
-
             // purge redis cache of all keys for this object type
             if (Config.RedisConfiguration.Enabled)
             {
                 RedisConnection.PurgeCache("DataObject");
+            }
+
+            if (allowSearch)
+            {
+                await DataObjectMetadataSearch(objectType, id);
             }
 
             return await GetDataObject(objectType, id);
@@ -1041,7 +1045,7 @@ namespace hasheous_server.Classes
             }
         }
 
-        public async Task<Models.DataObjectItem> EditDataObject(DataObjectType objectType, long id, Models.DataObjectItem model)
+        public async Task<Models.DataObjectItem> EditDataObject(DataObjectType objectType, long id, Models.DataObjectItem model, bool trustModelMetadataSearchType = false)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "UPDATE DataObject SET `Name`=@name, `UpdatedDate`=@updateddate WHERE ObjectType=@objecttype AND Id=@id";
@@ -1053,6 +1057,12 @@ namespace hasheous_server.Classes
             };
 
             db.ExecuteNonQuery(sql, dbDict);
+
+            // purge redis cache of all keys for this object type
+            if (Config.RedisConfiguration.Enabled)
+            {
+                RedisConnection.PurgeCache("DataObject");
+            }
 
             DataObjectItem EditedObject = await GetDataObject(objectType, id);
 
@@ -1075,42 +1085,69 @@ namespace hasheous_server.Classes
                                 // new tags to add
                                 // scan all supplied tags and if they aren't in existing tags, add them
                                 Dictionary<DataObjectItemTags.TagType, List<string>> newTags = new Dictionary<DataObjectItemTags.TagType, List<string>>();
-                                var jObject = (JObject)newAttribute.Value;
-                                var newAttributeValue = jObject.ToObject<Dictionary<DataObjectItemTags.TagType, List<string>>>();
-                                // normalise tags in newAttributeValue to lowercase and trimmed
-                                foreach (KeyValuePair<DataObjectItemTags.TagType, List<string>> tagType in newAttributeValue)
+                                Dictionary<DataObjectItemTags.TagType, List<string>>? newAttributeValue = null;
+
+                                if (newAttribute.Value is JObject)
                                 {
-                                    for (int i = 0; i < tagType.Value.Count; i++)
+                                    var jObject = (JObject)newAttribute.Value;
+                                    newAttributeValue = jObject.ToObject<Dictionary<DataObjectItemTags.TagType, List<string>>>();
+                                }
+                                else if (newAttribute.Value is Dictionary<DataObjectItemTags.TagType, hasheous_server.Models.DataObjectItemTags>)
+                                {
+                                    var dict = (Dictionary<DataObjectItemTags.TagType, hasheous_server.Models.DataObjectItemTags>)newAttribute.Value;
+                                    newAttributeValue = new Dictionary<DataObjectItemTags.TagType, List<string>>();
+                                    foreach (KeyValuePair<DataObjectItemTags.TagType, hasheous_server.Models.DataObjectItemTags> kvp in dict)
                                     {
-                                        tagType.Value[i] = tagType.Value[i].Trim().ToLower();
+                                        List<string> tagList = new List<string>();
+                                        foreach (DataObjectItemTags.TagModel tagModel in kvp.Value.Tags)
+                                        {
+                                            tagList.Add(tagModel.Text);
+                                        }
+                                        newAttributeValue.Add(kvp.Key, tagList);
                                     }
                                 }
-
-                                // loop the keys in the supplied value dictionary<DataObjectItemTages.TagType, List<string>>
-                                foreach (KeyValuePair<DataObjectItemTags.TagType, List<string>> suppliedTagType in newAttributeValue)
+                                else
                                 {
-                                    foreach (string suppliedTag in suppliedTagType.Value)
+                                    newAttributeValue = (Dictionary<DataObjectItemTags.TagType, List<string>>)newAttribute.Value;
+                                }
+
+                                if (newAttributeValue != null && newAttributeValue.Count > 0)
+                                {
+                                    // normalise tags in newAttributeValue to lowercase and trimmed
+                                    foreach (KeyValuePair<DataObjectItemTags.TagType, List<string>> tagType in newAttributeValue)
                                     {
-                                        bool tagFound = false;
-                                        if (existingTags.ContainsKey(suppliedTagType.Key))
+                                        for (int i = 0; i < tagType.Value.Count; i++)
                                         {
-                                            foreach (DataObjectItemTags.TagModel tagModel in existingTags[suppliedTagType.Key].Tags)
+                                            tagType.Value[i] = tagType.Value[i].Trim().ToLower();
+                                        }
+                                    }
+
+                                    // loop the keys in the supplied value dictionary<DataObjectItemTages.TagType, List<string>>
+                                    foreach (KeyValuePair<DataObjectItemTags.TagType, List<string>> suppliedTagType in newAttributeValue)
+                                    {
+                                        foreach (string suppliedTag in suppliedTagType.Value)
+                                        {
+                                            bool tagFound = false;
+                                            if (existingTags.ContainsKey(suppliedTagType.Key))
                                             {
-                                                if (tagModel.Text == suppliedTag)
+                                                foreach (DataObjectItemTags.TagModel tagModel in existingTags[suppliedTagType.Key].Tags)
                                                 {
-                                                    tagFound = true;
+                                                    if (tagModel.Text == suppliedTag && tagModel.AIGenerated == false)
+                                                    {
+                                                        tagFound = true;
+                                                    }
                                                 }
                                             }
-                                        }
 
-                                        if (tagFound == false)
-                                        {
-                                            // add to new tags
-                                            if (!newTags.ContainsKey(suppliedTagType.Key))
+                                            if (tagFound == false)
                                             {
-                                                newTags.Add(suppliedTagType.Key, new List<string>());
+                                                // add to new tags
+                                                if (!newTags.ContainsKey(suppliedTagType.Key))
+                                                {
+                                                    newTags.Add(suppliedTagType.Key, new List<string>());
+                                                }
+                                                newTags[suppliedTagType.Key].Add(suppliedTag);
                                             }
-                                            newTags[suppliedTagType.Key].Add(suppliedTag);
                                         }
                                     }
                                 }
@@ -1148,7 +1185,7 @@ namespace hasheous_server.Classes
                                         {
                                             foreach (DataObjectItemTags.TagModel tagModel in existingTagMappings[suppliedTagType.Key].Tags)
                                             {
-                                                if (tagModel.Text == suppliedTag)
+                                                if (tagModel.Text == suppliedTag && tagModel.AIGenerated == false)
                                                 {
                                                     mappingFound = true;
                                                 }
@@ -1163,7 +1200,7 @@ namespace hasheous_server.Classes
                                             {
                                                 foreach (DataObjectItemTags.TagModel tagModel in existingTags[suppliedTagType.Key].Tags)
                                                 {
-                                                    if (tagModel.Text == suppliedTag)
+                                                    if (tagModel.Text == suppliedTag && tagModel.AIGenerated == false)
                                                     {
                                                         tagIdToMap = tagModel.Id;
                                                     }
@@ -1172,10 +1209,11 @@ namespace hasheous_server.Classes
 
                                             if (tagIdToMap != -1)
                                             {
-                                                sql = "INSERT INTO DataObject_Tags (DataObjectId, TagId) VALUES (@dataobjectid, @tagid);";
+                                                sql = "INSERT INTO DataObject_Tags (DataObjectId, TagId, AIAssigned) VALUES (@dataobjectid, @tagid, @aiassigned);";
                                                 await db.ExecuteCMDAsync(sql, new Dictionary<string, object>{
                                                     { "dataobjectid", id },
-                                                    { "tagid", tagIdToMap }
+                                                    { "tagid", tagIdToMap },
+                                                    { "aiassigned", false }
                                                 });
                                             }
                                         }
@@ -1191,7 +1229,7 @@ namespace hasheous_server.Classes
                                         {
                                             foreach (string suppliedTag in newAttributeValue[existingTagMapping.Key])
                                             {
-                                                if (existingTagModel.Text == suppliedTag)
+                                                if (existingTagModel.Text == suppliedTag && existingTagModel.AIGenerated == false)
                                                 {
                                                     mappingInSupplied = true;
                                                 }
@@ -1201,10 +1239,11 @@ namespace hasheous_server.Classes
                                         if (mappingInSupplied == false)
                                         {
                                             // delete mapping
-                                            sql = "DELETE FROM DataObject_Tags WHERE DataObjectId=@dataobjectid AND TagId=@tagid;";
+                                            sql = "DELETE FROM DataObject_Tags WHERE DataObjectId=@dataobjectid AND TagId=@tagid AND AIAssigned=@aiassigned;";
                                             await db.ExecuteCMDAsync(sql, new Dictionary<string, object>{
                                                 { "dataobjectid", id },
-                                                { "tagid", existingTagModel.Id }
+                                                { "tagid", existingTagModel.Id },
+                                                { "aiassigned", false }
                                             });
                                         }
                                     }
@@ -1227,6 +1266,7 @@ namespace hasheous_server.Classes
 
                                 string sqlField;
                                 bool isMatch = false;
+                                string matchValue = "";
                                 switch (existingAttribute.attributeType)
                                 {
                                     case AttributeItem.AttributeType.ObjectRelationship:
@@ -1239,14 +1279,25 @@ namespace hasheous_server.Classes
                                                 if (tempCompare.Id == newCompareLong)
                                                 {
                                                     isMatch = true;
+                                                    matchValue = newCompareLong.ToString();
                                                 }
                                             }
                                             else
                                             {
-                                                DataObjectItem newCompare = (DataObjectItem)newAttribute.Value;
+                                                DataObjectItem? newCompare = null;
+                                                if (newAttribute.Value is hasheous_server.Models.RelationItem)
+                                                {
+                                                    newCompare = await GetDataObject((newAttribute.Value as hasheous_server.Models.RelationItem).relationId);
+                                                }
+                                                else
+                                                {
+                                                    newCompare = (DataObjectItem)newAttribute.Value;
+                                                }
+
                                                 if (tempCompare.Name == newCompare.Name)
                                                 {
                                                     isMatch = true;
+                                                    matchValue = newCompare.Id.ToString();
                                                 }
                                             }
                                         }
@@ -1275,10 +1326,10 @@ namespace hasheous_server.Classes
                                         // update existing value
                                         sql = "UPDATE DataObject_Attributes SET " + sqlField + "=@value WHERE DataObjectId=@id AND AttributeId=@attrid;";
                                         db.ExecuteNonQuery(sql, new Dictionary<string, object>{
-                                    { "id", id },
-                                    { "attrid", existingAttribute.Id },
-                                    { "value", newAttribute.Value }
-                                });
+                                            { "id", id },
+                                            { "attrid", existingAttribute.Id },
+                                            { "value", newAttribute.Value }
+                                        });
                                     }
                                 }
                                 else
@@ -1305,6 +1356,7 @@ namespace hasheous_server.Classes
             }
 
             // update metadata map
+            bool metadataChangeDetected = false;
             switch (objectType)
             {
                 case DataObjectType.Company:
@@ -1382,6 +1434,12 @@ namespace hasheous_server.Classes
                         }
 
                         bool metadataFound = false;
+                        BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod? matchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin;
+                        if (trustModelMetadataSearchType == true)
+                        {
+                            matchMethod = newMetadataItem.MatchMethod;
+                        }
+
                         foreach (DataObjectItem.MetadataItem existingMetadataItem in EditedObject.Metadata)
                         {
                             if (newMetadataItem.Source == existingMetadataItem.Source)
@@ -1389,11 +1447,13 @@ namespace hasheous_server.Classes
                                 metadataFound = true;
                                 if (newMetadataId.ToString() != existingMetadataItem.Id)
                                 {
+                                    metadataChangeDetected = true;
+
                                     // change to manually set
                                     sql = "UPDATE DataObject_MetadataMap SET MatchMethod=@match, MetadataId=@metaid, WinningVoteCount=@winningvotecount, TotalVoteCount=@totalvotecount WHERE DataObjectId=@id AND SourceId=@source;";
                                     db.ExecuteNonQuery(sql, new Dictionary<string, object>{
                                         { "id", id },
-                                        { "match", BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin },
+                                        { "match", matchMethod ?? BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin },
                                         { "metaid", newMetadataId },
                                         { "source", existingMetadataItem.Source },
                                         { "winningvotecount", 0 },
@@ -1405,10 +1465,12 @@ namespace hasheous_server.Classes
 
                         if (metadataFound == false)
                         {
+                            metadataChangeDetected = true;
+
                             sql = "INSERT INTO DataObject_MetadataMap (DataObjectId, MetadataId, SourceId, MatchMethod, LastSearched, NextSearch) VALUES (@id, @metaid, @source, @match, @last, @next);";
                             db.ExecuteNonQuery(sql, new Dictionary<string, object>{
                                 { "id", id },
-                                { "match", BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin },
+                                { "match", matchMethod ?? BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin },
                                 { "metaid", newMetadataId },
                                 { "source", newMetadataItem.Source },
                                 { "last", DateTime.UtcNow },
@@ -1490,10 +1552,27 @@ namespace hasheous_server.Classes
                 }
             }
 
-            // purge redis cache of all keys for this object type
-            if (Config.RedisConfiguration.Enabled)
+            UpdateDataObjectDate(id);
+
+            if (metadataChangeDetected == true)
             {
-                RedisConnection.PurgeCache("DataObject");
+                // metadata map change detected - reset associated tagging task
+                var tasks = TaskManagement.GetAllTasks(id);
+                if (tasks != null && tasks.Count > 0)
+                {
+                    foreach (var task in tasks)
+                    {
+                        if (task.TaskName == Models.Tasks.TaskType.AIDescriptionAndTagging)
+                        {
+                            await task.Reset();
+                        }
+                    }
+                }
+                else
+                {
+                    // no tagging task exists - create one
+                    TaskManagement.EnqueueTask((long)id, Models.Tasks.TaskType.AIDescriptionAndTagging);
+                }
             }
 
             return await GetDataObject(objectType, id);
@@ -1502,28 +1581,27 @@ namespace hasheous_server.Classes
         /// <summary>
         /// Performs a metadata look up on DataObjects with no match metadata
         /// </summary>
-        public async Task<MatchItem?> DataObjectMetadataSearch(DataObjectType objectType, bool ForceSearch = false)
+        public async Task DataObjectMetadataSearch(DataObjectType objectType, bool ForceSearch = false)
         {
-            var retVal = await _DataObjectMetadataSearch(objectType, null, ForceSearch);
-            return retVal;
+            await _DataObjectMetadataSearch2(objectType, null, ForceSearch);
         }
 
         /// <summary>
         /// Performs a metadata look up on the selected DataObject if it has no metadata match
         /// </summary>
         /// <param name="id"></param>
-        public async Task<MatchItem?> DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch = false)
+        public async Task DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch = false)
         {
             switch (objectType)
             {
                 case DataObjectType.Company:
                 case DataObjectType.Platform:
                 case DataObjectType.Game:
-                    var retVal = await _DataObjectMetadataSearch(objectType, id, ForceSearch);
-                    return retVal;
+                    await _DataObjectMetadataSearch2(objectType, id, ForceSearch);
+                    break;
 
                 default:
-                    return null;
+                    break;
             }
         }
 
@@ -2214,6 +2292,378 @@ namespace hasheous_server.Classes
             return DataObjectSearchResults;
         }
 
+        private async Task _DataObjectMetadataSearch2(DataObjectType objectType, long? id, bool ForceSearch)
+        {
+            List<MetadataSources> ProcessSources = new List<MetadataSources>
+            {
+                MetadataSources.IGDB,
+                MetadataSources.TheGamesDb,
+                MetadataSources.RetroAchievements,
+                MetadataSources.GiantBomb
+            };
+
+            MatchItem? DataObjectSearchResults = new MatchItem
+            {
+                MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
+                MetadataId = ""
+            };
+
+            // purge redis cache of all keys for this object type
+            if (Config.RedisConfiguration.Enabled)
+            {
+                RedisConnection.PurgeCache("DataObject");
+            }
+
+            // set up the list of objects that need to be processed
+            List<DataObjectItem> DataObjectsToProcess = new List<DataObjectItem>();
+            if (id != null)
+            {
+                // get a single data object
+                DataObjectItem? singleDataObject = await GetDataObject(objectType, (long)id);
+                if (singleDataObject != null)
+                {
+                    DataObjectsToProcess.Add(singleDataObject);
+                }
+                else
+                {
+                    // requested object not found
+                    return;
+                }
+            }
+            else
+            {
+                // get all data objects of the specified type that need metadata searching - any item last searched more than 5 days ago
+                DataTable data = await Config.database.ExecuteCMDAsync(@"
+                    SELECT DISTINCT
+                        DataObject.*, DDMM.LastSearched
+                    FROM
+                        DataObject
+                            JOIN 
+                        (SELECT 
+                            DataObjectId, LastSearched
+                        FROM
+                            DataObject_MetadataMap GROUP BY DataObjectId ORDER BY LastSearched) DDMM ON DataObject.Id = DDMM.DataObjectId
+                    WHERE
+                        ObjectType = @objecttype AND DDMM.LastSearched < @lastsearched
+                    ORDER BY DataObject.`Name`;
+                ", new Dictionary<string, object>
+                {
+                    { "@objecttype", objectType },
+                    { "@lastsearched", DateTime.UtcNow.AddDays(-5) }
+                });
+
+                foreach (DataRow row in data.Rows)
+                {
+                    DataObjectItem item = await BuildDataObject(objectType, (long)row["Id"], row, false, true);
+                    DataObjectsToProcess.Add(item);
+                }
+
+                if (DataObjectsToProcess.Count == 0)
+                {
+                    return;
+                }
+            }
+
+            // start processing each object
+            int processedObjectCount = 0;
+            foreach (DataObjectItem item in DataObjectsToProcess)
+            {
+                processedObjectCount++;
+
+                // if item is a game type, we need to first determine if a platform is mapped
+                DataObjectItem? itemPlatform = null;
+                if (item.ObjectType == DataObjectType.Game)
+                {
+                    if (item.Attributes != null && item.Attributes.Count > 0)
+                    {
+                        AttributeItem? platformAttribute = item.Attributes.Find(x => x.attributeName == AttributeItem.AttributeName.Platform && x.attributeType == AttributeItem.AttributeType.ObjectRelationship);
+                        if (platformAttribute != null)
+                        {
+                            // get the associated platform dataobject
+                            if (platformAttribute.Value.GetType() == typeof(DataObjectItem))
+                            {
+                                itemPlatform = (DataObjectItem)platformAttribute.Value;
+                            }
+                            else
+                            {
+                                RelationItem relationItem = (RelationItem)platformAttribute.Value;
+                                itemPlatform = await GetDataObject(DataObjectType.Platform, relationItem.relationId);
+                            }
+                        }
+                    }
+
+                    if (itemPlatform == null)
+                    {
+                        Logging.Log(Logging.LogType.Warning, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Skipping game " + item.Name + " as no platform is mapped.");
+                        continue;
+                    }
+                }
+
+                // generate a list of search candidates
+                List<string> SearchCandidates = GetSearchCandidates(item.Name);
+
+                Logging.Log(Logging.LogType.Information, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Searching for metadata for " + string.Join(", ", SearchCandidates) + " (" + item.ObjectType + ") Id: " + item.Id);
+
+                List<DataObjectItem.MetadataItem> metadataUpdates = new List<MetadataItem>();
+
+                // process each metadata source
+                foreach (MetadataSources metadataSource in Enum.GetValues(typeof(MetadataSources)))
+                {
+                    // skip if it's an unsupported source type
+                    if (!ProcessSources.Contains(metadataSource))
+                    {
+                        continue;
+                    }
+
+                    // setup search options
+                    Dictionary<string, object> searchOptions = new Dictionary<string, object>();
+
+                    // if item type is game, search platformItem for an metadata source that equals metadataSource - if not found, skip
+                    DataObjectItem.MetadataItem? platformMetadata = null;
+                    if (item.ObjectType == DataObjectType.Game && itemPlatform != null)
+                    {
+                        if (itemPlatform != null && itemPlatform.Metadata != null && itemPlatform.Metadata.Count > 0)
+                        {
+                            // check if platform has metadata for this source
+                            platformMetadata = itemPlatform.Metadata.Find(x => x.Source == metadataSource);
+                            if (!String.IsNullOrEmpty(platformMetadata?.ImmutableId))
+                            {
+                                searchOptions.Add("platformId", long.Parse(platformMetadata.ImmutableId ?? "0"));
+                            }
+                            else
+                            {
+                                platformMetadata = null;
+                            }
+                        }
+
+                        if (platformMetadata == null)
+                        {
+                            Logging.Log(Logging.LogType.Warning, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Skipping metadata source " + metadataSource + " for game " + item.Name + " as no platform metadata is mapped.");
+                            continue;
+                        }
+                    }
+
+                    // find the class that implements IMetadata for this source in the namespace hasheous_server.Classes.MetadataLib where the property MetadataSource = metadataSource
+                    var metadataHandlerType = typeof(MetadataLib.IMetadata).Assembly.GetTypes()
+                        .Where(t => typeof(MetadataLib.IMetadata).IsAssignableFrom(t) && !t.IsInterface)
+                        .FirstOrDefault(t =>
+                        {
+                            var instance = Activator.CreateInstance(t) as MetadataLib.IMetadata;
+                            return instance?.MetadataSource == metadataSource;
+                        });
+
+                    if (metadataHandlerType == null)
+                    {
+                        // No handler found for this metadata source, skip it
+                        Logging.Log(Logging.LogType.Warning, "Metadata Match", $"No IMetadata handler found for source: {metadataSource}");
+                        continue;
+                    }
+
+                    var metadataHandler = Activator.CreateInstance(metadataHandlerType) as MetadataLib.IMetadata;
+
+                    if (metadataHandler == null)
+                    {
+                        // Unable to create instance of the handler, skip it
+                        Logging.Log(Logging.LogType.Warning, "Metadata Match", $"Unable to create instance of IMetadata handler for source: {metadataSource}");
+                        continue;
+                    }
+
+                    // get the metadataitem from the dataobject - if not present, create a new one
+                    // default to new
+                    DataObjectItem.MetadataItem metadata = new DataObjectItem.MetadataItem(objectType)
+                    {
+                        Id = "",
+                        MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
+                        Source = metadataSource,
+                        LastSearch = DateTime.UtcNow.AddMonths(-3),
+                        NextSearch = DateTime.UtcNow.AddMonths(-1),
+                        WinningVoteCount = 0,
+                        TotalVoteCount = 0
+                    };
+                    if (item.Metadata != null)
+                    {
+                        DataObjectItem.MetadataItem? metadataFromItem = item.Metadata.Find(x => x.Source == metadataSource);
+                        if (metadataFromItem != null)
+                        {
+                            metadata = metadataFromItem;
+                        }
+                    }
+
+                    // do not search for metadata if the matchmethod is Manual, ManualByAdmin, or Voted
+                    List<BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod> dontSearchMatchMethods = [
+                        BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Manual,
+                        BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin,
+                        BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Voted
+                    ];
+
+                    if (metadata.MatchMethod == null || !dontSearchMatchMethods.Contains((BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod)metadata.MatchMethod))
+                    {
+                        // if the next search is in the past, or if we are forcing a search, then we can search for metadata
+                        if (ForceSearch || metadata.NextSearch < DateTime.UtcNow)
+                        {
+                            // searching is allowed
+                            Logging.Log(Logging.LogType.Information, "Metadata Match", "Checking " + metadataSource + "...");
+
+                            try
+                            {
+                                // perform the search
+                                DataObjects.MatchItem searchResult = await metadataHandler.FindMatchItemAsync(item, SearchCandidates, searchOptions);
+
+                                // update the metadata item with the search results
+                                metadata.Id = searchResult.MetadataId;
+                                metadata.MatchMethod = searchResult.MatchMethod;
+                                metadata.LastSearch = DateTime.UtcNow;
+                                switch (metadata.MatchMethod)
+                                {
+                                    case BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic:
+                                    case BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.AutomaticTooManyMatches:
+                                        metadata.NextSearch = DateTime.UtcNow.AddMonths(6);
+                                        break;
+                                    case BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch:
+                                        metadata.NextSearch = DateTime.UtcNow.AddMonths(1);
+                                        break;
+                                    default:
+                                        metadata.NextSearch = DateTime.UtcNow.AddDays(1);
+                                        break;
+                                }
+
+                                // add to updates list
+                                metadataUpdates.Add(metadata);
+
+                                Logging.Log(Logging.LogType.Information, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - " + item.ObjectType + " " + item.Name + " " + metadata.MatchMethod + " to " + metadata.Source + " metadata: " + metadata.Id);
+                            }
+                            catch (Exception ex)
+                            {
+                                Logging.Log(Logging.LogType.Warning, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Error processing metadata search", ex);
+                            }
+                        }
+                    }
+
+                    if (metadataSource == MetadataSources.IGDB && metadata.ImmutableId != null && metadata.ImmutableId != "")
+                    {
+                        // IGDB metadata found, we can use this to check other metadata sources
+                        // if (item.Metadata.Find(x => x.Source == MetadataSources.Wikipedia) == null)
+                        // {
+                        // no wikipedia metadata present, try to get it from IGDB
+                        var wiki = new MetadataLib.MetadataWikipedia();
+                        try
+                        {
+                            var wikiMetadataResults = await wiki.FindMatchItemAsync(item, SearchCandidates, new Dictionary<string, object>
+                            {
+                                { "igdbGameId", long.Parse(metadata.ImmutableId) }
+                            });
+                            if (wikiMetadataResults != null && wikiMetadataResults.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic)
+                            {
+                                // update the metadata item with the search results
+                                DataObjectItem.MetadataItem wikiMetadata = new DataObjectItem.MetadataItem(objectType)
+                                {
+                                    Id = wikiMetadataResults.MetadataId,
+                                    MatchMethod = wikiMetadataResults.MatchMethod,
+                                    Source = MetadataSources.Wikipedia,
+                                    LastSearch = DateTime.UtcNow,
+                                    NextSearch = DateTime.UtcNow.AddMonths(6),
+                                    WinningVoteCount = 0,
+                                    TotalVoteCount = 0
+                                };
+
+                                // add to updates list
+                                metadataUpdates.Add(wikiMetadata);
+
+                                Logging.Log(Logging.LogType.Information, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - " + item.ObjectType + " " + item.Name + " " + wikiMetadata.MatchMethod + " to " + wikiMetadata.Source + " metadata: " + wikiMetadata.Id);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Logging.Log(Logging.LogType.Warning, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Error processing Wikipedia metadata search", ex);
+                        }
+                        // }
+                    }
+                }
+
+                // clone DataObject to a new object incorporating any metadata updates - skip if no changes
+                if (metadataUpdates.Count > 0)
+                {
+                    DataObjectItem updatedDataObject = new DataObjectItem()
+                    {
+                        Id = item.Id,
+                        Name = item.Name,
+                        ObjectType = item.ObjectType,
+                        Permissions = item.Permissions,
+                        SignatureDataObjects = item.SignatureDataObjects,
+                        UpdatedDate = DateTime.UtcNow,
+                        UserPermissions = item.UserPermissions,
+                        CreatedDate = item.CreatedDate,
+                        Attributes = item.Attributes,
+                        Metadata = item.Metadata
+                    };
+
+                    if (updatedDataObject.Metadata == null)
+                    {
+                        updatedDataObject.Metadata = new List<DataObjectItem.MetadataItem>();
+                    }
+
+                    // apply metadata updates
+                    foreach (DataObjectItem.MetadataItem metadataUpdate in metadataUpdates)
+                    {
+                        // check if metadata source already exists
+                        DataObjectItem.MetadataItem? existingMetadata = updatedDataObject.Metadata.Find(x => x.Source == metadataUpdate.Source);
+                        if (existingMetadata != null)
+                        {
+                            // update existing
+                            existingMetadata.Id = metadataUpdate.Id;
+                            existingMetadata.MatchMethod = metadataUpdate.MatchMethod;
+                            existingMetadata.LastSearch = metadataUpdate.LastSearch;
+                            existingMetadata.NextSearch = metadataUpdate.NextSearch;
+                            existingMetadata.WinningVoteCount = metadataUpdate.WinningVoteCount;
+                            existingMetadata.TotalVoteCount = metadataUpdate.TotalVoteCount;
+                        }
+                        else
+                        {
+                            // add new
+                            updatedDataObject.Metadata.Add(metadataUpdate);
+                        }
+                    }
+
+                    // save updated data object
+                    await EditDataObject(updatedDataObject.ObjectType, updatedDataObject.Id, (DataObjectItem)updatedDataObject, true);
+                }
+
+                // ensure there are tasks for this item
+                var tasks = TaskManagement.GetAllTasks(item.Id);
+                bool aiTaskPresent = false;
+                foreach (var task in tasks)
+                {
+                    if (task.TaskName == Models.Tasks.TaskType.AIDescriptionAndTagging)
+                    {
+                        aiTaskPresent = true;
+                        break;
+                    }
+                }
+                // get metadata cover if new object is a game
+                if (objectType == DataObjectType.Game)
+                {
+                    try
+                    {
+                        BackgroundMetadataMatcher.BackgroundMetadataMatcher metadataMatcher = new BackgroundMetadataMatcher.BackgroundMetadataMatcher();
+                        await metadataMatcher.GetGameArtwork((long)item.Id, ForceSearch);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logging.Log(Logging.LogType.Warning, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Error processing game artwork metadata search", ex);
+                    }
+                }
+
+                // update date
+                UpdateDataObjectDate((long)item.Id);
+
+                // enqueue AI description and tagging task if not already present
+                if (aiTaskPresent == false)
+                {
+                    TaskManagement.EnqueueTask(item.Id, Models.Tasks.TaskType.AIDescriptionAndTagging);
+                }
+            }
+        }
+
         private static List<string> GetSearchCandidates(string GameName)
         {
             // remove version numbers from name
@@ -2292,7 +2742,7 @@ namespace hasheous_server.Classes
             return SearchCandidates;
         }
 
-        private async Task<MatchItem> GetDataObject<T>(MetadataSources Source, string Endpoint, string Fields, string Query)
+        public async Task<MatchItem> GetDataObject<T>(MetadataSources Source, string Endpoint, string Fields, string Query)
         {
             Communications communications = new Communications(Source);
             T[]? results;
@@ -2584,7 +3034,7 @@ namespace hasheous_server.Classes
             Dictionary<string, object> dbDict = new Dictionary<string, object>();
             if (DataObjectId != null)
             {
-                sql = "SELECT Tags.id, Tags.`type`, Tags.`name` FROM `Tags` INNER JOIN `DataObject_Tags` ON `Tags`.`id` = `DataObject_Tags`.`TagId` WHERE `DataObject_Tags`.`DataObjectId`=@id ORDER BY `Tags`.`name`;";
+                sql = "SELECT Tags.id, Tags.`type`, Tags.`name`, DataObject_Tags.`AIAssigned` FROM `Tags` INNER JOIN `DataObject_Tags` ON `Tags`.`id` = `DataObject_Tags`.`TagId` WHERE `DataObject_Tags`.`DataObjectId`=@id ORDER BY `Tags`.`name`;";
                 dbDict.Add("id", DataObjectId);
             }
             DataTable data = await db.ExecuteCMDAsync(sql, dbDict);
@@ -2606,7 +3056,8 @@ namespace hasheous_server.Classes
                 tags[tagType].Tags.Add(new DataObjectItemTags.TagModel()
                 {
                     Id = (long)row["id"],
-                    Text = (string)row["name"]
+                    Text = (string)row["name"],
+                    AIGenerated = row.Table.Columns.Contains("AIAssigned") && row["AIAssigned"] != DBNull.Value ? (bool)row["AIAssigned"] : false
                 });
             }
 

@@ -354,11 +354,13 @@ async function loadData() {
                             if (tagValues[tagTypeKey]) {
                                 let selectedElement = document.getElementById('attribute' + dataObject.attributes[i].attributeName.toLowerCase() + 'select' + tagTypeKey);
                                 for (let t = 0; t < tagValues[tagTypeKey].tags.length; t++) {
-                                    let tagOption = document.createElement('option');
-                                    tagOption.value = tagValues[tagTypeKey].tags[t].text;
-                                    tagOption.selected = 'selected';
-                                    tagOption.innerHTML = tagValues[tagTypeKey].tags[t].text;
-                                    selectedElement.appendChild(tagOption);
+                                    if (tagValues[tagTypeKey].tags[t].aiGenerated == false) {
+                                        let tagOption = document.createElement('option');
+                                        tagOption.value = tagValues[tagTypeKey].tags[t].text;
+                                        tagOption.selected = 'selected';
+                                        tagOption.innerHTML = tagValues[tagTypeKey].tags[t].text;
+                                        selectedElement.appendChild(tagOption);
+                                    }
                                 }
                                 $(selectedElement).trigger('change');
                             }

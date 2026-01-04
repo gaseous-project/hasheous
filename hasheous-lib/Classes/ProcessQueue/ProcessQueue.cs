@@ -143,6 +143,10 @@ namespace Classes.ProcessQueue
                     case QueueItemType.MetadataMapDump:
                         Task = new Dumps();
                         break;
+
+                    case QueueItemType.TaskResultParser:
+                        Task = new TaskResultParser();
+                        break;
                 }
             }
 
