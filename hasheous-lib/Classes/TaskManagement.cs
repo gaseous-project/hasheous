@@ -597,9 +597,6 @@ namespace hasheous_server.Classes.Tasks.Clients
                                 }
                             }
 
-                            // populate the prompt
-                            parameters.Add("prompt_description", prompt_description.Replace("<DATA_OBJECT_NAME>", dataObject.Name));
-                            parameters.Add("prompt_tags", prompt_tags.Replace("<DATA_OBJECT_NAME>", dataObject.Name));
                             // get platform from metadata
                             DataObjectItem? itemPlatform = null;
                             if (dataObject.Attributes != null && dataObject.Attributes.Count > 0)
@@ -619,6 +616,8 @@ namespace hasheous_server.Classes.Tasks.Clients
                                     }
                                 }
                             }
+                            prompt_description = prompt_description.Replace("<DATA_OBJECT_NAME>", dataObject.Name);
+                            prompt_tags = prompt_tags.Replace("<DATA_OBJECT_NAME>", dataObject.Name);
                             if (itemPlatform != null)
                             {
                                 prompt_description = prompt_description.Replace("<DATA_OBJECT_PLATFORM>", itemPlatform.Name);
@@ -629,6 +628,9 @@ namespace hasheous_server.Classes.Tasks.Clients
                                 prompt_description = prompt_description.Replace("<DATA_OBJECT_PLATFORM>", "Unknown Platform");
                                 prompt_tags = prompt_tags.Replace("<DATA_OBJECT_PLATFORM>", "Unknown Platform");
                             }
+                            // populate the prompt
+                            parameters.Add("prompt_description", prompt_description);
+                            parameters.Add("prompt_tags", prompt_tags);
                             // get metadata source descriptions
                             if (dataObject.Metadata != null && dataObject.Metadata.Count > 0)
                             {
