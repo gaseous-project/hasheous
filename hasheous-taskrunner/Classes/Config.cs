@@ -64,7 +64,8 @@ namespace hasheous_taskrunner.Classes
         {
             { "HostAddress", "https://hasheous.org/" },
             { "APIKey", "" },
-            { "ClientName", Dns.GetHostName() }
+            { "ClientName", Dns.GetHostName() },
+            { "ollama_url", "" }
         };
 
         /// <summary>
