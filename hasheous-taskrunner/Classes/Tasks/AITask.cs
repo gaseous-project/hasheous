@@ -69,16 +69,30 @@ namespace hasheous_taskrunner.Classes.Tasks
                 parameters["prompt_tags"] = parameters["prompt_tags"].Replace("<METADATA_SOURCE_DESCRIPTIONS>", sourceData);
             }
 
+            // override model to use ollama
+            string modelDescriptionOverride = "gemma3:4b";
+            string modelTagOverride = "gemma3:4b";
+            bool applyDescriptionOverride = true;
+            bool applyTagOverride = true;
+            if (applyDescriptionOverride == false)
+            {
+                modelDescriptionOverride = parameters != null && parameters.ContainsKey("prompt_description") ? parameters["prompt_description"] : "";
+            }
+            if (applyTagOverride == false)
+            {
+                modelTagOverride = parameters != null && parameters.ContainsKey("prompt_tags") ? parameters["prompt_tags"] : "";
+            }
+
             // generate the description
             var descriptionResult = await ai.ExecuteAsync(new Dictionary<string, object>
             {
-                { "model", parameters != null && parameters.ContainsKey("model_description") ? parameters["model_description"] : "" },
+                { "model", modelDescriptionOverride },
                 { "prompt", parameters != null && parameters.ContainsKey("prompt_description") ? parameters["prompt_description"] : "" }
             });
 
             var tagsResult = await ai.ExecuteAsync(new Dictionary<string, object>
             {
-                { "model", parameters != null && parameters.ContainsKey("model_tags") ? parameters["model_tags"] : "" },
+                { "model", modelTagOverride },
                 { "prompt", parameters != null && parameters.ContainsKey("prompt_tags") ? parameters["prompt_tags"] : "" }
             });
 
