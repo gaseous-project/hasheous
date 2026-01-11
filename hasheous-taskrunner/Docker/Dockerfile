@@ -19,6 +19,7 @@ RUN dotnet publish "hasheous-taskrunner/hasheous-taskrunner.csproj" --self-conta
 FROM mcr.microsoft.com/dotnet/runtime-deps:8.0
 ENV INDOCKER=1
 WORKDIR /App
+VOLUME [ "/root/.hasheous-taskrunner" ]
 
 RUN apt update && apt upgrade -y
 
