@@ -238,11 +238,13 @@ namespace hasheous_taskrunner.Classes.Capabilities
 
                     // Compute embeddings
                     var docEmbeddings = new List<double[]>();
+                    int docIndex = 1;
                     foreach (var text in embeddingTexts)
                     {
                         var emb = await GetEmbeddingAsync(http, embedModel, text);
                         if (emb != null) docEmbeddings.Add(emb);
                         else docEmbeddings.Add(Array.Empty<double>());
+                        docIndex++;
                     }
 
                     var queryEmbedding = await GetEmbeddingAsync(http, embedModel, prompt) ?? Array.Empty<double>();
@@ -361,6 +363,49 @@ namespace hasheous_taskrunner.Classes.Capabilities
         }
 
         private async Task<double[]?> GetEmbeddingAsync(HttpClient http, string embedModel, string text)
+        {
+            // Chunk text if too long (8000 chars ≈ 2000 tokens for most models)
+            const int maxChunkSize = 8000;
+            if (text.Length <= maxChunkSize)
+            {
+                return await GetSingleEmbeddingAsync(http, embedModel, text);
+            }
+
+            // Split into chunks and average embeddings
+            var chunks = new List<string>();
+            for (int i = 0; i < text.Length; i += maxChunkSize)
+            {
+                chunks.Add(text.Substring(i, Math.Min(maxChunkSize, text.Length - i)));
+            }
+
+            var embeddings = new List<double[]>();
+            foreach (var chunk in chunks)
+            {
+                var emb = await GetSingleEmbeddingAsync(http, embedModel, chunk);
+                if (emb != null) embeddings.Add(emb);
+            }
+
+            if (embeddings.Count == 0) return null;
+
+            // Average all chunk embeddings
+            int dim = embeddings[0].Length;
+            var avgEmb = new double[dim];
+            foreach (var emb in embeddings)
+            {
+                for (int i = 0; i < dim; i++)
+                {
+                    avgEmb[i] += emb[i];
+                }
+            }
+            for (int i = 0; i < dim; i++)
+            {
+                avgEmb[i] /= embeddings.Count;
+            }
+
+            return avgEmb;
+        }
+
+        private async Task<double[]?> GetSingleEmbeddingAsync(HttpClient http, string embedModel, string text)
         {
             var body = new { model = embedModel, prompt = text };
             var json = JsonSerializer.Serialize(body);
