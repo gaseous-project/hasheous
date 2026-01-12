@@ -50,28 +50,18 @@ namespace hasheous_taskrunner.Classes.Tasks
             }
 
             // get sources from parameters
-            string sourceData = "";
+            List<string> sources = new List<string>();
             foreach (string sourceKey in parameters["sources"].Split(';'))
             {
                 if (parameters.ContainsKey("Source_" + sourceKey.Trim()))
                 {
-                    sourceData += "---TEXT [\"" + sourceKey.Trim() + "\"]---\n" + parameters["Source_" + sourceKey.Trim()] + "\n\n";
+                    sources.Add("# " + sourceKey.Trim() + "\n\n" + parameters["Source_" + sourceKey.Trim()] + "\n\n");
                 }
             }
 
-            // append source data to prompts
-            if (parameters != null && parameters.ContainsKey("prompt_description"))
-            {
-                parameters["prompt_description"] = parameters["prompt_description"].Replace("<METADATA_SOURCE_DESCRIPTIONS>", sourceData);
-            }
-            if (parameters != null && parameters.ContainsKey("prompt_tags"))
-            {
-                parameters["prompt_tags"] = parameters["prompt_tags"].Replace("<METADATA_SOURCE_DESCRIPTIONS>", sourceData);
-            }
-
             // override model to use ollama
-            string modelDescriptionOverride = "gemma3:12b";
-            string modelTagOverride = "gemma3:12b";
+            string modelDescriptionOverride = "gemma3:4b";
+            string modelTagOverride = "gemma3:4b";
             bool applyDescriptionOverride = true;
             bool applyTagOverride = true;
             if (applyDescriptionOverride == false)
@@ -87,13 +77,15 @@ namespace hasheous_taskrunner.Classes.Tasks
             var descriptionResult = await ai.ExecuteAsync(new Dictionary<string, object>
             {
                 { "model", modelDescriptionOverride },
-                { "prompt", parameters != null && parameters.ContainsKey("prompt_description") ? parameters["prompt_description"] : "" }
+                { "prompt", parameters != null && parameters.ContainsKey("prompt_description") ? parameters["prompt_description"] : "" },
+                { "embeddings", sources }
             });
 
             var tagsResult = await ai.ExecuteAsync(new Dictionary<string, object>
             {
                 { "model", modelTagOverride },
-                { "prompt", parameters != null && parameters.ContainsKey("prompt_tags") ? parameters["prompt_tags"] : "" }
+                { "prompt", parameters != null && parameters.ContainsKey("prompt_tags") ? parameters["prompt_tags"] : "" },
+                { "embeddings", sources }
             });
 
             Dictionary<string, object> response = new Dictionary<string, object>();

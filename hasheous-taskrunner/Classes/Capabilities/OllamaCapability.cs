@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -192,39 +193,149 @@ namespace hasheous_taskrunner.Classes.Capabilities
                     return result;
                 }
 
-                // 3) Generate response
-                var genBody = new
+                // 3) RAG flow if embeddings provided; else direct generate
+                string responseText;
+
+                List<string> embeddingTexts = new List<string>();
+                if (parameters != null && parameters.ContainsKey("embeddings"))
                 {
-                    model = model,
-                    prompt = prompt,
-                    stream = false
-                };
-                var genJson = JsonSerializer.Serialize(genBody);
-                var genResp = await http.PostAsync("/api/generate", new StringContent(genJson, Encoding.UTF8, "application/json"));
-                if (!genResp.IsSuccessStatusCode)
-                {
-                    var genErr = await genResp.Content.ReadAsStringAsync();
-                    result["result"] = false;
-                    result["error"] = $"Generate failed: {(int)genResp.StatusCode} {genErr}";
-                    return result;
+                    try
+                    {
+                        if (parameters["embeddings"] is IEnumerable<object> objList)
+                        {
+                            foreach (var o in objList)
+                            {
+                                var s = Convert.ToString(o);
+                                if (!string.IsNullOrEmpty(s)) embeddingTexts.Add(s);
+                            }
+                        }
+                        else if (parameters["embeddings"] is IEnumerable<string> strList)
+                        {
+                            embeddingTexts.AddRange(strList.Where(s => !string.IsNullOrEmpty(s)));
+                        }
+                        else if (parameters["embeddings"] is string singleStr && !string.IsNullOrWhiteSpace(singleStr))
+                        {
+                            embeddingTexts.Add(singleStr);
+                        }
+                    }
+                    catch { }
                 }
 
-                var genContent = await genResp.Content.ReadAsStringAsync();
-
-                // Expected shape when stream=false: { "response": "...", ... }
-                string? responseText = null;
-                try
+                if (embeddingTexts.Count > 0)
                 {
-                    using var doc = JsonDocument.Parse(genContent);
-                    if (doc.RootElement.TryGetProperty("response", out var respProp) && respProp.ValueKind == JsonValueKind.String)
+                    // Use a dedicated embedding model for better retrieval
+                    string embedModel = "nomic-embed-text";
+
+                    // Ensure embedding model is available
+                    var pullEmbedBody = new { name = embedModel, stream = false };
+                    var pullEmbedJson = JsonSerializer.Serialize(pullEmbedBody);
+                    var pullEmbedResp = await http.PostAsync("/api/pull", new StringContent(pullEmbedJson, Encoding.UTF8, "application/json"));
+                    if (!pullEmbedResp.IsSuccessStatusCode)
                     {
-                        responseText = respProp.GetString();
+                        // If pull fails, continue and hope model already exists
+                        Console.WriteLine($"OllamaCapability: Embed model pull failed: {(int)pullEmbedResp.StatusCode}");
+                    }
+
+                    // Compute embeddings
+                    var docEmbeddings = new List<double[]>();
+                    foreach (var text in embeddingTexts)
+                    {
+                        var emb = await GetEmbeddingAsync(http, embedModel, text);
+                        if (emb != null) docEmbeddings.Add(emb);
+                        else docEmbeddings.Add(Array.Empty<double>());
+                    }
+
+                    var queryEmbedding = await GetEmbeddingAsync(http, embedModel, prompt) ?? Array.Empty<double>();
+
+                    // Rank by cosine similarity
+                    var ranked = new List<(int idx, double score)>();
+                    for (int i = 0; i < docEmbeddings.Count; i++)
+                    {
+                        double score = CosineSimilarity(queryEmbedding, docEmbeddings[i]);
+                        ranked.Add((i, score));
+                    }
+                    var topK = ranked
+                        .OrderByDescending(r => r.score)
+                        .Take(5)
+                        .Select(r => embeddingTexts[r.idx])
+                        .ToList();
+
+                    string ragPrompt = BuildRagPrompt(prompt, topK);
+
+                    var genBody = new
+                    {
+                        model = model,
+                        prompt = ragPrompt,
+                        stream = false,
+                        options = new
+                        {
+                            num_predict = 256,
+                            temperature = 0.2
+                        }
+                    };
+                    var genJson = JsonSerializer.Serialize(genBody);
+                    var genResp = await http.PostAsync("/api/generate", new StringContent(genJson, Encoding.UTF8, "application/json"));
+                    if (!genResp.IsSuccessStatusCode)
+                    {
+                        var genErr = await genResp.Content.ReadAsStringAsync();
+                        result["result"] = false;
+                        result["error"] = $"Generate failed: {(int)genResp.StatusCode} {genErr}";
+                        return result;
+                    }
+
+                    var genContent = await genResp.Content.ReadAsStringAsync();
+                    responseText = string.Empty;
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(genContent);
+                        if (doc.RootElement.TryGetProperty("response", out var respProp))
+                        {
+                            responseText = respProp.GetString() ?? string.Empty;
+                        }
+                    }
+                    catch
+                    {
+                        responseText = genContent;
                     }
                 }
-                catch
+                else
                 {
-                    // fall back to raw content
-                    responseText = genContent;
+                    // Direct generation without chunking
+                    var genBody = new
+                    {
+                        model = model,
+                        prompt = prompt,
+                        stream = false,
+                        options = new
+                        {
+                            num_predict = 256,
+                            temperature = 0.2
+                        }
+                    };
+                    var genJson = JsonSerializer.Serialize(genBody);
+                    var genResp = await http.PostAsync("/api/generate", new StringContent(genJson, Encoding.UTF8, "application/json"));
+                    if (!genResp.IsSuccessStatusCode)
+                    {
+                        var genErr = await genResp.Content.ReadAsStringAsync();
+                        result["result"] = false;
+                        result["error"] = $"Generate failed: {(int)genResp.StatusCode} {genErr}";
+                        return result;
+                    }
+
+                    var genContent = await genResp.Content.ReadAsStringAsync();
+                    responseText = string.Empty;
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(genContent);
+                        if (doc.RootElement.TryGetProperty("response", out var respProp))
+                        {
+                            responseText = respProp.GetString() ?? string.Empty;
+                        }
+                    }
+                    catch
+                    {
+                        responseText = genContent;
+                    }
                 }
 
                 result["result"] = true;
@@ -247,6 +358,67 @@ namespace hasheous_taskrunner.Classes.Capabilities
                 Timeout = TimeSpan.FromMinutes(5)
             };
             return http;
+        }
+
+        private async Task<double[]?> GetEmbeddingAsync(HttpClient http, string embedModel, string text)
+        {
+            var body = new { model = embedModel, prompt = text };
+            var json = JsonSerializer.Serialize(body);
+            var resp = await http.PostAsync("/api/embeddings", new StringContent(json, Encoding.UTF8, "application/json"));
+            if (!resp.IsSuccessStatusCode)
+            {
+                return null;
+            }
+            var content = await resp.Content.ReadAsStringAsync();
+            try
+            {
+                using var doc = JsonDocument.Parse(content);
+                if (doc.RootElement.TryGetProperty("embedding", out var embProp))
+                {
+                    var list = new List<double>();
+                    foreach (var v in embProp.EnumerateArray())
+                    {
+                        list.Add(v.GetDouble());
+                    }
+                    return list.ToArray();
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        private static double CosineSimilarity(double[] a, double[] b)
+        {
+            if (a == null || b == null || a.Length == 0 || b.Length == 0 || a.Length != b.Length) return 0.0;
+            double dot = 0.0, na = 0.0, nb = 0.0;
+            for (int i = 0; i < a.Length; i++)
+            {
+                dot += a[i] * b[i];
+                na += a[i] * a[i];
+                nb += b[i] * b[i];
+            }
+            double denom = Math.Sqrt(na) * Math.Sqrt(nb);
+            if (denom == 0.0) return 0.0;
+            return dot / denom;
+        }
+
+        private static string BuildRagPrompt(string taskPrompt, List<string> contexts)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("You are a precise summarizer. Use ONLY the provided context.");
+            sb.AppendLine("If the context is insufficient, say 'Insufficient context'.");
+            sb.AppendLine("Produce a concise summary, no chit-chat, under 8 sentences.");
+            sb.AppendLine();
+            sb.AppendLine("Context:");
+            for (int i = 0; i < contexts.Count; i++)
+            {
+                sb.AppendLine($"--- Passage {i + 1} ---");
+                sb.AppendLine(contexts[i]);
+            }
+            sb.AppendLine();
+            sb.AppendLine("Task:");
+            sb.AppendLine(taskPrompt);
+            return sb.ToString();
         }
     }
 }

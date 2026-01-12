@@ -1,11 +1,5 @@
 Generate detailed tags for the platform <DATA_OBJECT_NAME>.
 
-Here are the texts to use as a basis for the tags, each source is delimited by "---TEXT [SOURCE]---", with "---END OF SOURCES---" to denote the end of the source texts.
-
-<METADATA_SOURCE_DESCRIPTIONS>
-
----END OF SOURCES---
-
 If present; use the Wikipedia source as context for the other provided sources.
 
 The tags should accurately represent the platform. Only generate tags in the following categories: Type, Era, Console Generation (only relevant for consoles - leave blank for computers), Hardware Specs, Connectivity, Input Methods.

@@ -1,10 +1,4 @@
-Generate a detailed description/synopsis for the game <DATA_OBJECT_NAME> for <DATA_OBJECT_PLATFORM>. 
-
-Here are the texts to use as a basis for the description, each source is delimited by "---TEXT [SOURCE]---":
-
-<METADATA_SOURCE_DESCRIPTIONS>
-
----END OF SOURCES---
+Generate a detailed description/synopsis for the game <DATA_OBJECT_NAME> for <DATA_OBJECT_PLATFORM>.
 
 If present; use the Wikipedia source as context for the other provided sources.
 

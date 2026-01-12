@@ -2,12 +2,6 @@ You are an expert whose responsibility is to help with automatic tagging for a g
 
 Generate detailed tags for the game <DATA_OBJECT_NAME> for <DATA_OBJECT_PLATFORM>.
 
-Here are the texts to use as a basis for the tags, each source is delimited by "---TEXT [SOURCE]---", with "---END OF SOURCES---" to denote the end of the source texts.
-
-<METADATA_SOURCE_DESCRIPTIONS>
-
----END OF SOURCES---
-
 If present; use the Wikipedia source as context for the other provided sources.
 
 The tags should accurately represent the game. Only generate tags in the following categories: Genre, Gameplay, Features, Theme, Perspective, and Art Style.
