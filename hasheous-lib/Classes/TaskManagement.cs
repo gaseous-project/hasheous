@@ -114,17 +114,17 @@ namespace hasheous_server.Classes.Tasks.Clients
             // create cache key
             string cacheKey = hasheous.Classes.RedisConnection.GenerateKey("TaskWorkerAPIKeys", clientAPIKey + publicId);
 
-            // check cache first
-            if (Config.RedisConfiguration.Enabled)
-            {
-                string? cachedValue = hasheous.Classes.RedisConnection.GetDatabase(0).StringGet(cacheKey);
-                if (cachedValue != null)
-                {
-                    ClientModel? cachedItem = Newtonsoft.Json.JsonConvert.DeserializeObject<ClientModel>(cachedValue);
+            // // check cache first
+            // if (Config.RedisConfiguration.Enabled)
+            // {
+            //     string? cachedValue = hasheous.Classes.RedisConnection.GetDatabase(0).StringGet(cacheKey);
+            //     if (cachedValue != null)
+            //     {
+            //         ClientModel? cachedItem = Newtonsoft.Json.JsonConvert.DeserializeObject<ClientModel>(cachedValue);
 
-                    return cachedItem;
-                }
-            }
+            //         return cachedItem;
+            //     }
+            // }
 
             DataTable dt = await db.ExecuteCMDAsync("SELECT * FROM Task_Clients WHERE api_key = @api_key AND public_id = @public_id LIMIT 1;", new Dictionary<string, object>
             {
@@ -137,8 +137,8 @@ namespace hasheous_server.Classes.Tasks.Clients
             }
             else
             {
-                // cache the result
-                hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(cacheKey, Newtonsoft.Json.JsonConvert.SerializeObject(new ClientModel(dt.Rows[0])), TimeSpan.FromSeconds(3600)); // cache for 1 hour
+                // // cache the result
+                // hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(cacheKey, Newtonsoft.Json.JsonConvert.SerializeObject(new ClientModel(dt.Rows[0])), TimeSpan.FromSeconds(3600)); // cache for 1 hour
             }
             return new ClientModel(dt.Rows[0]);
         }

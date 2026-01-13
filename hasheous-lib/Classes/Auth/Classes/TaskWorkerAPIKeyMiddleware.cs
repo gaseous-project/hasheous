@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Security.Cryptography.Xml;
 using Classes;
+using hasheous.Classes;
 using hasheous_server.Classes.Tasks.Clients;
 using hasheous_server.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -58,14 +59,42 @@ namespace Authentication
                     return false;
                 }
 
-                // check the database
-                var client = ClientManagement.GetClientByAPIKeyAndPublicId(apiKey, publicId).GetAwaiter().GetResult();
-                if (client == null)
+                var cacheKey = RedisConnection.GenerateKey(APIKeyCacheNamePrefix, publicId + apiKey);
+                // check the cache first
+                if (Config.RedisConfiguration.Enabled)
                 {
-                    return false;
+                    string? cachedValue = hasheous.Classes.RedisConnection.GetDatabase(0).StringGet(cacheKey);
+                    if (cachedValue != null)
+                    {
+                        bool cachedItem = Newtonsoft.Json.JsonConvert.DeserializeObject<bool>(cachedValue);
+
+                        return cachedItem;
+                    }
                 }
 
-                return true;
+                // check the database
+                DataTable dt = Config.database.ExecuteCMD("SELECT * FROM Task_Clients WHERE api_key = @api_key AND public_id = @public_id LIMIT 1;", new Dictionary<string, object>
+                {
+                    { "@api_key", apiKey },
+                    { "@public_id", publicId }
+                });
+                bool isValid;
+                if (dt.Rows.Count == 0)
+                {
+                    isValid = false;
+                }
+                else
+                {
+                    isValid = true;
+                }
+
+                // store in cache
+                if (Config.RedisConfiguration.Enabled)
+                {
+                    hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(cacheKey, Newtonsoft.Json.JsonConvert.SerializeObject(isValid), TimeSpan.FromSeconds(CacheDuration));
+                }
+
+                return isValid;
             }
         }
 
