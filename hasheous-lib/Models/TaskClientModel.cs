@@ -308,7 +308,7 @@ namespace hasheous_server.Models.Tasks
         /// </returns>
         public QueueItemStatus? GetClientTaskStatus()
         {
-            if (this.IsActive == false)
+            if (this.IsActive == true)
             {
                 return Classes.Tasks.Clients.TaskManagement.GetClientTaskStatus(this.Id);
             }
