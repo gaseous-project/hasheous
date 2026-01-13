@@ -28,13 +28,30 @@ if (hasheous_taskrunner.Classes.Communication.Common.IsRegistered())
     // Main processing loop - each task run in the loop should be run as a background task
     while (!cts.Token.IsCancellationRequested)
     {
+        // Ensure registration is up to date if due
+        await hasheous_taskrunner.Classes.Communication.Registration.ReRegisterIfDue();
+
         // Send heartbeat if due
         await hasheous_taskrunner.Classes.Communication.Heartbeat.SendHeartbeatIfDue();
 
         // Fetch and execute tasks if due
         if (!hasheous_taskrunner.Classes.Communication.Tasks.IsRunningTask)
         {
-            await hasheous_taskrunner.Classes.Communication.Tasks.FetchAndExecuteTasksIfDue();
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await hasheous_taskrunner.Classes.Communication.Tasks.FetchAndExecuteTasksIfDue(cts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    Console.WriteLine("Task execution was cancelled.");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error in background task: {ex.Message}");
+                }
+            });
         }
 
         // Wait 10 before next iteration
@@ -66,5 +83,3 @@ else
 
 // Keep the console window open
 Console.WriteLine("Task worker has stopped.");
-Console.WriteLine("Press any key to exit...");
-Console.ReadKey();

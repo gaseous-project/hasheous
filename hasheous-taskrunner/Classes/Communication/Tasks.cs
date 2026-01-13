@@ -18,11 +18,13 @@ namespace hasheous_taskrunner.Classes.Communication
         /// <summary>
         /// Fetches and executes tasks from the configured host if the fetch interval has elapsed.
         /// </summary>
+        /// <param name="cancellationToken">Cancellation token to cancel the operation.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
-        public static async Task FetchAndExecuteTasksIfDue()
+        public static async Task FetchAndExecuteTasksIfDue(CancellationToken cancellationToken = default)
         {
             if (DateTime.UtcNow - lastTaskFetch >= taskFetchInterval)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 IsRunningTask = true;
                 string fetchTasksUrl = $"{Config.BaseUriPath}/clients/{Config.GetAuthValue("client_id")}/job";
                 try
@@ -56,7 +58,7 @@ namespace hasheous_taskrunner.Classes.Communication
 
                         // verify the task
                         Console.Write($"Verifying task ID {job.Id}...");
-                        TaskVerificationResult verificationResult = await handler.VerifyAsync(job.Parameters, CancellationToken.None);
+                        TaskVerificationResult verificationResult = await handler.VerifyAsync(job.Parameters, cancellationToken);
                         Console.WriteLine($" {verificationResult.Status}");
 
                         // acknowledge receipt of the task
@@ -94,7 +96,7 @@ namespace hasheous_taskrunner.Classes.Communication
                         try
                         {
                             Console.WriteLine($"Executing task ID {job.Id}...");
-                            Dictionary<string, object> executionResult = await handler.ExecuteAsync(job.Parameters, CancellationToken.None);
+                            Dictionary<string, object> executionResult = await handler.ExecuteAsync(job.Parameters, cancellationToken);
                             // report task completion
                             ackPayload["status"] = QueueItemStatus.Submitted.ToString();
                             ackPayload["result"] = executionResult.ContainsKey("response") ? executionResult["response"] : "";

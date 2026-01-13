@@ -151,13 +151,13 @@ namespace hasheous_server.Models.Tasks
         private DateTime _LastContactAt { get; set; }
 
         /// <summary>
-        /// Gets a value indicating whether the client is considered active (contacted within the last 5 minutes).
+        /// Gets a value indicating whether the client is considered active (contacted within the last 2 minutes).
         /// </summary>
         public bool IsActive
         {
             get
             {
-                return (DateTime.UtcNow - _LastContactAt).TotalMinutes < 5;
+                return (DateTime.UtcNow - _LastContactAt).TotalMinutes < 2;
             }
         }
 

@@ -9,6 +9,9 @@ namespace hasheous_taskrunner.Classes.Communication
     /// </summary>
     public static class Registration
     {
+        private static DateTime lastRegistrationTime = DateTime.MinValue;
+        private static readonly TimeSpan registrationInterval = TimeSpan.FromMinutes(60);
+
         /// <summary>
         /// Initializes registration-related resources; implement registration logic here.
         /// </summary>
@@ -95,6 +98,7 @@ namespace hasheous_taskrunner.Classes.Communication
                 {
                     await Common.Put<string?>(updateUrl, Config.RegistrationParameters);
                     Console.WriteLine("Registration info update successful.");
+                    lastRegistrationTime = DateTime.UtcNow;
                 }
                 catch (Exception ex)
                 {
@@ -121,6 +125,19 @@ namespace hasheous_taskrunner.Classes.Communication
                 {
                     Console.WriteLine($"Failed to unregister: {ex.Message}");
                 }
+            }
+        }
+
+        /// <summary>
+        /// Re-registers the task worker if the registration interval has elapsed.
+        /// </summary>
+        public async static Task ReRegisterIfDue()
+        {
+            if (DateTime.UtcNow - lastRegistrationTime >= registrationInterval)
+            {
+                Console.WriteLine("Re-registering task worker with host...");
+                await Initialize(Config.RegistrationParameters);
+                lastRegistrationTime = DateTime.UtcNow;
             }
         }
     }
