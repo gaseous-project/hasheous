@@ -558,7 +558,11 @@ namespace hasheous_server.Classes.Tasks.Clients
             {
                 return null;
             }
-            return (QueueItemStatus?)dt.Rows[0]["status"];
+
+            // parse status field to QueueItemStatus enum
+            QueueItemStatus? status = Enum.Parse<QueueItemStatus>(dt.Rows[0]["status"].ToString() ?? "");
+
+            return status;
         }
 
         private static List<QueueItemModel> GetAllTasksInternal(string query, Dictionary<string, object> parameters)

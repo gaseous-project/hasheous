@@ -183,7 +183,6 @@ resetPasswordButton.addEventListener("click", function (e) {
 });
 
 function resetPasswordCallback(result, redirectPath) {
-    console.log(result);
     switch (result.status) {
         case 200:
             window.location.replace(redirectPath);
@@ -294,7 +293,6 @@ function fetchTaskWorkerClients() {
             .then(data => {
                 if (data.length > 0) {
                     taskClientsDiv.style.display = 'block';
-                    console.log(data);
 
                     let taskClientsList = document.getElementById('taskClientsList');
                     taskClientsList.innerHTML = ''; // clear existing entries
@@ -318,7 +316,6 @@ function fetchTaskWorkerClients() {
                         };
                         clientList.push(clientEntry);
                     });
-                    console.log(clientList);
 
                     let tableGenerator = new generateTable(
                         clientList,
