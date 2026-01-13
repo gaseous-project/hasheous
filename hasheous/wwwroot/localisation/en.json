@@ -279,6 +279,7 @@
     "servicetaskstatussubmitted": "Submitted",
     "servicetaskstatuscompleted": "Completed",
     "servicetaskstatusfailed": "Failed",
+    "servicetaskstatusinactive": "Inactive",
     "public": "Public",
     "yes": "Yes",
     "currentvalue": "Current Value",
