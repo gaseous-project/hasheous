@@ -93,13 +93,13 @@ namespace hasheous_taskrunner.Classes.Communication
                         // execute the task
                         try
                         {
-                            Console.Write($"Executing task ID {job.Id}...");
+                            Console.WriteLine($"Executing task ID {job.Id}...");
                             Dictionary<string, object> executionResult = await handler.ExecuteAsync(job.Parameters, CancellationToken.None);
                             // report task completion
                             ackPayload["status"] = QueueItemStatus.Submitted.ToString();
                             ackPayload["result"] = executionResult.ContainsKey("response") ? executionResult["response"] : "";
                             ackPayload["error_message"] = executionResult.ContainsKey("error") ? executionResult["error"] : "";
-                            Console.WriteLine(" done.");
+                            Console.WriteLine($"Task ID {job.Id} complete.");
                         }
                         catch (Exception execEx)
                         {
@@ -109,9 +109,8 @@ namespace hasheous_taskrunner.Classes.Communication
                             ackPayload["error_message"] = execEx.Message;
                             Console.WriteLine($" failed: {execEx.Message}");
                         }
-                        Console.Write($"Reporting completion of task ID {job.Id} with status {ackPayload["status"]}...");
+                        Console.WriteLine($"Reporting completion of task ID {job.Id} with status {ackPayload["status"]}...");
                         await Common.Post<object>(acknowledgeUrl, ackPayload);
-                        Console.WriteLine(" done.");
                     }
                 }
                 catch (Exception ex)

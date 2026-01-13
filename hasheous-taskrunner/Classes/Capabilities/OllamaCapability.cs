@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
@@ -178,6 +179,7 @@ namespace hasheous_taskrunner.Classes.Capabilities
                 }
 
                 // 2) Pull model (stream: false for simpler handling)
+                Console.WriteLine($"OllamaCapability: Pulling model '{model}'...");
                 var pullBody = new
                 {
                     name = model,
@@ -195,6 +197,13 @@ namespace hasheous_taskrunner.Classes.Capabilities
 
                 // 3) RAG flow if embeddings provided; else direct generate
                 string responseText;
+
+                // Check if this is a tag generation request
+                bool isTagGeneration = false;
+                if (parameters != null && parameters.ContainsKey("isTagGeneration"))
+                {
+                    bool.TryParse(Convert.ToString(parameters["isTagGeneration"]), out isTagGeneration);
+                }
 
                 List<string> embeddingTexts = new List<string>();
                 if (parameters != null && parameters.ContainsKey("embeddings"))
@@ -219,14 +228,32 @@ namespace hasheous_taskrunner.Classes.Capabilities
                         }
                     }
                     catch { }
+
+                    // embeddings are usually markdown - break into chunks along markdown boundaries
+                    const int maxChunkSize = 4000;
+
+                    var chunkedEmbeddings = new List<string>();
+                    foreach (var text in embeddingTexts)
+                    {
+                        // Split into markdown-aware chunks
+                        var chunks = ChunkMarkdown(text, maxChunkSize);
+                        foreach (var chunk in chunks)
+                        {
+                            chunkedEmbeddings.Add(chunk);
+                        }
+                    }
+                    embeddingTexts = chunkedEmbeddings;
                 }
 
+                var stopWatch = new Stopwatch();
+                stopWatch.Start();
                 if (embeddingTexts.Count > 0)
                 {
                     // Use a dedicated embedding model for better retrieval
                     string embedModel = "nomic-embed-text";
 
                     // Ensure embedding model is available
+                    Console.WriteLine($"OllamaCapability: Pulling embedding model '{embedModel}'...");
                     var pullEmbedBody = new { name = embedModel, stream = false };
                     var pullEmbedJson = JsonSerializer.Serialize(pullEmbedBody);
                     var pullEmbedResp = await http.PostAsync("/api/pull", new StringContent(pullEmbedJson, Encoding.UTF8, "application/json"));
@@ -237,6 +264,7 @@ namespace hasheous_taskrunner.Classes.Capabilities
                     }
 
                     // Compute embeddings
+                    Console.WriteLine("OllamaCapability: Computing embeddings for RAG...");
                     var docEmbeddings = new List<double[]>();
                     int docIndex = 1;
                     foreach (var text in embeddingTexts)
@@ -256,23 +284,32 @@ namespace hasheous_taskrunner.Classes.Capabilities
                         double score = CosineSimilarity(queryEmbedding, docEmbeddings[i]);
                         ranked.Add((i, score));
                     }
-                    var topK = ranked
+                    // Adjust parameters based on task type
+                    int topK = isTagGeneration ? 10 : 5;
+                    int numPredict = isTagGeneration ? 512 : 256;
+                    double temperature = isTagGeneration ? 0.5 : 0.2;
+
+                    var topKResults = ranked
                         .OrderByDescending(r => r.score)
-                        .Take(5)
+                        .Take(topK)
                         .Select(r => embeddingTexts[r.idx])
                         .ToList();
 
-                    string ragPrompt = BuildRagPrompt(prompt, topK);
+                    string ragPrompt = isTagGeneration
+                        ? BuildRagPromptForTags(prompt, topKResults)
+                        : BuildRagPromptForSummary(prompt, topKResults);
 
+                    Console.WriteLine("OllamaCapability: Generating response with RAG prompt...");
                     var genBody = new
                     {
                         model = model,
                         prompt = ragPrompt,
                         stream = false,
+                        think = false,
                         options = new
                         {
-                            num_predict = 256,
-                            temperature = 0.2
+                            num_predict = numPredict,
+                            temperature = temperature
                         }
                     };
                     var genJson = JsonSerializer.Serialize(genBody);
@@ -302,12 +339,14 @@ namespace hasheous_taskrunner.Classes.Capabilities
                 }
                 else
                 {
+                    Console.WriteLine("OllamaCapability: Generating response without RAG...");
                     // Direct generation without chunking
                     var genBody = new
                     {
                         model = model,
                         prompt = prompt,
                         stream = false,
+                        think = false,
                         options = new
                         {
                             num_predict = 256,
@@ -339,6 +378,21 @@ namespace hasheous_taskrunner.Classes.Capabilities
                         responseText = genContent;
                     }
                 }
+                stopWatch.Stop();
+
+                var elapsedTime = stopWatch.ElapsedMilliseconds;
+                var elapsedUnits = "ms";
+                if (elapsedTime >= 1000)
+                {
+                    elapsedTime /= 1000;
+                    elapsedUnits = "s";
+                    if (elapsedTime >= 60)
+                    {
+                        elapsedTime /= 60;
+                        elapsedUnits = "min";
+                    }
+                }
+                Console.WriteLine($"OllamaCapability: Generation completed in {elapsedTime} {elapsedUnits}.");
 
                 result["result"] = true;
                 result["response"] = responseText ?? string.Empty;
@@ -357,7 +411,7 @@ namespace hasheous_taskrunner.Classes.Capabilities
             var http = new HttpClient
             {
                 BaseAddress = new Uri(baseUrl),
-                Timeout = TimeSpan.FromMinutes(5)
+                Timeout = TimeSpan.FromMinutes(10)
             };
             return http;
         }
@@ -447,6 +501,36 @@ namespace hasheous_taskrunner.Classes.Capabilities
             return dot / denom;
         }
 
+        private static string BuildRagPromptForSummary(string taskPrompt, List<string> contexts)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("Context:");
+            for (int i = 0; i < contexts.Count; i++)
+            {
+                sb.AppendLine($"--- Passage {i + 1} ---");
+                sb.AppendLine(contexts[i]);
+            }
+            sb.AppendLine();
+            sb.AppendLine("Task:");
+            sb.AppendLine(taskPrompt);
+            return sb.ToString();
+        }
+
+        private static string BuildRagPromptForTags(string taskPrompt, List<string> contexts)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("Reference Material:");
+            for (int i = 0; i < contexts.Count; i++)
+            {
+                sb.AppendLine($"--- Passage {i + 1} ---");
+                sb.AppendLine(contexts[i]);
+            }
+            sb.AppendLine();
+            sb.AppendLine("Instructions:");
+            sb.AppendLine(taskPrompt);
+            return sb.ToString();
+        }
+
         private static string BuildRagPrompt(string taskPrompt, List<string> contexts)
         {
             var sb = new StringBuilder();
@@ -464,6 +548,241 @@ namespace hasheous_taskrunner.Classes.Capabilities
             sb.AppendLine("Task:");
             sb.AppendLine(taskPrompt);
             return sb.ToString();
+        }
+
+        private static List<string> ChunkMarkdown(string text, int maxChunkSize)
+        {
+            var chunks = new List<string>();
+            var lines = text.Split('\n');
+            var sections = new List<List<string>>();
+            var currentSection = new List<string>();
+
+            // First pass: split by headers
+            foreach (var line in lines)
+            {
+                bool isHeader = line.TrimStart().StartsWith("# ") ||
+                                line.TrimStart().StartsWith("## ") ||
+                                line.TrimStart().StartsWith("### ") ||
+                                line.TrimStart().StartsWith("#### ") ||
+                                line.TrimStart().StartsWith("##### ") ||
+                                line.TrimStart().StartsWith("###### ");
+
+                if (isHeader && currentSection.Count > 0)
+                {
+                    sections.Add(currentSection);
+                    currentSection = new List<string> { line };
+                }
+                else
+                {
+                    currentSection.Add(line);
+                }
+            }
+            if (currentSection.Count > 0)
+            {
+                sections.Add(currentSection);
+            }
+
+            // Second pass: process each section
+            foreach (var section in sections)
+            {
+                ProcessSection(section, maxChunkSize, chunks);
+            }
+
+            return chunks.Count > 0 ? chunks : new List<string> { text };
+        }
+
+        private static void ProcessSection(List<string> sectionLines, int maxChunkSize, List<string> chunks)
+        {
+            string sectionText = string.Join("\n", sectionLines);
+
+            // If section fits, add as-is
+            if (sectionText.Length <= maxChunkSize)
+            {
+                chunks.Add(sectionText.TrimEnd());
+                return;
+            }
+
+            // Section is too large: extract code blocks and tables first
+            var extracted = ExtractBlockElements(sectionText);
+            string remaining = extracted.remaining;
+
+            // Add extracted code blocks and tables as their own chunks
+            foreach (var block in extracted.blocks)
+            {
+                chunks.Add(block.TrimEnd());
+            }
+
+            // Now chunk remaining content by paragraphs
+            ChunkByParagraphs(remaining, maxChunkSize, chunks);
+        }
+
+        private static void ChunkByParagraphs(string text, int maxChunkSize, List<string> chunks)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return;
+
+            var lines = text.Split('\n');
+            var currentChunk = new StringBuilder();
+
+            foreach (var line in lines)
+            {
+                // Paragraph boundary is a blank line
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    if (currentChunk.Length > 0)
+                    {
+                        // Check if adding empty line would exceed size
+                        string tentative = currentChunk.ToString() + "\n";
+                        if (tentative.Length <= maxChunkSize)
+                        {
+                            currentChunk.AppendLine();
+                        }
+                        else
+                        {
+                            // Save current chunk and start fresh
+                            chunks.Add(currentChunk.ToString().TrimEnd());
+                            currentChunk.Clear();
+                        }
+                    }
+                }
+                else
+                {
+                    string tentative = currentChunk.Length == 0 ? line : currentChunk.ToString() + "\n" + line;
+                    if (tentative.Length <= maxChunkSize)
+                    {
+                        if (currentChunk.Length > 0)
+                            currentChunk.AppendLine(line);
+                        else
+                            currentChunk.Append(line);
+                    }
+                    else
+                    {
+                        // Current chunk is full
+                        if (currentChunk.Length > 0)
+                        {
+                            chunks.Add(currentChunk.ToString().TrimEnd());
+                        }
+                        currentChunk.Clear();
+
+                        // If single line exceeds maxChunkSize, split it by sentence
+                        if (line.Length > maxChunkSize)
+                        {
+                            ChunkBySentences(line, maxChunkSize, chunks);
+                        }
+                        else
+                        {
+                            currentChunk.Append(line);
+                        }
+                    }
+                }
+            }
+
+            if (currentChunk.Length > 0)
+            {
+                chunks.Add(currentChunk.ToString().TrimEnd());
+            }
+        }
+
+        private static void ChunkBySentences(string text, int maxChunkSize, List<string> chunks)
+        {
+            // Split by sentence boundaries: . ! ? followed by space
+            var sentences = System.Text.RegularExpressions.Regex.Split(text, @"(?<=[.!?])\s+")
+                .Select(s => s.Trim())
+                .Where(s => !string.IsNullOrEmpty(s))
+                .ToList();
+
+            var currentChunk = new StringBuilder();
+            foreach (var sentence in sentences)
+            {
+                string tentative = currentChunk.Length == 0 ? sentence : currentChunk.ToString() + " " + sentence;
+                if (tentative.Length <= maxChunkSize)
+                {
+                    if (currentChunk.Length > 0)
+                        currentChunk.Append(" ");
+                    currentChunk.Append(sentence);
+                }
+                else
+                {
+                    if (currentChunk.Length > 0)
+                        chunks.Add(currentChunk.ToString());
+                    currentChunk.Clear();
+
+                    if (sentence.Length > maxChunkSize)
+                    {
+                        // Sentence itself is too long, force split
+                        chunks.Add(sentence.Substring(0, maxChunkSize));
+                        if (sentence.Length > maxChunkSize)
+                            chunks.Add(sentence.Substring(maxChunkSize));
+                    }
+                    else
+                    {
+                        currentChunk.Append(sentence);
+                    }
+                }
+            }
+            if (currentChunk.Length > 0)
+                chunks.Add(currentChunk.ToString());
+        }
+
+        private class BlockExtraction
+        {
+            public List<string> blocks { get; set; } = new List<string>();
+            public string remaining { get; set; } = string.Empty;
+        }
+
+        private static BlockExtraction ExtractBlockElements(string text)
+        {
+            var result = new BlockExtraction();
+            var lines = text.Split('\n');
+            var remaining = new StringBuilder();
+            int i = 0;
+
+            while (i < lines.Length)
+            {
+                string line = lines[i];
+                string trimmed = line.TrimStart();
+
+                // Detect code block (``` or indented code)
+                if (trimmed.StartsWith("```"))
+                {
+                    var codeBlock = new StringBuilder(line);
+                    i++;
+                    while (i < lines.Length)
+                    {
+                        codeBlock.AppendLine(lines[i]);
+                        if (lines[i].TrimStart().StartsWith("```"))
+                        {
+                            i++;
+                            break;
+                        }
+                        i++;
+                    }
+                    result.blocks.Add(codeBlock.ToString().TrimEnd());
+                    continue;
+                }
+
+                // Detect table (line with | delimiters)
+                if (trimmed.Contains("|") && (i + 1 < lines.Length && lines[i + 1].TrimStart().Contains("|")))
+                {
+                    var table = new StringBuilder(line);
+                    i++;
+                    // Add table header separator and rows
+                    while (i < lines.Length && lines[i].TrimStart().Contains("|"))
+                    {
+                        table.AppendLine(lines[i]);
+                        i++;
+                    }
+                    result.blocks.Add(table.ToString().TrimEnd());
+                    continue;
+                }
+
+                // Not a block element, add to remaining
+                remaining.AppendLine(line);
+                i++;
+            }
+
+            result.remaining = remaining.ToString();
+            return result;
         }
     }
 }

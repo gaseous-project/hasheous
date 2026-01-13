@@ -41,6 +41,14 @@ namespace Classes.ProcessQueue
 
                 try
                 {
+                    if (taskItem.ErrorMessage != null && taskItem.ErrorMessage.Length > 0)
+                    {
+                        taskItem.Status = QueueItemStatus.Failed;
+                        taskItem.CompletedAt = DateTime.UtcNow;
+                        await taskItem.Commit();
+                        continue;
+                    }
+
                     // get the related data object
                     hasheous_server.Models.DataObjectItem? dataObject = null;
                     if (taskItem.DataObjectId > 0)

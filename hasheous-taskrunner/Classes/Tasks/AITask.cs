@@ -61,7 +61,7 @@ namespace hasheous_taskrunner.Classes.Tasks
 
             // override model to use ollama
             string modelDescriptionOverride = "gemma3:12b";
-            string modelTagOverride = "gemma3:12b";
+            string modelTagOverride = "qwen3:8b";
             bool applyDescriptionOverride = true;
             bool applyTagOverride = true;
             if (applyDescriptionOverride == false)
@@ -85,7 +85,8 @@ namespace hasheous_taskrunner.Classes.Tasks
             {
                 { "model", modelTagOverride },
                 { "prompt", parameters != null && parameters.ContainsKey("prompt_tags") ? parameters["prompt_tags"] : "" },
-                { "embeddings", sources }
+                { "embeddings", sources },
+                { "isTagGeneration", "true" }
             });
 
             Dictionary<string, object> response = new Dictionary<string, object>();
@@ -96,6 +97,18 @@ namespace hasheous_taskrunner.Classes.Tasks
                     { "result", false },
                     { "error", "No response from AI capability." }
                 };
+            }
+
+            if ((descriptionResult != null && descriptionResult.ContainsKey("result") && !(bool)descriptionResult["result"]) || (tagsResult != null && tagsResult.ContainsKey("result") && !(bool)tagsResult["result"]))
+            {
+                response = new Dictionary<string, object>
+                {
+                    { "result", false },
+                    { "error", descriptionResult.ContainsKey("error") ? descriptionResult["error"] : "Unknown error from AI capability." }
+                };
+
+                Console.WriteLine("AITask: AI capability returned an error: " + (response.ContainsKey("error") ? response["error"] : "Unknown error."));
+                return response;
             }
 
             // merge results
@@ -168,15 +181,56 @@ namespace hasheous_taskrunner.Classes.Tasks
         private string ollamaPrune(string input)
         {
             input = input.Trim();
-            if ((input.StartsWith("```") || input.StartsWith("```json")) && input.EndsWith("```"))
+
+            // Look for markdown code blocks anywhere in the text
+            int codeBlockStart = input.IndexOf("```");
+            if (codeBlockStart >= 0)
             {
-                int firstLineEnd = input.IndexOf('\n');
-                int lastLineStart = input.LastIndexOf("```");
-                if (firstLineEnd >= 0 && lastLineStart > firstLineEnd)
+                // Skip past the opening ``` and optional language identifier (e.g., ```json)
+                int firstLineEnd = input.IndexOf('\n', codeBlockStart);
+                if (firstLineEnd < 0) return input; // malformed, return as-is
+
+                // Find the closing ```
+                int codeBlockEnd = input.IndexOf("```", firstLineEnd + 1);
+                if (codeBlockEnd < 0) return input; // malformed, return as-is
+
+                // Extract content between markers
+                input = input.Substring(firstLineEnd + 1, codeBlockEnd - firstLineEnd - 1).Trim();
+            }
+
+            // Validate JSON
+            try
+            {
+                using (var doc = System.Text.Json.JsonDocument.Parse(input))
                 {
-                    input = input.Substring(firstLineEnd + 1, lastLineStart - firstLineEnd - 1).Trim();
+                    // Valid JSON, return it
+                    return input;
                 }
             }
+            catch (System.Text.Json.JsonException)
+            {
+                // Invalid JSON - try to find JSON object boundaries
+                int jsonStart = input.IndexOf('{');
+                int jsonEnd = input.LastIndexOf('}');
+
+                if (jsonStart >= 0 && jsonEnd > jsonStart)
+                {
+                    string extracted = input.Substring(jsonStart, jsonEnd - jsonStart + 1);
+                    try
+                    {
+                        using (var doc = System.Text.Json.JsonDocument.Parse(extracted))
+                        {
+                            return extracted;
+                        }
+                    }
+                    catch
+                    {
+                        // Still invalid, return original
+                        return input;
+                    }
+                }
+            }
+
             return input;
         }
     }
