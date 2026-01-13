@@ -355,15 +355,9 @@ namespace hasheous_server.Classes.Tasks.Clients
                 throw new Exception("Task is not assigned to this client.");
             }
             task.Status = status;
-            if (task.Status == QueueItemStatus.InProgress && task.StartedAt == null)
-            {
-                task.StartedAt = DateTime.UtcNow;
-                task.CompletedAt = null;
-            }
-            if (task.Status == QueueItemStatus.Submitted || task.Status == QueueItemStatus.Failed)
-            {
-                task.CompletedAt = DateTime.UtcNow;
-            }
+            // task completedAt is used to denote the last time the status changed.
+            // logic to act on the completedAt is contained in the TaskResultParser class.
+            task.CompletedAt = DateTime.UtcNow;
             task.Result = result;
             if (errorMessage != null)
             {
