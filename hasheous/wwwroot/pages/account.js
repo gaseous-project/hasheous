@@ -311,7 +311,7 @@ function fetchTaskWorkerClients() {
                             clientVersion: client.client.clientVersion,
                             isActive: client.client.isActive ? "🟢" : "🔴",
                             capabilities: capabilities,
-                            taskStatus: lang.getLang(client.taskStatus),
+                            taskStatus: lang.getLang('servicetaskstatus' + client.taskStatus),
                             lastContact: client.client.lastContactAt ? new Date(client.client.lastContactAt).toLocaleString() : lang.getLang('never')
                         };
                         clientList.push(clientEntry);
