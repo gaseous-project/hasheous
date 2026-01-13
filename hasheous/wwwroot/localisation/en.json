@@ -272,6 +272,13 @@
     "serviceneverstarted": "Stopped",
     "servicedisabled": "Disabled",
     "servicestart": "Start",
+    "servicetasktypeaidescriptionandtagging": "AI Description and Tagging Progress",
+    "servicetaskstatuspending": "Pending",
+    "servicetaskstatusassigned": "Assigned",
+    "servicetaskstatusinprogress": "In Progress",
+    "servicetaskstatussubmitted": "Submitted",
+    "servicetaskstatuscompleted": "Completed",
+    "servicetaskstatusfailed": "Failed",
     "public": "Public",
     "yes": "Yes",
     "currentvalue": "Current Value",
@@ -306,5 +313,13 @@
     "tagtypes.gameperspective": "Perspectives",
     "tagtypes.gameartstyle": "Art Styles",
     "aigeneratedtag": "AI Generated Tag",
-    "aidescription": "AI Generated Description"
+    "aidescription": "AI Generated Description",
+    "taskworkerclients": "Task Worker Clients",
+    "taskworkerclientsdescription": "The following clients are connected to the Hasheous Task Worker service. Clients that have been offline for more than 24 hours are automatically removed.",
+    "clientname": "Name",
+    "clientversion": "Version",
+    "capabilities": "Capabilities",
+    "taskstatus": "Task Status",
+    "lastcontact": "Last Contact",
+    "inactive": "Inactive"
 }

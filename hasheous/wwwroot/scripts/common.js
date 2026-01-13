@@ -117,11 +117,27 @@ function formatBytes(bytes, decimals = 2) {
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`
 }
 
+/**
+ * Generates an HTML table from a dataset.
+ */
 class generateTable {
     resultSet = undefined;
 
     table = undefined;
 
+    /**
+     * Generates an HTML table from a dataset.
+     * @param {*} dataSet The dataset to generate the table from
+     * @param {*} columns An array of column definitions - column name with an optional type separated by a colon (e.g. "name", "date:date", "size:bytes", "website:link", "description:lang", "logo:image")
+     * @param {*} indexColumn The name of the column to use as the index (for row click callbacks)
+     * @param {*} hideIndex Whether to hide the index column from display
+     * @param {*} rowClickCallback A callback function to call when a row is clicked
+     * @param {*} recordCount The total number of records in the dataset
+     * @param {*} pageNumber The current page number
+     * @param {*} pageCount The total number of pages
+     * @param {*} pagingCallback A callback function to call when a page is changed
+     * @returns 
+     */
     constructor(dataSet, columns, indexColumn, hideIndex, rowClickCallback, recordCount, pageNumber, pageCount, pagingCallback) {
         this.resultSet = dataSet;
 
@@ -153,7 +169,15 @@ class generateTable {
                     cellName = columns[i].name;
                 } else {
                     headerName = lang.getLang(columns[i].split(":")[0]);
-                    cellName = columns[i].split(":")[0];
+                    let cellNameParts = columns[i].split(":");
+                    cellName = cellNameParts[0];
+                    if (cellNameParts[1]) {
+                        switch (cellNameParts[1]) {
+                            case "hideheading":
+                                headerName = "";
+                                break;
+                        }
+                    }
                 }
                 if (
                     (hideIndex === true && (headerName.toLowerCase() !== indexColumn.toLowerCase())) ||

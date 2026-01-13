@@ -1,7 +1,10 @@
+using Authentication;
 using hasheous_server.Classes;
 using hasheous_server.Classes.Tasks.Clients;
 using hasheous_server.Models;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace hasheous_server.Controllers.v1_0
@@ -16,6 +19,23 @@ namespace hasheous_server.Controllers.v1_0
     [IgnoreAntiforgeryToken]
     public class TaskWorkerController : ControllerBase
     {
+        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly SignInManager<ApplicationUser> _signInManager;
+        private readonly IEmailSender _emailSender;
+        private readonly ILogger _logger;
+
+        public TaskWorkerController(
+            UserManager<ApplicationUser> userManager,
+            SignInManager<ApplicationUser> signInManager,
+            IEmailSender emailSender,
+            ILoggerFactory loggerFactory)
+        {
+            _userManager = userManager;
+            _signInManager = signInManager;
+            _emailSender = emailSender;
+            _logger = loggerFactory.CreateLogger<TaskWorkerController>();
+        }
+
         #region "Clients"
         /// <summary>
         /// Registers a new task worker client with the specified name and version.
@@ -63,8 +83,15 @@ namespace hasheous_server.Controllers.v1_0
                 }
             }
 
-            var result = await ClientManagement.RegisterClient(apiKey, clientName, clientVersion, capabilities, publicId);
-            return Ok(result);
+            try
+            {
+                var result = await ClientManagement.RegisterClient(apiKey, clientName, clientVersion, capabilities, publicId);
+                return Ok(result);
+            }
+            catch
+            {
+                return BadRequest();
+            }
         }
 
         /// <summary>
@@ -84,7 +111,7 @@ namespace hasheous_server.Controllers.v1_0
             string? apiKey = Request.Headers.TryGetValue(Authentication.TaskWorkerAPIKey.APIKeyHeaderName, out var headerValue) ? headerValue.FirstOrDefault() : null;
             if (apiKey == null)
             {
-                return Unauthorized("API key is missing.");
+                return Unauthorized("API key is missing or invalid.");
             }
             var client = await ClientManagement.GetClientByAPIKeyAndPublicId(apiKey, publicid);
             if (client == null)
@@ -237,5 +264,79 @@ namespace hasheous_server.Controllers.v1_0
         }
 
         #endregion "Clients"
+
+        #region "Management"
+
+        /// <summary>
+        /// Retrieves all registered task worker clients associated with the current authenticated user.
+        /// </summary>
+        /// <returns>An IActionResult containing the list of clients for the authenticated user.</returns>
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [Authorize(Roles = "Task Runner")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [Route("user/clients")]
+        public async Task<IActionResult> GetClients()
+        {
+            var user = await _userManager.GetUserAsync(HttpContext.User);
+            if (user == null)
+            {
+                return Forbid();
+            }
+
+            List<Models.Tasks.ClientModel> clients = await ClientManagement.GetAllClientsForUserId(user.Id);
+
+            List<Dictionary<string, object?>> result = new List<Dictionary<string, object?>>();
+
+            foreach (var client in clients)
+            {
+                string? clientStatus = client.GetClientTaskStatus()?.ToString();
+                if (clientStatus == null || clientStatus == "")
+                {
+                    clientStatus = "Inactive";
+                }
+                Dictionary<string, object?> clientDict = new Dictionary<string, object?>
+                {
+                    {"client", client },
+                    {"taskStatus", clientStatus }
+                };
+                result.Add(clientDict);
+            }
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Retrieves tasks, optionally filtered by DataObjectId.
+        /// </summary>
+        /// <param name="DataObjectId">Optional DataObjectId to filter tasks.</param>
+        /// <returns>If DataObjectId is null, returns a task progress summary. If DataObjectId is provided, returns tasks filtered by that DataObjectId.</returns>
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [AllowAnonymous]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [Route("tasks")]
+        [Route("tasks/{DataObjectId?}")]
+        public async Task<IActionResult> GetTasks(long? DataObjectId = null)
+        {
+            if (DataObjectId == null)
+            {
+                var summary = await TaskManagement.GetTaskProgressSummary();
+                return Ok(summary);
+            }
+            else
+            {
+                var tasks = TaskManagement.GetAllTasks((long)DataObjectId);
+                // remove parameters from the tasks before returning
+                foreach (var task in tasks)
+                {
+                    task.Parameters = null;
+                }
+                return Ok(tasks);
+            }
+        }
+
+        #endregion "Management"
     }
 }

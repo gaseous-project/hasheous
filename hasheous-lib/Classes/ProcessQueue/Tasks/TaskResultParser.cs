@@ -211,6 +211,16 @@ namespace Classes.ProcessQueue
                 }
             }
 
+            // prune stale clients
+            var clients = await hasheous_server.Classes.Tasks.Clients.ClientManagement.GetAllClients();
+            foreach (var client in clients)
+            {
+                if (client.IsStale)
+                {
+                    await client.Unregister();
+                }
+            }
+
             return null; // Assuming the method returns void, we return null here.
         }
 

@@ -31,6 +31,14 @@ namespace hasheous_server.Classes.Tasks.Clients
             // resolve userAPIKey to user account
             var user = GetUserObjectFromAPIKey(userAPIKey);
 
+            // check roles
+            var userRolesTable = new Authentication.UserRolesTable(db);
+            var userRoles = userRolesTable.FindByUserId(user.Id);
+            if (!userRoles.Contains("Task Runner"))
+            {
+                throw new Exception("User does not have the required 'Task Runner' role.");
+            }
+
             // create new client
             string clientAPIKey = GenerateClientAPIKey();
             ClientModel client = new ClientModel(clientAPIKey, clientName, user.Id.ToString(), version, capabilities, publicId);
@@ -103,6 +111,21 @@ namespace hasheous_server.Classes.Tasks.Clients
         /// </remarks>
         public async static Task<ClientModel?> GetClientByAPIKeyAndPublicId(string clientAPIKey, string publicId)
         {
+            // create cache key
+            string cacheKey = hasheous.Classes.RedisConnection.GenerateKey("TaskWorkerAPIKeys", clientAPIKey + publicId);
+
+            // check cache first
+            if (Config.RedisConfiguration.Enabled)
+            {
+                string? cachedValue = hasheous.Classes.RedisConnection.GetDatabase(0).StringGet(cacheKey);
+                if (cachedValue != null)
+                {
+                    ClientModel? cachedItem = Newtonsoft.Json.JsonConvert.DeserializeObject<ClientModel>(cachedValue);
+
+                    return cachedItem;
+                }
+            }
+
             DataTable dt = await db.ExecuteCMDAsync("SELECT * FROM Task_Clients WHERE api_key = @api_key AND public_id = @public_id LIMIT 1;", new Dictionary<string, object>
             {
                 { "@api_key", clientAPIKey },
@@ -111,6 +134,11 @@ namespace hasheous_server.Classes.Tasks.Clients
             if (dt.Rows.Count == 0)
             {
                 return null;
+            }
+            else
+            {
+                // cache the result
+                hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(cacheKey, Newtonsoft.Json.JsonConvert.SerializeObject(new ClientModel(dt.Rows[0])), TimeSpan.FromSeconds(3600)); // cache for 1 hour
             }
             return new ClientModel(dt.Rows[0]);
         }
@@ -512,6 +540,25 @@ namespace hasheous_server.Classes.Tasks.Clients
             {
                 { "@dataobjectid", dataObjectId }
             });
+        }
+
+        public static QueueItemStatus? GetClientTaskStatus(long clientId)
+        {
+            List<int> activeStatuses = new List<int>
+            {
+                (int)QueueItemStatus.Assigned,
+                (int)QueueItemStatus.InProgress
+            };
+
+            DataTable dt = Config.database.ExecuteCMD($"SELECT * FROM `Task_Queue` WHERE `client_id` = @client_id AND `status` IN ({string.Join(",", activeStatuses)}) LIMIT 1;", new Dictionary<string, object>
+            {
+                { "@client_id", clientId }
+            });
+            if (dt.Rows.Count == 0)
+            {
+                return null;
+            }
+            return (QueueItemStatus?)dt.Rows[0]["status"];
         }
 
         private static List<QueueItemModel> GetAllTasksInternal(string query, Dictionary<string, object> parameters)
@@ -1138,6 +1185,35 @@ namespace hasheous_server.Classes.Tasks.Clients
                 }
             }
             return "";
+        }
+
+        /// <summary>
+        /// Retrieves a summary of task progress grouped by task type and status.
+        /// </summary>
+        /// <returns>A nested dictionary mapping task types to their status counts.</returns>
+        /// <remarks>
+        /// This method queries the Task_Queue table and aggregates the count of tasks for each combination of task type and status.
+        /// </remarks>
+        public async static Task<Dictionary<hasheous_server.Models.Tasks.TaskType, Dictionary<hasheous_server.Models.Tasks.QueueItemStatus, int>>> GetTaskProgressSummary()
+        {
+            string sql = "SELECT `task_name`, `status`, COUNT(`status`) AS `TypeCount` FROM `hasheous`.`Task_Queue` GROUP BY `task_name`, `status`;";
+            DataTable dt = await Config.database.ExecuteCMDAsync(sql);
+
+            Dictionary<hasheous_server.Models.Tasks.TaskType, Dictionary<hasheous_server.Models.Tasks.QueueItemStatus, int>> summary = new Dictionary<hasheous_server.Models.Tasks.TaskType, Dictionary<hasheous_server.Models.Tasks.QueueItemStatus, int>>();
+
+            foreach (DataRow row in dt.Rows)
+            {
+                hasheous_server.Models.Tasks.TaskType taskType = (hasheous_server.Models.Tasks.TaskType)Enum.Parse(typeof(hasheous_server.Models.Tasks.TaskType), row["task_name"].ToString() ?? "Unknown");
+                hasheous_server.Models.Tasks.QueueItemStatus status = (hasheous_server.Models.Tasks.QueueItemStatus)Enum.Parse(typeof(hasheous_server.Models.Tasks.QueueItemStatus), row["status"].ToString() ?? "Unknown");
+                int count = Convert.ToInt32(row["TypeCount"]);
+
+                if (!summary.ContainsKey(taskType))
+                {
+                    summary[taskType] = new Dictionary<hasheous_server.Models.Tasks.QueueItemStatus, int>();
+                }
+                summary[taskType][status] = count;
+            }
+            return summary;
         }
     }
 }

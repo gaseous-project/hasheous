@@ -42,7 +42,8 @@
 				"Zignd.html-css-class-completion",
 				"ms-azuretools.vscode-docker",
 				"Gruntfuggly.todo-tree",
-				"eamodio.gitlens"
+				"eamodio.gitlens",
+				"cweijan.vscode-redis-client"
 			]
 		}
 	}

@@ -162,6 +162,17 @@ namespace hasheous_server.Models.Tasks
         }
 
         /// <summary>
+        /// Gets a value indicating whether the client is considered stale (not contacted for 1 day or more). If true; the client is eligible for deletion.
+        /// </summary> 
+        public bool IsStale
+        {
+            get
+            {
+                return (DateTime.UtcNow - _LastContactAt).TotalDays >= 1;
+            }
+        }
+
+        /// <summary>
         /// Gets or sets the version string of the client application.
         /// </summary>
         public string? ClientVersion
@@ -287,6 +298,17 @@ namespace hasheous_server.Models.Tasks
                 { "@capabilities", System.Text.Json.JsonSerializer.Serialize(this.Capabilities) },
                 { "@id", this._Id }
             });
+        }
+
+        /// <summary>
+        /// Gets the current task status for the client.
+        /// </summary>
+        /// <returns>
+        /// The current task status for the client, or null if no status is available.
+        /// </returns>
+        public QueueItemStatus? GetClientTaskStatus()
+        {
+            return Classes.Tasks.Clients.TaskManagement.GetClientTaskStatus(this.Id);
         }
     }
 }

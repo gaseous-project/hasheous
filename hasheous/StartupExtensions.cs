@@ -264,6 +264,7 @@ public static class StartupExtensions
             options.AddPolicy("Moderator", policy => policy.RequireRole("Moderator"));
             options.AddPolicy("Member", policy => policy.RequireRole("Member"));
             options.AddPolicy("VerifiedEmail", policy => policy.RequireRole("Verified Email"));
+            options.AddPolicy("TaskRunner", policy => policy.RequireRole("Task Runner"));
         });
         services.AddAuthentication(o => { o.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme; });
         services.AddAuthentication().AddCookie();
@@ -341,7 +342,7 @@ public static class StartupExtensions
         using var scope = app.Services.CreateScope();
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleStore>();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-        var roles = new[] { "Admin", "Moderator", "Member", "Verified Email" };
+        var roles = new[] { "Admin", "Moderator", "Member", "Verified Email", "Task Runner" };
         foreach (var role in roles)
         {
             if (await roleManager.FindByNameAsync(role, CancellationToken.None) == null)
