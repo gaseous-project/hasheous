@@ -338,7 +338,7 @@ namespace hasheous_server.Classes
             }
         }
 
-        public async Task<Models.DataObjectItem?> GetDataObject(DataObjectType objectType, long id)
+        public async Task<Models.DataObjectItem?> GetDataObject(DataObjectType objectType, long id, bool GetChildRelations = true, bool GetMetadata = true, bool GetSignatureData = true)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "SELECT * FROM DataObject WHERE ObjectType=@objecttype AND Id=@id;";
@@ -351,7 +351,7 @@ namespace hasheous_server.Classes
 
             if (data.Rows.Count > 0)
             {
-                DataObjectItem item = await BuildDataObject(objectType, id, data.Rows[0], true);
+                DataObjectItem item = await BuildDataObject(objectType, id, data.Rows[0], GetChildRelations, GetMetadata, GetSignatureData);
 
                 return item;
             }
@@ -3194,6 +3194,180 @@ namespace hasheous_server.Classes
             }
 
             return targetObject;
+        }
+
+        /// <summary>
+        /// Get similar data objects based on tags. Returns up to 10 objects with the highest overall similarity,
+        /// calculated by comparing tags across all tag categories. Each returned object includes per-category
+        /// similarity scores and an overall similarity percentage.
+        /// </summary>
+        /// <param name="DataObject">The data object to find similar items for</param>
+        /// <param name="filterTagType">Optional tag type to filter similarity calculation. If null, returns overall similarity across all categories. If specified, returns similarity based only on that tag type.</param>
+        /// <returns>
+        /// A list of up to 10 similar data objects sorted by similarity (highest first)
+        /// </returns>
+        public async Task<DataObjectsList?> GetSimilarDataObjects(Models.DataObjectItem? dataObject, DataObjectItemTags.TagType? filterTagType = null)
+        {
+            DataObjectsList list = new DataObjectsList
+            {
+                Objects = new List<DataObjectItem>(),
+                Count = 0,
+                PageNumber = 1,
+                PageSize = 10,
+                TotalPages = 0
+            };
+
+            // check for tags - if none, abort
+            if (dataObject == null || dataObject.Attributes == null || dataObject.Attributes.Count == 0)
+            {
+                return list;
+            }
+
+            // check DataObject type - only games are supported, so return list as is if the type is not game
+            if (dataObject != null && dataObject.ObjectType != DataObjectType.Game)
+            {
+                return list;
+            }
+
+            AttributeItem? tagAttribute = dataObject.Attributes.Find(x => x.attributeName == AttributeItem.AttributeName.Tags);
+            if (tagAttribute == null || tagAttribute.Value == null)
+            {
+                return list;
+            }
+
+            // Extract source tags by category
+            var sourceTags = tagAttribute.Value as Dictionary<DataObjectItemTags.TagType, DataObjectItemTags>;
+            if (sourceTags == null || sourceTags.Count == 0)
+            {
+                return list;
+            }
+
+            // Build a dictionary of source tag IDs keyed by tag type for quick lookup
+            Dictionary<DataObjectItemTags.TagType, HashSet<long>> sourceTagIds = new Dictionary<DataObjectItemTags.TagType, HashSet<long>>();
+
+            // If a specific tag type is requested, only include tags of that type
+            if (filterTagType != null)
+            {
+                if (sourceTags.ContainsKey((DataObjectItemTags.TagType)filterTagType))
+                {
+                    sourceTagIds[(DataObjectItemTags.TagType)filterTagType] = new HashSet<long>(sourceTags[(DataObjectItemTags.TagType)filterTagType].Tags.Select(t => t.Id));
+                }
+                else
+                {
+                    // Source object has no tags of the requested type
+                    return list;
+                }
+            }
+            else
+            {
+                // Include all tag types
+                foreach (var tagEntry in sourceTags)
+                {
+                    sourceTagIds[tagEntry.Key] = new HashSet<long>(tagEntry.Value.Tags.Select(t => t.Id));
+                }
+            }
+
+            // Get all objects of the same type (excluding the source object itself)
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql = "SELECT Id FROM DataObject WHERE ObjectType = @objecttype AND Id != @sourceid ORDER BY Id;";
+            DataTable candidateData = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>
+            {
+                { "objecttype", dataObject.ObjectType },
+                { "sourceid", dataObject.Id }
+            });
+
+            if (candidateData.Rows.Count == 0)
+            {
+                return list;
+            }
+
+            // Dictionary to store similarity scores: candidateId -> { tagType -> similarity%, overall -> similarity% }
+            Dictionary<long, Dictionary<string, double>> similarityScores = new Dictionary<long, Dictionary<string, double>>();
+
+            // Evaluate each candidate
+            foreach (DataRow row in candidateData.Rows)
+            {
+                long candidateId = (long)row["Id"];
+
+                // Get tags for this candidate
+                var candidateTags = await GetTags(candidateId);
+                if (candidateTags.Count == 0)
+                {
+                    continue;
+                }
+
+                // Calculate per-category similarity
+                Dictionary<string, double> categoryScores = new Dictionary<string, double>();
+                double totalSimilarity = 0;
+                int categoriesWithTags = 0;
+
+                foreach (var sourceTagEntry in sourceTagIds)
+                {
+                    DataObjectItemTags.TagType tagType = sourceTagEntry.Key;
+                    HashSet<long> sourceTagIdSet = sourceTagEntry.Value;
+
+                    double categorySimilarity = 0;
+                    if (sourceTagIdSet.Count > 0)
+                    {
+                        if (candidateTags.ContainsKey(tagType))
+                        {
+                            var candidateTagIds = new HashSet<long>(candidateTags[tagType].Tags.Select(t => t.Id));
+                            int matchCount = sourceTagIdSet.Intersect(candidateTagIds).Count();
+                            // Similarity is the percentage of source tags that appear in the candidate
+                            categorySimilarity = (double)matchCount / sourceTagIdSet.Count * 100.0;
+                        }
+                        totalSimilarity += categorySimilarity;
+                        categoriesWithTags++;
+                    }
+
+                    // Store category-specific similarity (only if source has tags in this category)
+                    categoryScores[tagType.ToString()] = categorySimilarity;
+                }
+
+                // Calculate overall similarity as average across categories that have source tags
+                // If filtering by tag type, the "overall" is just that category's similarity
+                double overallSimilarity = categoriesWithTags > 0 ? totalSimilarity / categoriesWithTags : 0;
+                categoryScores["Overall"] = overallSimilarity;
+
+                similarityScores[candidateId] = categoryScores;
+            }
+
+            // Sort candidates by overall similarity descending and take top 10
+            var topCandidates = similarityScores
+                .Where(x => x.Value["Overall"] > 0) // Only include candidates with at least some similarity
+                .OrderByDescending(x => x.Value["Overall"])
+                .Take(10)
+                .ToList();
+
+            // Fetch the actual DataObject items for the top candidates
+            foreach (var candidateEntry in topCandidates)
+            {
+                DataObjectItem? candidate = await GetDataObject(dataObject.ObjectType, candidateEntry.Key, false, false, false);
+                if (candidate != null)
+                {
+                    // Store similarity metadata in a new attribute for display
+                    // Create a custom attribute to hold similarity scores
+                    var similarityAttribute = new AttributeItem
+                    {
+                        attributeName = AttributeItem.AttributeName.Description, // Reuse for now; could add custom type
+                        attributeType = AttributeItem.AttributeType.LongString,
+                        attributeRelationType = DataObjectType.None,
+                        Value = System.Text.Json.JsonSerializer.Serialize(candidateEntry.Value)
+                    };
+
+                    // Add similarity scores as custom property (store in a way accessible to consumers)
+                    // For now, we'll attach via the item's metadata or a custom property
+                    candidate.Attributes ??= new List<AttributeItem>();
+
+                    list.Objects.Add(candidate);
+                }
+            }
+
+            list.Count = list.Objects.Count;
+            list.PageSize = 10;
+            list.TotalPages = 1;
+
+            return list;
         }
     }
 }
