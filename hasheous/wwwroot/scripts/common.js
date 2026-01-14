@@ -214,6 +214,7 @@ class generateTable {
                     let cellValue = this.#processValue(cellName, rawCellValue, cellType);
 
                     let cellContent = document.createElement('span');
+                    let cellWidth = null;
                     switch (cellType) {
                         case "date":
                             if (cellValue.length > 0) {
@@ -265,6 +266,7 @@ class generateTable {
                             } else {
                                 cellContent.innerHTML = "<div class=\"dataObjectLogoTable\"></div>";
                             }
+                            cellWidth = "60px";
                             break;
 
                         default:
@@ -280,6 +282,9 @@ class generateTable {
                     ) {
                         let cell = document.createElement('td');
                         cell.classList.add('tablecell');
+                        if (cellWidth != null) {
+                            cell.style.width = cellWidth;
+                        }
                         let cellName = '';
                         if (columns[x].name) {
                             cellName = columns[x].name;

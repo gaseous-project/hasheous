@@ -3342,7 +3342,7 @@ namespace hasheous_server.Classes
             // Fetch the actual DataObject items for the top candidates
             foreach (var candidateEntry in topCandidates)
             {
-                DataObjectItem? candidate = await GetDataObject(dataObject.ObjectType, candidateEntry.Key, false, false, false);
+                DataObjectItem? candidate = await GetDataObject(dataObject.ObjectType, candidateEntry.Key, true, false, false);
                 if (candidate != null)
                 {
                     // Store similarity metadata in a new attribute for display

@@ -126,6 +126,9 @@ fetch('/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int'), {
     dataObject = success;
 
     renderContent();
+    if (pageType == "game") {
+        renderSimilarContent();
+    }
 }).catch(function (error) {
     console.warn(error);
     document.getElementById('content').innerHTML = '<div class="alert alert-danger" role="alert">' + lang.getLang('dataobjectdetailerror') + '</div>';
@@ -331,6 +334,13 @@ function renderContent() {
                         tagOutput += "</table>";
                     }
                 }
+
+                attributeValues.push(
+                    {
+                        "attribute": "ainotice",
+                        "value": lang.getLang("ainoticebody")
+                    }
+                );
 
 
                 break;
@@ -745,6 +755,51 @@ function renderContent() {
 
             break;
     }
+}
+
+function renderSimilarContent() {
+    fetch('/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int') + '/Similar', {
+        method: 'GET'
+    }).then(async function (response) {
+        if (!response.ok) {
+            throw new Error('Failed to fetch similar data objects');
+        }
+        return response.json();
+    }).then(function (success) {
+        if (success.objects.length > 0) {
+            document.getElementById('dataObjectSimilarSection').style.display = '';
+
+            document.getElementById('similardataobjects').innerHTML = lang.getLang('similar' + pageType);
+
+            let similarDataObjectsElement = document.getElementById('dataObjectSimilar');
+            similarDataObjectsElement.appendChild(
+                new generateTable(
+                    success.objects,
+                    [
+                        'id',
+                        {
+                            column: 'attributes[attributeName=Logo].value:image',
+                            name: 'logo'
+                        },
+                        'name',
+                        {
+                            column: 'attributes[attributeName=Platform].value.name',
+                            name: 'platform'
+                        }
+                    ],
+                    'id',
+                    true,
+                    function (id) {
+                        window.location = '/index.html?page=dataobjectdetail&type=' + pageType + '&id=' + id;
+                    }
+                )
+            );
+        }
+    },
+        function (error) {
+            console.warn(error);
+        }
+    );
 }
 
 function GetApiKeys() {
