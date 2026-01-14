@@ -13,6 +13,8 @@ namespace TaskRunner.Classes
     /// </summary>
     public static class HttpHelper
     {
+        private static bool httpClientInitialized = false;
+
         /// <summary>
         /// Gets or sets the base URI for all HTTP requests. Setting this value rebuilds the request headers.
         /// </summary>
@@ -24,7 +26,11 @@ namespace TaskRunner.Classes
             }
             set
             {
-                client.BaseAddress = new Uri(value);
+                if (httpClientInitialized == false)
+                {
+                    client.BaseAddress = new Uri(value);
+                    httpClientInitialized = true;
+                }
 
                 BuildHeaders();
             }
