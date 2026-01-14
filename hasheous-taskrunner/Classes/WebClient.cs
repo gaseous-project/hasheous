@@ -62,6 +62,45 @@ namespace TaskRunner.Classes
         private static HttpClient client = CreateHttpClient();
 
         /// <summary>
+        /// Handles HTTP responses with exponential backoff for 429 (Too Many Requests) status codes.
+        /// Honors the Retry-After header if available, otherwise uses exponential backoff starting at 30 seconds.
+        /// </summary>
+        /// <param name="response">The HTTP response to check.</param>
+        /// <param name="retryCount">The current retry attempt number.</param>
+        /// <param name="maxRetries">The maximum number of retries (default 5).</param>
+        /// <returns>True if a retry should be attempted, false otherwise.</returns>
+        private static async Task<bool> HandleRateLimitAsync(HttpResponseMessage response, int retryCount, int maxRetries = 5)
+        {
+            if ((int)response.StatusCode == 429 && retryCount < maxRetries)
+            {
+                int waitSeconds = 30;
+
+                // Check for Retry-After header
+                if (response.Headers.RetryAfter != null)
+                {
+                    if (response.Headers.RetryAfter.Delta != null)
+                    {
+                        waitSeconds = (int)response.Headers.RetryAfter.Delta.Value.TotalSeconds;
+                    }
+                    else if (response.Headers.RetryAfter.Date != null)
+                    {
+                        waitSeconds = (int)(response.Headers.RetryAfter.Date.Value - DateTimeOffset.UtcNow).TotalSeconds;
+                        if (waitSeconds < 0) waitSeconds = 30;
+                    }
+                }
+                else
+                {
+                    // Apply exponential backoff: 30s, 60s, 120s, 240s, 480s
+                    waitSeconds = 30 * (int)Math.Pow(2, retryCount - 1);
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(waitSeconds));
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
         /// Creates and configures an HttpClient instance. In debug mode, configures to trust self-signed certificates.
         /// </summary>
         /// <returns>A configured HttpClient instance.</returns>
@@ -81,6 +120,7 @@ namespace TaskRunner.Classes
 
         /// <summary>
         /// Sends a POST request with JSON content to the specified URL and deserializes the response.
+        /// Automatically retries on 429 responses with exponential backoff (max 5 retries).
         /// </summary>
         /// <typeparam name="T?">The type to deserialize the response into.</typeparam>
         /// <param name="url">The URL to send the POST request to.</param>
@@ -88,26 +128,45 @@ namespace TaskRunner.Classes
         /// <returns>The deserialized response object of type T.</returns>
         public static async Task<T?> Post<T>(string url, object contentValue)
         {
-            // ensure headers are built
-            BuildHeaders();
+            int retryCount = 0;
+            const int maxRetries = 5;
 
-            var stringContent = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(contentValue), Encoding.UTF8, "application/json");
-            await stringContent.LoadIntoBufferAsync();
-            var response = await client.PostAsync(url, stringContent);
-            response.EnsureSuccessStatusCode();
-
-            // Deserialize the updated product from the response body.
-            var resultStr = await response.Content.ReadAsStringAsync();
-            var resultObject = JsonConvert.DeserializeObject<T>(resultStr, new JsonSerializerSettings
+            while (retryCount <= maxRetries)
             {
-                Converters = { new SafeEnumConverter() }
-            });
+                // ensure headers are built
+                BuildHeaders();
 
-            return resultObject;
+                var stringContent = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(contentValue), Encoding.UTF8, "application/json");
+                await stringContent.LoadIntoBufferAsync();
+                var response = await client.PostAsync(url, stringContent);
+
+                if ((int)response.StatusCode == 429)
+                {
+                    if (await HandleRateLimitAsync(response, retryCount, maxRetries))
+                    {
+                        retryCount++;
+                        continue;
+                    }
+                }
+
+                response.EnsureSuccessStatusCode();
+
+                // Deserialize the updated product from the response body.
+                var resultStr = await response.Content.ReadAsStringAsync();
+                var resultObject = JsonConvert.DeserializeObject<T>(resultStr, new JsonSerializerSettings
+                {
+                    Converters = { new SafeEnumConverter() }
+                });
+
+                return resultObject;
+            }
+
+            throw new HttpRequestException("Max retries exceeded on POST request");
         }
 
         /// <summary>
         /// Sends a PUT request with JSON content to the specified URL and deserializes the response.
+        /// Automatically retries on 429 responses with exponential backoff (max 5 retries).
         /// </summary>
         /// <typeparam name="T?">The type to deserialize the response into.</typeparam>
         /// <param name="url">The URL to send the PUT request to.</param>
@@ -115,64 +174,121 @@ namespace TaskRunner.Classes
         /// <returns>The deserialized response object of type T.</returns>
         public static async Task<T?> Put<T>(string url, object contentValue)
         {
-            // ensure headers are built
-            BuildHeaders();
+            int retryCount = 0;
+            const int maxRetries = 5;
 
-            var stringContent = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(contentValue), Encoding.UTF8, "application/json");
-            await stringContent.LoadIntoBufferAsync();
-            var response = await client.PutAsync(url, stringContent);
-            response.EnsureSuccessStatusCode();
-
-            // Deserialize the updated product from the response body.
-            var resultStr = await response.Content.ReadAsStringAsync();
-            var resultObject = JsonConvert.DeserializeObject<T>(resultStr, new JsonSerializerSettings
+            while (retryCount <= maxRetries)
             {
-                Converters = { new SafeEnumConverter() }
-            });
+                // ensure headers are built
+                BuildHeaders();
 
-            return resultObject;
+                var stringContent = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(contentValue), Encoding.UTF8, "application/json");
+                await stringContent.LoadIntoBufferAsync();
+                var response = await client.PutAsync(url, stringContent);
+
+                if ((int)response.StatusCode == 429)
+                {
+                    if (await HandleRateLimitAsync(response, retryCount, maxRetries))
+                    {
+                        retryCount++;
+                        continue;
+                    }
+                }
+
+                response.EnsureSuccessStatusCode();
+
+                // Deserialize the updated product from the response body.
+                var resultStr = await response.Content.ReadAsStringAsync();
+                var resultObject = JsonConvert.DeserializeObject<T>(resultStr, new JsonSerializerSettings
+                {
+                    Converters = { new SafeEnumConverter() }
+                });
+
+                return resultObject;
+            }
+
+            throw new HttpRequestException("Max retries exceeded on PUT request");
         }
 
         /// <summary>
         /// Sends a GET request to the specified URL and deserializes the response.
+        /// Automatically retries on 429 responses with exponential backoff (max 5 retries).
         /// </summary>
         /// <typeparam name="T?">The type to deserialize the response into.</typeparam>
         /// <param name="url">The URL to send the GET request to.</param>
         /// <returns>The deserialized response object of type T.</returns>
         public static async Task<T?> Get<T>(string url)
         {
-            // ensure headers are built
-            BuildHeaders();
+            int retryCount = 0;
+            const int maxRetries = 5;
 
-            var response = await client.GetAsync(url);
-            response.EnsureSuccessStatusCode();
-
-            // Get the response
-            string resultStr = await response.Content.ReadAsStringAsync();
-
-            // Deserialize the response to T
-            T? resultObject = JsonConvert.DeserializeObject<T>(resultStr, new JsonSerializerSettings
+            while (retryCount <= maxRetries)
             {
-                MaxDepth = 8,
-                ObjectCreationHandling = ObjectCreationHandling.Auto,
-                CheckAdditionalContent = true,
-                Converters = { new SafeEnumConverter() }
-            });
+                // ensure headers are built
+                BuildHeaders();
 
-            return resultObject;
+                var response = await client.GetAsync(url);
+
+                if ((int)response.StatusCode == 429)
+                {
+                    if (await HandleRateLimitAsync(response, retryCount, maxRetries))
+                    {
+                        retryCount++;
+                        continue;
+                    }
+                }
+
+                response.EnsureSuccessStatusCode();
+
+                // Get the response
+                string resultStr = await response.Content.ReadAsStringAsync();
+
+                // Deserialize the response to T
+                T? resultObject = JsonConvert.DeserializeObject<T>(resultStr, new JsonSerializerSettings
+                {
+                    MaxDepth = 8,
+                    ObjectCreationHandling = ObjectCreationHandling.Auto,
+                    CheckAdditionalContent = true,
+                    Converters = { new SafeEnumConverter() }
+                });
+
+                return resultObject;
+            }
+
+            throw new HttpRequestException("Max retries exceeded on GET request");
         }
 
         /// <summary>
         /// Sends a DELETE request to the specified URL and ensures a successful HTTP response.
+        /// Automatically retries on 429 responses with exponential backoff (max 5 retries).
         /// </summary>
         /// <param name="url">The URL to send the DELETE request to.</param>
         public static async Task Delete(string url)
         {
-            // ensure headers are built
-            BuildHeaders();
+            int retryCount = 0;
+            const int maxRetries = 5;
 
-            var response = await client.DeleteAsync(url);
-            response.EnsureSuccessStatusCode();
+            while (retryCount <= maxRetries)
+            {
+                // ensure headers are built
+                BuildHeaders();
+
+                var response = await client.DeleteAsync(url);
+
+                if ((int)response.StatusCode == 429)
+                {
+                    if (await HandleRateLimitAsync(response, retryCount, maxRetries))
+                    {
+                        retryCount++;
+                        continue;
+                    }
+                }
+
+                response.EnsureSuccessStatusCode();
+                return;
+            }
+
+            throw new HttpRequestException("Max retries exceeded on DELETE request");
         }
 
         /// <summary>
