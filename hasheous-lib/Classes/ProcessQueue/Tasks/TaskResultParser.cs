@@ -224,7 +224,7 @@ namespace Classes.ProcessQueue
             // find all tasks that are stale and reset them to pending
             // - tasks that have been in progress for more than 1 hour
             // - tasks that have been in assigned for more than 2 hours
-            string resetSql = "SELECT * FROM Task_Queue WHERE (status = @inProgressStatus AND start_time < @inProgressTime) OR (status = @assignedStatus AND assigned_at < @assignedTime);";
+            string resetSql = "SELECT * FROM Task_Queue WHERE (status = @inProgressStatus AND completion_time < @inProgressTime) OR (status = @assignedStatus AND completion_time < @assignedTime);";
             DataTable staleTasks = await Config.database.ExecuteCMDAsync(resetSql, new Dictionary<string, object>
             {
                 { "@inProgressStatus", QueueItemStatus.InProgress },
