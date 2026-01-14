@@ -306,6 +306,7 @@ function renderContent() {
             case "Tags":
                 let tags = dataObject.attributes[i].value;
 
+                let hasTags = false;
                 for (const tagType of Object.values(tagTypes)) {
                     if (tags[tagType]) {
                         let tagOutput = '<table>';
@@ -313,6 +314,7 @@ function renderContent() {
                         let tagColour = `style="background-color: ${tagColourValue};"`;
 
                         for (const tag of tags[tagType].tags) {
+                            hasTags = true;
                             let aiImage = '';
                             if (tag.aiGenerated) {
                                 aiImage = ' <img src="/images/ai.svg" class="banner_button_image aigeneratedicon" title="' + lang.getLang('aigeneratedtag') + '">';
@@ -335,13 +337,14 @@ function renderContent() {
                     }
                 }
 
-                attributeValues.push(
-                    {
-                        "attribute": "ainotice",
-                        "value": lang.getLang("ainoticebody")
-                    }
-                );
-
+                if (hasTags == true) {
+                    attributeValues.push(
+                        {
+                            "attribute": "ainotice",
+                            "value": lang.getLang("ainoticebody")
+                        }
+                    );
+                }
 
                 break;
 
