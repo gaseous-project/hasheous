@@ -26,7 +26,10 @@ namespace hasheous_taskrunner.Classes.Communication
             if (Config.GetAuthValue("client_id") != null)
             {
                 Console.WriteLine("Client is already registered with ID: " + Config.GetAuthValue("client_id"));
-                parameters.Add("client_id", Config.GetAuthValue("client_id"));
+                if (!parameters.ContainsKey("client_id"))
+                {
+                    parameters.Add("client_id", Config.GetAuthValue("client_id"));
+                }
             }
             TaskRunner.Classes.HttpHelper.BaseUri = Config.Configuration["HostAddress"];
             TaskRunner.Classes.HttpHelper.Headers.Add("X-API-Key", Config.Configuration["APIKey"]);
