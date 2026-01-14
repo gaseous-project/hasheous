@@ -32,7 +32,14 @@ namespace hasheous_taskrunner.Classes.Communication
                 }
             }
             TaskRunner.Classes.HttpHelper.BaseUri = Config.Configuration["HostAddress"];
-            TaskRunner.Classes.HttpHelper.Headers.Add("X-API-Key", Config.Configuration["APIKey"]);
+            if (!TaskRunner.Classes.HttpHelper.Headers.ContainsKey("X-API-Key"))
+            {
+                TaskRunner.Classes.HttpHelper.Headers.Add("X-API-Key", Config.Configuration["APIKey"]);
+            }
+            else
+            {
+                TaskRunner.Classes.HttpHelper.Headers["X-API-Key"] = Config.Configuration["APIKey"];
+            }
 
             // start registration loop
             int retryCount = 0;
