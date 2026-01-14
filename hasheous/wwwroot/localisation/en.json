@@ -322,5 +322,10 @@
     "capabilities": "Capabilities",
     "taskstatus": "Task Status",
     "lastcontact": "Last Contact",
-    "inactive": "Inactive"
+    "inactive": "Inactive",
+    "ainotice": "AI Notice",
+    "ainoticebody": "Tags marked with the AI icon have been generated or suggested by an AI system and may not have been reviewed by human moderators. Please use discretion when considering these tags.",
+    "similargame": "Similar Games",
+    "similarcompany": "Similar Companies",
+    "similarplatform": "Similar Platforms"
 }

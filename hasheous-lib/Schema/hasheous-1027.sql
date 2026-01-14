@@ -11,7 +11,8 @@ CREATE TABLE `Task_Clients` (
     INDEX `idx_public_id` (`public_id`),
     INDEX `idx_client_name` (`client_name`),
     INDEX `idx_owner_id` (`owner_id`),
-    INDEX `idx_last_heartbeat` (`last_heartbeat`)
+    INDEX `idx_last_heartbeat` (`last_heartbeat`),
+    CONSTRAINT `fk_task_clients_owner_id` FOREIGN KEY (`owner_id`) REFERENCES `Users` (`Id`) ON DELETE CASCADE
 );
 
 CREATE TABLE `Task_Queue` (
