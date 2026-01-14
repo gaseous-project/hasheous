@@ -3281,20 +3281,59 @@ namespace hasheous_server.Classes
                 return list;
             }
 
+            // Collect all candidate IDs
+            List<long> candidateIds = new List<long>();
+            foreach (DataRow row in candidateData.Rows)
+            {
+                candidateIds.Add((long)row["Id"]);
+            }
+
+            // Batch-fetch all tags for all candidates in one query
+            string candidateIdList = string.Join(",", candidateIds);
+            string tagsSql = @"SELECT DataObject_Tags.DataObjectId, Tags.id, Tags.type, Tags.name, DataObject_Tags.AIAssigned 
+                              FROM Tags 
+                              INNER JOIN DataObject_Tags ON Tags.id = DataObject_Tags.TagId 
+                              WHERE DataObject_Tags.DataObjectId IN (" + candidateIdList + @") 
+                              ORDER BY DataObject_Tags.DataObjectId, Tags.name;";
+
+            DataTable allTagsData = await db.ExecuteCMDAsync(tagsSql, new Dictionary<string, object>());
+
+            // Build a dictionary: candidateId -> { tagType -> List<tagId> }
+            Dictionary<long, Dictionary<DataObjectItemTags.TagType, HashSet<long>>> candidateTagsMap =
+                new Dictionary<long, Dictionary<DataObjectItemTags.TagType, HashSet<long>>>();
+
+            foreach (DataRow tagRow in allTagsData.Rows)
+            {
+                long candidateId = (long)tagRow["DataObjectId"];
+                DataObjectItemTags.TagType tagType = (DataObjectItemTags.TagType)(int)tagRow["type"];
+                long tagId = (long)tagRow["id"];
+
+                if (!candidateTagsMap.ContainsKey(candidateId))
+                {
+                    candidateTagsMap[candidateId] = new Dictionary<DataObjectItemTags.TagType, HashSet<long>>();
+                }
+
+                if (!candidateTagsMap[candidateId].ContainsKey(tagType))
+                {
+                    candidateTagsMap[candidateId][tagType] = new HashSet<long>();
+                }
+
+                candidateTagsMap[candidateId][tagType].Add(tagId);
+            }
+
             // Dictionary to store similarity scores: candidateId -> { tagType -> similarity%, overall -> similarity% }
             Dictionary<long, Dictionary<string, double>> similarityScores = new Dictionary<long, Dictionary<string, double>>();
 
             // Evaluate each candidate
-            foreach (DataRow row in candidateData.Rows)
+            foreach (long candidateId in candidateIds)
             {
-                long candidateId = (long)row["Id"];
-
-                // Get tags for this candidate
-                var candidateTags = await GetTags(candidateId);
-                if (candidateTags.Count == 0)
+                // Skip candidates with no tags
+                if (!candidateTagsMap.ContainsKey(candidateId) || candidateTagsMap[candidateId].Count == 0)
                 {
                     continue;
                 }
+
+                var candidateTags = candidateTagsMap[candidateId];
 
                 // Calculate per-category similarity
                 Dictionary<string, double> categoryScores = new Dictionary<string, double>();
@@ -3311,7 +3350,7 @@ namespace hasheous_server.Classes
                     {
                         if (candidateTags.ContainsKey(tagType))
                         {
-                            var candidateTagIds = new HashSet<long>(candidateTags[tagType].Tags.Select(t => t.Id));
+                            HashSet<long> candidateTagIds = candidateTags[tagType];
                             int matchCount = sourceTagIdSet.Intersect(candidateTagIds).Count();
                             // Similarity is the percentage of source tags that appear in the candidate
                             categorySimilarity = (double)matchCount / sourceTagIdSet.Count * 100.0;
@@ -3339,27 +3378,52 @@ namespace hasheous_server.Classes
                 .Take(10)
                 .ToList();
 
-            // Fetch the actual DataObject items for the top candidates
+            if (topCandidates.Count == 0)
+            {
+                return list;
+            }
+
+            // Batch-fetch DataObject records for top 10
+            List<long> topCandidateIds = topCandidates.Select(x => x.Key).ToList();
+            string topIdList = string.Join(",", topCandidateIds);
+
+            string dataObjectSql = "SELECT * FROM DataObject WHERE Id IN (" + topIdList + ") ORDER BY FIELD(Id, " + topIdList + ");";
+            DataTable topDataObjectsData = await db.ExecuteCMDAsync(dataObjectSql, new Dictionary<string, object>());
+
+            // Build DataObject items using BuildDataObject for each
             foreach (var candidateEntry in topCandidates)
             {
-                DataObjectItem? candidate = await GetDataObject(dataObject.ObjectType, candidateEntry.Key, true, false, false);
-                if (candidate != null)
+                DataRow? dataObjectRow = null;
+                foreach (DataRow row in topDataObjectsData.Rows)
                 {
-                    // Store similarity metadata in a new attribute for display
-                    // Create a custom attribute to hold similarity scores
-                    var similarityAttribute = new AttributeItem
+                    if ((long)row["Id"] == candidateEntry.Key)
                     {
-                        attributeName = AttributeItem.AttributeName.Description, // Reuse for now; could add custom type
-                        attributeType = AttributeItem.AttributeType.LongString,
-                        attributeRelationType = DataObjectType.None,
-                        Value = System.Text.Json.JsonSerializer.Serialize(candidateEntry.Value)
-                    };
+                        dataObjectRow = row;
+                        break;
+                    }
+                }
 
-                    // Add similarity scores as custom property (store in a way accessible to consumers)
-                    // For now, we'll attach via the item's metadata or a custom property
-                    candidate.Attributes ??= new List<AttributeItem>();
+                if (dataObjectRow != null)
+                {
+                    DataObjectItem? candidate = await BuildDataObject(dataObject.ObjectType, candidateEntry.Key, dataObjectRow, true);
+                    if (candidate != null)
+                    {
+                        // Store similarity metadata in a new attribute for display
+                        // Create a custom attribute to hold similarity scores
+                        var similarityAttribute = new AttributeItem
+                        {
+                            attributeName = AttributeItem.AttributeName.Description, // Reuse for now; could add custom type
+                            attributeType = AttributeItem.AttributeType.LongString,
+                            attributeRelationType = DataObjectType.None,
+                            Value = System.Text.Json.JsonSerializer.Serialize(candidateEntry.Value)
+                        };
 
-                    list.Objects.Add(candidate);
+                        // Add similarity scores as custom property (store in a way accessible to consumers)
+                        // For now, we'll attach via the item's metadata or a custom property
+                        candidate.Attributes ??= new List<AttributeItem>();
+
+                        list.Objects.Add(candidate);
+                    }
                 }
             }
 
