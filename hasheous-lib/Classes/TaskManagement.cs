@@ -607,8 +607,8 @@ namespace hasheous_server.Classes.Tasks.Clients
             switch (taskType)
             {
                 case TaskType.AIDescriptionAndTagging:
-                    parameters.Add("model_description", "gemma3:4b");
-                    parameters.Add("model_tags", "gemma3:4b");
+                    parameters.Add("model_description", "gemma3:12b");
+                    parameters.Add("model_tags", "qwen3:8b");
                     parameters.Add("sources", "");  // will be populated with actual sources used
 
                     string prompt_description = "";
