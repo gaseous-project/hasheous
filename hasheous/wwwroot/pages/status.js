@@ -190,10 +190,18 @@ function LoadTaskStatus() {
             let taskElement = document.getElementById('task-process');
             taskElement.innerHTML = ''; // Clear existing content
 
+            if (!tasks || Object.keys(tasks).length === 0) {
+                return;
+            }
+
+            const serviceHeader = document.createElement('h2');
+            serviceHeader.textContent = lang.getLang('servicetaskstatus');
+            taskElement.appendChild(serviceHeader);
+
             // top level is task type
             // second level is task status - value is count
             for (const taskType of Object.keys(tasks)) {
-                const typeHeader = document.createElement('h2');
+                const typeHeader = document.createElement('h3');
                 typeHeader.textContent = lang.getLang('servicetasktype' + taskType);
                 taskElement.appendChild(typeHeader);
 
