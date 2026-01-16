@@ -2406,6 +2406,15 @@ namespace hasheous_server.Classes
 
                 List<DataObjectItem.MetadataItem> metadataUpdates = new List<MetadataItem>();
 
+                // calculate a dates to search next time should we not find any matches, or need to refresh automatic matches
+                // day count should be randomised to ensure that we don't spend multiple days processing records
+                // automatic and automaticetoomanymatches - should be between 6 and 12 months
+                int automaticNextDay = new Random().Next(180, 365);
+                // nomatch - should be between 1 and 6 months
+                int noMatchNextDay = new Random().Next(30, 180);
+                // default - just one day
+                int defaultNextDay = 1;
+
                 // process each metadata source
                 foreach (MetadataSources metadataSource in Enum.GetValues(typeof(MetadataSources)))
                 {
@@ -2517,13 +2526,13 @@ namespace hasheous_server.Classes
                                 {
                                     case BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic:
                                     case BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.AutomaticTooManyMatches:
-                                        metadata.NextSearch = DateTime.UtcNow.AddMonths(6);
+                                        metadata.NextSearch = DateTime.UtcNow.AddDays(automaticNextDay);
                                         break;
                                     case BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch:
-                                        metadata.NextSearch = DateTime.UtcNow.AddMonths(1);
+                                        metadata.NextSearch = DateTime.UtcNow.AddDays(noMatchNextDay);
                                         break;
                                     default:
-                                        metadata.NextSearch = DateTime.UtcNow.AddDays(1);
+                                        metadata.NextSearch = DateTime.UtcNow.AddDays(defaultNextDay);
                                         break;
                                 }
 
