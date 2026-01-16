@@ -7,24 +7,23 @@
 	"dockerComposeFile": "docker-compose.yml",
 	"service": "development",
 	"workspaceFolder": "/workspace",
-
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},
-
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	"forwardPorts": [ 5220, 7157 ],
+	"forwardPorts": [
+		5220,
+		7157
+	],
 	"portsAttributes": {
-			"5198": {
-				"protocol": "http"
-			},
-			"7157": {
-				"protocol": "https"
-			}
+		"5198": {
+			"protocol": "http"
+		},
+		"7157": {
+			"protocol": "https"
+		}
 	},
-
 	// Use 'postCreateCommand' to run commands after the container is created.
 	"postCreateCommand": "dotnet dev-certs https && dotnet restore",
-
 	// Configure tool-specific properties.
 	"customizations": {
 		"vscode": {
@@ -42,12 +41,10 @@
 				"Zignd.html-css-class-completion",
 				"ms-azuretools.vscode-docker",
 				"Gruntfuggly.todo-tree",
-				"eamodio.gitlens",
-				"cweijan.vscode-redis-client"
+				"eamodio.gitlens"
 			]
 		}
 	}
-
 	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
 	// "remoteUser": "root"
 }

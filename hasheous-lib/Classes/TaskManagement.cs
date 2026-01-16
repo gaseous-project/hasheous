@@ -318,8 +318,8 @@ namespace hasheous_server.Classes.Tasks.Clients
             {
                 task.ClientId = client.Id;
                 task.Status = QueueItemStatus.Assigned;
-                task.StartedAt = null;
-                task.CompletedAt = null;
+                task.StartedAt = DateTime.UtcNow;
+                task.CompletedAt = DateTime.UtcNow;
                 task.Result = "";
                 task.ErrorMessage = "";
                 await task.Commit();
