@@ -335,7 +335,7 @@ public static class StartupExtensions
     }
 
     /// <summary>
-    /// Ensures system roles exist and assigns Verified Email role to users with confirmed emails.
+    /// Ensures system roles exist with proper dependencies and settings, and assigns Verified Email role to users with confirmed emails.
     /// </summary>
     public static async Task SeedRolesAndVerifiedEmailAsync(this WebApplication app)
     {
@@ -343,6 +343,8 @@ public static class StartupExtensions
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleStore>();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var roles = new[] { "Admin", "Moderator", "Member", "Verified Email", "Task Runner" };
+
+        // Create roles if they don't exist
         foreach (var role in roles)
         {
             if (await roleManager.FindByNameAsync(role, CancellationToken.None) == null)
@@ -351,13 +353,57 @@ public static class StartupExtensions
                 await roleManager.CreateAsync(applicationRole, CancellationToken.None);
             }
         }
-        const string verifiedEmailRole = "Verified Email";
+
+        // Configure role dependencies and permissions
+        var memberRole = await roleManager.FindByNameAsync("Member", CancellationToken.None);
+        var moderatorRole = await roleManager.FindByNameAsync("Moderator", CancellationToken.None);
+        var adminRole = await roleManager.FindByNameAsync("Admin", CancellationToken.None);
+        var verifiedEmailRole = await roleManager.FindByNameAsync("Verified Email", CancellationToken.None);
+        var taskRunnerRole = await roleManager.FindByNameAsync("Task Runner", CancellationToken.None);
+
+        // Set up role hierarchy: Admin depends on Moderator depends on Member
+        if (memberRole != null)
+        {
+            memberRole.AllowManualAssignment = false;
+            memberRole.RoleDependsOn = Guid.Empty;
+            await roleManager.UpdateAsync(memberRole, CancellationToken.None);
+        }
+
+        if (moderatorRole != null && memberRole != null)
+        {
+            moderatorRole.AllowManualAssignment = true;
+            moderatorRole.RoleDependsOn = Guid.Parse(memberRole.Id);
+            await roleManager.UpdateAsync(moderatorRole, CancellationToken.None);
+        }
+
+        if (adminRole != null && moderatorRole != null)
+        {
+            adminRole.AllowManualAssignment = true;
+            adminRole.RoleDependsOn = Guid.Parse(moderatorRole.Id);
+            await roleManager.UpdateAsync(adminRole, CancellationToken.None);
+        }
+
+        if (verifiedEmailRole != null)
+        {
+            verifiedEmailRole.AllowManualAssignment = false;
+            verifiedEmailRole.RoleDependsOn = Guid.Empty;
+            await roleManager.UpdateAsync(verifiedEmailRole, CancellationToken.None);
+        }
+
+        if (taskRunnerRole != null)
+        {
+            taskRunnerRole.AllowManualAssignment = true;
+            taskRunnerRole.RoleDependsOn = Guid.Empty;
+            await roleManager.UpdateAsync(taskRunnerRole, CancellationToken.None);
+        }
+
+        // Assign Verified Email role to users with confirmed emails
         var usersWithConfirmedEmails = userManager.Users.Where(u => u.EmailConfirmed).ToList();
         foreach (var user in usersWithConfirmedEmails)
         {
-            if (!await userManager.IsInRoleAsync(user, verifiedEmailRole))
+            if (!await userManager.IsInRoleAsync(user, "Verified Email"))
             {
-                await userManager.AddToRoleAsync(user, verifiedEmailRole);
+                await userManager.AddToRoleAsync(user, "Verified Email");
             }
         }
     }

@@ -7,7 +7,7 @@ using MySqlConnector;
 
 namespace Authentication
 {
-    public class UserStore : 
+    public class UserStore :
         IUserStore<ApplicationUser>,
         IUserRoleStore<ApplicationUser>,
         IUserLoginStore<ApplicationUser>,
@@ -106,13 +106,40 @@ namespace Authentication
                 throw new ArgumentException("Argument cannot be null or empty: roleName.");
             }
 
-            string roleId = roleTable.GetRoleId(roleName);
-            if (!string.IsNullOrEmpty(roleId))
+            AddToRoleWithDependenciesAsync(user, roleName);
+
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Recursively adds a role and all its dependencies to a user based on the role hierarchy
+        /// </summary>
+        private void AddToRoleWithDependenciesAsync(ApplicationUser user, string roleName)
+        {
+            // Get the role
+            ApplicationRole? role = roleTable.GetRoleByName(roleName);
+            if (role == null)
             {
-                userRolesTable.Insert(user, roleId);
+                return;
             }
 
-            return Task.FromResult<object>(null);
+            // Check if user is already in this role to avoid primary key violation
+            List<string> userRoles = userRolesTable.FindByUserId(user.Id);
+            if (!userRoles.Contains(roleName))
+            {
+                // Add the role to the user
+                userRolesTable.Insert(user, role.Id);
+            }
+
+            // If this role depends on another role, recursively add that role too
+            if (role.RoleDependsOn != Guid.Empty)
+            {
+                ApplicationRole? dependentRole = roleTable.GetRoleById(role.RoleDependsOn.ToString());
+                if (dependentRole != null && !string.IsNullOrEmpty(dependentRole.Name))
+                {
+                    AddToRoleWithDependenciesAsync(user, dependentRole.Name);
+                }
+            }
         }
 
         public Task<IdentityResult> CreateAsync(ApplicationUser user, CancellationToken cancellationToken)
@@ -442,14 +469,35 @@ namespace Authentication
                 throw new ArgumentNullException("role");
             }
 
-            IdentityRole? role = roleTable.GetRoleByName(roleName);
+            RemoveFromRoleWithDependentRolesAsync(user, roleName);
 
-            if (role != null)
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Removes a role from a user and any roles that depend on it (reverse hierarchy)
+        /// </summary>
+        private void RemoveFromRoleWithDependentRolesAsync(ApplicationUser user, string roleName)
+        {
+            // Get the role
+            ApplicationRole? role = roleTable.GetRoleByName(roleName);
+            if (role == null)
             {
-                userRolesTable.DeleteUserFromRole(user.Id, role.Id);
+                return;
             }
 
-            return Task.FromResult<Object>(null);
+            // Remove the role from the user
+            userRolesTable.DeleteUserFromRole(user.Id, role.Id);
+
+            // Find and remove any roles that depend on this role
+            List<ApplicationRole> allRoles = roleTable.GetRoles();
+            foreach (var dependentRole in allRoles)
+            {
+                if (dependentRole.RoleDependsOn == Guid.Parse(role.Id) && dependentRole.Name != null)
+                {
+                    RemoveFromRoleWithDependentRolesAsync(user, dependentRole.Name);
+                }
+            }
         }
 
         public Task RemoveLoginAsync(ApplicationUser user, string loginProvider, string providerKey, CancellationToken cancellationToken)

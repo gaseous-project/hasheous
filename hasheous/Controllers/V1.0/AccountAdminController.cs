@@ -23,17 +23,20 @@ namespace hasheous_server.Controllers.v1_0
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly IEmailSender _emailSender;
         private readonly ILogger _logger;
+        private readonly RoleManager<ApplicationRole> _roleManager;
 
         public AccountAdminController(
             UserManager<ApplicationUser> userManager,
             SignInManager<ApplicationUser> signInManager,
             IEmailSender emailSender,
-            ILoggerFactory loggerFactory)
+            ILoggerFactory loggerFactory,
+            RoleManager<ApplicationRole> roleManager)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _emailSender = emailSender;
             _logger = loggerFactory.CreateLogger<AccountAdminController>();
+            _roleManager = roleManager;
         }
 
         [HttpGet]
@@ -52,6 +55,12 @@ namespace hasheous_server.Controllers.v1_0
                 user.LockoutEnd = rawUser.LockoutEnd;
                 user.SecurityProfile = rawUser.SecurityProfile;
 
+                // make sure this user is not the logged in user - this is to prevent an admin from removing their own admin rights
+                if (user.EmailAddress == User.FindFirstValue(ClaimTypes.Email).ToLower())
+                {
+                    continue;
+                }
+
                 // get roles
                 ApplicationUser? aUser = await _userManager.FindByIdAsync(rawUser.Id);
                 if (aUser != null)
@@ -62,49 +71,18 @@ namespace hasheous_server.Controllers.v1_0
                     user.Roles.Sort();
                 }
 
-                if (user.Roles.Contains("Admin") || user.Roles.Contains("Moderator"))
+                // only add a user to the list if they contain roles other than "Member" or "Verified Email"
+                if (user.Roles.Except(new string[] { "Member", "Verified Email" }).Any())
                 {
                     users.Add(user);
                 }
             }
 
+            // sort all users by email
+            users = users.OrderBy(u => u.EmailAddress).ToList();
+
             return Ok(users);
         }
-
-        // [HttpPost]
-        // [Route("Users")]
-        // [Authorize(Roles = "Admin")]
-        // public async Task<IActionResult> NewUser(RegisterViewModel model)
-        // {
-        //     if (ModelState.IsValid)
-        //     {
-        //         ApplicationUser user = new ApplicationUser
-        //         {
-        //             UserName = model.UserName,
-        //             NormalizedUserName = model.UserName.ToUpper(),
-        //             Email = model.Email,
-        //             NormalizedEmail = model.Email.ToUpper()
-        //         };
-        //         var result = await _userManager.CreateAsync(user, model.Password);
-        //         if (result.Succeeded)
-        //         {
-        //             // add new users to the player role
-        //             await _userManager.AddToRoleAsync(user, "Player");
-
-        //             Logging.Log(Logging.LogType.Information, "User Management", User.FindFirstValue(ClaimTypes.Name) + " created user " + model.Email + " with password.");
-
-        //             return Ok(result);
-        //         }
-        //         else
-        //         {
-        //             return Ok(result);
-        //         }
-        //     }
-        //     else
-        //     {
-        //         return NotFound();
-        //     }
-        // }
 
         [HttpGet]
         [Route("Users/{Email}")]
@@ -136,30 +114,10 @@ namespace hasheous_server.Controllers.v1_0
             }
         }
 
-        // [HttpDelete]
-        // [Route("Users/{UserId}")]
-        // [Authorize(Roles = "Admin")]
-        // public async Task<IActionResult> DeleteUser(string UserId)
-        // {
-        //     // get user
-        //     ApplicationUser? user = await _userManager.FindByIdAsync(UserId);
-
-        //     if (user == null)
-        //     {
-        //         return NotFound();
-        //     }
-        //     else
-        //     {
-        //         await _userManager.DeleteAsync(user);
-        //         Logging.Log(Logging.LogType.Information, "User Management", User.FindFirstValue(ClaimTypes.Name) + " deleted user " + user.Email);
-        //         return Ok();
-        //     }
-        // }
-
         [HttpPost]
         [Route("Users/{Email}/Roles")]
         [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> SetUserRoles(string Email, string RoleName)
+        public async Task<IActionResult> SetUserRoles(string Email, [FromBody] string[] roleList)
         {
             ApplicationUser? user = await _userManager.FindByEmailAsync(Email);
 
@@ -171,30 +129,16 @@ namespace hasheous_server.Controllers.v1_0
                 // delete all roles
                 foreach (string role in userRoles)
                 {
-                    if ((new string[] { "Admin", "Moderator" }).Contains(role))
+                    if (role != "Member" && role != "Verified Email")
                     {
                         await _userManager.RemoveFromRoleAsync(user, role);
                     }
                 }
 
-                // add only requested roles
-                switch (RoleName)
+                // add requested roles (dependencies are handled automatically)
+                foreach (string roleName in roleList)
                 {
-                    case "Admin":
-                        await _userManager.AddToRoleAsync(user, "Admin");
-                        await _userManager.AddToRoleAsync(user, "Moderator");
-                        await _userManager.AddToRoleAsync(user, "Member");
-                        break;
-                    case "Moderator":
-                        await _userManager.AddToRoleAsync(user, "Moderator");
-                        await _userManager.AddToRoleAsync(user, "Member");
-                        break;
-                    case "Member":
-                        await _userManager.AddToRoleAsync(user, "Member");
-                        break;
-                    default:
-                        await _userManager.AddToRoleAsync(user, RoleName);
-                        break;
+                    await _userManager.AddToRoleAsync(user, roleName);
                 }
 
                 return Ok();
@@ -205,64 +149,13 @@ namespace hasheous_server.Controllers.v1_0
             }
         }
 
-        // [HttpPost]
-        // [Route("Users/{UserId}/SecurityProfile")]
-        // [Authorize(Roles = "Admin")]
-        // public async Task<IActionResult> SetUserSecurityProfile(string UserId, SecurityProfileViewModel securityProfile)
-        // {
-        //     if (ModelState.IsValid)
-        //     {
-        //         ApplicationUser? user = await _userManager.FindByIdAsync(UserId);
-
-        //         if (user != null)
-        //         {
-        //             user.SecurityProfile = securityProfile;
-        //             await _userManager.UpdateAsync(user);
-
-        //             return Ok();
-        //         }
-        //         else
-        //         {
-        //             return NotFound();
-        //         }
-        //     }
-        //     else
-        //     {
-        //         return NotFound();
-        //     }
-        // }
-
-        // [HttpPost]
-        // [Route("Users/{UserId}/Password")]
-        // [Authorize(Roles = "Admin")]
-        // public async Task<IActionResult> ResetPassword(string UserId, SetPasswordViewModel model)
-        // {
-        //     if (ModelState.IsValid)
-        //     {
-        //         // we can reset the users password
-        //         ApplicationUser? user = await _userManager.FindByIdAsync(UserId);
-        //         if (user != null)
-        //         {
-        //             string resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
-        //             IdentityResult passwordChangeResult = await _userManager.ResetPasswordAsync(user, resetToken, model.NewPassword);
-        //             if (passwordChangeResult.Succeeded == true)
-        //             {
-        //                 return Ok(passwordChangeResult);
-        //             }
-        //             else
-        //             {
-        //                 return Ok(passwordChangeResult);
-        //             }
-        //         }
-        //         else
-        //         {
-        //             return NotFound();
-        //         }
-        //     }
-        //     else
-        //     {
-        //         return NotFound();
-        //     }
-        // }
+        [HttpGet]
+        [Route("Roles")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> GetAllRoles()
+        {
+            var roles = _roleManager.Roles.Select(r => new { r.Id, r.Name, r.AllowManualAssignment, r.RoleDependsOn }).OrderBy(r => r.Name).ToList();
+            return Ok(roles);
+        }
     }
 }
