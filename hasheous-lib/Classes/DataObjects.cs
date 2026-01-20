@@ -1483,6 +1483,47 @@ namespace hasheous_server.Classes
                 default:
                     break;
             }
+            // remove all AI content and linked if there is no metadata providers attached
+            bool noMetadataLinksPresent = false;
+            if (model.Metadata != null)
+            {
+                if (model.Metadata.Count == 0)
+                {
+                    noMetadataLinksPresent = true;
+                }
+                else
+                {
+                    noMetadataLinksPresent = true;
+                    foreach (DataObjectItem.MetadataItem metadataItem in model.Metadata)
+                    {
+                        if (String.IsNullOrEmpty(metadataItem.Id) == false)
+                        {
+                            noMetadataLinksPresent = false;
+                        }
+                    }
+                }
+            }
+            if (noMetadataLinksPresent == true)
+            {
+                // delete ai description
+                sql = "DELETE FROM DataObject_Attributes WHERE DataObjectId=@id AND AttributeType=@attrtype AND AttributeName=@attrname;";
+                db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                    { "id", id },
+                    { "attrtype", (int)AttributeItem.AttributeType.LongString },
+                    { "attrname", (int)AttributeItem.AttributeName.AIDescription }
+                });
+                // delete ai tags
+                sql = "DELETE FROM DataObject_Tags WHERE DataObjectId=@id AND AIAssigned=@aiassigned;";
+                db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                    { "id", id },
+                    { "aiassigned", true }
+                });
+                // delete ai tasks
+                sql = "DELETE FROM Task_Queue WHERE dataobjectid=@id;";
+                db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                    { "id", id }
+                });
+            }
 
             // signatures
             sql = "DELETE FROM DataObject_SignatureMap WHERE DataObjectId=@id";
