@@ -34,11 +34,11 @@ if (userProfile.EmailConfirmed) {
 }
 
 // setup resend verification button
-resendButton.addEventListener('click', function(e) {
+resendButton.addEventListener('click', function (e) {
     e.preventDefault();
     resendButton.disabled = true;
     resendButton.innerHTML = lang.getLang('sendingemailverification');
-    
+
     postData('/api/v1.0/Account/ResendEmailVerification', 'POST', {}, true)
         .then(response => {
             if (response.ok) {
@@ -183,7 +183,6 @@ resetPasswordButton.addEventListener("click", function (e) {
 });
 
 function resetPasswordCallback(result, redirectPath) {
-    console.log(result);
     switch (result.status) {
         case 200:
             window.location.replace(redirectPath);
@@ -279,6 +278,68 @@ fetch('/api/v1/Account/social-login', {
             });
         }
     });
+
+// set up task worker clients display
+function fetchTaskWorkerClients() {
+    let taskClientsDiv = document.getElementById('taskClients');
+
+    if (userProfile.Roles.includes('Task Runner')) {
+        fetch('/api/v1.0/TaskWorker/user/clients', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        }).then(response => response.json())
+            .then(data => {
+                if (data.length > 0) {
+                    taskClientsDiv.style.display = 'block';
+
+                    let taskClientsList = document.getElementById('taskClientsList');
+                    taskClientsList.innerHTML = ''; // clear existing entries
+
+                    let clientList = [];
+                    data.forEach(client => {
+                        // format capabilities
+                        let capabilities = '';
+                        client.client.capabilities.forEach((capability) => {
+                            capabilities += `<div class="badge">${lang.getLang(capability)}</div>`;
+                        });
+
+                        let clientEntry = {
+                            publicId: client.client.publicId,
+                            clientName: client.client.clientName,
+                            clientVersion: client.client.clientVersion,
+                            isActive: client.client.isActive ? "🟢" : "🔴",
+                            capabilities: capabilities,
+                            taskStatus: lang.getLang('servicetaskstatus' + client.taskStatus),
+                            lastContact: client.client.lastContactAt ? new Date(client.client.lastContactAt).toLocaleString() : lang.getLang('never')
+                        };
+                        clientList.push(clientEntry);
+                    });
+
+                    let tableGenerator = new generateTable(
+                        clientList,
+                        ['publicId', 'isActive:hideheading', 'clientName', 'clientVersion', 'capabilities', 'taskStatus', 'lastContact'],
+                        'publicId',
+                        true,
+                        null,
+                        clientList.length
+                    );
+                    tableGenerator.setAttribute("style", "width: 100%;");
+
+                    taskClientsList.appendChild(
+                        tableGenerator
+                    );
+                } else {
+                    taskClientsDiv.style.display = 'none';
+                }
+            });
+    } else {
+        taskClientsDiv.style.display = 'none';
+    }
+    setTimeout(fetchTaskWorkerClients, 10000); // refresh every 10 seconds
+}
+fetchTaskWorkerClients();
 
 // setup delete account confirmation checkbox
 let deleteAccountButton = document.getElementById('deleteaccount');

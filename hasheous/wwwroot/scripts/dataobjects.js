@@ -281,7 +281,7 @@ class dataObjectAttributes {
                         {
                             for (let i = 0; i < data.length; i++) {
                                 arr.push({
-                                    id: data[i].id,
+                                    id: data[i].text,
                                     text: data[i].text
                                 });
                             }

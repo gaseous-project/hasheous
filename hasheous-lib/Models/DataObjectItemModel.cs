@@ -45,7 +45,8 @@ namespace hasheous_server.Models
             Wikipedia = 18,
             Public = 19,
             DumpFile = 20,
-            Tags = 21
+            Tags = 21,
+            AIDescription = 22
         }
 
         public long? Id { get; set; }
