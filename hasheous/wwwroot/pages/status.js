@@ -249,7 +249,7 @@ function LoadTaskStatus() {
             }
         })
         .catch(error => {
-            console.error('Error fetching user profile:', error);
+            console.error('Error fetching task status:', error);
         });
 }
 
