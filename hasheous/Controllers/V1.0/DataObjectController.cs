@@ -800,7 +800,7 @@ namespace hasheous_server.Controllers.v1_0
                 { "objectType", (int)ObjectType }
             };
 
-            var countResult = db.ExecuteCMD(countSql, countDict);
+            var countResult = await db.ExecuteCMDAsync(countSql, countDict);
             int totalRecords = 0;
             if (countResult.Rows.Count > 0)
             {
@@ -822,7 +822,7 @@ namespace hasheous_server.Controllers.v1_0
                 { "offset", offset }
             };
 
-            var historyData = db.ExecuteCMD(sql, dbDict);
+            var historyData = await db.ExecuteCMDAsync(sql, dbDict);
             
             var historyList = new List<object>();
             

@@ -1571,7 +1571,7 @@ namespace hasheous_server.Classes
                     dbDict = new Dictionary<string, object>{
                         { "email", acl.Key }
                     };
-                    DataTable userRecord = db.ExecuteCMD(sql, dbDict);
+                    DataTable userRecord = await db.ExecuteCMDAsync(sql, dbDict);
                     if (userRecord.Rows.Count > 0)
                     {
                         sql = "INSERT INTO DataObject_ACL (`DataObject_ID`, `UserId`, `Read`, `Write`, `Delete`) VALUES (@id, @userid, @read, @write, @delete);";
