@@ -320,7 +320,7 @@ namespace hasheous_server.Classes
         public async Task<Models.DataObjectItem?> GetDataObject(long id)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql = "SELECT * FROM DataObject WHERE Id=@id;";
+            string sql = "SELECT * FROM DataObject WHERE Id=@id AND (IsDeleted = 0 OR IsDeleted IS NULL);";
             Dictionary<string, object> dbDict = new Dictionary<string, object>{
                 { "id", id }
             };
@@ -339,10 +339,19 @@ namespace hasheous_server.Classes
             }
         }
 
-        public async Task<Models.DataObjectItem?> GetDataObject(DataObjectType objectType, long id, bool GetChildRelations = true, bool GetMetadata = true, bool GetSignatureData = true)
+        public async Task<Models.DataObjectItem?> GetDataObject(DataObjectType objectType, long id, bool GetChildRelations = true, bool GetMetadata = true, bool GetSignatureData = true, bool includeSoftDeleted = false)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql = "SELECT * FROM DataObject WHERE ObjectType=@objecttype AND Id=@id AND (IsDeleted = 0 OR IsDeleted IS NULL);";
+            string sql;
+            if (includeSoftDeleted)
+            {
+                sql = "SELECT * FROM DataObject WHERE ObjectType=@objecttype AND Id=@id;";
+            }
+            else
+            {
+                sql = "SELECT * FROM DataObject WHERE ObjectType=@objecttype AND Id=@id AND (IsDeleted = 0 OR IsDeleted IS NULL);";
+            }
+            
             Dictionary<string, object> dbDict = new Dictionary<string, object>{
                 { "id", id },
                 { "objecttype", objectType }
@@ -1064,8 +1073,7 @@ namespace hasheous_server.Classes
             // Store deletion in history (create a "deleted" version)
             if (preDeleteObject != null)
             {
-                var deletedObject = preDeleteObject;
-                // We'll mark it conceptually as deleted by storing the pre-delete state
+                // Store the pre-delete state in history
                 await StoreDataObjectHistory(preDeleteObject, preDeleteObject, user?.Id);
             }
 
@@ -1808,8 +1816,8 @@ namespace hasheous_server.Classes
                 return null; // History record not found
             }
             
-            // Get current object state
-            Models.DataObjectItem? currentObject = await GetDataObject(objectType, objectId, true, true, true);
+            // Get current object state (including soft-deleted objects for restoration)
+            Models.DataObjectItem? currentObject = await GetDataObject(objectType, objectId, true, true, true, true);
             if (currentObject == null)
             {
                 return null; // Object not found
@@ -1829,6 +1837,19 @@ namespace hasheous_server.Classes
             if (historicObject == null)
             {
                 return null; // Failed to deserialize historic object
+            }
+            
+            // If object is soft-deleted, restore it by setting IsDeleted=false
+            if (currentObject != null)
+            {
+                Database updateDb = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+                string updateSql = "UPDATE DataObject SET IsDeleted=0, UpdatedDate=@updateddate WHERE ObjectType=@objecttype AND Id=@id";
+                Dictionary<string, object> updateDict = new Dictionary<string, object>{
+                    { "id", objectId },
+                    { "objecttype", objectType },
+                    { "updateddate", DateTime.UtcNow }
+                };
+                await updateDb.ExecuteCMDAsync(updateSql, updateDict);
             }
             
             // Use EditDataObject to restore the historic state
@@ -3455,8 +3476,8 @@ namespace hasheous_server.Classes
             // apply changes if commit = true
             if (commit == true)
             {
-                var editDataObject = EditDataObject(targetObject.ObjectType, targetObject.Id, targetObject);
-                var dataObjectMetadataSearch = DataObjectMetadataSearch(targetObject.ObjectType, targetObject.Id, false);
+                await EditDataObject(targetObject.ObjectType, targetObject.Id, targetObject);
+                await DataObjectMetadataSearch(targetObject.ObjectType, targetObject.Id, false);
                 UpdateDataObjectDate(targetObject.Id);
                 await DeleteDataObject(sourceObject.ObjectType, sourceObject.Id, null);
             }

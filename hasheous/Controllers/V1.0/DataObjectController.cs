@@ -886,7 +886,7 @@ namespace hasheous_server.Controllers.v1_0
             hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
             // Check if object exists (including soft-deleted ones for restoration purposes)
-            Models.DataObjectItem? DataObject = await DataObjects.GetDataObject(ObjectType, Id);
+            Models.DataObjectItem? DataObject = await DataObjects.GetDataObject(ObjectType, Id, true, true, true, true);
 
             if (DataObject == null)
             {
