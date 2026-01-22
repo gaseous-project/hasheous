@@ -459,6 +459,29 @@ namespace hasheous_server.Classes
 
         private async Task<Models.DataObjectItem> BuildDataObject(DataObjectType ObjectType, long id, DataRow row, bool GetChildRelations = false, bool GetMetadata = true, bool GetSignatureData = true)
         {
+            // Check if object is soft-deleted
+            bool isDeleted = row["IsDeleted"] != DBNull.Value ? Convert.ToBoolean(row["IsDeleted"]) : false;
+            long? mergedIntoId = row["MergedIntoId"] != DBNull.Value ? Convert.ToInt64(row["MergedIntoId"]) : null;
+            
+            // If object is soft-deleted, return minimal representation
+            if (isDeleted)
+            {
+                Models.DataObjectItem deletedItem = new Models.DataObjectItem
+                {
+                    Id = id,
+                    Name = (string)row["Name"],
+                    ObjectType = ObjectType,
+                    IsDeleted = true,
+                    MergedIntoId = mergedIntoId,
+                    CreatedDate = (DateTime)row["CreatedDate"],
+                    UpdatedDate = (DateTime)row["UpdatedDate"],
+                    Metadata = new List<MetadataItem>(),
+                    SignatureDataObjects = new List<Dictionary<string, object>>(),
+                    Attributes = new List<AttributeItem>()
+                };
+                return deletedItem;
+            }
+            
             // get attributes
             List<AttributeItem> attributes = await GetAttributes(id, GetChildRelations);
 
@@ -517,6 +540,8 @@ namespace hasheous_server.Classes
                 Name = (string)row["Name"],
                 CreatedDate = (DateTime)row["CreatedDate"],
                 UpdatedDate = (DateTime)row["UpdatedDate"],
+                IsDeleted = row["IsDeleted"] != DBNull.Value ? Convert.ToBoolean(row["IsDeleted"]) : false,
+                MergedIntoId = row["MergedIntoId"] != DBNull.Value ? Convert.ToInt64(row["MergedIntoId"]) : null,
                 Metadata = metadataItems,
                 SignatureDataObjects = signatureItems,
                 Attributes = attributes
@@ -1053,18 +1078,20 @@ namespace hasheous_server.Classes
         /// <param name="objectType">The type of the object</param>
         /// <param name="id">The ID of the object</param>
         /// <param name="user">The user performing the deletion (for history tracking)</param>
-        public async Task DeleteDataObject(DataObjectType objectType, long id, ApplicationUser? user = null)
+        /// <param name="mergedIntoId">Optional ID of the object this was merged into</param>
+        public async Task DeleteDataObject(DataObjectType objectType, long id, ApplicationUser? user = null, long? mergedIntoId = null)
         {
             // Get the object before deletion for history
-            Models.DataObjectItem? preDeleteObject = await GetDataObject(objectType, id);
+            Models.DataObjectItem? preDeleteObject = await GetDataObject(objectType, id, true, true, true, true);
             
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             
-            // Soft delete - set IsDeleted flag instead of actual deletion
-            string sql = "UPDATE DataObject SET IsDeleted=1, UpdatedDate=@updateddate WHERE ObjectType=@objecttype AND Id=@id";
+            // Soft delete - set IsDeleted flag and optionally MergedIntoId
+            string sql = "UPDATE DataObject SET IsDeleted=1, MergedIntoId=@mergedintoid, UpdatedDate=@updateddate WHERE ObjectType=@objecttype AND Id=@id";
             Dictionary<string, object> dbDict = new Dictionary<string, object>{
                 { "id", id },
                 { "objecttype", objectType },
+                { "mergedintoid", mergedIntoId.HasValue ? (object)mergedIntoId.Value : DBNull.Value },
                 { "updateddate", DateTime.UtcNow }
             };
 
@@ -3479,7 +3506,7 @@ namespace hasheous_server.Classes
                 await EditDataObject(targetObject.ObjectType, targetObject.Id, targetObject);
                 await DataObjectMetadataSearch(targetObject.ObjectType, targetObject.Id, false);
                 UpdateDataObjectDate(targetObject.Id);
-                await DeleteDataObject(sourceObject.ObjectType, sourceObject.Id, null);
+                await DeleteDataObject(sourceObject.ObjectType, sourceObject.Id, null, targetObject.Id);
             }
 
             return targetObject;
