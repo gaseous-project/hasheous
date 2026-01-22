@@ -1675,7 +1675,7 @@ namespace hasheous_server.Classes
             var postEditToken = Newtonsoft.Json.Linq.JToken.Parse(postEditJson);
             var diffToken = jdp.Diff(preEditToken, postEditToken);
             
-            if (diffToken == null || diffToken.ToString() == "{}")
+            if (diffToken == null || !diffToken.HasValues)
             {
                 // No changes detected, don't store history
                 return;
@@ -1744,9 +1744,9 @@ namespace hasheous_server.Classes
         }
 
         /// <summary>
-        /// Decompresses a GZip compressed byte array to string
+        /// Decompresses a GZip compressed byte array to string (used for history data)
         /// </summary>
-        private string DecompressString(byte[] compressedData)
+        public string DecompressString(byte[] compressedData)
         {
             using (var memoryStream = new System.IO.MemoryStream(compressedData))
             {
@@ -1759,14 +1759,6 @@ namespace hasheous_server.Classes
                     }
                 }
             }
-        }
-
-        /// <summary>
-        /// Public method to decompress history data
-        /// </summary>
-        public string DecompressHistoryString(byte[] compressedData)
-        {
-            return DecompressString(compressedData);
         }
 
         /// <summary>

@@ -769,7 +769,7 @@ namespace hasheous_server.Controllers.v1_0
         [AllowAnonymous]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [Route("{ObjectType}/{Id}/History")]
-        public async Task<IActionResult> GetDataObjectHistory(Classes.DataObjects.DataObjectType ObjectType, long Id)
+        public async Task<IActionResult> GetDataObjectHistory(Classes.DataObjects.DataObjectType ObjectType, long Id, int pageNumber = 1, int pageSize = 50)
         {
             hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
@@ -780,17 +780,46 @@ namespace hasheous_server.Controllers.v1_0
                 return NotFound();
             }
 
-            // Get history from database
+            // Validate pagination parameters
+            if (pageNumber < 1) pageNumber = 1;
+            if (pageSize < 1) pageSize = 50;
+            if (pageSize > 100) pageSize = 100; // Max page size to prevent abuse
+
+            // Calculate offset
+            int offset = (pageNumber - 1) * pageSize;
+
+            // Get total count
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string countSql = @"SELECT COUNT(*) as Total 
+                               FROM DataObjectHistory 
+                               WHERE ObjectId = @objectId AND ObjectType = @objectType";
+            
+            Dictionary<string, object> countDict = new Dictionary<string, object>
+            {
+                { "objectId", Id },
+                { "objectType", (int)ObjectType }
+            };
+
+            var countResult = db.ExecuteCMD(countSql, countDict);
+            int totalRecords = 0;
+            if (countResult.Rows.Count > 0)
+            {
+                totalRecords = Convert.ToInt32(countResult.Rows[0]["Total"]);
+            }
+
+            // Get history from database with pagination
             string sql = @"SELECT Id, ObjectId, ObjectType, UserId, ChangeTimestamp, PreEditJson, DiffJson 
                           FROM DataObjectHistory 
                           WHERE ObjectId = @objectId AND ObjectType = @objectType 
-                          ORDER BY ChangeTimestamp DESC";
+                          ORDER BY ChangeTimestamp DESC
+                          LIMIT @limit OFFSET @offset";
             
             Dictionary<string, object> dbDict = new Dictionary<string, object>
             {
                 { "objectId", Id },
-                { "objectType", (int)ObjectType }
+                { "objectType", (int)ObjectType },
+                { "limit", pageSize },
+                { "offset", offset }
             };
 
             var historyData = db.ExecuteCMD(sql, dbDict);
@@ -805,8 +834,8 @@ namespace hasheous_server.Controllers.v1_0
                 byte[] preEditCompressed = (byte[])row["PreEditJson"];
                 byte[] diffCompressed = (byte[])row["DiffJson"];
                 
-                string preEditJson = DataObjects.DecompressHistoryString(preEditCompressed);
-                string diffJson = DataObjects.DecompressHistoryString(diffCompressed);
+                string preEditJson = DataObjects.DecompressString(preEditCompressed);
+                string diffJson = DataObjects.DecompressString(diffCompressed);
                 
                 var historyItem = new Dictionary<string, object>
                 {
@@ -827,7 +856,20 @@ namespace hasheous_server.Controllers.v1_0
                 historyList.Add(historyItem);
             }
 
-            return Ok(historyList);
+            // Calculate total pages
+            int totalPages = (int)Math.Ceiling((double)totalRecords / pageSize);
+
+            // Return paginated result
+            var result = new
+            {
+                History = historyList,
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                TotalRecords = totalRecords,
+                TotalPages = totalPages
+            };
+
+            return Ok(result);
         }
     }
 }
