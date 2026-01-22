@@ -261,7 +261,7 @@ namespace hasheous_server.Controllers.v1_0
                 }
                 else
                 {
-                    DataObjects.DeleteDataObject(ObjectType, Id);
+                    await DataObjects.DeleteDataObject(ObjectType, Id, user);
                     return Ok();
                 }
             }
@@ -657,7 +657,7 @@ namespace hasheous_server.Controllers.v1_0
                         return BadRequest("The target object must be of the same type as the source object.");
                     }
 
-                    var result = DataObjects.MergeObjects(DataObject, TargetDataObject, Commit);
+                    var result = await DataObjects.MergeObjects(DataObject, TargetDataObject, Commit);
                     return Ok(result);
                 }
             }
@@ -870,6 +870,38 @@ namespace hasheous_server.Controllers.v1_0
             };
 
             return Ok(result);
+        }
+
+        [MapToApiVersion("1.0")]
+        [HttpPost]
+        [Authorize(Roles = "Admin,Moderator")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [Route("{ObjectType}/{Id}/Rollback/{HistoryId}")]
+        public async Task<IActionResult> RollbackDataObject(Classes.DataObjects.DataObjectType ObjectType, long Id, long HistoryId)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            
+            hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
+
+            // Check if object exists (including soft-deleted ones for restoration purposes)
+            Models.DataObjectItem? DataObject = await DataObjects.GetDataObject(ObjectType, Id);
+
+            if (DataObject == null)
+            {
+                return NotFound("DataObject not found");
+            }
+
+            // Perform rollback
+            Models.DataObjectItem? restoredObject = await DataObjects.RollbackDataObject(ObjectType, Id, HistoryId, user);
+
+            if (restoredObject == null)
+            {
+                return BadRequest("Failed to rollback. History record not found or rollback failed.");
+            }
+
+            return Ok(restoredObject);
         }
     }
 }

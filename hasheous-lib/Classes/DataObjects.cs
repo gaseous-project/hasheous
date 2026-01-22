@@ -237,23 +237,23 @@ namespace hasheous_server.Classes
                         case DataObjectType.App:
                             if (user != null)
                             {
-                                sql = "SELECT * FROM DataObject LEFT JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId AND DataObject_Attributes.AttributeType = 6 LEFT JOIN DataObject_ACL ON DataObject.Id = DataObject_ACL.DataObject_ID WHERE ObjectType = @objecttype AND (DataObject_Attributes.AttributeValue = 1 OR (DataObject_ACL.UserId = @userid AND DataObject_ACL.Read = 1)) ORDER BY `Name`;";
+                                sql = "SELECT * FROM DataObject LEFT JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId AND DataObject_Attributes.AttributeType = 6 LEFT JOIN DataObject_ACL ON DataObject.Id = DataObject_ACL.DataObject_ID WHERE ObjectType = @objecttype AND (IsDeleted = 0 OR IsDeleted IS NULL) AND (DataObject_Attributes.AttributeValue = 1 OR (DataObject_ACL.UserId = @userid AND DataObject_ACL.Read = 1)) ORDER BY `Name`;";
                                 dbDict.Add("userid", user.Id);
                             }
                             else
                             {
-                                sql = "SELECT * FROM DataObject LEFT JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId AND DataObject_Attributes.AttributeType = 6 LEFT JOIN DataObject_ACL ON DataObject.Id = DataObject_ACL.DataObject_ID WHERE ObjectType = @objecttype AND DataObject_Attributes.AttributeValue = 1 ORDER BY `Name`;";
+                                sql = "SELECT * FROM DataObject LEFT JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId AND DataObject_Attributes.AttributeType = 6 LEFT JOIN DataObject_ACL ON DataObject.Id = DataObject_ACL.DataObject_ID WHERE ObjectType = @objecttype AND (IsDeleted = 0 OR IsDeleted IS NULL) AND DataObject_Attributes.AttributeValue = 1 ORDER BY `Name`;";
                             }
                             break;
 
                         default:
-                            sql = "SELECT * FROM DataObject WHERE ObjectType = @objecttype ORDER BY `Name`;";
+                            sql = "SELECT * FROM DataObject WHERE ObjectType = @objecttype AND (IsDeleted = 0 OR IsDeleted IS NULL) ORDER BY `Name`;";
                             break;
                     }
                 }
                 else
                 {
-                    sql = "SELECT * FROM DataObject WHERE ObjectType = @objecttype AND `Name` LIKE @search ORDER BY `Name`;";
+                    sql = "SELECT * FROM DataObject WHERE ObjectType = @objecttype AND (IsDeleted = 0 OR IsDeleted IS NULL) AND `Name` LIKE @search ORDER BY `Name`;";
                     dbDict.Add("search", "%" + search + "%");
                 }
             }
@@ -342,7 +342,7 @@ namespace hasheous_server.Classes
         public async Task<Models.DataObjectItem?> GetDataObject(DataObjectType objectType, long id, bool GetChildRelations = true, bool GetMetadata = true, bool GetSignatureData = true)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql = "SELECT * FROM DataObject WHERE ObjectType=@objecttype AND Id=@id;";
+            string sql = "SELECT * FROM DataObject WHERE ObjectType=@objecttype AND Id=@id AND (IsDeleted = 0 OR IsDeleted IS NULL);";
             Dictionary<string, object> dbDict = new Dictionary<string, object>{
                 { "id", id },
                 { "objecttype", objectType }
@@ -1038,17 +1038,36 @@ namespace hasheous_server.Classes
             return postEditObject;
         }
 
-        public void DeleteDataObject(DataObjectType objectType, long id)
+        /// <summary>
+        /// Soft deletes a DataObject by marking it as deleted (sets IsDeleted=true)
+        /// </summary>
+        /// <param name="objectType">The type of the object</param>
+        /// <param name="id">The ID of the object</param>
+        /// <param name="user">The user performing the deletion (for history tracking)</param>
+        public async Task DeleteDataObject(DataObjectType objectType, long id, ApplicationUser? user = null)
         {
+            // Get the object before deletion for history
+            Models.DataObjectItem? preDeleteObject = await GetDataObject(objectType, id);
+            
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql = "DELETE FROM DataObject WHERE ObjectType=@objecttype AND Id=@id";
+            
+            // Soft delete - set IsDeleted flag instead of actual deletion
+            string sql = "UPDATE DataObject SET IsDeleted=1, UpdatedDate=@updateddate WHERE ObjectType=@objecttype AND Id=@id";
             Dictionary<string, object> dbDict = new Dictionary<string, object>{
                 { "id", id },
                 { "objecttype", objectType },
                 { "updateddate", DateTime.UtcNow }
             };
 
-            db.ExecuteNonQuery(sql, dbDict);
+            await db.ExecuteCMDAsync(sql, dbDict);
+            
+            // Store deletion in history (create a "deleted" version)
+            if (preDeleteObject != null)
+            {
+                var deletedObject = preDeleteObject;
+                // We'll mark it conceptually as deleted by storing the pre-delete state
+                await StoreDataObjectHistory(preDeleteObject, preDeleteObject, user?.Id);
+            }
 
             // purge redis cache of all keys for this object type
             if (Config.RedisConfiguration.Enabled)
@@ -1759,6 +1778,63 @@ namespace hasheous_server.Classes
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Rolls back a DataObject to a previous state from history
+        /// </summary>
+        /// <param name="objectType">The type of the object</param>
+        /// <param name="objectId">The ID of the object</param>
+        /// <param name="historyId">The history record ID to rollback to</param>
+        /// <param name="user">The user performing the rollback</param>
+        /// <returns>The restored DataObjectItem or null if rollback failed</returns>
+        public async Task<Models.DataObjectItem?> RollbackDataObject(DataObjectType objectType, long objectId, long historyId, ApplicationUser? user = null)
+        {
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            
+            // Get the history record
+            string sql = "SELECT * FROM DataObjectHistory WHERE Id = @historyId AND ObjectId = @objectId AND ObjectType = @objectType";
+            Dictionary<string, object> dbDict = new Dictionary<string, object>
+            {
+                { "historyId", historyId },
+                { "objectId", objectId },
+                { "objectType", (int)objectType }
+            };
+            
+            DataTable historyData = await db.ExecuteCMDAsync(sql, dbDict);
+            
+            if (historyData.Rows.Count == 0)
+            {
+                return null; // History record not found
+            }
+            
+            // Get current object state
+            Models.DataObjectItem? currentObject = await GetDataObject(objectType, objectId, true, true, true);
+            if (currentObject == null)
+            {
+                return null; // Object not found
+            }
+            
+            // Decompress and deserialize the pre-edit JSON from history
+            byte[] preEditCompressed = (byte[])historyData.Rows[0]["PreEditJson"];
+            string preEditJson = DecompressString(preEditCompressed);
+            
+            var jsonSettings = new Newtonsoft.Json.JsonSerializerSettings
+            {
+                ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore
+            };
+            
+            Models.DataObjectItem? historicObject = Newtonsoft.Json.JsonConvert.DeserializeObject<Models.DataObjectItem>(preEditJson, jsonSettings);
+            
+            if (historicObject == null)
+            {
+                return null; // Failed to deserialize historic object
+            }
+            
+            // Use EditDataObject to restore the historic state
+            Models.DataObjectItem? restoredObject = await EditDataObject(objectType, objectId, historicObject, user, false);
+            
+            return restoredObject;
         }
 
         /// <summary>
@@ -3269,7 +3345,7 @@ namespace hasheous_server.Classes
             return tagAttribute;
         }
 
-        public DataObjectItem MergeObjects(DataObjectItem sourceObject, DataObjectItem targetObject, bool commit = false)
+        public async Task<DataObjectItem> MergeObjects(DataObjectItem sourceObject, DataObjectItem targetObject, bool commit = false)
         {
             // first, ensure both objects are the same type
             if (sourceObject.ObjectType != targetObject.ObjectType)
@@ -3382,7 +3458,7 @@ namespace hasheous_server.Classes
                 var editDataObject = EditDataObject(targetObject.ObjectType, targetObject.Id, targetObject);
                 var dataObjectMetadataSearch = DataObjectMetadataSearch(targetObject.ObjectType, targetObject.Id, false);
                 UpdateDataObjectDate(targetObject.Id);
-                DeleteDataObject(sourceObject.ObjectType, sourceObject.Id);
+                await DeleteDataObject(sourceObject.ObjectType, sourceObject.Id, null);
             }
 
             return targetObject;
