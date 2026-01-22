@@ -12,6 +12,7 @@ using hasheous_server.Classes.Tasks.Clients;
 using hasheous_server.Models;
 using IGDB;
 using IGDB.Models;
+using JsonDiffPatchDotNet;
 using Microsoft.AspNetCore.Razor.Language.Intermediate;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -1570,13 +1571,13 @@ namespace hasheous_server.Classes
                     dbDict = new Dictionary<string, object>{
                         { "email", acl.Key }
                     };
-                    DataTable user = db.ExecuteCMD(sql, dbDict);
-                    if (user.Rows.Count > 0)
+                    DataTable userRecord = db.ExecuteCMD(sql, dbDict);
+                    if (userRecord.Rows.Count > 0)
                     {
                         sql = "INSERT INTO DataObject_ACL (`DataObject_ID`, `UserId`, `Read`, `Write`, `Delete`) VALUES (@id, @userid, @read, @write, @delete);";
                         dbDict = new Dictionary<string, object>{
                             { "id", id },
-                            { "userid", user.Rows[0]["Id"] }
+                            { "userid", userRecord.Rows[0]["Id"] }
                         };
                         if (acl.Value.Contains(DataObjectPermission.PermissionType.Read))
                         {
@@ -1669,7 +1670,7 @@ namespace hasheous_server.Classes
             string postEditJson = Newtonsoft.Json.JsonConvert.SerializeObject(postEditCopy, jsonSettings);
 
             // Generate JSON diff
-            var jdp = new JsonDiffPatch.JsonDiffPatch();
+            var jdp = new JsonDiffPatchDotNet.JsonDiffPatch();
             var preEditToken = Newtonsoft.Json.Linq.JToken.Parse(preEditJson);
             var postEditToken = Newtonsoft.Json.Linq.JToken.Parse(postEditJson);
             var diffToken = jdp.Diff(preEditToken, postEditToken);
