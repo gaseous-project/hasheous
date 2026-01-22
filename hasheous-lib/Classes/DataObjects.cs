@@ -999,8 +999,11 @@ namespace hasheous_server.Classes
             return await GetDataObject(objectType, (long)(ulong)data.Rows[0][0]);
         }
 
-        public async Task<Models.DataObjectItem> EditDataObject(DataObjectType objectType, long id, Models.DataObjectItemModel model, bool allowSearch = true)
+        public async Task<Models.DataObjectItem> EditDataObject(DataObjectType objectType, long id, Models.DataObjectItemModel model, ApplicationUser? user = null, bool allowSearch = true)
         {
+            // Get pre-edit object for history
+            Models.DataObjectItem? preEditObject = await GetDataObject(objectType, id);
+            
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "UPDATE DataObject SET `Name`=@name, `UpdatedDate`=@updateddate WHERE ObjectType=@objecttype AND Id=@id";
             Dictionary<string, object> dbDict = new Dictionary<string, object>{
@@ -1023,7 +1026,15 @@ namespace hasheous_server.Classes
                 await DataObjectMetadataSearch(objectType, id);
             }
 
-            return await GetDataObject(objectType, id);
+            Models.DataObjectItem? postEditObject = await GetDataObject(objectType, id);
+            
+            // Store history
+            if (preEditObject != null && postEditObject != null)
+            {
+                await StoreDataObjectHistory(preEditObject, postEditObject, user?.Id);
+            }
+
+            return postEditObject;
         }
 
         public void DeleteDataObject(DataObjectType objectType, long id)
@@ -1045,8 +1056,11 @@ namespace hasheous_server.Classes
             }
         }
 
-        public async Task<Models.DataObjectItem> EditDataObject(DataObjectType objectType, long id, Models.DataObjectItem model, bool trustModelMetadataSearchType = false)
+        public async Task<Models.DataObjectItem> EditDataObject(DataObjectType objectType, long id, Models.DataObjectItem model, ApplicationUser? user = null, bool trustModelMetadataSearchType = false)
         {
+            // Get pre-edit object for history
+            Models.DataObjectItem? preEditObject = await GetDataObject(objectType, id);
+            
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "UPDATE DataObject SET `Name`=@name, `UpdatedDate`=@updateddate WHERE ObjectType=@objecttype AND Id=@id";
             Dictionary<string, object> dbDict = new Dictionary<string, object>{
@@ -1616,7 +1630,142 @@ namespace hasheous_server.Classes
                 }
             }
 
-            return await GetDataObject(objectType, id);
+            Models.DataObjectItem? postEditObject = await GetDataObject(objectType, id);
+            
+            // Store history
+            if (preEditObject != null && postEditObject != null)
+            {
+                await StoreDataObjectHistory(preEditObject, postEditObject, user?.Id);
+            }
+
+            return postEditObject;
+        }
+
+        /// <summary>
+        /// Stores history of changes made to a DataObject
+        /// </summary>
+        /// <param name="preEditObject">The object before editing</param>
+        /// <param name="postEditObject">The object after editing</param>
+        /// <param name="userId">The user ID who made the changes (can be null)</param>
+        /// <param name="excludedAttributes">List of attribute names to exclude from history (e.g., ROMs)</param>
+        public async Task StoreDataObjectHistory(Models.DataObjectItem preEditObject, Models.DataObjectItem postEditObject, string? userId, List<AttributeItem.AttributeName>? excludedAttributes = null)
+        {
+            if (excludedAttributes == null)
+            {
+                excludedAttributes = new List<AttributeItem.AttributeName> { AttributeItem.AttributeName.ROMs };
+            }
+
+            // Create copies of objects with excluded attributes removed
+            var preEditCopy = CloneObjectWithExcludedAttributes(preEditObject, excludedAttributes);
+            var postEditCopy = CloneObjectWithExcludedAttributes(postEditObject, excludedAttributes);
+
+            // Serialize pre-edit object to JSON
+            var jsonSettings = new Newtonsoft.Json.JsonSerializerSettings
+            {
+                ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore,
+                NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore
+            };
+            string preEditJson = Newtonsoft.Json.JsonConvert.SerializeObject(preEditCopy, jsonSettings);
+            string postEditJson = Newtonsoft.Json.JsonConvert.SerializeObject(postEditCopy, jsonSettings);
+
+            // Generate JSON diff
+            var jdp = new JsonDiffPatch.JsonDiffPatch();
+            var preEditToken = Newtonsoft.Json.Linq.JToken.Parse(preEditJson);
+            var postEditToken = Newtonsoft.Json.Linq.JToken.Parse(postEditJson);
+            var diffToken = jdp.Diff(preEditToken, postEditToken);
+            
+            if (diffToken == null || diffToken.ToString() == "{}")
+            {
+                // No changes detected, don't store history
+                return;
+            }
+
+            string diffJson = diffToken.ToString();
+
+            // Compress JSON using GZip
+            byte[] preEditCompressed = CompressString(preEditJson);
+            byte[] diffCompressed = CompressString(diffJson);
+
+            // Store in database
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql = @"INSERT INTO DataObjectHistory (ObjectId, ObjectType, UserId, ChangeTimestamp, PreEditJson, DiffJson) 
+                          VALUES (@objectId, @objectType, @userId, @changeTimestamp, @preEditJson, @diffJson)";
+            
+            Dictionary<string, object> dbDict = new Dictionary<string, object>
+            {
+                { "objectId", postEditObject.Id },
+                { "objectType", (int)postEditObject.ObjectType },
+                { "userId", userId ?? (object)DBNull.Value },
+                { "changeTimestamp", DateTime.UtcNow },
+                { "preEditJson", preEditCompressed },
+                { "diffJson", diffCompressed }
+            };
+
+            await db.ExecuteCMDAsync(sql, dbDict);
+        }
+
+        /// <summary>
+        /// Creates a copy of a DataObjectItem with specified attributes excluded
+        /// </summary>
+        private Models.DataObjectItem CloneObjectWithExcludedAttributes(Models.DataObjectItem original, List<AttributeItem.AttributeName> excludedAttributes)
+        {
+            var jsonSettings = new Newtonsoft.Json.JsonSerializerSettings
+            {
+                ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore
+            };
+            string json = Newtonsoft.Json.JsonConvert.SerializeObject(original, jsonSettings);
+            var clone = Newtonsoft.Json.JsonConvert.DeserializeObject<Models.DataObjectItem>(json, jsonSettings);
+            
+            if (clone.Attributes != null && excludedAttributes.Count > 0)
+            {
+                clone.Attributes = clone.Attributes
+                    .Where(attr => !excludedAttributes.Contains(attr.attributeName))
+                    .ToList();
+            }
+            
+            return clone;
+        }
+
+        /// <summary>
+        /// Compresses a string using GZip compression
+        /// </summary>
+        private byte[] CompressString(string text)
+        {
+            byte[] buffer = System.Text.Encoding.UTF8.GetBytes(text);
+            using (var memoryStream = new System.IO.MemoryStream())
+            {
+                using (var gzipStream = new System.IO.Compression.GZipStream(memoryStream, System.IO.Compression.CompressionMode.Compress, true))
+                {
+                    gzipStream.Write(buffer, 0, buffer.Length);
+                }
+                return memoryStream.ToArray();
+            }
+        }
+
+        /// <summary>
+        /// Decompresses a GZip compressed byte array to string
+        /// </summary>
+        private string DecompressString(byte[] compressedData)
+        {
+            using (var memoryStream = new System.IO.MemoryStream(compressedData))
+            {
+                using (var gzipStream = new System.IO.Compression.GZipStream(memoryStream, System.IO.Compression.CompressionMode.Decompress))
+                {
+                    using (var resultStream = new System.IO.MemoryStream())
+                    {
+                        gzipStream.CopyTo(resultStream);
+                        return System.Text.Encoding.UTF8.GetString(resultStream.ToArray());
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Public method to decompress history data
+        /// </summary>
+        public string DecompressHistoryString(byte[] compressedData)
+        {
+            return DecompressString(compressedData);
         }
 
         /// <summary>
@@ -2675,7 +2824,7 @@ namespace hasheous_server.Classes
                     }
 
                     // save updated data object
-                    await EditDataObject(updatedDataObject.ObjectType, updatedDataObject.Id, (DataObjectItem)updatedDataObject, true);
+                    await EditDataObject(updatedDataObject.ObjectType, updatedDataObject.Id, (DataObjectItem)updatedDataObject, null, true);
                 }
 
                 // ensure there are tasks for this item

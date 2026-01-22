@@ -287,7 +287,7 @@ namespace hasheous_server.Controllers.v1_0
             {
                 hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
-                Models.DataObjectItem? DataObject = await DataObjects.EditDataObject(ObjectType, Id, model);
+                Models.DataObjectItem? DataObject = await DataObjects.EditDataObject(ObjectType, Id, model, user);
 
                 if (DataObject == null)
                 {
@@ -323,7 +323,7 @@ namespace hasheous_server.Controllers.v1_0
                 {
                     hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
-                    Models.DataObjectItem? DataObject = await DataObjects.EditDataObject(ObjectType, Id, model);
+                    Models.DataObjectItem? DataObject = await DataObjects.EditDataObject(ObjectType, Id, model, user);
 
                     if (DataObject == null)
                     {
@@ -762,6 +762,72 @@ namespace hasheous_server.Controllers.v1_0
             {
                 return NotFound();
             }
+        }
+
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [AllowAnonymous]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [Route("{ObjectType}/{Id}/History")]
+        public async Task<IActionResult> GetDataObjectHistory(Classes.DataObjects.DataObjectType ObjectType, long Id)
+        {
+            hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
+
+            Models.DataObjectItem? DataObject = await DataObjects.GetDataObject(ObjectType, Id);
+
+            if (DataObject == null)
+            {
+                return NotFound();
+            }
+
+            // Get history from database
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql = @"SELECT Id, ObjectId, ObjectType, UserId, ChangeTimestamp, PreEditJson, DiffJson 
+                          FROM DataObjectHistory 
+                          WHERE ObjectId = @objectId AND ObjectType = @objectType 
+                          ORDER BY ChangeTimestamp DESC";
+            
+            Dictionary<string, object> dbDict = new Dictionary<string, object>
+            {
+                { "objectId", Id },
+                { "objectType", (int)ObjectType }
+            };
+
+            var historyData = db.ExecuteCMD(sql, dbDict);
+            
+            var historyList = new List<object>();
+            
+            // Check if user is admin or moderator to show UserId
+            bool canSeeUserId = User.IsInRole("Admin") || User.IsInRole("Moderator");
+            
+            foreach (System.Data.DataRow row in historyData.Rows)
+            {
+                byte[] preEditCompressed = (byte[])row["PreEditJson"];
+                byte[] diffCompressed = (byte[])row["DiffJson"];
+                
+                string preEditJson = DataObjects.DecompressHistoryString(preEditCompressed);
+                string diffJson = DataObjects.DecompressHistoryString(diffCompressed);
+                
+                var historyItem = new Dictionary<string, object>
+                {
+                    { "Id", row["Id"] },
+                    { "ObjectId", row["ObjectId"] },
+                    { "ObjectType", row["ObjectType"] },
+                    { "ChangeTimestamp", row["ChangeTimestamp"] },
+                    { "PreEditJson", Newtonsoft.Json.JsonConvert.DeserializeObject(preEditJson) },
+                    { "DiffJson", Newtonsoft.Json.JsonConvert.DeserializeObject(diffJson) }
+                };
+                
+                // Only include UserId if user has permission
+                if (canSeeUserId && row["UserId"] != DBNull.Value)
+                {
+                    historyItem.Add("UserId", row["UserId"]);
+                }
+                
+                historyList.Add(historyItem);
+            }
+
+            return Ok(historyList);
         }
     }
 }
