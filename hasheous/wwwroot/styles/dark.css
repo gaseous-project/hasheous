@@ -140,4 +140,8 @@
     .select2-selection__clear:hover {
         color: var(--element-background-color);
     }
+
+    .aigeneratediconlarge {
+        filter: invert(1);
+    }
 }

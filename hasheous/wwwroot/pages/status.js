@@ -1,4 +1,9 @@
 function LoadStatusPage() {
+    LoadTaskStatus();
+    LoadBackgroundTasks();
+}
+
+function LoadBackgroundTasks() {
     const statusTable = document.getElementById('status-table');
 
     let columnCount = 5; // Default column count
@@ -82,6 +87,7 @@ function LoadStatusPage() {
                         "servicemanagement": [
                             "TallyVotes",
                             "MetadataMatchSearch",
+                            "TaskResultParser",
                             "GetMissingArtwork",
                             "MetadataMapDump"
                         ]
@@ -167,6 +173,83 @@ function LoadStatusPage() {
         .catch(error => {
             console.error('Error fetching background tasks:', error);
             statusTable.innerHTML = `<tr><td colspan="${columnCount}">Error loading status. Please try again later.</td></tr>`;
+        });
+}
+
+function LoadTaskStatus() {
+    fetch('/api/v1/TaskWorker/tasks', {
+        method: 'GET'
+    })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(tasks => {
+            let taskElement = document.getElementById('task-process');
+            taskElement.innerHTML = ''; // Clear existing content
+
+            if (!tasks || Object.keys(tasks).length === 0) {
+                return;
+            }
+
+            const serviceHeader = document.createElement('h2');
+            serviceHeader.textContent = lang.getLang('servicetaskstatus');
+            taskElement.appendChild(serviceHeader);
+
+            // top level is task type
+            // second level is task status - value is count
+            for (const taskType of Object.keys(tasks)) {
+                const typeHeader = document.createElement('h3');
+                typeHeader.textContent = lang.getLang('servicetasktype' + taskType);
+                taskElement.appendChild(typeHeader);
+
+                const statusBar = document.createElement('div');
+                statusBar.className = 'status-bar';
+
+                const legendBar = document.createElement('div');
+                legendBar.className = 'legend-bar';
+
+                // calculate total for percentage calculations
+                let totalCount = 0;
+                for (const status of Object.keys(tasks[taskType])) {
+                    totalCount += tasks[taskType][status];
+                }
+
+                // generate status items
+                for (const status of Object.keys(tasks[taskType])) {
+                    const count = tasks[taskType][status];
+                    const elementColour = `#${intToRGB(hashCode(status + taskType))}`;
+
+                    // generate status bar item
+                    const statusItem = document.createElement('div');
+                    statusItem.classList.add('status-item');
+                    statusItem.classList.add('status-' + status.toLowerCase());
+                    statusItem.style.backgroundColor = elementColour;
+                    const percentage = ((count / totalCount) * 100).toFixed(2);
+                    statusItem.style.width = percentage + '%';
+                    statusBar.appendChild(statusItem);
+
+                    // generate legend items
+                    const legendItem = document.createElement('div');
+                    legendItem.classList.add('legend-item');
+                    const legendColorBox = document.createElement('span');
+                    legendColorBox.classList.add('legend-color-box', 'status-' + status.toLowerCase());
+                    legendColorBox.style.backgroundColor = elementColour;
+                    legendItem.appendChild(legendColorBox);
+                    const legendText = document.createElement('span');
+                    legendText.textContent = `${lang.getLang('servicetaskstatus' + status)}: ${count}`;
+                    legendItem.appendChild(legendText);
+                    legendBar.appendChild(legendItem);
+                }
+
+                taskElement.appendChild(statusBar);
+                taskElement.appendChild(legendBar);
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching task status:', error);
         });
 }
 

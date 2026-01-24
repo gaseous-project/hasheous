@@ -225,6 +225,9 @@ Classes.ProcessQueue.QueueProcessor.QueueItems = new List<Classes.ProcessQueue.Q
     // metadata rematch
     new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.MetadataMatchSearch, 1440, false),
 
+    // task result parser
+    new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.TaskResultParser, 5, false),
+
     // maintenance services
     // hourly
     new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.HourlyMaintenance, 60, false),

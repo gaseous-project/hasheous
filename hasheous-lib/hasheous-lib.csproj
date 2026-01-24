@@ -15,19 +15,19 @@
     <DocumentationFile>bin\Release\net8.0\hasheous-lib.xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="gaseous-signature-parser" Version="2.4.5" />
+    <PackageReference Include="gaseous-signature-parser" Version="2.4.6" />
     <PackageReference Include="gaseous.IGDB" Version="1.0.5" />
-    <PackageReference Include="hasheous-client" Version="1.4.2" />
+    <PackageReference Include="hasheous-client" Version="1.4.4" />
     <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="8.0.22" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.MicrosoftAccount" Version="8.0.21" />
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="8.0.21" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="8.0.22" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Versioning" Version="5.1.0" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Versioning.ApiExplorer" Version="5.1.0" />
     <PackageReference Include="StackExchange.Redis" Version="2.9.32" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.6" />
     <PackageReference Include="MySqlConnector" Version="2.4.0" />
-    <PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="8.0.21" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="8.0.22" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.21" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.10" />
     <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="9.0.0" />
@@ -35,15 +35,13 @@
   </ItemGroup>
   <ItemGroup>
     <None Remove="Support\" />
-    <None Remove="Support\Country.txt" />
-    <None Remove="Support\Language.txt" />
+    <None Remove="Support\*.txt" />
     <None Remove="Schema\" />
     <None Remove="Schema\hasheous-*.sql" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Build" Version="17.11.48" />
-    <EmbeddedResource Include="Support\Country.txt" />
-    <EmbeddedResource Include="Support\Language.txt" />
+    <EmbeddedResource Include="Support\*.txt" />
     <EmbeddedResource Include="Schema\hasheous-*.sql" />
   </ItemGroup>
 </Project>

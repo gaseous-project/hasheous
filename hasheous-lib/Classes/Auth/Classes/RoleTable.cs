@@ -9,7 +9,7 @@ namespace Authentication
     /// <summary>
     /// Class that represents the Role table in the MySQL Database
     /// </summary>
-    public class RoleTable 
+    public class RoleTable
     {
         private Database _database;
 
@@ -43,10 +43,12 @@ namespace Authentication
         /// <returns></returns>
         public int Insert(ApplicationRole role)
         {
-            string commandText = "Insert into Roles (Id, Name) values (@id, @name)";
+            string commandText = "Insert into Roles (Id, Name, AllowManualAssignment, RoleDependsOn) values (@id, @name, @allowManualAssignment, @roleDependsOn)";
             Dictionary<string, object> parameters = new Dictionary<string, object>();
             parameters.Add("@name", role.Name);
             parameters.Add("@id", role.Id);
+            parameters.Add("@allowManualAssignment", role.AllowManualAssignment);
+            parameters.Add("@roleDependsOn", role.RoleDependsOn.ToString());
 
             return (int)_database.ExecuteNonQuery(commandText, parameters);
         }
@@ -63,7 +65,7 @@ namespace Authentication
             parameters.Add("@id", roleId);
 
             DataTable table = _database.ExecuteCMD(commandText, parameters);
-            
+
             if (table.Rows.Count == 0)
             {
                 return null;
@@ -101,19 +103,25 @@ namespace Authentication
         /// <returns></returns>
         public ApplicationRole? GetRoleById(string roleId)
         {
-            var roleName = GetRoleName(roleId);
+            string commandText = "Select Id, Name, AllowManualAssignment, RoleDependsOn from Roles where Id = @id";
+            Dictionary<string, object> parameters = new Dictionary<string, object>();
+            parameters.Add("@id", roleId);
+
+            var rows = _database.ExecuteCMDDict(commandText, parameters);
             ApplicationRole? role = null;
 
-            if(roleName != null)
+            if (rows.Count > 0)
             {
+                var row = rows[0];
                 role = new ApplicationRole();
-                role.Id = roleId;
-                role.Name = roleName;
-                role.NormalizedName = roleName.ToUpper();
+                role.Id = (string)row["Id"];
+                role.Name = (string)row["Name"];
+                role.NormalizedName = ((string)row["Name"]).ToUpper();
+                role.AllowManualAssignment = Convert.ToBoolean(row["AllowManualAssignment"]);
+                role.RoleDependsOn = Guid.Parse((string)row["RoleDependsOn"]);
             }
 
             return role;
-
         }
 
         /// <summary>
@@ -123,15 +131,22 @@ namespace Authentication
         /// <returns></returns>
         public ApplicationRole? GetRoleByName(string roleName)
         {
-            var roleId = GetRoleId(roleName);
-            ApplicationRole role = null;
+            string commandText = "Select Id, Name, AllowManualAssignment, RoleDependsOn from Roles where Name = @name";
+            Dictionary<string, object> parameters = new Dictionary<string, object>();
+            parameters.Add("@name", roleName);
 
-            if (roleId != null)
+            var rows = _database.ExecuteCMDDict(commandText, parameters);
+            ApplicationRole? role = null;
+
+            if (rows.Count > 0)
             {
+                var row = rows[0];
                 role = new ApplicationRole();
-                role.Id = roleId;
-                role.Name = roleName;
-                role.NormalizedName = roleName.ToUpper();
+                role.Id = (string)row["Id"];
+                role.Name = (string)row["Name"];
+                role.NormalizedName = ((string)row["Name"]).ToUpper();
+                role.AllowManualAssignment = Convert.ToBoolean(row["AllowManualAssignment"]);
+                role.RoleDependsOn = Guid.Parse((string)row["RoleDependsOn"]);
             }
 
             return role;
@@ -139,9 +154,12 @@ namespace Authentication
 
         public int Update(ApplicationRole role)
         {
-            string commandText = "Update Roles set Name = @name where Id = @id";
+            string commandText = "Update Roles set Name = @name, AllowManualAssignment = @allowManualAssignment, RoleDependsOn = @roleDependsOn where Id = @id";
             Dictionary<string, object> parameters = new Dictionary<string, object>();
             parameters.Add("@id", role.Id);
+            parameters.Add("@name", role.Name);
+            parameters.Add("@allowManualAssignment", role.AllowManualAssignment);
+            parameters.Add("@roleDependsOn", role.RoleDependsOn.ToString());
 
             return (int)_database.ExecuteNonQuery(commandText, parameters);
         }
@@ -150,15 +168,17 @@ namespace Authentication
         {
             List<ApplicationRole> roles = new List<ApplicationRole>();
 
-            string commandText = "Select Name from Roles";
+            string commandText = "Select Id, Name, AllowManualAssignment, RoleDependsOn from Roles";
 
             var rows = _database.ExecuteCMDDict(commandText);
-            foreach(Dictionary<string, object> row in rows)
+            foreach (Dictionary<string, object> row in rows)
             {
                 ApplicationRole role = (ApplicationRole)Activator.CreateInstance(typeof(ApplicationRole));
                 role.Id = (string)row["Id"];
                 role.Name = (string)row["Name"];
                 role.NormalizedName = ((string)row["Name"]).ToUpper();
+                role.AllowManualAssignment = Convert.ToBoolean(row["AllowManualAssignment"]);
+                role.RoleDependsOn = Guid.Parse((string)row["RoleDependsOn"]);
                 roles.Add(role);
             }
 

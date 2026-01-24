@@ -1,13 +1,13 @@
 using System.Data;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Filters;
-using Microsoft.AspNetCore.Identity;
-using Classes;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Security.Cryptography.Xml;
-using Microsoft.AspNetCore.Authorization;
+using Classes;
 using hasheous_server.Models;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Filters;
 
 namespace Authentication
 {
