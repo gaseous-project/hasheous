@@ -665,6 +665,33 @@ namespace hasheous_server.Controllers.v1_0
 
         [MapToApiVersion("1.0")]
         [HttpGet]
+        [AllowAnonymous]
+        [ProducesResponseType(typeof(DataObjectsList), StatusCodes.Status200OK)]
+        [Route("{ObjectType}/{Id}/Similar")]
+        public async Task<IActionResult> GetSimilarDataObjects(Classes.DataObjects.DataObjectType ObjectType, long Id, DataObjectItemTags.TagType? filterTagType)
+        {
+            // only valid for game types
+            if (ObjectType != Classes.DataObjects.DataObjectType.Game)
+            {
+                return NotFound();
+            }
+
+            hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
+
+            Models.DataObjectItem? DataObject = await DataObjects.GetDataObject(ObjectType, Id);
+
+            if (DataObject == null)
+            {
+                return NotFound();
+            }
+            else
+            {
+                return Ok(await DataObjects.GetSimilarDataObjects(DataObject, filterTagType));
+            }
+        }
+
+        [MapToApiVersion("1.0")]
+        [HttpGet]
         [Authorize]
         [ProducesResponseType(typeof(List<ClientApiKeyItem>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]

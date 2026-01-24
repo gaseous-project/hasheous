@@ -168,6 +168,10 @@ switch (taskType)
         Task = new Dumps();
         break;
 
+    case QueueItemType.TaskResultParser:
+        Task = new TaskResultParser();
+        break;
+
     default:
         Console.WriteLine($"Error: Unsupported service type '{serviceName}'.");
         return;
@@ -176,6 +180,7 @@ switch (taskType)
 // start the task
 try
 {
+    Config.database = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
     await Task.ExecuteAsync();
 }
 catch (Exception ex)
