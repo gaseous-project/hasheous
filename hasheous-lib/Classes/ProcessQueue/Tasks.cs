@@ -118,6 +118,11 @@ namespace Classes.ProcessQueue
         /// <summary>
         /// Metadata map dump task
         /// </summary>
-        MetadataMapDump
+        MetadataMapDump,
+
+        /// <summary>
+        /// Task Result Parser
+        /// </summary>
+        TaskResultParser
     }
 }

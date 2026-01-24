@@ -126,6 +126,9 @@ fetch('/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int'), {
     dataObject = success;
 
     renderContent();
+    if (pageType == "game") {
+        renderSimilarContent();
+    }
 }).catch(function (error) {
     console.warn(error);
     document.getElementById('content').innerHTML = '<div class="alert alert-danger" role="alert">' + lang.getLang('dataobjectdetailerror') + '</div>';
@@ -188,6 +191,7 @@ function renderContent() {
     });
 
     let descriptionElement = document.getElementById('dataObjectDescription');
+    let aiDescriptionElement = document.getElementById('dataObjectAIDescription');
     let attributeValues = [];
 
     for (let i = 0; i < dataObject.attributes.length; i++) {
@@ -199,6 +203,21 @@ function renderContent() {
                 descBody.classList.add('descriptionspan');
                 descBody.innerHTML = dataObject.attributes[i].value;
                 descriptionElement.appendChild(descBody);
+
+                break;
+
+            case "AIDescription":
+                document.getElementById('dataObjectAIDescriptionSection').style.display = '';
+
+                // render AI description - content is markdown
+                let markdownText = dataObject.attributes[i].value;
+                // convert markdown to HTML using marked
+                let htmlContent = marked.parse(markdownText);
+
+                let aiDescBody = document.createElement('span');
+                aiDescBody.classList.add('descriptionspan');
+                aiDescBody.innerHTML = htmlContent;
+                aiDescriptionElement.appendChild(aiDescBody);
 
                 break;
 
@@ -287,16 +306,25 @@ function renderContent() {
             case "Tags":
                 let tags = dataObject.attributes[i].value;
 
+                let hasTags = false;
                 for (const tagType of Object.values(tagTypes)) {
                     if (tags[tagType]) {
                         let tagOutput = '<table>';
-                        const tagColour = `style="background-color: #${intToRGB(hashCode(tagType.toLowerCase()))};"`;
+                        let tagColourValue = `#${intToRGB(hashCode(tagType.toLowerCase()))}`;
+                        let tagColour = `style="background-color: ${tagColourValue};"`;
 
                         for (const tag of tags[tagType].tags) {
+                            hasTags = true;
+                            let aiImage = '';
+                            if (tag.aiGenerated) {
+                                aiImage = ' <img src="/images/ai.svg" class="banner_button_image aigeneratedicon" title="' + lang.getLang('aigeneratedtag') + '">';
+                                tagColour = ` style="background: linear-gradient(156deg,rgba(255, 0, 217, 1) 0px, rgba(255, 0, 208, 1) 10px, ${tagColourValue} 40px, ${tagColourValue} 100%);" `;
+                            }
+
                             if (tagOutput != '') {
                                 tagOutput += ' ';
                             }
-                            tagOutput += `<span class="badge badge-tag badge-tag-type-${tagType.toLowerCase()}" ${tagColour}>${tag.text}</span>`;
+                            tagOutput += `<span class="badge badge-tag badge-tag-type-${tagType.toLowerCase()}" ${tagColour}>${aiImage} ${tag.text}</span>`;
                         }
 
                         attributeValues.push(
@@ -309,6 +337,14 @@ function renderContent() {
                     }
                 }
 
+                if (hasTags == true) {
+                    attributeValues.push(
+                        {
+                            "attribute": "ainotice",
+                            "value": lang.getLang("ainoticebody")
+                        }
+                    );
+                }
 
                 break;
 
@@ -722,6 +758,51 @@ function renderContent() {
 
             break;
     }
+}
+
+function renderSimilarContent() {
+    fetch('/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int') + '/Similar', {
+        method: 'GET'
+    }).then(async function (response) {
+        if (!response.ok) {
+            throw new Error('Failed to fetch similar data objects');
+        }
+        return response.json();
+    }).then(function (success) {
+        if (success.objects.length > 0) {
+            document.getElementById('dataObjectSimilarSection').style.display = '';
+
+            document.getElementById('similardataobjects').innerHTML = lang.getLang('similar' + pageType);
+
+            let similarDataObjectsElement = document.getElementById('dataObjectSimilar');
+            similarDataObjectsElement.appendChild(
+                new generateTable(
+                    success.objects,
+                    [
+                        'id',
+                        {
+                            column: 'attributes[attributeName=Logo].value:image',
+                            name: 'logo'
+                        },
+                        'name',
+                        {
+                            column: 'attributes[attributeName=Platform].value.name',
+                            name: 'platform'
+                        }
+                    ],
+                    'id',
+                    true,
+                    function (id) {
+                        window.location = '/index.html?page=dataobjectdetail&type=' + pageType + '&id=' + id;
+                    }
+                )
+            );
+        }
+    },
+        function (error) {
+            console.warn(error);
+        }
+    );
 }
 
 function GetApiKeys() {

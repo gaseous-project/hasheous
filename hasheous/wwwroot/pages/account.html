@@ -8,7 +8,8 @@
 <p id="account_email"></p>
 <div id="email_verification_status" style="margin-top: 10px;">
     <span id="email_verified_status"></span>
-    <button id="resend_verification" type="button" data-lang="resendemailverification" style="margin-left: 10px; display: none;"></button>
+    <button id="resend_verification" type="button" data-lang="resendemailverification"
+        style="margin-left: 10px; display: none;"></button>
 </div>
 
 <h2 data-lang="submissionapikeyheading"></h2>
@@ -58,7 +59,16 @@
     </table>
 </div>
 
-<h2 data-lang="deleteaccount"></h2>
+<div id="taskClients" style="display: none;">
+    <h2 data-lang="taskworkerclients"></h2>
+    <p data-lang="taskworkerclientsdescription"></p>
+    <div id="taskClientsList" style="width: 100%;">
+        <!-- Task worker clients will be populated here -->
+    </div>
+</div>
+
+<h2 data-lang=" deleteaccount">
+</h2>
 <p data-lang="deleteaccountdescription"></p>
 <span><input type="checkbox" id="deleteaccountconfirm" /><label for="deleteaccountconfirm"
         data-lang="deleteaccountconfirm"></label></span>

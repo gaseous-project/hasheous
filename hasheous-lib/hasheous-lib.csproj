@@ -35,15 +35,13 @@
   </ItemGroup>
   <ItemGroup>
     <None Remove="Support\" />
-    <None Remove="Support\Country.txt" />
-    <None Remove="Support\Language.txt" />
+    <None Remove="Support\*.txt" />
     <None Remove="Schema\" />
     <None Remove="Schema\hasheous-*.sql" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Build" Version="17.11.48" />
-    <EmbeddedResource Include="Support\Country.txt" />
-    <EmbeddedResource Include="Support\Language.txt" />
+    <EmbeddedResource Include="Support\*.txt" />
     <EmbeddedResource Include="Schema\hasheous-*.sql" />
   </ItemGroup>
 </Project>

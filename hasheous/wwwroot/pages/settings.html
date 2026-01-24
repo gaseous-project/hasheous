@@ -8,25 +8,30 @@
             <input type="email" id="role_email" placeholder="Email" class="inputwide">
         </td>
         <td>
-            <select id="role_type">
-                <option value="None" data-lang="none"></option>
-                <option value="Moderator" data-lang="moderator"></option>
-                <option value="Admin" data-lang="admin"></option>
-            </select>
+            <button id="role_load"><span data-lang="loaduser"></span> <img src="/images/user.svg"
+                    class="buttonicon" /></button>
+        </td>
+    </tr>
+    <tr id="role_userRoles" style="display: none;">
+        <td>
+            <div id="role_selector">
+
+            </div>
             <button id="role_apply"><span data-lang="save"></span> <img src="/images/save.svg"
                     class="buttonicon" /></button>
             <!-- <button id="role_delete" class="redbutton"><span data-lang="delete"></span> <img src="/images/delete.svg"
                     class="buttonicon buttonicon13" /></button> -->
         </td>
     </tr>
+    <tr id="role_error" style="display: none;">
+        <td>
+            <span class="error" data-lang="usernotfound"></span>
+        </td>
+    </tr>
 </table>
 
-<h3 data-lang="admin"></h3>
+<h3 data-lang="privilegedusers"></h3>
 <div id="roles_admins"></div>
 
-<h3 data-lang="moderator"></h3>
-<div id="roles_moderators"></div>
-
 <h2 data-lang="cachecontrol"></h2>
-<button id="flushcache"><span data-lang="flushcache"></span> <img src="/images/flush.svg"
-        class="buttonicon" /></button>
+<button id="flushcache"><span data-lang="flushcache"></span> <img src="/images/flush.svg" class="buttonicon" /></button>
