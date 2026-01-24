@@ -28,6 +28,18 @@ namespace Classes.ProcessQueue
             return null;
         }
 
+        private TimeSpan cacheDuration = TimeSpan.FromDays(3);
+
+        private Newtonsoft.Json.JsonSerializerSettings jsonSettings = new Newtonsoft.Json.JsonSerializerSettings
+        {
+            Formatting = Newtonsoft.Json.Formatting.Indented,
+            NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore,
+            Converters = new List<Newtonsoft.Json.JsonConverter>
+            {
+                new Newtonsoft.Json.Converters.StringEnumConverter()
+            }
+        };
+
         private async Task<object?> DumpMetadataAsync()
         {
             string outputPath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "Content");
@@ -63,7 +75,7 @@ namespace Classes.ProcessQueue
             {
                 Logging.Log(Logging.LogType.Information, "Metadata Dump", $"Getting page {pageNumber} of game data objects for dump...");
 
-                var dataObjectsList = await dataObjects.GetDataObjects(DataObjects.DataObjectType.Game, pageNumber, 1000, null, false, false);
+                var dataObjectsList = await dataObjects.GetDataObjects(DataObjects.DataObjectType.Game, pageNumber, 100, null, false, false);
                 if (dataObjectsList == null || dataObjectsList.Objects.Count == 0)
                 {
                     Logging.Log(Logging.LogType.Information, "Metadata Dump", "No more game data objects to process.");
@@ -80,7 +92,20 @@ namespace Classes.ProcessQueue
 
                     string platformName = "Unknown Platform";
 
-                    DataObjectItem? dataObject = await dataObjects.GetDataObject(dataObjectItem.Id);
+                    DataObjectItem? dataObject;
+                    string cacheKey = RedisConnection.GenerateKey("Dumps", "Game_" + dataObjectItem.Id.ToString());
+                    if (RedisConnection.CacheItemExists(cacheKey))
+                    {
+                        dataObject = RedisConnection.GetCacheItem<DataObjectItem>(cacheKey);
+                    }
+                    else
+                    {
+                        dataObject = await dataObjects.GetDataObject(DataObjects.DataObjectType.Game, dataObjectItem.Id);
+                        if (dataObject != null)
+                        {
+                            RedisConnection.SetCacheItem<DataObjectItem>(cacheKey, dataObject, cacheDuration);
+                        }
+                    }
 
                     if (dataObject == null)
                     {
@@ -109,22 +134,27 @@ namespace Classes.ProcessQueue
                         // add the platform mapping file
                         if (platformItem != null)
                         {
-                            DataObjectItem? platformDataObject = await dataObjects.GetDataObject(DataObjects.DataObjectType.Platform, platformItem.Id);
+                            DataObjectItem? platformDataObject;
+                            string platformCacheKey = RedisConnection.GenerateKey("Dumps", "Platform_" + platformItem.Id.ToString());
+                            if (RedisConnection.CacheItemExists(platformCacheKey))
+                            {
+                                platformDataObject = RedisConnection.GetCacheItem<DataObjectItem>(platformCacheKey);
+                            }
+                            else
+                            {
+                                platformDataObject = await dataObjects.GetDataObject(DataObjects.DataObjectType.Platform, platformItem.Id);
+                                if (platformDataObject != null)
+                                {
+                                    RedisConnection.SetCacheItem<DataObjectItem>(platformCacheKey, platformDataObject, cacheDuration);
+                                }
+                            }
                             if (platformDataObject != null)
                             {
                                 string platformFileName = "PlatformMapping.json";
                                 string platformFilePath = Path.Combine(platformPath, platformFileName);
 
                                 // serialize the dictionary to JSON and write to file
-                                string platformJsonContent = Newtonsoft.Json.JsonConvert.SerializeObject(platformDataObject, new Newtonsoft.Json.JsonSerializerSettings
-                                {
-                                    Formatting = Newtonsoft.Json.Formatting.Indented,
-                                    NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore,
-                                    Converters = new List<Newtonsoft.Json.JsonConverter>
-                                    {
-                                        new Newtonsoft.Json.Converters.StringEnumConverter()
-                                    }
-                                });
+                                string platformJsonContent = Newtonsoft.Json.JsonConvert.SerializeObject(platformDataObject, jsonSettings);
                                 await File.WriteAllTextAsync(platformFilePath, platformJsonContent);
                             }
                         }
@@ -146,17 +176,18 @@ namespace Classes.ProcessQueue
                     string filePath = Path.Combine(platformPath, fileName);
 
                     // serialize the dictionary to JSON and write to file
-                    string jsonContent = Newtonsoft.Json.JsonConvert.SerializeObject(dataObject, new Newtonsoft.Json.JsonSerializerSettings
-                    {
-                        Formatting = Newtonsoft.Json.Formatting.Indented,
-                        NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore,
-                        Converters = new List<Newtonsoft.Json.JsonConverter>
-                        {
-                            new Newtonsoft.Json.Converters.StringEnumConverter()
-                        }
-                    });
+                    string jsonContent = Newtonsoft.Json.JsonConvert.SerializeObject(dataObject, jsonSettings);
                     await File.WriteAllTextAsync(filePath, jsonContent);
+
+                    // if counter is a multiple of 10, introduce a short delay
+                    if (counter % 10 == 0)
+                    {
+                        await Task.Delay(2000); // 2 seconds delay
+                    }
                 }
+
+                // sleep for a 30 seconds to avoid overwhelming the system
+                await Task.Delay(30000);
             }
 
             // step 3: zip the output directory
@@ -200,6 +231,9 @@ namespace Classes.ProcessQueue
                         }
                     }
                 }
+
+                // sleep for 5 seconds to avoid overwhelming the system
+                await Task.Delay(5000);
             }
             // delete the old platform zip if it exists
             Logging.Log(Logging.LogType.Information, "Metadata Dump", "Replacing old platform zip files with new ones...");
@@ -258,7 +292,7 @@ namespace Classes.ProcessQueue
             // loop through all platform pages
             for (int platformPageNumber = 1; ; platformPageNumber++)
             {
-                var allPlatforms = await platformDataObjects.GetDataObjects(DataObjects.DataObjectType.Platform, platformPageNumber, 1000, null, false, false);
+                var allPlatforms = await platformDataObjects.GetDataObjects(DataObjects.DataObjectType.Platform, platformPageNumber, 100, null, false, false);
                 if (allPlatforms == null || allPlatforms.Objects.Count == 0)
                 {
                     break; // No more items to process
@@ -279,7 +313,7 @@ namespace Classes.ProcessQueue
                     bool hasGames = false;
                     for (int gamePageNumber = 1; ; gamePageNumber++)
                     {
-                        var platformGames = await platformDataObjects.GetDataObjects(DataObjects.DataObjectType.Game, gamePageNumber, 1000, null, false, false, AttributeItem.AttributeName.Platform, platform.Id.ToString());
+                        var platformGames = await platformDataObjects.GetDataObjects(DataObjects.DataObjectType.Game, gamePageNumber, 100, null, false, false, AttributeItem.AttributeName.Platform, platform.Id.ToString());
                         if (platformGames == null || platformGames.Objects.Count == 0)
                         {
                             break; // No more items to process
@@ -293,7 +327,21 @@ namespace Classes.ProcessQueue
                         foreach (var game in platformGames.Objects)
                         {
                             string gameMetadataPath = Path.Combine(platformPath, game.Name.Trim() + $" ({game.Id})");
-                            var gameObject = await platformDataObjects.GetDataObject(game.Id);
+                            DataObjectItem? gameObject;
+                            string gameCacheKey = RedisConnection.GenerateKey("Dumps", "Game_" + game.Id.ToString());
+                            if (RedisConnection.CacheItemExists(gameCacheKey))
+                            {
+                                gameObject = RedisConnection.GetCacheItem<DataObjectItem>(gameCacheKey);
+                            }
+                            else
+                            {
+                                gameObject = await platformDataObjects.GetDataObject(DataObjects.DataObjectType.Game, game.Id);
+                                if (gameObject != null)
+                                {
+                                    RedisConnection.SetCacheItem<DataObjectItem>(gameCacheKey, gameObject, cacheDuration);
+                                }
+                            }
+
                             if (gameObject != null && gameObject.Attributes != null)
                             {
                                 foreach (var attribute in gameObject.Attributes)
@@ -334,22 +382,14 @@ namespace Classes.ProcessQueue
                                                 CRC = rom.Crc
                                             };
                                             // fetch the lookup result
-                                            HashLookup hashLookup = new HashLookup(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), model, true, "All");
+                                            HashLookup hashLookup = new HashLookup(Config.database, model, true, "All");
                                             await hashLookup.PerformLookup();
                                             if (hashLookup == null || hashLookup.Signatures == null)
                                             {
                                                 continue;
                                             }
                                             // serialise the lookup result to JSON
-                                            string romJsonContent = Newtonsoft.Json.JsonConvert.SerializeObject(hashLookup.Signatures, new Newtonsoft.Json.JsonSerializerSettings
-                                            {
-                                                Formatting = Newtonsoft.Json.Formatting.Indented,
-                                                NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore,
-                                                Converters = new List<Newtonsoft.Json.JsonConverter>
-                                                {
-                                                    new Newtonsoft.Json.Converters.StringEnumConverter()
-                                                }
-                                            });
+                                            string romJsonContent = Newtonsoft.Json.JsonConvert.SerializeObject(hashLookup.Signatures, jsonSettings);
                                             // hash the JSON content to create a unique filename
                                             using var md5 = System.Security.Cryptography.MD5.Create();
                                             byte[] hashBytes = md5.ComputeHash(System.Text.Encoding.UTF8.GetBytes(romJsonContent));
@@ -362,13 +402,28 @@ namespace Classes.ProcessQueue
                                             // create the output file
                                             string romOutputPath = Path.Combine(gameMetadataPath, $"{hashString}.json");
                                             await File.WriteAllTextAsync(romOutputPath, romJsonContent);
+
+                                            // sleep for 1 second to avoid overwhelming the system every 10 ROMs
+                                            if (romCounter % 10 == 0)
+                                            {
+                                                await Task.Delay(1000);
+                                            }
                                         }
                                         romSw.Stop();
+
+                                        // sleep for 5 seconds to avoid overwhelming the system
+                                        await Task.Delay(5000);
                                     }
                                 }
+
+                                // sleep for 2 seconds to avoid overwhelming the system
+                                await Task.Delay(2000);
                             }
                         }
                         sw.Stop();
+
+                        // sleep for 10 seconds to avoid overwhelming the system
+                        await Task.Delay(10000);
                     }
 
                     // If the platform has no games, skip zipping
@@ -428,6 +483,9 @@ namespace Classes.ProcessQueue
                         Directory.Delete(platformPath, true);
                     }
                 }
+
+                // sleep for 15 seconds to avoid overwhelming the system
+                await Task.Delay(15000);
             }
 
             // Step 7: Finalise the main hashes zip

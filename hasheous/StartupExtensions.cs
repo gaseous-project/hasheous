@@ -1,27 +1,27 @@
-using System.Reflection;
 using System.Linq;
-using Microsoft.OpenApi.Models;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Versioning;
-using System.Text.Json.Serialization;
-using Microsoft.AspNetCore.Http.Features;
-using Microsoft.AspNetCore.Server.Kestrel.Core;
-using Microsoft.AspNetCore.HttpOverrides;
-using Microsoft.AspNetCore.Identity.UI.Services;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Authentication;
-using StackExchange.Redis;
-using Classes;
-using hasheous_server.Classes;
-using hasheous.Classes;
-using Microsoft.AspNetCore.Mvc.Filters;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using System.Net;
 using System.Net.Mail;
+using System.Reflection;
+using System.Text.Json.Serialization;
+using Authentication;
+using Classes;
 using Classes.ProcessQueue;
+using hasheous.Classes;
+using hasheous_server.Classes;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.UI.Services;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.AspNetCore.Mvc.Versioning;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.OpenApi.Models;
+using StackExchange.Redis;
 using static Classes.Common;
 
 namespace Hasheous;
@@ -154,6 +154,14 @@ public static class StartupExtensions
                 Description = "Client API Key",
                 Scheme = "ClientApiKeyScheme"
             });
+            options.AddSecurityDefinition("Task Worker API Key", new OpenApiSecurityScheme
+            {
+                Name = TaskWorkerAPIKey.APIKeyHeaderName,
+                In = ParameterLocation.Header,
+                Type = SecuritySchemeType.ApiKey,
+                Description = "Task Worker API Key",
+                Scheme = "TaskWorkerApiKeyScheme"
+            });
             options.OperationFilter<AuthorizationOperationFilter>();
             options.DocumentFilter<IGDBMetadataDocumentFilter>();
             options.SwaggerDoc("v1", new OpenApiInfo
@@ -256,6 +264,7 @@ public static class StartupExtensions
             options.AddPolicy("Moderator", policy => policy.RequireRole("Moderator"));
             options.AddPolicy("Member", policy => policy.RequireRole("Member"));
             options.AddPolicy("VerifiedEmail", policy => policy.RequireRole("Verified Email"));
+            options.AddPolicy("TaskRunner", policy => policy.RequireRole("Task Runner"));
         });
         services.AddAuthentication(o => { o.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme; });
         services.AddAuthentication().AddCookie();
@@ -289,7 +298,11 @@ public static class StartupExtensions
         services.AddSingleton<Authentication.ApiKey.ApiKeyAuthorizationFilter>();
         services.AddSingleton<Authentication.ApiKey.IApiKeyValidator, Authentication.ApiKey.ApiKeyValidator>();
         services.AddSingleton<Authentication.ClientApiKey.ClientApiKeyAuthorizationFilter>();
-        services.AddSingleton<Authentication.ClientApiKey.IClientApiKeyValidator, Authentication.ClientApiKey.ClientApiKeyValidator>();
+        services.AddSingleton<Authentication.ClientApiKey.IClientApiKeyValidator, Authentication.ClientApiKey.ClientApiKeyValidator>
+        ();
+        services.AddSingleton<Authentication.TaskWorkerAPIKey.TaskWorkerAPIKeyAuthorizationFilter>();
+        services.AddSingleton<Authentication.TaskWorkerAPIKey.ITaskWorkerAPIKeyValidator, Authentication.TaskWorkerAPIKey.TaskWorkerAPIKeyValidator>
+        ();
         return services;
     }
 
@@ -322,14 +335,16 @@ public static class StartupExtensions
     }
 
     /// <summary>
-    /// Ensures system roles exist and assigns Verified Email role to users with confirmed emails.
+    /// Ensures system roles exist with proper dependencies and settings, and assigns Verified Email role to users with confirmed emails.
     /// </summary>
     public static async Task SeedRolesAndVerifiedEmailAsync(this WebApplication app)
     {
         using var scope = app.Services.CreateScope();
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleStore>();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-        var roles = new[] { "Admin", "Moderator", "Member", "Verified Email" };
+        var roles = new[] { "Admin", "Moderator", "Member", "Verified Email", "Task Runner" };
+
+        // Create roles if they don't exist
         foreach (var role in roles)
         {
             if (await roleManager.FindByNameAsync(role, CancellationToken.None) == null)
@@ -338,13 +353,57 @@ public static class StartupExtensions
                 await roleManager.CreateAsync(applicationRole, CancellationToken.None);
             }
         }
-        const string verifiedEmailRole = "Verified Email";
+
+        // Configure role dependencies and permissions
+        var memberRole = await roleManager.FindByNameAsync("Member", CancellationToken.None);
+        var moderatorRole = await roleManager.FindByNameAsync("Moderator", CancellationToken.None);
+        var adminRole = await roleManager.FindByNameAsync("Admin", CancellationToken.None);
+        var verifiedEmailRole = await roleManager.FindByNameAsync("Verified Email", CancellationToken.None);
+        var taskRunnerRole = await roleManager.FindByNameAsync("Task Runner", CancellationToken.None);
+
+        // Set up role hierarchy: Admin depends on Moderator depends on Member
+        if (memberRole != null)
+        {
+            memberRole.AllowManualAssignment = false;
+            memberRole.RoleDependsOn = Guid.Empty;
+            await roleManager.UpdateAsync(memberRole, CancellationToken.None);
+        }
+
+        if (moderatorRole != null && memberRole != null)
+        {
+            moderatorRole.AllowManualAssignment = true;
+            moderatorRole.RoleDependsOn = Guid.Parse(memberRole.Id);
+            await roleManager.UpdateAsync(moderatorRole, CancellationToken.None);
+        }
+
+        if (adminRole != null && moderatorRole != null)
+        {
+            adminRole.AllowManualAssignment = true;
+            adminRole.RoleDependsOn = Guid.Parse(moderatorRole.Id);
+            await roleManager.UpdateAsync(adminRole, CancellationToken.None);
+        }
+
+        if (verifiedEmailRole != null)
+        {
+            verifiedEmailRole.AllowManualAssignment = false;
+            verifiedEmailRole.RoleDependsOn = Guid.Empty;
+            await roleManager.UpdateAsync(verifiedEmailRole, CancellationToken.None);
+        }
+
+        if (taskRunnerRole != null)
+        {
+            taskRunnerRole.AllowManualAssignment = true;
+            taskRunnerRole.RoleDependsOn = Guid.Empty;
+            await roleManager.UpdateAsync(taskRunnerRole, CancellationToken.None);
+        }
+
+        // Assign Verified Email role to users with confirmed emails
         var usersWithConfirmedEmails = userManager.Users.Where(u => u.EmailConfirmed).ToList();
         foreach (var user in usersWithConfirmedEmails)
         {
-            if (!await userManager.IsInRoleAsync(user, verifiedEmailRole))
+            if (!await userManager.IsInRoleAsync(user, "Verified Email"))
             {
-                await userManager.AddToRoleAsync(user, verifiedEmailRole);
+                await userManager.AddToRoleAsync(user, "Verified Email");
             }
         }
     }

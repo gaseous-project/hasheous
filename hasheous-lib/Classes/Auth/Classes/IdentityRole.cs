@@ -12,5 +12,15 @@ namespace Authentication
     /// </summary>
     public class ApplicationRole : IdentityRole
     {
+        /// <summary>
+        /// Flag indicating whether this role can be manually assigned by administrators
+        /// </summary>
+        public bool AllowManualAssignment { get; set; } = false;
+
+        /// <summary>
+        /// If set, indicates this role depends on another role (referenced by GUID).
+        /// Establishes a hierarchy of roles (e.g., Admin depends on Moderator depends on Member)
+        /// </summary>
+        public Guid RoleDependsOn { get; set; } = Guid.Empty;
     }
 }
