@@ -260,6 +260,17 @@ namespace hasheous_server.Classes
             return _metadataHandlerTypeCache;
         }
 
+        /// <summary>
+        /// Generates a Redis cache key for a data object based on its type and ID. Use this to ensure standardised key names.
+        /// </summary>
+        /// <param name="objectType">The type of the data object.</param>
+        /// <param name="objectId">The unique identifier of the data object.</param>
+        /// <returns>A string representing the Redis cache key.</returns>
+        public static string DataObjectCacheKey(DataObjectType objectType, long objectId)
+        {
+            return RedisConnection.GenerateKey("DataObject", objectType.ToString() + objectId.ToString());
+        }
+
         public async Task<DataObjectsList> GetDataObjects(DataObjectType objectType, int pageNumber = 0, int pageSize = 0, string? search = null, bool GetChildRelations = false, bool GetMetadataMap = true, AttributeItem.AttributeName? filterAttribute = null, string? filterValue = null, ApplicationUser? user = null)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
@@ -481,10 +492,19 @@ namespace hasheous_server.Classes
                 { "updateddate", DateTime.UtcNow }
             });
 
-            // purge redis cache of all keys for this object type
-            if (Config.RedisConfiguration.Enabled)
+            // get the object type
+            DataObjectItem? item = GetDataObject(DataObjectId).Result;
+            if (item != null)
             {
-                RedisConnection.PurgeCache("DataObject");
+                DataObjectType objectType = item.ObjectType;
+
+                // generate a cache key for this object id
+                string cacheKey = DataObjectCacheKey(objectType, DataObjectId);
+                // purge redis cache of this object
+                if (Config.RedisConfiguration.Enabled)
+                {
+                    RedisConnection.GetDatabase(0).KeyDelete(cacheKey);
+                }
             }
         }
 
@@ -1031,12 +1051,6 @@ namespace hasheous_server.Classes
                     break;
             }
 
-            // purge redis cache of all keys for this object type
-            if (Config.RedisConfiguration.Enabled)
-            {
-                RedisConnection.PurgeCache("DataObject");
-            }
-
             return await GetDataObject(objectType, (long)(ulong)data.Rows[0][0]);
         }
 
@@ -1053,10 +1067,12 @@ namespace hasheous_server.Classes
 
             db.ExecuteNonQuery(sql, dbDict);
 
-            // purge redis cache of all keys for this object type
+            // generate a cache key for this object id
+            string cacheKey = DataObjectCacheKey(objectType, id);
+            // purge redis cache of this object
             if (Config.RedisConfiguration.Enabled)
             {
-                RedisConnection.PurgeCache("DataObject");
+                RedisConnection.GetDatabase(0).KeyDelete(cacheKey);
             }
 
             if (allowSearch)
@@ -1082,7 +1098,8 @@ namespace hasheous_server.Classes
             // purge redis cache of all keys for this object type
             if (Config.RedisConfiguration.Enabled)
             {
-                RedisConnection.PurgeCache("DataObject");
+                string cacheKey = DataObjectCacheKey(objectType, id);
+                RedisConnection.GetDatabase(0).KeyDelete(cacheKey);
             }
         }
 
@@ -1099,10 +1116,12 @@ namespace hasheous_server.Classes
 
             db.ExecuteNonQuery(sql, dbDict);
 
-            // purge redis cache of all keys for this object type
+            // generate a cache key for this object id
+            string cacheKey = DataObjectCacheKey(objectType, id);
+            // purge redis cache of this object
             if (Config.RedisConfiguration.Enabled)
             {
-                RedisConnection.PurgeCache("DataObject");
+                RedisConnection.GetDatabase(0).KeyDelete(cacheKey);
             }
 
             DataObjectItem EditedObject = await GetDataObject(objectType, id);
@@ -1689,25 +1708,12 @@ namespace hasheous_server.Classes
 
         private async Task _DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch)
         {
-            List<MetadataSources> ProcessSources = new List<MetadataSources>
-            {
+            HashSet<MetadataSources> ProcessSources = [
                 MetadataSources.IGDB,
                 MetadataSources.TheGamesDb,
                 MetadataSources.RetroAchievements,
                 MetadataSources.GiantBomb
-            };
-
-            MatchItem? DataObjectSearchResults = new MatchItem
-            {
-                MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
-                MetadataId = ""
-            };
-
-            // purge redis cache of all keys for this object type
-            if (Config.RedisConfiguration.Enabled)
-            {
-                RedisConnection.PurgeCache("DataObject");
-            }
+            ];
 
             // set up the list of objects that need to be processed
             List<DataObjectItem> DataObjectsToProcess = new List<DataObjectItem>();
@@ -1759,6 +1765,22 @@ namespace hasheous_server.Classes
                 }
             }
 
+            // get all metadata sources
+            MetadataSources[] allMetadataSources = (MetadataSources[])Enum.GetValues(typeof(MetadataSources));
+
+            // set up randomiser
+            Random rand = new Random();
+
+            // set now time
+            DateTime now = DateTime.UtcNow;
+
+            // do not search for metadata if the matchmethod is Manual, ManualByAdmin, or Voted
+            List<BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod> dontSearchMatchMethods = [
+                BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Manual,
+                BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin,
+                BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Voted
+            ];
+
             // start processing each object
             int processedObjectCount = 0;
             foreach (DataObjectItem item in DataObjectsToProcess)
@@ -1804,14 +1826,14 @@ namespace hasheous_server.Classes
                 // calculate a dates to search next time should we not find any matches, or need to refresh automatic matches
                 // day count should be randomised to ensure that we don't spend multiple days processing records
                 // automatic and automaticetoomanymatches - should be between 6 and 12 months
-                int automaticNextDay = new Random().Next(180, 365);
+                int automaticNextDay = rand.Next(180, 365);
                 // nomatch - should be between 1 and 6 months
-                int noMatchNextDay = new Random().Next(30, 180);
+                int noMatchNextDay = rand.Next(30, 180);
                 // default - just one day
                 int defaultNextDay = 1;
 
                 // process each metadata source
-                foreach (MetadataSources metadataSource in Enum.GetValues(typeof(MetadataSources)))
+                foreach (MetadataSources metadataSource in allMetadataSources)
                 {
                     // skip if it's an unsupported source type
                     if (!ProcessSources.Contains(metadataSource))
@@ -1873,8 +1895,8 @@ namespace hasheous_server.Classes
                         Id = "",
                         MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
                         Source = metadataSource,
-                        LastSearch = DateTime.UtcNow.AddMonths(-3),
-                        NextSearch = DateTime.UtcNow.AddMonths(-1),
+                        LastSearch = now.AddMonths(-3),
+                        NextSearch = now.AddMonths(-1),
                         WinningVoteCount = 0,
                         TotalVoteCount = 0
                     };
@@ -1887,17 +1909,10 @@ namespace hasheous_server.Classes
                         }
                     }
 
-                    // do not search for metadata if the matchmethod is Manual, ManualByAdmin, or Voted
-                    List<BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod> dontSearchMatchMethods = [
-                        BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Manual,
-                        BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin,
-                        BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Voted
-                    ];
-
                     if (metadata.MatchMethod == null || !dontSearchMatchMethods.Contains((BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod)metadata.MatchMethod))
                     {
                         // if the next search is in the past, or if we are forcing a search, then we can search for metadata
-                        if (ForceSearch || metadata.NextSearch < DateTime.UtcNow)
+                        if (ForceSearch || metadata.NextSearch < now)
                         {
                             // searching is allowed
                             Logging.Log(Logging.LogType.Information, "Metadata Match", "Checking " + metadataSource + "...");
@@ -1910,18 +1925,18 @@ namespace hasheous_server.Classes
                                 // update the metadata item with the search results
                                 metadata.Id = searchResult.MetadataId;
                                 metadata.MatchMethod = searchResult.MatchMethod;
-                                metadata.LastSearch = DateTime.UtcNow;
+                                metadata.LastSearch = now;
                                 switch (metadata.MatchMethod)
                                 {
                                     case BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic:
                                     case BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.AutomaticTooManyMatches:
-                                        metadata.NextSearch = DateTime.UtcNow.AddDays(automaticNextDay);
+                                        metadata.NextSearch = now.AddDays(automaticNextDay);
                                         break;
                                     case BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch:
-                                        metadata.NextSearch = DateTime.UtcNow.AddDays(noMatchNextDay);
+                                        metadata.NextSearch = now.AddDays(noMatchNextDay);
                                         break;
                                     default:
-                                        metadata.NextSearch = DateTime.UtcNow.AddDays(defaultNextDay);
+                                        metadata.NextSearch = now.AddDays(defaultNextDay);
                                         break;
                                 }
 
@@ -1958,8 +1973,8 @@ namespace hasheous_server.Classes
                                     Id = wikiMetadataResults.MetadataId,
                                     MatchMethod = wikiMetadataResults.MatchMethod,
                                     Source = MetadataSources.Wikipedia,
-                                    LastSearch = DateTime.UtcNow,
-                                    NextSearch = DateTime.UtcNow.AddMonths(6),
+                                    LastSearch = now,
+                                    NextSearch = now.AddMonths(6),
                                     WinningVoteCount = 0,
                                     TotalVoteCount = 0
                                 };
@@ -1988,7 +2003,7 @@ namespace hasheous_server.Classes
                         ObjectType = item.ObjectType,
                         Permissions = item.Permissions,
                         SignatureDataObjects = item.SignatureDataObjects,
-                        UpdatedDate = DateTime.UtcNow,
+                        UpdatedDate = now,
                         UserPermissions = item.UserPermissions,
                         CreatedDate = item.CreatedDate,
                         Attributes = item.Attributes,
