@@ -1738,6 +1738,16 @@ namespace hasheous_server.Classes
             }
         }
 
+        // do not search for metadata if the matchmethod is Manual, ManualByAdmin, or Voted
+        private static List<BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod> dontSearchMatchMethods = [
+            BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Manual,
+            BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin,
+            BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Voted
+        ];
+
+        // get all metadata sources
+        private static MetadataSources[] allMetadataSources = (MetadataSources[])Enum.GetValues(typeof(MetadataSources));
+
         private async Task _DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch)
         {
             HashSet<MetadataSources> ProcessSources = [
@@ -1746,6 +1756,9 @@ namespace hasheous_server.Classes
                 MetadataSources.RetroAchievements,
                 MetadataSources.GiantBomb
             ];
+
+            // set now time
+            DateTime now = DateTime.UtcNow;
 
             // set up the list of objects that need to be processed
             List<DataObjectItem> DataObjectsToProcess = new List<DataObjectItem>();
@@ -1782,7 +1795,7 @@ namespace hasheous_server.Classes
                 ", new Dictionary<string, object>
                 {
                     { "@objecttype", objectType },
-                    { "@lastsearched", DateTime.UtcNow.AddDays(-5) }
+                    { "@lastsearched", now.AddDays(-5) }
                 });
 
                 foreach (DataRow row in data.Rows)
@@ -1797,21 +1810,8 @@ namespace hasheous_server.Classes
                 }
             }
 
-            // get all metadata sources
-            MetadataSources[] allMetadataSources = (MetadataSources[])Enum.GetValues(typeof(MetadataSources));
-
             // set up randomiser
             Random rand = new Random();
-
-            // set now time
-            DateTime now = DateTime.UtcNow;
-
-            // do not search for metadata if the matchmethod is Manual, ManualByAdmin, or Voted
-            List<BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod> dontSearchMatchMethods = [
-                BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Manual,
-                BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin,
-                BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Voted
-            ];
 
             // start processing each object
             int processedObjectCount = 0;
@@ -1843,7 +1843,7 @@ namespace hasheous_server.Classes
 
                     if (itemPlatform == null)
                     {
-                        Logging.Log(Logging.LogType.Warning, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Skipping game " + item.Name + " as no platform is mapped.");
+                        Logging.Log(Logging.LogType.Warning, "Metadata Match", $"{processedObjectCount} / {DataObjectsToProcess.Count} - Skipping game {item.Name} as no platform is mapped.");
                         continue;
                     }
                 }
@@ -1851,7 +1851,7 @@ namespace hasheous_server.Classes
                 // generate a list of search candidates
                 List<string> SearchCandidates = GetSearchCandidates(item.Name);
 
-                Logging.Log(Logging.LogType.Information, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Searching for metadata for " + string.Join(", ", SearchCandidates) + " (" + item.ObjectType + ") Id: " + item.Id);
+                Logging.Log(Logging.LogType.Information, "Metadata Match", $"{processedObjectCount} / {DataObjectsToProcess.Count} - Searching for metadata for {string.Join(", ", SearchCandidates)} ({item.ObjectType}) Id: {item.Id}");
 
                 List<DataObjectItem.MetadataItem> metadataUpdates = new List<MetadataItem>();
 
@@ -1896,7 +1896,7 @@ namespace hasheous_server.Classes
 
                         if (platformMetadata == null)
                         {
-                            Logging.Log(Logging.LogType.Warning, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Skipping metadata source " + metadataSource + " for game " + item.Name + " as no platform metadata is mapped.");
+                            Logging.Log(Logging.LogType.Warning, "Metadata Match", $"{processedObjectCount} / {DataObjectsToProcess.Count} - Skipping metadata source {metadataSource} for game {item.Name} as no platform metadata is mapped.");
                             continue;
                         }
                     }
@@ -1938,7 +1938,7 @@ namespace hasheous_server.Classes
                         if (ForceSearch || metadata.NextSearch < now)
                         {
                             // searching is allowed
-                            Logging.Log(Logging.LogType.Information, "Metadata Match", "Checking " + metadataSource + "...");
+                            Logging.Log(Logging.LogType.Information, "Metadata Match", $"Checking {metadataSource}...");
 
                             try
                             {
@@ -1966,11 +1966,11 @@ namespace hasheous_server.Classes
                                 // add to updates list
                                 metadataUpdates.Add(metadata);
 
-                                Logging.Log(Logging.LogType.Information, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - " + item.ObjectType + " " + item.Name + " " + metadata.MatchMethod + " to " + metadata.Source + " metadata: " + metadata.Id);
+                                Logging.Log(Logging.LogType.Information, "Metadata Match", $"{processedObjectCount} / {DataObjectsToProcess.Count} - {item.ObjectType} {item.Name} {metadata.MatchMethod} to {metadata.Source} metadata: {metadata.Id}");
                             }
                             catch (Exception ex)
                             {
-                                Logging.Log(Logging.LogType.Warning, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Error processing metadata search", ex);
+                                Logging.Log(Logging.LogType.Warning, "Metadata Match", $"{processedObjectCount} / {DataObjectsToProcess.Count} - Error processing metadata search", ex);
                             }
                         }
                     }
@@ -2005,12 +2005,12 @@ namespace hasheous_server.Classes
                                 // add to updates list
                                 metadataUpdates.Add(wikiMetadata);
 
-                                Logging.Log(Logging.LogType.Information, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - " + item.ObjectType + " " + item.Name + " " + wikiMetadata.MatchMethod + " to " + wikiMetadata.Source + " metadata: " + wikiMetadata.Id);
+                                Logging.Log(Logging.LogType.Information, "Metadata Match", $"{processedObjectCount} / {DataObjectsToProcess.Count} - {item.ObjectType} {item.Name} {wikiMetadata.MatchMethod} to {wikiMetadata.Source} metadata: {wikiMetadata.Id}");
                             }
                         }
                         catch (Exception ex)
                         {
-                            Logging.Log(Logging.LogType.Warning, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Error processing Wikipedia metadata search", ex);
+                            Logging.Log(Logging.LogType.Warning, "Metadata Match", $"{processedObjectCount} / {DataObjectsToProcess.Count} - Error processing Wikipedia metadata search", ex);
                         }
                         // }
                     }
@@ -2065,16 +2065,7 @@ namespace hasheous_server.Classes
                 }
 
                 // ensure there are tasks for this item
-                var tasks = TaskManagement.GetAllTasks(item.Id);
-                bool aiTaskPresent = false;
-                foreach (var task in tasks)
-                {
-                    if (task.TaskName == Models.Tasks.TaskType.AIDescriptionAndTagging)
-                    {
-                        aiTaskPresent = true;
-                        break;
-                    }
-                }
+                bool aiTaskPresent = TaskManagement.GetAllTasks(item.Id).Any(t => t.TaskName == Models.Tasks.TaskType.AIDescriptionAndTagging);
                 // get metadata cover if new object is a game
                 if (objectType == DataObjectType.Game)
                 {
@@ -2085,7 +2076,7 @@ namespace hasheous_server.Classes
                     }
                     catch (Exception ex)
                     {
-                        Logging.Log(Logging.LogType.Warning, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Error processing game artwork metadata search", ex);
+                        Logging.Log(Logging.LogType.Warning, "Metadata Match", $"{processedObjectCount} / {DataObjectsToProcess.Count} - Error processing game artwork metadata search", ex);
                     }
                 }
 
