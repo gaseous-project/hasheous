@@ -2061,7 +2061,7 @@ namespace hasheous_server.Classes
                     }
 
                     // save updated data object
-                    await EditDataObject(updatedDataObject.ObjectType, updatedDataObject.Id, (DataObjectItem)updatedDataObject, true);
+                    _ = EditDataObject(updatedDataObject.ObjectType, updatedDataObject.Id, (DataObjectItem)updatedDataObject, true);
                 }
 
                 // ensure there are tasks for this item
@@ -2072,7 +2072,7 @@ namespace hasheous_server.Classes
                     try
                     {
                         BackgroundMetadataMatcher.BackgroundMetadataMatcher metadataMatcher = new BackgroundMetadataMatcher.BackgroundMetadataMatcher();
-                        await metadataMatcher.GetGameArtwork((long)item.Id, ForceSearch);
+                        _ = metadataMatcher.GetGameArtwork((long)item.Id, ForceSearch);
                     }
                     catch (Exception ex)
                     {
