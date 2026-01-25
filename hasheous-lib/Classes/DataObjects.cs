@@ -224,6 +224,7 @@ namespace hasheous_server.Classes
         /// Initialized lazily on first use to avoid reflection overhead.
         /// </summary>
         private static Dictionary<MetadataSources, Type>? _metadataHandlerTypeCache;
+        private static Dictionary<MetadataSources, MetadataLib.IMetadata>? _metadataHandlerInstanceCache;
 
         /// <summary>
         /// Gets or builds the cached mapping of MetadataSources to IMetadata handler types.
@@ -258,6 +259,37 @@ namespace hasheous_server.Classes
             }
 
             return _metadataHandlerTypeCache;
+        }
+
+        /// <summary>
+        /// Gets or builds the cached mapping of MetadataSources to IMetadata handler instances.
+        /// Reuses handler instances across searches if they are stateless/thread-safe.
+        /// </summary>
+        private static Dictionary<MetadataSources, MetadataLib.IMetadata> GetMetadataHandlerInstanceCache()
+        {
+            if (_metadataHandlerInstanceCache != null)
+                return _metadataHandlerInstanceCache;
+
+            _metadataHandlerInstanceCache = new Dictionary<MetadataSources, MetadataLib.IMetadata>();
+            var typeCache = GetMetadataHandlerTypeCache();
+
+            foreach (var kvp in typeCache)
+            {
+                try
+                {
+                    var instance = Activator.CreateInstance(kvp.Value) as MetadataLib.IMetadata;
+                    if (instance != null)
+                    {
+                        _metadataHandlerInstanceCache[kvp.Key] = instance;
+                    }
+                }
+                catch
+                {
+                    // Skip types that cannot be instantiated
+                }
+            }
+
+            return _metadataHandlerInstanceCache;
         }
 
         /// <summary>
@@ -1869,22 +1901,13 @@ namespace hasheous_server.Classes
                         }
                     }
 
-                    // Get metadata handler type from cache (avoids expensive reflection in nested loop)
-                    var metadataHandlerCache = GetMetadataHandlerTypeCache();
+                    // Get metadata handler instance from cache (avoids expensive reflection + instantiation in nested loop)
+                    var metadataHandlerCache = GetMetadataHandlerInstanceCache();
 
-                    if (!metadataHandlerCache.TryGetValue(metadataSource, out var metadataHandlerType))
+                    if (!metadataHandlerCache.TryGetValue(metadataSource, out var metadataHandler))
                     {
                         // No handler found for this metadata source, skip it
                         Logging.Log(Logging.LogType.Warning, "Metadata Match", $"No IMetadata handler found for source: {metadataSource}");
-                        continue;
-                    }
-
-                    var metadataHandler = Activator.CreateInstance(metadataHandlerType) as MetadataLib.IMetadata;
-
-                    if (metadataHandler == null)
-                    {
-                        // Unable to create instance of the handler, skip it
-                        Logging.Log(Logging.LogType.Warning, "Metadata Match", $"Unable to create instance of IMetadata handler for source: {metadataSource}");
                         continue;
                     }
 
