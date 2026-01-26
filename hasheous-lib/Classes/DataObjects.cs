@@ -1553,6 +1553,25 @@ namespace hasheous_server.Classes
                                     });
                                 }
                             }
+
+                            if (trustModelMetadataSearchType == true)
+                            {
+                                // update next search field if match method is NoMatch or Automatic
+                                if (new List<BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod?>{
+                                    BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
+                                    BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic,
+                                    BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.AutomaticTooManyMatches
+                                }.Contains(matchMethod))
+                                {
+                                    // update next search regardless of changes
+                                    sql = "UPDATE DataObject_MetadataMap SET NextSearch=@nextsearch WHERE DataObjectId=@id AND SourceId=@source;";
+                                    db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                                        { "id", id },
+                                        { "source", newMetadataItem.Source },
+                                        { "nextsearch", newMetadataItem.NextSearch }
+                                    });
+                                }
+                            }
                         }
 
                         if (metadataFound == false)
@@ -1792,7 +1811,7 @@ namespace hasheous_server.Classes
                         (SELECT 
                             DataObjectId, LastSearched
                         FROM
-                            DataObject_MetadataMap GROUP BY DataObjectId ORDER BY LastSearched) DDMM ON DataObject.Id = DDMM.DataObjectId
+                            DataObject_MetadataMap GROUP BY DataObjectId ORDER BY LastSearched ASC) DDMM ON DataObject.Id = DDMM.DataObjectId
                     WHERE
                         ObjectType = @objecttype AND DDMM.LastSearched < @lastsearched
                     ORDER BY DataObject.`Name`;
@@ -1875,6 +1894,17 @@ namespace hasheous_server.Classes
                     // skip if it's an unsupported source type
                     if (!ProcessSources.Contains(metadataSource))
                     {
+                        // set the next search date to 6 months in the future to avoid rechecking too often
+                        DataObjectItem.MetadataItem? existingMetadata = null;
+                        if (item.Metadata != null)
+                        {
+                            existingMetadata = item.Metadata.Find(x => x.Source == metadataSource);
+                        }
+                        if (existingMetadata != null)
+                        {
+                            existingMetadata.NextSearch = now.AddDays(noMatchNextDay);
+                            metadataUpdates.Add(existingMetadata);
+                        }
                         continue;
                     }
 
