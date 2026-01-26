@@ -1760,6 +1760,9 @@ namespace hasheous_server.Classes
             // set now time
             DateTime now = DateTime.UtcNow;
 
+            // set up report sending
+            string logName = $"{Config.LogName}-MetadataMatchSearch";
+
             // set up the list of objects that need to be processed
             List<DataObjectItem> DataObjectsToProcess = new List<DataObjectItem>();
             if (id != null)
@@ -1779,6 +1782,7 @@ namespace hasheous_server.Classes
             else
             {
                 // get all data objects of the specified type that need metadata searching - any item last searched more than 5 days ago
+                Logging.SendReport(logName, 0, 0, $"Querying database for {objectType} data objects needing metadata search...");
                 DataTable data = await Config.database.ExecuteCMDAsync(@"
                     SELECT DISTINCT
                         DataObject.*, DDMM.LastSearched
@@ -1852,6 +1856,7 @@ namespace hasheous_server.Classes
                 List<string> SearchCandidates = GetSearchCandidates(item.Name);
 
                 Logging.Log(Logging.LogType.Information, "Metadata Match", $"{processedObjectCount} / {DataObjectsToProcess.Count} - Searching for metadata for {string.Join(", ", SearchCandidates)} ({item.ObjectType}) Id: {item.Id}");
+                Logging.SendReport(logName, processedObjectCount, DataObjectsToProcess.Count, $"Searching for metadata for {string.Join(", ", SearchCandidates)} ({item.ObjectType})");
 
                 List<DataObjectItem.MetadataItem> metadataUpdates = new List<MetadataItem>();
 
@@ -2089,6 +2094,8 @@ namespace hasheous_server.Classes
                     TaskManagement.EnqueueTask(item.Id, Models.Tasks.TaskType.AIDescriptionAndTagging);
                 }
             }
+
+            Logging.SendReport(logName, null, null, $"Metadata search complete for {DataObjectsToProcess.Count} {objectType} data objects.");
         }
 
         private static List<string> GetSearchCandidates(string GameName)

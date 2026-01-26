@@ -175,6 +175,7 @@ namespace Classes.ProcessQueue
             private bool _SaveLastRunTime = false;
             private int _Interval = 0;
             private string _LastResult = "";
+            private ReportModel? _LastReport = null;
             private string? _LastError = null;
             private bool _ForceExecute = false;
             private bool _InProcess = false;
@@ -198,6 +199,7 @@ namespace Classes.ProcessQueue
             }
             public int Interval => _Interval;
             public string LastResult => _LastResult;
+            public ReportModel? LastReport { get { return _LastReport; } set { _LastReport = value; } }
             public string? LastError => _LastError;
             public bool Force => _ForceExecute;
             public bool AllowManualStart => _AllowManualStart;
@@ -267,7 +269,7 @@ namespace Classes.ProcessQueue
                             else
                             {
                                 // if we don't have a task, execute the service-host with item type
-                                string[] args = new string[] { "service-host.dll", "--service", _ItemType.ToString(), "--reportingserver", Config.ServiceCommunication.ReportingServerUrl, "--correlationid", _CorrelationId };
+                                string[] args = new string[] { "service-host.dll", "--service", _ItemType.ToString(), "--reportingserver", Config.ServiceCommunication.ReportingServerUrl, "--processid", ProcessId.ToString(), "--correlationid", _CorrelationId };
                                 var process = new Process
                                 {
                                     StartInfo = new ProcessStartInfo
@@ -303,6 +305,7 @@ namespace Classes.ProcessQueue
 
                         _ForceExecute = false;
                         _ItemState = QueueItemState.Stopped;
+                        _LastReport = null;
                         _LastFinishTime = DateTime.UtcNow;
                         _LastRunDuration = Math.Round((DateTime.UtcNow - _LastRunTime).TotalSeconds, 2);
 
@@ -341,6 +344,7 @@ namespace Classes.ProcessQueue
             public DateTime NextRunTime { get; set; }
             public int Interval { get; set; }
             public string LastResult { get; set; }
+            public ReportModel? LastReport { get; set; }
             public bool Force { get; set; }
             public bool AllowManualStart { get; set; }
             public bool RemoveWhenStopped { get; set; }

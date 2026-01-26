@@ -47,7 +47,7 @@
                 "--service",
                 "MetadataMatchSearch",
                 "--reportingserver",
-                "https://localhost:5001"
+                "https://localhost:7023"
             ],
             "cwd": "${workspaceFolder}/service-host",
             "stopAtEntry": false

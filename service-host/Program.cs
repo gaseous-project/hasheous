@@ -1,6 +1,7 @@
 using Classes;
 using Classes.ProcessQueue;
 using hasheous_server.Classes;
+using hasheous_server.Classes.Report;
 using HasheousServerHost.Classes.CLI;
 using static Classes.Common;
 
@@ -25,6 +26,7 @@ if (cmdArgs.Contains("--version"))
 // process other command line arguments
 string serviceName = null;
 string reportingServerUrl = null;
+string processId = Guid.Empty.ToString();
 string correlationId = null;
 
 for (int i = 0; i < cmdArgs.Length; i++)
@@ -36,6 +38,10 @@ for (int i = 0; i < cmdArgs.Length; i++)
     else if (cmdArgs[i] == "--reportingserver" && i + 1 < cmdArgs.Length)
     {
         reportingServerUrl = cmdArgs[i + 1];
+    }
+    else if (cmdArgs[i] == "--processid" && i + 1 < cmdArgs.Length)
+    {
+        processId = cmdArgs[i + 1];
     }
     else if (cmdArgs[i] == "--correlationid" && i + 1 < cmdArgs.Length)
     {
@@ -73,6 +79,7 @@ if (string.IsNullOrEmpty(correlationId))
     // If no correlation ID is provided, generate a new one
     correlationId = Guid.NewGuid().ToString();
 }
+CallContext.SetData("ProcessId", processId);
 CallContext.SetData("CorrelationId", correlationId);
 CallContext.SetData("CallingProcess", taskType.ToString());
 CallContext.SetData("CallingUser", "System");
@@ -80,8 +87,13 @@ CallContext.SetData("CallingUser", "System");
 // Initialize the configuration
 Config.LogName = serviceName;
 
+// setup the reporting instance
+Report report = new Report(reportingServerUrl, processId, correlationId);
+Logging.report = report;
+
 // Start the specified service
 Logging.Log(Logging.LogType.Information, serviceName, $"Starting service with reporting server '{reportingServerUrl}'...");
+Logging.SendReport(Config.LogName, null, null, "Service starting");
 
 // Initialize the service with the provided configuration
 IQueueTask? Task;

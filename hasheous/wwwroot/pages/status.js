@@ -155,6 +155,37 @@ function LoadBackgroundTasks() {
                                 }
 
                                 groupBody.appendChild(row);
+
+                                // display report status if available
+                                if (task.lastReport) {
+                                    if (task.lastReport.progress) {
+                                        // task.lastReport.progress is a dictionary of progress items
+                                        const progressItems = Object.keys(task.lastReport.progress);
+                                        progressItems.forEach(progressKey => {
+                                            const progress = task.lastReport.progress[progressKey];
+                                            const progressRow = document.createElement('tr');
+
+                                            const progressCell = document.createElement('td');
+                                            progressCell.className = 'tablecell';
+                                            progressCell.colSpan = columnCount;
+                                            let progressText = ``;
+                                            if (progress.total && progress.total > 0) {
+                                                const percentage = ((progress.count / progress.total) * 100).toFixed(2);
+                                                progressText += `${progress.count} / ${progress.total} (${percentage}%)`;
+                                            } else if (progress.count) {
+                                                progressText += `${progress.count}`;
+                                            } else {
+                                                progressText += `-`;
+                                            }
+                                            if (progress.description) {
+                                                progressText += ` - ${progress.description}`;
+                                            }
+                                            progressCell.innerHTML = progressText;
+                                            progressRow.appendChild(progressCell);
+                                            groupBody.appendChild(progressRow);
+                                        });
+                                    }
+                                }
                                 groupFound = true;
                             }
                         });
