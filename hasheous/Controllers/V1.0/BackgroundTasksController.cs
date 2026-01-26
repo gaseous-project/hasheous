@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Classes;
 using Microsoft.AspNetCore.Authorization;
+using Classes.ProcessQueue;
 
 namespace hasheous_server.Controllers.v1_0
 {
@@ -53,6 +54,26 @@ namespace hasheous_server.Controllers.v1_0
                 // Log the exception (not shown here for brevity)
                 return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while processing your request.");
             }
+        }
+
+        [HttpPost]
+        [MapToApiVersion("1.0")]
+        [Route("{ProcessId:guid}/{correlationId:guid}/report")]
+        public async Task<IActionResult> ReportProgress(Guid ProcessId, Guid correlationId, [FromBody] Models.ReportModel report)
+        {
+            // get the background task item
+            foreach (var queueItem in QueueProcessor.QueueItems)
+            {
+                if (queueItem.ProcessId == ProcessId && queueItem.CorrelationId == correlationId.ToString())
+                {
+                    // update the last report
+                    queueItem.LastReport = report;
+
+                    return Ok();
+                }
+            }
+
+            return Ok();
         }
 
         [HttpPost]

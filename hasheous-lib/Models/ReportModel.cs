@@ -29,6 +29,34 @@ namespace hasheous_server.Models
             /// Gets or sets a description of the progress item.
             /// </summary>
             public string description { get; set; } = string.Empty;
+
+            /// <summary>
+            /// Gets or sets the processing speed (items per second).
+            /// Calculated only when count and total are both non-null and non-zero.
+            /// </summary>
+            public double? itemsPerSecond { get; set; }
+
+            /// <summary>
+            /// Gets or sets the estimated time to completion in seconds.
+            /// Calculated only when count and total are both non-null and non-zero.
+            /// </summary>
+            public double? estimatedSecondsRemaining { get; set; }
+
+            /// <summary>
+            /// Gets or sets the timestamp when this progress was first tracked.
+            /// Used internally for speed calculations.
+            /// </summary>
+            [System.Text.Json.Serialization.JsonIgnore]
+            [Newtonsoft.Json.JsonIgnore]
+            public DateTime? firstTrackedTime { get; set; }
+
+            /// <summary>
+            /// Gets or sets the initial count when tracking began.
+            /// Used internally for speed calculations.
+            /// </summary>
+            [System.Text.Json.Serialization.JsonIgnore]
+            [Newtonsoft.Json.JsonIgnore]
+            public int? firstTrackedCount { get; set; }
         }
     }
 }

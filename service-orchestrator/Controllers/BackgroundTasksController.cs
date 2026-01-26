@@ -65,6 +65,71 @@ namespace hasheous_server.Controllers.v1_0
             {
                 if (queueItem.ProcessId == ProcessId && queueItem.CorrelationId == correlationId.ToString())
                 {
+                    // Calculate speed and ETA for each progress item
+                    if (report?.Progress != null)
+                    {
+                        var currentTime = DateTime.UtcNow;
+
+                        foreach (var progressKey in report.Progress.Keys.ToList())
+                        {
+                            var progressItem = report.Progress[progressKey];
+
+                            // Only calculate if count and total are valid
+                            if (progressItem.count.HasValue && progressItem.total.HasValue &&
+                                progressItem.count.Value > 0 && progressItem.total.Value > 0)
+                            {
+                                // Initialize tracking data if this is the first time
+                                if (!progressItem.firstTrackedTime.HasValue)
+                                {
+                                    progressItem.firstTrackedTime = currentTime;
+                                    progressItem.firstTrackedCount = progressItem.count.Value;
+                                }
+                                else if (queueItem.LastReport?.Progress?.ContainsKey(progressKey) == true)
+                                {
+                                    // Preserve tracking data from previous report
+                                    var previousItem = queueItem.LastReport.Progress[progressKey];
+                                    if (previousItem.firstTrackedTime.HasValue)
+                                    {
+                                        progressItem.firstTrackedTime = previousItem.firstTrackedTime;
+                                        progressItem.firstTrackedCount = previousItem.firstTrackedCount;
+                                    }
+                                }
+
+                                // Calculate speed and ETA if we have tracking data
+                                if (progressItem.firstTrackedTime.HasValue && progressItem.firstTrackedCount.HasValue)
+                                {
+                                    var elapsedSeconds = (currentTime - progressItem.firstTrackedTime.Value).TotalSeconds;
+                                    var itemsProcessed = progressItem.count.Value - progressItem.firstTrackedCount.Value;
+
+                                    // Only calculate speed if at least 5 seconds have elapsed and items were processed
+                                    // This provides more stable estimates for longer-running tasks
+                                    if (elapsedSeconds >= 5 && itemsProcessed > 0)
+                                    {
+                                        // Calculate items per second
+                                        progressItem.itemsPerSecond = itemsProcessed / elapsedSeconds;
+
+                                        // Calculate estimated time remaining
+                                        var itemsRemaining = progressItem.total.Value - progressItem.count.Value;
+                                        if (itemsRemaining > 0 && progressItem.itemsPerSecond.Value > 0)
+                                        {
+                                            progressItem.estimatedSecondsRemaining = itemsRemaining / progressItem.itemsPerSecond.Value;
+                                        }
+                                        else
+                                        {
+                                            progressItem.estimatedSecondsRemaining = 0;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        // Not enough time elapsed yet - keep estimates null
+                                        progressItem.itemsPerSecond = null;
+                                        progressItem.estimatedSecondsRemaining = null;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     // update the last report
                     queueItem.LastReport = report;
 
