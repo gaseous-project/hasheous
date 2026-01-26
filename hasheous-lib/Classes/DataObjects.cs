@@ -1804,16 +1804,16 @@ namespace hasheous_server.Classes
                 Logging.SendReport(logName, 0, 0, $"Querying database for {objectType} data objects needing metadata search...");
                 DataTable data = await Config.database.ExecuteCMDAsync(@"
                     SELECT DISTINCT
-                        DataObject.*, DDMM.LastSearched
+                        DataObject.*, DDMM.NextSearch
                     FROM
                         DataObject
                             JOIN 
                         (SELECT 
-                            DataObjectId, LastSearched
+                            DataObjectId, NextSearch
                         FROM
-                            DataObject_MetadataMap GROUP BY DataObjectId ORDER BY LastSearched ASC) DDMM ON DataObject.Id = DDMM.DataObjectId
+                            DataObject_MetadataMap GROUP BY DataObjectId ORDER BY NextSearch ASC) DDMM ON DataObject.Id = DDMM.DataObjectId
                     WHERE
-                        ObjectType = @objecttype AND DDMM.LastSearched < @lastsearched
+                        ObjectType = @objecttype AND DDMM.NextSearch < @lastsearched
                     ORDER BY DataObject.`Name`;
                 ", new Dictionary<string, object>
                 {
