@@ -82,17 +82,30 @@ namespace hasheous_server.Controllers.v1_0
                                 // Initialize tracking data if this is the first time
                                 if (!progressItem.firstTrackedTime.HasValue)
                                 {
-                                    progressItem.firstTrackedTime = currentTime;
-                                    progressItem.firstTrackedCount = progressItem.count.Value;
-                                }
-                                else if (queueItem.LastReport?.Progress?.ContainsKey(progressKey) == true)
-                                {
-                                    // Preserve tracking data from previous report
-                                    var previousItem = queueItem.LastReport.Progress[progressKey];
-                                    if (previousItem.firstTrackedTime.HasValue)
+                                    // Try to get from previous report first (for cases where JSON doesn't preserve DateTime)
+                                    if (queueItem.LastReport?.Progress?.ContainsKey(progressKey) == true)
                                     {
-                                        progressItem.firstTrackedTime = previousItem.firstTrackedTime;
-                                        progressItem.firstTrackedCount = previousItem.firstTrackedCount;
+                                        var previousItem = queueItem.LastReport.Progress[progressKey];
+                                        if (previousItem.firstTrackedTime.HasValue)
+                                        {
+                                            progressItem.firstTrackedTime = previousItem.firstTrackedTime;
+                                            progressItem.firstTrackedCount = previousItem.firstTrackedCount;
+                                            System.Diagnostics.Debug.WriteLine($"[ReportProgress] Recovered tracking for '{progressKey}': firstCount={progressItem.firstTrackedCount}, firstTime={progressItem.firstTrackedTime}");
+                                        }
+                                        else
+                                        {
+                                            // Previous report didn't have tracking data, initialize now
+                                            progressItem.firstTrackedTime = currentTime;
+                                            progressItem.firstTrackedCount = progressItem.count.Value;
+                                            System.Diagnostics.Debug.WriteLine($"[ReportProgress] First tracking for '{progressKey}': count={progressItem.count}, time={progressItem.firstTrackedTime}");
+                                        }
+                                    }
+                                    else
+                                    {
+                                        // No previous report, initialize now
+                                        progressItem.firstTrackedTime = currentTime;
+                                        progressItem.firstTrackedCount = progressItem.count.Value;
+                                        System.Diagnostics.Debug.WriteLine($"[ReportProgress] First tracking for '{progressKey}': count={progressItem.count}, time={progressItem.firstTrackedTime}");
                                     }
                                 }
 
@@ -101,6 +114,8 @@ namespace hasheous_server.Controllers.v1_0
                                 {
                                     var elapsedSeconds = (currentTime - progressItem.firstTrackedTime.Value).TotalSeconds;
                                     var itemsProcessed = progressItem.count.Value - progressItem.firstTrackedCount.Value;
+
+                                    System.Diagnostics.Debug.WriteLine($"[ReportProgress] '{progressKey}': elapsed={elapsedSeconds:F2}s, itemsProcessed={itemsProcessed}, current={progressItem.count}, total={progressItem.total}");
 
                                     // Only calculate speed if at least 5 seconds have elapsed and items were processed
                                     // This provides more stable estimates for longer-running tasks
@@ -114,6 +129,7 @@ namespace hasheous_server.Controllers.v1_0
                                         if (itemsRemaining > 0 && progressItem.itemsPerSecond.Value > 0)
                                         {
                                             progressItem.estimatedSecondsRemaining = itemsRemaining / progressItem.itemsPerSecond.Value;
+                                            System.Diagnostics.Debug.WriteLine($"[ReportProgress] Calculated ETA for '{progressKey}': speed={progressItem.itemsPerSecond:F2} items/s, ETA={progressItem.estimatedSecondsRemaining:F2}s");
                                         }
                                         else
                                         {
@@ -125,6 +141,7 @@ namespace hasheous_server.Controllers.v1_0
                                         // Not enough time elapsed yet - keep estimates null
                                         progressItem.itemsPerSecond = null;
                                         progressItem.estimatedSecondsRemaining = null;
+                                        System.Diagnostics.Debug.WriteLine($"[ReportProgress] Not enough data yet for '{progressKey}': elapsed={elapsedSeconds:F2}s (need >=5), itemsProcessed={itemsProcessed}");
                                     }
                                 }
                             }
