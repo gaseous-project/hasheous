@@ -36,7 +36,8 @@ namespace hasheous_server.Classes.Report
         /// <param name="count">The current progress count.</param>
         /// <param name="total">The total count to complete.</param>
         /// <param name="description">A description of the progress item.</param>
-        public async System.Threading.Tasks.Task SendAsync(string progressItemKey, int? count, int? total, string description)
+        /// <param name="performETACalculation">If true, performs ETA calculation for the progress item.</param>
+        public async System.Threading.Tasks.Task SendAsync(string progressItemKey, int? count, int? total, string description, bool performETACalculation = false)
         {
             if (_reportModel.Progress.ContainsKey(progressItemKey))
             {
@@ -45,6 +46,7 @@ namespace hasheous_server.Classes.Report
                 item.count = count;
                 item.total = total;
                 item.description = description;
+                item.enableETACalculation = performETACalculation;
             }
             else
             {
@@ -53,7 +55,8 @@ namespace hasheous_server.Classes.Report
                 {
                     count = count,
                     total = total,
-                    description = description
+                    description = description,
+                    enableETACalculation = performETACalculation
                 };
             }
 

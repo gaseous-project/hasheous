@@ -74,6 +74,12 @@ namespace hasheous_server.Controllers.v1_0
                         {
                             var progressItem = report.Progress[progressKey];
 
+                            if (!progressItem.enableETACalculation)
+                            {
+                                // Skip calculation if not enabled
+                                continue;
+                            }
+
                             // Only calculate if count and total are valid
                             if (progressItem.count.HasValue && progressItem.total.HasValue &&
                                 progressItem.count.Value > 0 && progressItem.total.Value > 0)

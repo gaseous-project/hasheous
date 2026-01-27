@@ -210,11 +210,12 @@ namespace Classes
         /// <param name="count">The current count of items processed.</param>
         /// <param name="total">The total number of items to process.</param>
         /// <param name="description">A description of the current progress.</param>
-        static public void SendReport(string progressItemKey, int? count, int? total, string description)
+        /// <param name="performETACalculation">If true, performs ETA calculation for the progress item.</param>
+        static public void SendReport(string progressItemKey, int? count, int? total, string description, bool performETACalculation = false)
         {
             if (report != null)
             {
-                report.SendAsync(progressItemKey, count, total, description);
+                _ = report.SendAsync(progressItemKey, count, total, description, performETACalculation);
             }
         }
 

@@ -143,7 +143,7 @@ namespace Classes
             int StatusCounter = 1;
             foreach (DataRow row in tables.Rows)
             {
-                Logging.SendReport(Config.LogName, StatusCounter, tables.Rows.Count, "Optimising table " + row[0].ToString());
+                Logging.SendReport(Config.LogName, StatusCounter, tables.Rows.Count, "Optimising table " + row[0].ToString(), true);
                 sql = "OPTIMIZE TABLE " + row[0].ToString();
                 DataTable response = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>(), 240);
                 foreach (DataRow responseRow in response.Rows)

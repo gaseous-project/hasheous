@@ -16,6 +16,11 @@ namespace hasheous_server.Models
         public class ProgressItem
         {
             /// <summary>
+            /// Gets or sets a value indicating whether ETA calculation is enabled for this progress item.
+            /// </summary>
+            public bool enableETACalculation { get; set; } = false;
+
+            /// <summary>
             /// Gets or sets the current count.
             /// </summary>
             public int? count { get; set; }

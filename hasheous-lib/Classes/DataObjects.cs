@@ -1929,7 +1929,7 @@ namespace hasheous_server.Classes
             List<string> SearchCandidates = GetSearchCandidates(item.Name);
 
             Logging.Log(Logging.LogType.Information, "Metadata Match", $"{processedObjectCount} / {objectTotalCount} - Searching for metadata for {string.Join(", ", SearchCandidates)} ({item.ObjectType}) Id: {item.Id}");
-            Logging.SendReport(logName, processedObjectCount, objectTotalCount, $"Searching for metadata for {string.Join(", ", SearchCandidates)} ({item.ObjectType})");
+            Logging.SendReport(logName, processedObjectCount, objectTotalCount, $"Searching for metadata for {string.Join(", ", SearchCandidates)} ({item.ObjectType})", true);
 
             List<DataObjectItem.MetadataItem> metadataUpdates = new List<MetadataItem>();
 
