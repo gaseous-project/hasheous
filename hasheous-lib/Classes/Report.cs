@@ -36,7 +36,7 @@ namespace hasheous_server.Classes.Report
         /// <param name="count">The current progress count.</param>
         /// <param name="total">The total count to complete.</param>
         /// <param name="description">A description of the progress item.</param>
-        public async void SendAsync(string progressItemKey, int? count, int? total, string description)
+        public async System.Threading.Tasks.Task SendAsync(string progressItemKey, int? count, int? total, string description)
         {
             if (_reportModel.Progress.ContainsKey(progressItemKey))
             {
