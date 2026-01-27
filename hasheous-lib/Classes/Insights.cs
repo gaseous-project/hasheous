@@ -349,7 +349,8 @@ namespace Classes.Insights
                 // drop aggregated data from Insights_API_Requests older than 40 days
                 string deleteSql = @"
                 DELETE FROM Insights_API_Requests
-                WHERE event_datetime < @deleteBefore LIMIT 1000;";
+                WHERE event_datetime < @deleteBefore LIMIT 1000;
+                SELECT ROW_COUNT() as rows_deleted;";
                 Dictionary<string, object> deleteParams = new Dictionary<string, object>
                 {
                     { "@deleteBefore", now.AddDays(-40) }
@@ -360,7 +361,7 @@ namespace Classes.Insights
                 {
                     Logging.Log(Logging.LogType.Information, "Insights", "Pruning old Insights_API_Requests data older than 40 days...");
                     DataTable deleteResult = await db.ExecuteCMDAsync(deleteSql, deleteParams);
-                    rowsDeleted = deleteResult.Rows.Count;
+                    rowsDeleted = deleteResult.Rows.Count > 0 ? Convert.ToInt32(deleteResult.Rows[0]["rows_deleted"]) : 0;
                 } while (rowsDeleted > 0);
             }
         }
