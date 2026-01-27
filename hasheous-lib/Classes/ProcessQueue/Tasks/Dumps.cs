@@ -25,6 +25,33 @@ namespace Classes.ProcessQueue
             await DumpMetadataAsync();
             // await DumpMetadataHashAsync();
 
+            // clean up deprecated dump files
+            string outputHashesPath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "HashContent");
+            string zipHashesFilePath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "MetadataHashesMap.zip");
+            string zipHashesTempFilePath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "MetadataHashesMap.Temp.zip");
+            string platformHashesZipFilePath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "Platform Hashes");
+            string platformHashesTempZipFilePath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "Platform Hashes.Temp");
+            if (Directory.Exists(outputHashesPath))
+            {
+                Directory.Delete(outputHashesPath, true);
+            }
+            if (File.Exists(zipHashesFilePath))
+            {
+                File.Delete(zipHashesFilePath);
+            }
+            if (File.Exists(zipHashesTempFilePath))
+            {
+                File.Delete(zipHashesTempFilePath);
+            }
+            if (Directory.Exists(platformHashesZipFilePath))
+            {
+                Directory.Delete(platformHashesZipFilePath, true);
+            }
+            if (Directory.Exists(platformHashesTempZipFilePath))
+            {
+                Directory.Delete(platformHashesTempZipFilePath, true);
+            }
+
             return null;
         }
 
@@ -71,6 +98,7 @@ namespace Classes.ProcessQueue
 
             // step 1: get all game data objects
             // This will fetch all game data objects, which can be paginated.
+            int totalGamesProcessed = 0;
             for (int pageNumber = 1; ; pageNumber++)
             {
                 Logging.Log(Logging.LogType.Information, "Metadata Dump", $"Getting page {pageNumber} of game data objects for dump...");
@@ -84,11 +112,11 @@ namespace Classes.ProcessQueue
 
                 // step 2: dump each game data object
                 Logging.Log(Logging.LogType.Information, "Metadata Dump", $"Processing {dataObjectsList.Objects.Count} game data objects from page {pageNumber}...");
-                long counter = 0;
                 foreach (var dataObjectItem in dataObjectsList.Objects)
                 {
-                    counter++;
-                    Logging.Log(Logging.LogType.Information, "Metadata Dump", $"{counter}/{dataObjectsList.Objects.Count}: Processing game (ID: {dataObjectItem.Id})...");
+                    totalGamesProcessed++;
+                    Logging.Log(Logging.LogType.Information, "Metadata Dump", $"{totalGamesProcessed}/{dataObjectsList.Count}: Processing game (ID: {dataObjectItem.Id})...");
+                    Logging.SendReport(Config.LogName, totalGamesProcessed, dataObjectsList.Count, $"Processing {dataObjectItem.Name}...");
 
                     string platformName = "Unknown Platform";
 
@@ -109,7 +137,7 @@ namespace Classes.ProcessQueue
 
                     if (dataObject == null)
                     {
-                        Logging.Log(Logging.LogType.Information, "Metadata Dump", $"{counter}/{dataObjectsList.Objects.Count}:   Data object with ID {dataObjectItem.Id} not found. Skipping...");
+                        Logging.Log(Logging.LogType.Information, "Metadata Dump", $"{totalGamesProcessed}/{dataObjectsList.Count}:   Data object with ID {dataObjectItem.Id} not found. Skipping...");
 
                         continue; // Skip if the data object is not found
                     }
@@ -180,7 +208,7 @@ namespace Classes.ProcessQueue
                     await File.WriteAllTextAsync(filePath, jsonContent);
 
                     // if counter is a multiple of 10, introduce a short delay
-                    if (counter % 10 == 0)
+                    if (totalGamesProcessed % 10 == 0)
                     {
                         await Task.Delay(2000); // 2 seconds delay
                     }
@@ -189,6 +217,8 @@ namespace Classes.ProcessQueue
                 // sleep for a 30 seconds to avoid overwhelming the system
                 await Task.Delay(30000);
             }
+
+            Logging.SendReport(Config.LogName, totalGamesProcessed, totalGamesProcessed, "Compressing content.");
 
             // step 3: zip the output directory
             if (File.Exists(zipFilePath))
@@ -206,8 +236,12 @@ namespace Classes.ProcessQueue
             Directory.CreateDirectory(platformTempZipFilePath);
 
             Logging.Log(Logging.LogType.Information, "Metadata Dump", "Creating individual platform zip files...");
+            int platformCounter = 0;
             foreach (string platform in platforms)
             {
+                platformCounter++;
+                Logging.SendReport(Config.LogName, platformCounter, platforms.Count, $"Creating zip for platform {platform}...");
+
                 // create a zip for the platform
                 string platformSourcePath = Path.Combine(outputPath, platform);
                 if (Directory.Exists(platformSourcePath))
