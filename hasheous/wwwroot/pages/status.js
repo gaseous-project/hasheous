@@ -183,20 +183,24 @@ function LoadBackgroundTasks() {
                                             if (progress.estimatedSecondsRemaining) {
                                                 let timeRemaining = `${progress.estimatedSecondsRemaining} seconds`;
                                                 if (progress.estimatedSecondsRemaining > 604800) {
+                                                    // more than a week
                                                     const weeks = Math.floor(progress.estimatedSecondsRemaining / 604800);
                                                     const days = Math.floor((progress.estimatedSecondsRemaining % 604800) / 86400);
                                                     timeRemaining = `${weeks} weeks${days > 0 ? ' ' + days + ' days' : ''}`;
                                                 } else if (progress.estimatedSecondsRemaining > 86400) {
+                                                    // more than a day
                                                     const days = Math.floor(progress.estimatedSecondsRemaining / 86400);
                                                     const hours = Math.floor((progress.estimatedSecondsRemaining % 86400) / 3600);
                                                     timeRemaining = `${days} days${hours > 0 ? ' ' + hours + ' hours' : ''}`;
                                                 } else if (progress.estimatedSecondsRemaining > 3600) {
+                                                    // more than an hour
                                                     const hours = Math.floor(progress.estimatedSecondsRemaining / 3600);
                                                     const minutes = Math.floor((progress.estimatedSecondsRemaining % 3600) / 60);
                                                     timeRemaining = `${hours} hours${minutes > 0 ? ' ' + minutes + ' minutes' : ''}`;
                                                 } else if (progress.estimatedSecondsRemaining > 60) {
+                                                    // more than a minute
                                                     const minutes = Math.floor(progress.estimatedSecondsRemaining / 60);
-                                                    const seconds = progress.estimatedSecondsRemaining % 60;
+                                                    const seconds = Math.floor(progress.estimatedSecondsRemaining % 60);
                                                     timeRemaining = `${minutes} minutes${seconds > 0 ? ' ' + seconds + ' seconds' : ''}`;
                                                 }
 
