@@ -65,7 +65,8 @@ namespace Classes
                                 LastRunDuration = queueItem.LastRunDuration, // Use the updated property
                                 NextRunTime = queueItem.NextRunTime,
                                 Interval = queueItem.Interval,
-                                LastResult = queueItem.LastResult
+                                LastResult = queueItem.LastResult,
+                                LastReport = queueItem.LastReport
                             };
                         }
                         break;

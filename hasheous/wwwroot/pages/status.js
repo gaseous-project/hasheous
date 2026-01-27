@@ -155,6 +155,63 @@ function LoadBackgroundTasks() {
                                 }
 
                                 groupBody.appendChild(row);
+
+                                // display report status if available
+                                if (task.lastReport) {
+                                    if (task.lastReport.progress) {
+                                        // task.lastReport.progress is a dictionary of progress items
+                                        const progressItems = Object.keys(task.lastReport.progress);
+                                        progressItems.forEach(progressKey => {
+                                            const progress = task.lastReport.progress[progressKey];
+                                            const progressRow = document.createElement('tr');
+
+                                            const progressCell = document.createElement('td');
+                                            progressCell.className = 'tablecell';
+                                            progressCell.colSpan = columnCount;
+                                            let progressText = ``;
+                                            if (progress.total && progress.total > 0) {
+                                                const percentage = ((progress.count / progress.total) * 100).toFixed(2);
+                                                progressText += `${progress.count} / ${progress.total} (${percentage}%)`;
+                                            } else if (progress.count) {
+                                                progressText += `${progress.count}`;
+                                            } else {
+                                                progressText += `-`;
+                                            }
+                                            if (progress.description) {
+                                                progressText += ` - ${progress.description}`;
+                                            }
+                                            if (progress.estimatedSecondsRemaining) {
+                                                let timeRemaining = `${progress.estimatedSecondsRemaining} seconds`;
+                                                if (progress.estimatedSecondsRemaining > 604800) {
+                                                    // more than a week
+                                                    const weeks = Math.floor(progress.estimatedSecondsRemaining / 604800);
+                                                    const days = Math.floor((progress.estimatedSecondsRemaining % 604800) / 86400);
+                                                    timeRemaining = `${weeks} weeks${days > 0 ? ' ' + days + ' days' : ''}`;
+                                                } else if (progress.estimatedSecondsRemaining > 86400) {
+                                                    // more than a day
+                                                    const days = Math.floor(progress.estimatedSecondsRemaining / 86400);
+                                                    const hours = Math.floor((progress.estimatedSecondsRemaining % 86400) / 3600);
+                                                    timeRemaining = `${days} days${hours > 0 ? ' ' + hours + ' hours' : ''}`;
+                                                } else if (progress.estimatedSecondsRemaining > 3600) {
+                                                    // more than an hour
+                                                    const hours = Math.floor(progress.estimatedSecondsRemaining / 3600);
+                                                    const minutes = Math.floor((progress.estimatedSecondsRemaining % 3600) / 60);
+                                                    timeRemaining = `${hours} hours${minutes > 0 ? ' ' + minutes + ' minutes' : ''}`;
+                                                } else if (progress.estimatedSecondsRemaining > 60) {
+                                                    // more than a minute
+                                                    const minutes = Math.floor(progress.estimatedSecondsRemaining / 60);
+                                                    const seconds = Math.floor(progress.estimatedSecondsRemaining % 60);
+                                                    timeRemaining = `${minutes} minutes${seconds > 0 ? ' ' + seconds + ' seconds' : ''}`;
+                                                }
+
+                                                progressText += ` - ${timeRemaining} remaining`;
+                                            }
+                                            progressCell.innerHTML = progressText;
+                                            progressRow.appendChild(progressCell);
+                                            groupBody.appendChild(progressRow);
+                                        });
+                                    }
+                                }
                                 groupFound = true;
                             }
                         });

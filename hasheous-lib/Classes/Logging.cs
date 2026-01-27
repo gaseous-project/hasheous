@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Reflection.Metadata.Ecma335;
 using Classes;
+using hasheous_server.Classes.Report;
 using static Classes.Common;
 
 namespace Classes
@@ -194,6 +195,27 @@ namespace Classes
                 {
                     _ = LogToDisk(logItem, TraceOutput, null);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the report instance used for sending progress updates during long-running operations.
+        /// </summary>
+        static public Report? report { get; set; } = null;
+
+        /// <summary>
+        /// Sends a progress report with the specified parameters.
+        /// </summary>
+        /// <param name="progressItemKey">The key identifying the progress item.</param>
+        /// <param name="count">The current count of items processed.</param>
+        /// <param name="total">The total number of items to process.</param>
+        /// <param name="description">A description of the current progress.</param>
+        /// <param name="performETACalculation">If true, performs ETA calculation for the progress item.</param>
+        static public void SendReport(string progressItemKey, int? count, int? total, string description, bool performETACalculation = false)
+        {
+            if (report != null)
+            {
+                _ = report.SendAsync(progressItemKey, count, total, description, performETACalculation);
             }
         }
 

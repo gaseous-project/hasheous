@@ -32,6 +32,8 @@ namespace hasheous_server.Models
 
             private DataObjects.DataObjectType _ObjectType;
 
+            public DataObjects.DataObjectType ObjectType => _ObjectType;
+
             public string Id { get; set; }
             public string? ImmutableId { get; set; }
             public MappingStatus Status { get; set; }
