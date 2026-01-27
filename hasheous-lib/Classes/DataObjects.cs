@@ -1816,14 +1816,19 @@ namespace hasheous_server.Classes
 
                 // first get a count of all records
                 DataTable countData = await Config.database.ExecuteCMDAsync(@"
-                    SELECT COUNT(DISTINCT DataObject.Id) AS ObjectCount
+                    SELECT
+                        COUNT(*) AS ObjectCount
                     FROM
                         DataObject
                             JOIN 
                         (SELECT 
                             DataObjectId, NextSearch
                         FROM
-                            DataObject_MetadataMap GROUP BY DataObjectId ORDER BY NextSearch ASC) DDMM ON DataObject.Id = DDMM.DataObjectId
+                            DataObject_MetadataMap
+                        WHERE
+                            MatchMethod IN (0, 1)
+                        GROUP BY DataObjectId
+                        ORDER BY NextSearch ASC) DDMM ON DataObject.Id = DDMM.DataObjectId
                     WHERE
                         ObjectType = @objecttype AND DDMM.NextSearch < @nextsearched;
                 ", dbDict);
@@ -1837,48 +1842,37 @@ namespace hasheous_server.Classes
                     // start processing data objects in pages
                     do
                     {
-                        // set up the list of objects that need to be processed
-                        List<DataObjectItem> DataObjectsToProcess = new List<DataObjectItem>();
+                        int pageNumberOffset = pageNumber * pageSize;
 
-                        if (!dbDict.ContainsKey("pageNumber"))
-                        {
-                            dbDict.Add("pageNumber", pageNumber);
-                        }
-                        else
-                        {
-                            dbDict["pageNumber"] = pageNumber;
-                        }
-                        if (!dbDict.ContainsKey("pageSize"))
-                        {
-                            dbDict.Add("pageSize", pageSize);
-                        }
-                        else
-                        {
-                            dbDict["pageSize"] = pageSize;
-                        }
-
-                        DataTable data = await Config.database.ExecuteCMDAsync(@"
+                        Logging.Log(Logging.LogType.Information, "Metadata Match", $"Querying database for page {pageNumber} of {objectType} data objects needing metadata search...");
+                        DataTable data = await Config.database.ExecuteCMDAsync(@$"
                         SELECT DISTINCT
                             DataObject.*, DDMM.NextSearch
                         FROM
                             DataObject
                                 JOIN 
                             (SELECT 
-                                DataObjectId, NextSearch
+                                DataObjectId, MatchMethod, NextSearch
                             FROM
-                                DataObject_MetadataMap GROUP BY DataObjectId ORDER BY NextSearch ASC) DDMM ON DataObject.Id = DDMM.DataObjectId
+                                DataObject_MetadataMap
+                            WHERE
+                                MatchMethod IN (0, 1)
+                            GROUP BY DataObjectId
+                            ORDER BY NextSearch ASC) DDMM ON DataObject.Id = DDMM.DataObjectId
                         WHERE
                             ObjectType = @objecttype AND DDMM.NextSearch < @nextsearched
                         ORDER BY DataObject.`Name`
-                        LIMIT @pageNumber, @pageSize;
+                        LIMIT {pageNumberOffset}, {pageSize};
                         ", dbDict);
 
                         if (data.Rows.Count == 0)
                         {
                             // we're done here
+                            Logging.Log(Logging.LogType.Information, "Metadata Match", $"No more {objectType} data objects found needing metadata search.");
                             break;
                         }
 
+                        List<DataObjectItem> DataObjectsToProcess = new List<DataObjectItem>();
                         foreach (DataRow row in data.Rows)
                         {
                             DataObjectItem item = await BuildDataObject(objectType, (long)row["Id"], row, false, true);
