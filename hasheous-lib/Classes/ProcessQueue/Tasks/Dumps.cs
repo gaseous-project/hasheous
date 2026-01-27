@@ -23,7 +23,7 @@ namespace Classes.ProcessQueue
             Logging.Log(Logging.LogType.Information, "Metadata Dump", "Starting metadata dump processes...");
 
             await DumpMetadataAsync();
-            await DumpMetadataHashAsync();
+            // await DumpMetadataHashAsync();
 
             return null;
         }
