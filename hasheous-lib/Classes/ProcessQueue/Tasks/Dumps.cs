@@ -116,7 +116,7 @@ namespace Classes.ProcessQueue
                 {
                     totalGamesProcessed++;
                     Logging.Log(Logging.LogType.Information, "Metadata Dump", $"{totalGamesProcessed}/{dataObjectsList.Count}: Processing game (ID: {dataObjectItem.Id})...");
-                    Logging.SendReport(Config.LogName, totalGamesProcessed, dataObjectsList.Count, $"Processing {dataObjectItem.Name}...");
+                    Logging.SendReport(Config.LogName, totalGamesProcessed, dataObjectsList.Count, $"Processing {dataObjectItem.Name}...", true);
 
                     string platformName = "Unknown Platform";
 
@@ -218,7 +218,7 @@ namespace Classes.ProcessQueue
                 await Task.Delay(30000);
             }
 
-            Logging.SendReport(Config.LogName, totalGamesProcessed, totalGamesProcessed, "Compressing content.");
+            Logging.SendReport(Config.LogName, null, null, "Compressing content.");
 
             // step 3: zip the output directory
             if (File.Exists(zipFilePath))
@@ -240,7 +240,7 @@ namespace Classes.ProcessQueue
             foreach (string platform in platforms)
             {
                 platformCounter++;
-                Logging.SendReport(Config.LogName, platformCounter, platforms.Count, $"Creating zip for platform {platform}...");
+                Logging.SendReport(Config.LogName, platformCounter, platforms.Count, $"Creating zip for platform {platform}...", true);
 
                 // create a zip for the platform
                 string platformSourcePath = Path.Combine(outputPath, platform);
