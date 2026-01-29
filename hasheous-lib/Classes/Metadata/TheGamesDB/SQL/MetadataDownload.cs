@@ -126,7 +126,8 @@ namespace TheGamesDB.SQL
                 psi.RedirectStandardError = true;
                 psi.UseShellExecute = false;
                 psi.CreateNoWindow = false;
-                using var process = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start process");
+                using var process = Process.Start(psi)
+                    ?? throw new InvalidOperationException($"Failed to start process: {psi.FileName} {psi.Arguments}");
                 await process.WaitForExitAsync();
 
                 Logging.Log(Logging.LogType.Information, "TheGamesDb", "Imported metadata database from TheGamesDb");
