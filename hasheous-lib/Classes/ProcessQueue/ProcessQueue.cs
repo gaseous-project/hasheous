@@ -270,7 +270,7 @@ namespace Classes.ProcessQueue
                             {
                                 // if we don't have a task, execute the service-host with item type
                                 string[] args = new string[] { "service-host.dll", "--service", _ItemType.ToString(), "--reportingserver", Config.ServiceCommunication.ReportingServerUrl, "--processid", ProcessId.ToString(), "--correlationid", _CorrelationId };
-                                var process = new Process
+                                using var process = new Process
                                 {
                                     StartInfo = new ProcessStartInfo
                                     {
