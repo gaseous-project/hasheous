@@ -1,11 +1,11 @@
 ﻿using System;
-using System.IO;
-using MySqlConnector;
-using gaseous_signature_parser.models.RomSignatureObject;
 using System.Data;
-using Classes;
+using System.IO;
 using System.Net;
+using Classes;
+using gaseous_signature_parser.models.RomSignatureObject;
 using Microsoft.CodeAnalysis;
+using MySqlConnector;
 
 namespace XML
 {
@@ -58,6 +58,8 @@ namespace XML
             Dictionary<string, object> dbDict = new Dictionary<string, object>();
             System.Data.DataTable sigDB;
 
+            DateTime now = DateTime.UtcNow;
+
             for (UInt16 i = 0; i < PathContents.Length; ++i)
             {
                 string XMLFile = PathContents[i];
@@ -105,6 +107,18 @@ namespace XML
                             "MAMEMess"
                         };
 
+                        RomSignatureObject.Game.Rom.SignatureSourceType signatureSourceType = RomSignatureObject.Game.Rom.SignatureSourceType.None;
+                        // get the value from the first rom of the first game if present
+                        if (Object.Games != null && Object.Games.Count > 0)
+                        {
+                            RomSignatureObject.Game firstGame = Object.Games[0];
+                            if (firstGame.Roms != null && firstGame.Roms.Count > 0)
+                            {
+                                RomSignatureObject.Game.Rom firstRom = firstGame.Roms[0];
+                                signatureSourceType = firstRom.SignatureSource;
+                            }
+                        }
+
                         // store source object
                         bool processGames = false;
                         if (Object.SourceMd5 != null)
@@ -131,6 +145,7 @@ namespace XML
                                 dbDict.Add("uri", Common.ReturnValueIfNull(Object.Url.ToString(), ""));
                             }
                             dbDict.Add("sourcetype", Common.ReturnValueIfNull(Object.SourceType, ""));
+                            dbDict.Add("processedat", now);
                             dbDict.Add("sourcemd5", Object.SourceMd5);
                             dbDict.Add("sourcesha1", Object.SourceSHA1);
 
@@ -138,7 +153,7 @@ namespace XML
                             if (sigDB.Rows.Count == 0)
                             {
                                 // entry not present, insert it
-                                sql = "INSERT INTO Signatures_Sources (`Name`, `Description`, `Category`, `Version`, `Author`, `Email`, `Homepage`, `Url`, `SourceType`, `SourceMD5`, `SourceSHA1`) VALUES (@name, @description, @category, @version, @author, @email, @homepage, @uri, @sourcetype, @sourcemd5, @sourcesha1); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
+                                sql = "INSERT INTO Signatures_Sources (`Name`, `Description`, `Category`, `Version`, `Author`, `Email`, `Homepage`, `Url`, `SourceType`, `processed_at`, `SourceMD5`, `SourceSHA1`) VALUES (@name, @description, @category, @version, @author, @email, @homepage, @uri, @sourcetype, @processedat, @sourcemd5, @sourcesha1); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
 
                                 sigDB = db.ExecuteCMD(sql, dbDict);
 
@@ -173,6 +188,7 @@ namespace XML
                                     dbDict.Add("systemvariant", Common.ReturnValueIfNull(gameObject.SystemVariant, ""));
                                     dbDict.Add("video", Common.ReturnValueIfNull(gameObject.Video, ""));
                                     dbDict.Add("category", Common.ReturnValueIfNull(gameObject.Category, ""));
+                                    dbDict.Add("updatedat", now);
 
                                     List<int> gameCountries = new List<int>();
                                     if (
@@ -298,8 +314,8 @@ namespace XML
                                     {
                                         // entry not present, insert it
                                         sql = "INSERT INTO Signatures_Games " +
-                                            "(`Name`, `Description`, `Year`, `PublisherId`, `Demo`, `SystemId`, `SystemVariant`, `Video`, `Copyright`, `Category`, `MetadataSource`, `SourceId`) VALUES " +
-                                            "(@name, @description, @year, @publisherid, @demo, @systemid, @systemvariant, @video, @copyright, @category, @sigsource, @sourceid); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
+                                            "(`Name`, `Description`, `Year`, `PublisherId`, `Demo`, `SystemId`, `SystemVariant`, `Video`, `Copyright`, `Category`, `MetadataSource`, `SourceId`, `created_at`, `updated_at`) VALUES " +
+                                            "(@name, @description, @year, @publisherid, @demo, @systemid, @systemvariant, @video, @copyright, @category, @sigsource, @sourceid, @updatedat, @updatedat); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
                                         sigDB = db.ExecuteCMD(sql, dbDict);
 
                                         gameId = Convert.ToInt32(sigDB.Rows[0][0]);
@@ -310,7 +326,7 @@ namespace XML
                                         long gameSourceId = (long)sigDB.Rows[0]["SourceId"];
                                         int gameMetadataSourceId = (int)sigDB.Rows[0]["MetadataSource"];
 
-                                        string gameSourceSql = "UPDATE Signatures_Games SET `Category`=@category, `MetadataSource`=@sigsource, `SourceId`=@sourceid WHERE `Id`=@gameid;";
+                                        string gameSourceSql = "UPDATE Signatures_Games SET `Category`=@category, `MetadataSource`=@sigsource, `SourceId`=@sourceid, `updated_at`=@updatedat WHERE `Id`=@gameid;";
                                         dbDict.Add("gameid", gameId);
                                         db.ExecuteCMD(gameSourceSql, dbDict);
                                     }
@@ -399,6 +415,7 @@ namespace XML
                                             dbDict.Add("metadatasource", romObject.SignatureSource);
                                             dbDict.Add("status", Common.ReturnValueIfNull(romObject.Status, ""));
                                             dbDict.Add("ingestorversion", 3);
+                                            dbDict.Add("updatedat", now);
 
                                             Dictionary<string, string>? countries = new Dictionary<string, string>();
                                             if (romObject.Country != null)
@@ -418,7 +435,7 @@ namespace XML
                                             if (sigDB.Rows.Count == 0)
                                             {
                                                 // entry not present, insert it
-                                                sql = "INSERT INTO Signatures_Roms (`GameId`, `Name`, `Size`, `CRC`, `MD5`, `SHA1`, `SHA256`, `Status`, `DevelopmentStatus`, `Attributes`, `RomType`, `RomTypeMedia`, `MediaLabel`, `MetadataSource`, `IngestorVersion`, `Countries`, `Languages`) VALUES (@gameid, @name, @size, @crc, @md5, @sha1, @sha256, @status, @developmentstatus, @attributes, @romtype, @romtypemedia, @medialabel, @metadatasource, @ingestorversion, @countries, @languages); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
+                                                sql = "INSERT INTO Signatures_Roms (`GameId`, `Name`, `Size`, `CRC`, `MD5`, `SHA1`, `SHA256`, `Status`, `DevelopmentStatus`, `Attributes`, `RomType`, `RomTypeMedia`, `MediaLabel`, `MetadataSource`, `IngestorVersion`, `Countries`, `Languages`, `created_at`, `updated_at`) VALUES (@gameid, @name, @size, @crc, @md5, @sha1, @sha256, @status, @developmentstatus, @attributes, @romtype, @romtypemedia, @medialabel, @metadatasource, @ingestorversion, @countries, @languages, @updatedat, @updatedat); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
                                                 sigDB = db.ExecuteCMD(sql, dbDict);
 
                                                 romId = Convert.ToInt32(sigDB.Rows[0][0]);
@@ -440,7 +457,7 @@ namespace XML
                                                 }
 
                                                 // update the rom entry
-                                                sql = "UPDATE Signatures_Roms SET `GameId`=@gameid, `Name`=@name, `Size`=@size, `Status`=@status, `DevelopmentStatus`=@developmentstatus, `Attributes`=@attributes, `RomType`=@romtype, `RomTypeMedia`=@romtypemedia, `MediaLabel`=@medialabel, `MetadataSource`=@metadatasource, `Countries`=@countries, `Languages`=@languages WHERE `Id`=@romid;";
+                                                sql = "UPDATE Signatures_Roms SET `GameId`=@gameid, `Name`=@name, `Size`=@size, `Status`=@status, `DevelopmentStatus`=@developmentstatus, `Attributes`=@attributes, `RomType`=@romtype, `RomTypeMedia`=@romtypemedia, `MediaLabel`=@medialabel, `MetadataSource`=@metadatasource, `Countries`=@countries, `Languages`=@languages, `updated_at`=@updatedat WHERE `Id`=@romid;";
                                                 db.ExecuteCMD(sql, dbDict);
                                             }
 
@@ -474,6 +491,18 @@ namespace XML
                                 File.Delete(destDBFile);
                             }
                             File.Move(DBFile, destDBFile);
+                        }
+
+                        // remove records older than now - this should only be records that weren't included in the latest import
+                        if (Object != null && signatureSourceType != RomSignatureObject.Game.Rom.SignatureSourceType.None)
+                        {
+                            sql = "DELETE FROM Signatures_Roms WHERE MetadataSource=@sourceid AND updated_at < @processedat;";
+                            dbDict = new Dictionary<string, object>
+                            {
+                                { "sourceid", signatureSourceType },
+                                { "processedat", now.AddDays(-2) }
+                            };
+                            db.ExecuteCMD(sql, dbDict);
                         }
                     }
                     catch (Exception ex)
