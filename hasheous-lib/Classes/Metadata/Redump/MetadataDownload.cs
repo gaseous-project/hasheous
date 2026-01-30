@@ -77,7 +77,7 @@ namespace Redump
 
                     // Download the datfile
                     Logging.Log(Logging.LogType.Information, "Redump", $"Downloading datfile for platform {platformName} from {platformLink}");
-                    Logging.SendReport(Config.LogName, currentRow, cols.Count, $"Downloading datfile for platform {platformName}");
+                    Logging.SendReport(Config.LogName, currentRow, rows.Count, $"Downloading datfile for platform {platformName}");
                     string downloadPath = System.IO.Path.Combine(tempDir, $"{platformName}.zip");
                     await DownloadTools.DownloadFile(new Uri(platformLink), downloadPath);
                     // Extract the datfile
