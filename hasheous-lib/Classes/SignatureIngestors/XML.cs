@@ -496,13 +496,18 @@ namespace XML
                         // remove records older than now - this should only be records that weren't included in the latest import
                         if (Object != null && signatureSourceType != RomSignatureObject.Game.Rom.SignatureSourceType.None)
                         {
-                            sql = "DELETE FROM Signatures_Roms WHERE MetadataSource=@sourceid AND updated_at < @processedat;";
+                            sql = "DELETE FROM Signatures_Roms WHERE MetadataSource=@sourceid AND updated_at < @processedat LIMIT 1000; SELECT ROW_COUNT() AS Count;";
                             dbDict = new Dictionary<string, object>
                             {
                                 { "sourceid", signatureSourceType },
                                 { "processedat", now.AddDays(-2) }
                             };
-                            db.ExecuteCMD(sql, dbDict);
+                            long deletedCount = 1;
+                            while (deletedCount > 0)
+                            {
+                                DataTable deletedCountTable = await db.ExecuteCMDAsync(sql, dbDict);
+                                deletedCount = Convert.ToInt64(deletedCountTable.Rows[0]["Count"]);
+                            }
                         }
                     }
                     catch (Exception ex)
