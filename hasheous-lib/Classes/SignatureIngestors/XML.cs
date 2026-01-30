@@ -65,6 +65,7 @@ namespace XML
                 string XMLFile = PathContents[i];
 
                 Logging.Log(Logging.LogType.Information, "Signature Ingest", "(" + (i + 1) + " / " + PathContents.Length + ") Processing " + XMLType.ToString() + " DAT file: " + XMLFile);
+                Logging.SendReport(Config.LogName, (i + 1), PathContents.Length, "Processing " + XMLType.ToString() + " DAT file: " + XMLFile);
 
                 string? DBFile = null;
                 if (XMLDBSearchPath != null)
