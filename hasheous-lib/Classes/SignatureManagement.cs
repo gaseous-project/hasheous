@@ -42,7 +42,7 @@ namespace Classes
             // check if the query is cached
             if (Config.RedisConfiguration.Enabled)
             {
-                string? cachedData = hasheous.Classes.RedisConnection.GetDatabase(0).StringGet(cacheKey);
+                string? cachedData = await hasheous.Classes.RedisConnection.GetDatabase(0).StringGetAsync(cacheKey);
                 if (cachedData != null)
                 {
                     // if cached data is found, deserialize it and return

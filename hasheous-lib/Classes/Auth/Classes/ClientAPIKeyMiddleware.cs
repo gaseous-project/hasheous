@@ -26,7 +26,7 @@ namespace Authentication
             }
         }
 
-        public class ClientApiKeyAuthorizationFilter : IAuthorizationFilter
+        public class ClientApiKeyAuthorizationFilter : IAsyncAuthorizationFilter
         {
             private readonly IClientApiKeyValidator _clientApiKeyValidator;
 
@@ -35,11 +35,11 @@ namespace Authentication
                 _clientApiKeyValidator = clientApiKeyValidator;
             }
 
-            public void OnAuthorization(AuthorizationFilterContext context)
+            public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
             {
                 string apiKey = context.HttpContext.Request.Headers[APIKeyHeaderName];
 
-                if (!_clientApiKeyValidator.IsValid(apiKey, ref context))
+                if (apiKey == null || !await _clientApiKeyValidator.IsValidAsync(apiKey, context))
                 {
                     context.Result = new UnauthorizedResult();
                 }
@@ -48,7 +48,7 @@ namespace Authentication
 
         public class ClientApiKeyValidator : IClientApiKeyValidator
         {
-            public bool IsValid(string apiKey, ref AuthorizationFilterContext context)
+            public async Task<bool> IsValidAsync(string apiKey, AuthorizationFilterContext context)
             {
                 if (Config.RequireClientAPIKey == false)
                 {
@@ -60,7 +60,7 @@ namespace Authentication
                     return false;
                 }
 
-                ClientApiKeyItem? apiKeyItem = new ClientApiKey().GetAppFromApiKey(apiKey);
+                ClientApiKeyItem? apiKeyItem = await new ClientApiKey().GetAppFromApiKeyAsync(apiKey);
 
                 if (apiKeyItem == null || apiKeyItem.Revoked || (apiKeyItem.Expires != null && apiKeyItem.Expires < DateTime.UtcNow))
                 {
@@ -73,7 +73,7 @@ namespace Authentication
 
         public interface IClientApiKeyValidator
         {
-            bool IsValid(string apiKey, ref AuthorizationFilterContext context);
+            Task<bool> IsValidAsync(string apiKey, AuthorizationFilterContext context);
         }
 
         public List<ClientApiKeyItem>? GetApiKeys(long DataObjectId)
@@ -133,7 +133,7 @@ namespace Authentication
         /// The ClientApiKeyItem contains details such as KeyId, ClientAppId, Name, Key, Created, Expires, and Revoked status.
         /// If the API key is cached, it will return the cached item; otherwise, it will fetch from the database and cache it.
         /// </returns>
-        public ClientApiKeyItem? GetAppFromApiKey(string apiKey)
+        public async Task<ClientApiKeyItem?> GetAppFromApiKeyAsync(string apiKey)
         {
             var keyName = APIKeyCacheNamePrefix + ":" + apiKey;
 
@@ -141,7 +141,7 @@ namespace Authentication
             // Otherwise, use a simple in-memory cache
             if (Config.RedisConfiguration.Enabled)
             {
-                string? cachedValue = hasheous.Classes.RedisConnection.GetDatabase(0).StringGet(keyName);
+                string? cachedValue = await hasheous.Classes.RedisConnection.GetDatabase(0).StringGetAsync(keyName);
                 if (cachedValue != null)
                 {
                     ClientApiKeyItem? cachedItem = Newtonsoft.Json.JsonConvert.DeserializeObject<ClientApiKeyItem>(cachedValue);
@@ -191,7 +191,7 @@ namespace Authentication
 
                 if (Config.RedisConfiguration.Enabled)
                 {
-                    hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(keyName, serializedApiKey, TimeSpan.FromSeconds(CacheDuration));
+                    await hasheous.Classes.RedisConnection.GetDatabase(0).StringSetAsync(keyName, serializedApiKey, TimeSpan.FromSeconds(CacheDuration));
                 }
                 else
                 {

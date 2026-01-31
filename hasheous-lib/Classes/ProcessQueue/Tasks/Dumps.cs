@@ -122,9 +122,9 @@ namespace Classes.ProcessQueue
 
                     DataObjectItem? dataObject;
                     string cacheKey = RedisConnection.GenerateKey("Dumps", "Game_" + dataObjectItem.Id.ToString());
-                    if (RedisConnection.CacheItemExists(cacheKey))
+                    if (await RedisConnection.CacheItemExists(cacheKey))
                     {
-                        dataObject = RedisConnection.GetCacheItem<DataObjectItem>(cacheKey);
+                        dataObject = await RedisConnection.GetCacheItem<DataObjectItem>(cacheKey);
                     }
                     else
                     {
@@ -164,16 +164,16 @@ namespace Classes.ProcessQueue
                         {
                             DataObjectItem? platformDataObject;
                             string platformCacheKey = RedisConnection.GenerateKey("Dumps", "Platform_" + platformItem.Id.ToString());
-                            if (RedisConnection.CacheItemExists(platformCacheKey))
+                            if (await RedisConnection.CacheItemExists(platformCacheKey))
                             {
-                                platformDataObject = RedisConnection.GetCacheItem<DataObjectItem>(platformCacheKey);
+                                platformDataObject = await RedisConnection.GetCacheItem<DataObjectItem>(platformCacheKey);
                             }
                             else
                             {
                                 platformDataObject = await dataObjects.GetDataObject(DataObjects.DataObjectType.Platform, platformItem.Id);
                                 if (platformDataObject != null)
                                 {
-                                    RedisConnection.SetCacheItem<DataObjectItem>(platformCacheKey, platformDataObject, cacheDuration);
+                                    await RedisConnection.SetCacheItem<DataObjectItem>(platformCacheKey, platformDataObject, cacheDuration);
                                 }
                             }
                             if (platformDataObject != null)
@@ -363,9 +363,9 @@ namespace Classes.ProcessQueue
                             string gameMetadataPath = Path.Combine(platformPath, game.Name.Trim() + $" ({game.Id})");
                             DataObjectItem? gameObject;
                             string gameCacheKey = RedisConnection.GenerateKey("Dumps", "Game_" + game.Id.ToString());
-                            if (RedisConnection.CacheItemExists(gameCacheKey))
+                            if (await RedisConnection.CacheItemExists(gameCacheKey))
                             {
-                                gameObject = RedisConnection.GetCacheItem<DataObjectItem>(gameCacheKey);
+                                gameObject = await RedisConnection.GetCacheItem<DataObjectItem>(gameCacheKey);
                             }
                             else
                             {

@@ -11,4 +11,7 @@ RENAME COLUMN `DateUpdated` TO `updated_at`;
 
 ALTER TABLE `Signatures_Roms`
 CHANGE COLUMN `created_at` `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-CHANGE COLUMN `updated_at` `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP;
+CHANGE COLUMN `updated_at` `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN `SourceId` INT NULL AFTER `MetadataSource`,
+ADD INDEX (`SourceId`),
+ADD INDEX (`MetadataSource`, `SourceId`);

@@ -92,9 +92,9 @@ namespace hasheous_server.Controllers.v1_0
 
             if (Config.RedisConfiguration.Enabled)
             {
-                if (RedisConnection.CacheItemExists(cacheKey))
+                if (await RedisConnection.CacheItemExists(cacheKey))
                 {
-                    return Ok(RedisConnection.GetCacheItem<Models.DataObjectItem>(cacheKey));
+                    return Ok(await RedisConnection.GetCacheItem<Models.DataObjectItem>(cacheKey));
                 }
             }
 
