@@ -143,10 +143,6 @@ namespace Redump
                     }
                 }
 
-                // cleanup signature processed directory
-                string redumpProcessedDir = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesProcessedDirectory, "Redump");
-                if (Directory.Exists(redumpProcessedDir)) { Directory.Delete(redumpProcessedDir, true); }
-
                 // move extracted files to processing directory
                 string redumpProcessingDir = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesDirectory, "Redump");
                 if (Directory.Exists(redumpProcessingDir)) { Directory.Delete(redumpProcessingDir, true); }

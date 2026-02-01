@@ -177,17 +177,21 @@ namespace RetroAchievements
 
                 // compile the DAT XML file for the platform
                 CompileXMLDatResponse? datFile = CompileXMLDat(platform, datPath);
+            }
 
-                if (datFile.allowOverwrite == true)
-                {
-                    // copy the DAT file to the signature ingest directory
-                    string ingestPath = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesDirectory, "RetroAchievements", Path.GetFileName(datFile.FileName));
-                    if (File.Exists(ingestPath))
-                    {
-                        File.Delete(ingestPath);
-                    }
-                    File.Copy(datFile.FileName, ingestPath);
-                }
+            // copy the DAT files to the processing directory
+            string signatureDestDir = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesDirectory, "RetroAchievements");
+            if (Directory.Exists(signatureDestDir))
+            {
+                Directory.Delete(signatureDestDir, true);
+            }
+            Directory.CreateDirectory(signatureDestDir);
+            foreach (string file in Directory.GetFiles(datPath, "*.dat", SearchOption.TopDirectoryOnly))
+            {
+                string destFile = Path.Combine(signatureDestDir, Path.GetFileName(file));
+                File.Copy(file, destFile);
+
+                Logging.Log(Logging.LogType.Information, "RetroAchievements", $"RetroAchievements metadata file copied to processing directory: {destFile}");
             }
 
             // force start the signature ingest process
