@@ -6,7 +6,15 @@ namespace Classes.ProcessQueue
     public class SignatureIngestor : IQueueTask
     {
         /// <inheritdoc/>
-        public List<QueueItemType> Blocks => new List<QueueItemType>();
+        public List<QueueItemType> Blocks => new List<QueueItemType>{
+            QueueItemType.FetchFBNEOMetadata,
+            QueueItemType.FetchMAMERedumpMetadata,
+            QueueItemType.FetchPureDOSDATMetadata,
+            QueueItemType.FetchRedumpMetadata,
+            QueueItemType.FetchRetroAchievementsMetadata,
+            QueueItemType.FetchTOSECMetadata,
+            QueueItemType.FetchWHDLoadMetadata
+        };
 
         /// <inheritdoc/>
         public async Task<object?> ExecuteAsync()
