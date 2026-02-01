@@ -1842,8 +1842,7 @@ namespace hasheous_server.Classes
                     // start processing data objects in pages
                     do
                     {
-                        int pageNumberOffset = 1;
-
+                        int offset = pageNumber * pageSize;
                         Logging.Log(Logging.LogType.Information, "Metadata Match", $"Querying database for page {pageNumber} of {objectType} data objects needing metadata search...");
                         DataTable data = await Config.database.ExecuteCMDAsync(@$"
                         SELECT DISTINCT
@@ -1862,7 +1861,7 @@ namespace hasheous_server.Classes
                         WHERE
                             ObjectType = @objecttype AND DDMM.NextSearch < @nextsearched
                         ORDER BY DataObject.`Name`
-                        LIMIT {pageNumberOffset}, {pageSize};
+                        LIMIT {pageSize} OFFSET {offset};
                         ", dbDict);
 
                         if (data.Rows.Count == 0)
@@ -1894,7 +1893,7 @@ namespace hasheous_server.Classes
                         }
 
                         pageNumber++;
-                    } while (1 == 1);
+                    } while (true);
                 }
             }
 
