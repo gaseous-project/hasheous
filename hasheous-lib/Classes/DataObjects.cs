@@ -1842,7 +1842,7 @@ namespace hasheous_server.Classes
                     // start processing data objects in pages
                     do
                     {
-                        int pageNumberOffset = pageNumber * pageSize;
+                        int pageNumberOffset = 1;
 
                         Logging.Log(Logging.LogType.Information, "Metadata Match", $"Querying database for page {pageNumber} of {objectType} data objects needing metadata search...");
                         DataTable data = await Config.database.ExecuteCMDAsync(@$"
@@ -1884,6 +1884,13 @@ namespace hasheous_server.Classes
                             processedObjectCount++;
 
                             await _DataObjectMetadataSearch_Apply(item, logName, rand, objectType, id, ForceSearch, now, ProcessSources, processedObjectCount, totalObjectCount);
+                        }
+
+                        if (data.Rows.Count < pageSize)
+                        {
+                            // we're done here
+                            Logging.Log(Logging.LogType.Information, "Metadata Match", $"No more {objectType} data objects found needing metadata search.");
+                            break;
                         }
 
                         pageNumber++;
