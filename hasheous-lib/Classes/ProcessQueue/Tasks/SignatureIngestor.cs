@@ -23,19 +23,13 @@ namespace Classes.ProcessQueue
                 {
 
                     string SignaturePath = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesDirectory, parserType.ToString());
-                    string SignatureProcessedPath = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesProcessedDirectory, parserType.ToString());
 
                     if (!Directory.Exists(SignaturePath))
                     {
                         Directory.CreateDirectory(SignaturePath);
                     }
 
-                    if (!Directory.Exists(SignatureProcessedPath))
-                    {
-                        Directory.CreateDirectory(SignatureProcessedPath);
-                    }
-
-                    await tIngest.Import(SignaturePath, SignatureProcessedPath, parserType);
+                    await tIngest.Import(SignaturePath, parserType);
                 }
             }
 

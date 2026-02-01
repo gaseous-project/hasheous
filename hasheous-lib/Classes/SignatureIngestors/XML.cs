@@ -19,9 +19,8 @@ namespace XML
         /// Imports signature data from XML/DAT files into the database.
         /// </summary>
         /// <param name="SearchPath">The directory path containing XML/DAT files to process.</param>
-        /// <param name="ProcessedDirectory">The directory path where processed files will be moved.</param>
         /// <param name="XMLType">The type of signature parser to use (e.g., NoIntro, TOSEC, MAME).</param>
-        public async Task Import(string SearchPath, string ProcessedDirectory, gaseous_signature_parser.parser.SignatureParser XMLType)
+        public async Task Import(string SearchPath, gaseous_signature_parser.parser.SignatureParser XMLType)
         {
             // connect to database
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
