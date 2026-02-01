@@ -21,7 +21,9 @@ namespace Classes.ProcessQueue
         {
             XML.XMLIngestor tIngest = new XML.XMLIngestor();
 
-            foreach (int i in Enum.GetValues(typeof(gaseous_signature_parser.parser.SignatureParser)))
+            var parserTypes = Enum.GetValues(typeof(gaseous_signature_parser.parser.SignatureParser));
+
+            foreach (int i in parserTypes)
             {
                 gaseous_signature_parser.parser.SignatureParser parserType = (gaseous_signature_parser.parser.SignatureParser)i;
                 if (
