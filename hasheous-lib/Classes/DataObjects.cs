@@ -1948,6 +1948,15 @@ namespace hasheous_server.Classes
                     if (platformMetadata == null)
                     {
                         Logging.Log(Logging.LogType.Warning, "Metadata Match", $"{processedObjectCount} / {objectTotalCount} - Skipping metadata source {metadataSource} for game {item.Name} as no platform metadata is mapped.");
+
+                        // update the metadata nextsearch value to avoid rechecking too often
+                        string sql = "UPDATE DataObject_MetadataMap SET NextSearch=@nextsearch WHERE DataObjectId=@id AND SourceId=@source;";
+                        await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object>{
+                            { "id", item.Id },
+                            { "source", metadataSource },
+                            { "nextsearch", now.AddDays(noMatchNextDay) }
+                        });
+
                         continue;
                     }
                 }
