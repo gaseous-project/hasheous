@@ -1825,7 +1825,7 @@ namespace hasheous_server.Classes
                         FROM
                             DataObject_MetadataMap
                         WHERE
-                            MatchMethod IN (0, 1)
+                            SourceId IN (" + string.Join(", ", ProcessSources.Select(s => (int)s)) + @") AND MatchMethod IN (0, 1)
                         GROUP BY DataObjectId
                         ORDER BY NextSearch ASC) DDMM ON DataObject.Id = DDMM.DataObjectId
                     WHERE
