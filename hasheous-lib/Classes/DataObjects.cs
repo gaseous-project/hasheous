@@ -1787,7 +1787,6 @@ namespace hasheous_server.Classes
 
             // start processing each object
             int processedObjectCount = 0;
-            int totalObjectCount = 1;
 
             if (id != null)
             {
@@ -1795,7 +1794,7 @@ namespace hasheous_server.Classes
                 DataObjectItem? singleDataObject = await GetDataObject(objectType, (long)id);
                 if (singleDataObject != null)
                 {
-                    await _DataObjectMetadataSearch_Apply(singleDataObject, logName, rand, objectType, id, ForceSearch, now, ProcessSources, 1, totalObjectCount);
+                    await _DataObjectMetadataSearch_Apply(singleDataObject, logName, rand, objectType, id, ForceSearch, now, ProcessSources, 1, 1);
                 }
                 else
                 {
@@ -1814,10 +1813,10 @@ namespace hasheous_server.Classes
                     { "@nextsearched", now }
                 };
 
-                // first get a count of all records
-                DataTable countData = await Config.database.ExecuteCMDAsync(@"
+                // first all record ids
+                DataTable ids = await Config.database.ExecuteCMDAsync(@"
                     SELECT
-                        COUNT(*) AS ObjectCount
+                        DataObject.Id, DDMM.NextSearch
                     FROM
                         DataObject
                             JOIN 
@@ -1832,68 +1831,25 @@ namespace hasheous_server.Classes
                     WHERE
                         ObjectType = @objecttype AND DDMM.NextSearch < @nextsearched;
                 ", dbDict);
-                if (countData.Rows.Count > 0)
+                if (ids.Rows.Count > 0)
                 {
-                    totalObjectCount = Convert.ToInt32(countData.Rows[0]["ObjectCount"]);
-
-                    int pageNumber = 0;
-                    int pageSize = 100;
-
-                    // start processing data objects in pages
-                    do
+                    // start processing data objects
+                    foreach (DataRow row in ids.Rows)
                     {
-                        int offset = pageNumber * pageSize;
-                        Logging.Log(Logging.LogType.Information, "Metadata Match", $"Querying database for page {pageNumber} of {objectType} data objects needing metadata search...");
-                        DataTable data = await Config.database.ExecuteCMDAsync(@$"
-                        SELECT DISTINCT
-                            DataObject.*, DDMM.NextSearch
-                        FROM
-                            DataObject
-                                JOIN 
-                            (SELECT 
-                                DataObjectId, MatchMethod, NextSearch
-                            FROM
-                                DataObject_MetadataMap
-                            WHERE
-                                MatchMethod IN (0, 1)
-                            GROUP BY DataObjectId
-                            ORDER BY NextSearch ASC) DDMM ON DataObject.Id = DDMM.DataObjectId
-                        WHERE
-                            ObjectType = @objecttype AND DDMM.NextSearch < @nextsearched
-                        ORDER BY DataObject.`Name`
-                        LIMIT {pageSize} OFFSET {offset};
-                        ", dbDict);
+                        processedObjectCount++;
 
-                        if (data.Rows.Count == 0)
+                        var item = await GetDataObject(objectType, (long)row["Id"]);
+                        if (item != null)
                         {
-                            // we're done here
-                            Logging.Log(Logging.LogType.Information, "Metadata Match", $"No more {objectType} data objects found needing metadata search.");
-                            break;
+                            await _DataObjectMetadataSearch_Apply(item, logName, rand, objectType, id, ForceSearch, now, ProcessSources, processedObjectCount, ids.Rows.Count);
                         }
 
-                        List<DataObjectItem> DataObjectsToProcess = new List<DataObjectItem>();
-                        foreach (DataRow row in data.Rows)
+                        // sleep every 5 rows for half a second to prevent the system from being overwhelmed
+                        if (processedObjectCount % 5 == 0)
                         {
-                            DataObjectItem item = await BuildDataObject(objectType, (long)row["Id"], row, false, true);
-                            DataObjectsToProcess.Add(item);
+                            await Task.Delay(500);
                         }
-
-                        foreach (DataObjectItem item in DataObjectsToProcess)
-                        {
-                            processedObjectCount++;
-
-                            await _DataObjectMetadataSearch_Apply(item, logName, rand, objectType, id, ForceSearch, now, ProcessSources, processedObjectCount, totalObjectCount);
-                        }
-
-                        if (data.Rows.Count < pageSize)
-                        {
-                            // we're done here
-                            Logging.Log(Logging.LogType.Information, "Metadata Match", $"No more {objectType} data objects found needing metadata search.");
-                            break;
-                        }
-
-                        pageNumber++;
-                    } while (true);
+                    }
                 }
             }
 
