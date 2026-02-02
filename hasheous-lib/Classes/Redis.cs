@@ -185,7 +185,8 @@ namespace hasheous.Classes
                     NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore
                 };
                 string serializedData = Newtonsoft.Json.JsonConvert.SerializeObject(data, settings);
-                await RedisConnection.GetDatabase(0).StringSetAsync(cacheKey, serializedData, expiry);
+                StackExchange.Redis.Expiration expiration = expiry.HasValue ? expiry.Value : StackExchange.Redis.Expiration.Persist;
+                await RedisConnection.GetDatabase(0).StringSetAsync(cacheKey, serializedData, expiration);
             }
         }
     }

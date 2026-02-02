@@ -142,7 +142,7 @@ namespace hasheous_server.Controllers.v1_0
                     // cache any non-app object
                     if (Config.RedisConfiguration.Enabled)
                     {
-                        RedisConnection.SetCacheItem(cacheKey, DataObject);
+                        await RedisConnection.SetCacheItem(cacheKey, DataObject);
                     }
                 }
 
