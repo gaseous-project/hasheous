@@ -117,15 +117,15 @@ namespace XML
 
                     sql = "SELECT * FROM Signatures_Sources WHERE `SourceMD5`=@sourcemd5";
                     dbDict = new Dictionary<string, object>
-                            {
-                                { "name", Common.ReturnValueIfNull(Object.Name, "") },
-                                { "description", Common.ReturnValueIfNull(Object.Description, "") },
-                                { "category", Common.ReturnValueIfNull(Object.Category, "") },
-                                { "version", Common.ReturnValueIfNull(Object.Version, "") },
-                                { "author", Common.ReturnValueIfNull(Object.Author, "") },
-                                { "email", Common.ReturnValueIfNull(Object.Email, "") },
-                                { "homepage", Common.ReturnValueIfNull(Object.Homepage, "") }
-                            };
+                    {
+                        { "name", Common.ReturnValueIfNull(Object.Name, "") },
+                        { "description", Common.ReturnValueIfNull(Object.Description, "") },
+                        { "category", Common.ReturnValueIfNull(Object.Category, "") },
+                        { "version", Common.ReturnValueIfNull(Object.Version, "") },
+                        { "author", Common.ReturnValueIfNull(Object.Author, "") },
+                        { "email", Common.ReturnValueIfNull(Object.Email, "") },
+                        { "homepage", Common.ReturnValueIfNull(Object.Homepage, "") }
+                    };
                     if (Object.Url == null)
                     {
                         dbDict.Add("uri", "");
