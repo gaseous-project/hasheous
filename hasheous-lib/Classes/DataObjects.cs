@@ -1564,10 +1564,11 @@ namespace hasheous_server.Classes
                                 }.Contains(matchMethod))
                                 {
                                     // update next search regardless of changes
-                                    sql = "UPDATE DataObject_MetadataMap SET NextSearch=@nextsearch WHERE DataObjectId=@id AND SourceId=@source;";
+                                    sql = "UPDATE DataObject_MetadataMap SET LastSearched=@lastsearched, NextSearch=@nextsearch WHERE DataObjectId=@id AND SourceId=@source;";
                                     db.ExecuteNonQuery(sql, new Dictionary<string, object>{
                                         { "id", id },
                                         { "source", newMetadataItem.Source },
+                                        { "lastsearched", newMetadataItem.LastSearch },
                                         { "nextsearch", newMetadataItem.NextSearch }
                                     });
                                 }
@@ -1921,6 +1922,21 @@ namespace hasheous_server.Classes
                         existingMetadata.NextSearch = now.AddDays(noMatchNextDay);
                         metadataUpdates.Add(existingMetadata);
                     }
+                    else
+                    {
+                        // no existing metadata map - create a default one
+                        DataObjectItem.MetadataItem newMetadata = new DataObjectItem.MetadataItem(objectType)
+                        {
+                            Id = "",
+                            MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
+                            Source = metadataSource,
+                            LastSearch = now,
+                            NextSearch = now.AddDays(noMatchNextDay),
+                            WinningVoteCount = 0,
+                            TotalVoteCount = 0
+                        };
+                        metadataUpdates.Add(newMetadata);
+                    }
                     continue;
                 }
 
@@ -1949,13 +1965,32 @@ namespace hasheous_server.Classes
                     {
                         Logging.Log(Logging.LogType.Warning, "Metadata Match", $"{processedObjectCount} / {objectTotalCount} - Skipping metadata source {metadataSource} for game {item.Name} as no platform metadata is mapped.");
 
-                        // update the metadata nextsearch value to avoid rechecking too often
-                        string sql = "UPDATE DataObject_MetadataMap SET NextSearch=@nextsearch WHERE DataObjectId=@id AND SourceId=@source;";
-                        await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object>{
-                            { "id", item.Id },
-                            { "source", metadataSource },
-                            { "nextsearch", now.AddDays(noMatchNextDay) }
-                        });
+                        // set the next search date to 6 months in the future to avoid rechecking too often
+                        DataObjectItem.MetadataItem? existingMetadata = null;
+                        if (item.Metadata != null)
+                        {
+                            existingMetadata = item.Metadata.Find(x => x.Source == metadataSource);
+                        }
+                        if (existingMetadata != null)
+                        {
+                            existingMetadata.NextSearch = now.AddDays(noMatchNextDay);
+                            metadataUpdates.Add(existingMetadata);
+                        }
+                        else
+                        {
+                            // no existing metadata map - create a default one
+                            DataObjectItem.MetadataItem newMetadata = new DataObjectItem.MetadataItem(objectType)
+                            {
+                                Id = "",
+                                MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
+                                Source = metadataSource,
+                                LastSearch = now,
+                                NextSearch = now.AddDays(noMatchNextDay),
+                                WinningVoteCount = 0,
+                                TotalVoteCount = 0
+                            };
+                            metadataUpdates.Add(newMetadata);
+                        }
 
                         continue;
                     }
@@ -1978,7 +2013,7 @@ namespace hasheous_server.Classes
                     Id = "",
                     MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
                     Source = metadataSource,
-                    LastSearch = now.AddMonths(-3),
+                    LastSearch = now,
                     NextSearch = now.AddMonths(-1),
                     WinningVoteCount = 0,
                     TotalVoteCount = 0
@@ -2108,7 +2143,7 @@ namespace hasheous_server.Classes
                         // update existing
                         existingMetadata.Id = metadataUpdate.Id;
                         existingMetadata.MatchMethod = metadataUpdate.MatchMethod;
-                        existingMetadata.LastSearch = metadataUpdate.LastSearch;
+                        existingMetadata.LastSearch = now;
                         existingMetadata.NextSearch = metadataUpdate.NextSearch;
                         existingMetadata.WinningVoteCount = metadataUpdate.WinningVoteCount;
                         existingMetadata.TotalVoteCount = metadataUpdate.TotalVoteCount;
