@@ -126,7 +126,7 @@ namespace Classes
             }
 
             // delete all metadata sources of type None - this shouldn't happen, but just in case
-            sql = "DELETE FROM DataObjects_MetadataMap WHERE SourceId = @sourceid LIMIT 1000; SELECT ROW_COUNT() AS AffectedRows;";
+            sql = "DELETE FROM DataObject_MetadataMap WHERE SourceId = @sourceid LIMIT 1000; SELECT ROW_COUNT() AS AffectedRows;";
             Dictionary<string, object> dbDict = new Dictionary<string, object>
             {
                 { "@sourceid", MetadataSources.None }
