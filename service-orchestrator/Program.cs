@@ -217,7 +217,7 @@ app.Use(async (context, next) =>
 Classes.ProcessQueue.QueueProcessor.QueueItems = new List<Classes.ProcessQueue.QueueProcessor.QueueItem>
 {
     // signature ingestor
-    new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.SignatureIngestor, 60, false),
+    new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.SignatureIngestor, 1440, false),
 
     // tally votes
     new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.TallyVotes, 1440, false),

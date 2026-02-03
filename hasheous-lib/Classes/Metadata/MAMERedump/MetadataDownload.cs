@@ -25,17 +25,12 @@ namespace MAMERedump
                     if (!cloneSuccess)
                     {
                         Logging.Log(Logging.LogType.Warning, SourceName, $"{SourceName} repository is already up to date; no changes detected.");
-                        return;
                     }
                 }
                 catch (Exception ex)
                 {
                     throw new Exception($"Failed to clone or refresh ${SourceName} repository from '{GitUrl}': {ex.Message}", ex);
                 }
-
-                // cleanup signature processed directory
-                string tosecProcessedDir = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesProcessedDirectory, SourceName);
-                if (Directory.Exists(tosecProcessedDir)) { Directory.Delete(tosecProcessedDir, true); }
 
                 // copy the signature files to the processing directory
                 string datFilePath = Path.Combine(extractDir, "MAME Redump");

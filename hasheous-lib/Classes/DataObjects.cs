@@ -1564,10 +1564,11 @@ namespace hasheous_server.Classes
                                 }.Contains(matchMethod))
                                 {
                                     // update next search regardless of changes
-                                    sql = "UPDATE DataObject_MetadataMap SET NextSearch=@nextsearch WHERE DataObjectId=@id AND SourceId=@source;";
+                                    sql = "UPDATE DataObject_MetadataMap SET LastSearched=@lastsearched, NextSearch=@nextsearch WHERE DataObjectId=@id AND SourceId=@source;";
                                     db.ExecuteNonQuery(sql, new Dictionary<string, object>{
                                         { "id", id },
                                         { "source", newMetadataItem.Source },
+                                        { "lastsearched", newMetadataItem.LastSearch },
                                         { "nextsearch", newMetadataItem.NextSearch }
                                     });
                                 }
@@ -1787,7 +1788,6 @@ namespace hasheous_server.Classes
 
             // start processing each object
             int processedObjectCount = 0;
-            int totalObjectCount = 1;
 
             if (id != null)
             {
@@ -1795,7 +1795,7 @@ namespace hasheous_server.Classes
                 DataObjectItem? singleDataObject = await GetDataObject(objectType, (long)id);
                 if (singleDataObject != null)
                 {
-                    await _DataObjectMetadataSearch_Apply(singleDataObject, logName, rand, objectType, id, ForceSearch, now, ProcessSources, 1, totalObjectCount);
+                    await _DataObjectMetadataSearch_Apply(singleDataObject, logName, rand, objectType, id, ForceSearch, now, ProcessSources, 1, 1);
                 }
                 else
                 {
@@ -1814,10 +1814,10 @@ namespace hasheous_server.Classes
                     { "@nextsearched", now }
                 };
 
-                // first get a count of all records
-                DataTable countData = await Config.database.ExecuteCMDAsync(@"
+                // first all record ids
+                DataTable ids = await Config.database.ExecuteCMDAsync(@"
                     SELECT
-                        COUNT(*) AS ObjectCount
+                        DataObject.Id, DDMM.NextSearch
                     FROM
                         DataObject
                             JOIN 
@@ -1826,68 +1826,31 @@ namespace hasheous_server.Classes
                         FROM
                             DataObject_MetadataMap
                         WHERE
-                            MatchMethod IN (0, 1)
+                            SourceId IN (" + string.Join(", ", ProcessSources.Select(s => (int)s)) + @") AND MatchMethod IN (0, 1)
                         GROUP BY DataObjectId
                         ORDER BY NextSearch ASC) DDMM ON DataObject.Id = DDMM.DataObjectId
                     WHERE
                         ObjectType = @objecttype AND DDMM.NextSearch < @nextsearched;
                 ", dbDict);
-                if (countData.Rows.Count > 0)
+                if (ids.Rows.Count > 0)
                 {
-                    totalObjectCount = Convert.ToInt32(countData.Rows[0]["ObjectCount"]);
-
-                    int pageNumber = 0;
-                    int pageSize = 100;
-
-                    // start processing data objects in pages
-                    do
+                    // start processing data objects
+                    foreach (DataRow row in ids.Rows)
                     {
-                        int pageNumberOffset = pageNumber * pageSize;
+                        processedObjectCount++;
 
-                        Logging.Log(Logging.LogType.Information, "Metadata Match", $"Querying database for page {pageNumber} of {objectType} data objects needing metadata search...");
-                        DataTable data = await Config.database.ExecuteCMDAsync(@$"
-                        SELECT DISTINCT
-                            DataObject.*, DDMM.NextSearch
-                        FROM
-                            DataObject
-                                JOIN 
-                            (SELECT 
-                                DataObjectId, MatchMethod, NextSearch
-                            FROM
-                                DataObject_MetadataMap
-                            WHERE
-                                MatchMethod IN (0, 1)
-                            GROUP BY DataObjectId
-                            ORDER BY NextSearch ASC) DDMM ON DataObject.Id = DDMM.DataObjectId
-                        WHERE
-                            ObjectType = @objecttype AND DDMM.NextSearch < @nextsearched
-                        ORDER BY DataObject.`Name`
-                        LIMIT {pageNumberOffset}, {pageSize};
-                        ", dbDict);
-
-                        if (data.Rows.Count == 0)
+                        var item = await GetDataObject(objectType, (long)row["Id"]);
+                        if (item != null)
                         {
-                            // we're done here
-                            Logging.Log(Logging.LogType.Information, "Metadata Match", $"No more {objectType} data objects found needing metadata search.");
-                            break;
+                            await _DataObjectMetadataSearch_Apply(item, logName, rand, objectType, id, ForceSearch, now, ProcessSources, processedObjectCount, ids.Rows.Count);
                         }
 
-                        List<DataObjectItem> DataObjectsToProcess = new List<DataObjectItem>();
-                        foreach (DataRow row in data.Rows)
+                        // sleep every 5 rows for half a second to prevent the system from being overwhelmed
+                        if (processedObjectCount % 5 == 0)
                         {
-                            DataObjectItem item = await BuildDataObject(objectType, (long)row["Id"], row, false, true);
-                            DataObjectsToProcess.Add(item);
+                            await Task.Delay(500);
                         }
-
-                        foreach (DataObjectItem item in DataObjectsToProcess)
-                        {
-                            processedObjectCount++;
-
-                            await _DataObjectMetadataSearch_Apply(item, logName, rand, objectType, id, ForceSearch, now, ProcessSources, processedObjectCount, totalObjectCount);
-                        }
-
-                        pageNumber++;
-                    } while (1 == 1);
+                    }
                 }
             }
 
@@ -1959,6 +1922,21 @@ namespace hasheous_server.Classes
                         existingMetadata.NextSearch = now.AddDays(noMatchNextDay);
                         metadataUpdates.Add(existingMetadata);
                     }
+                    else
+                    {
+                        // no existing metadata map - create a default one
+                        DataObjectItem.MetadataItem newMetadata = new DataObjectItem.MetadataItem(objectType)
+                        {
+                            Id = "",
+                            MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
+                            Source = metadataSource,
+                            LastSearch = now,
+                            NextSearch = now.AddDays(noMatchNextDay),
+                            WinningVoteCount = 0,
+                            TotalVoteCount = 0
+                        };
+                        metadataUpdates.Add(newMetadata);
+                    }
                     continue;
                 }
 
@@ -1986,6 +1964,34 @@ namespace hasheous_server.Classes
                     if (platformMetadata == null)
                     {
                         Logging.Log(Logging.LogType.Warning, "Metadata Match", $"{processedObjectCount} / {objectTotalCount} - Skipping metadata source {metadataSource} for game {item.Name} as no platform metadata is mapped.");
+
+                        // set the next search date to 6 months in the future to avoid rechecking too often
+                        DataObjectItem.MetadataItem? existingMetadata = null;
+                        if (item.Metadata != null)
+                        {
+                            existingMetadata = item.Metadata.Find(x => x.Source == metadataSource);
+                        }
+                        if (existingMetadata != null)
+                        {
+                            existingMetadata.NextSearch = now.AddDays(noMatchNextDay);
+                            metadataUpdates.Add(existingMetadata);
+                        }
+                        else
+                        {
+                            // no existing metadata map - create a default one
+                            DataObjectItem.MetadataItem newMetadata = new DataObjectItem.MetadataItem(objectType)
+                            {
+                                Id = "",
+                                MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
+                                Source = metadataSource,
+                                LastSearch = now,
+                                NextSearch = now.AddDays(noMatchNextDay),
+                                WinningVoteCount = 0,
+                                TotalVoteCount = 0
+                            };
+                            metadataUpdates.Add(newMetadata);
+                        }
+
                         continue;
                     }
                 }
@@ -2007,7 +2013,7 @@ namespace hasheous_server.Classes
                     Id = "",
                     MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
                     Source = metadataSource,
-                    LastSearch = now.AddMonths(-3),
+                    LastSearch = now,
                     NextSearch = now.AddMonths(-1),
                     WinningVoteCount = 0,
                     TotalVoteCount = 0
@@ -2137,7 +2143,7 @@ namespace hasheous_server.Classes
                         // update existing
                         existingMetadata.Id = metadataUpdate.Id;
                         existingMetadata.MatchMethod = metadataUpdate.MatchMethod;
-                        existingMetadata.LastSearch = metadataUpdate.LastSearch;
+                        existingMetadata.LastSearch = now;
                         existingMetadata.NextSearch = metadataUpdate.NextSearch;
                         existingMetadata.WinningVoteCount = metadataUpdate.WinningVoteCount;
                         existingMetadata.TotalVoteCount = metadataUpdate.TotalVoteCount;

@@ -1,12 +1,13 @@
 using System.Data;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Filters;
-using Microsoft.AspNetCore.Identity;
-using Classes;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Security.Cryptography.Xml;
+using System.Threading.Tasks;
+using Classes;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Filters;
 
 namespace Authentication
 {
@@ -25,7 +26,7 @@ namespace Authentication
             }
         }
 
-        public class ApiKeyAuthorizationFilter : IAuthorizationFilter
+        public class ApiKeyAuthorizationFilter : IAsyncAuthorizationFilter
         {
             private readonly IApiKeyValidator _apiKeyValidator;
 
@@ -34,7 +35,7 @@ namespace Authentication
                 _apiKeyValidator = apiKeyValidator;
             }
 
-            public void OnAuthorization(AuthorizationFilterContext context)
+            public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
             {
                 // Check if the user is authenticated
                 // Escape early if the user is already authenticated
@@ -45,7 +46,7 @@ namespace Authentication
 
                 string? apiKey = context.HttpContext.Request.Headers.TryGetValue(ApiKeyHeaderName, out var headerValue) ? headerValue.FirstOrDefault() : null;
 
-                if (!_apiKeyValidator.IsValid(apiKey, ref context))
+                if (apiKey == null || !await _apiKeyValidator.IsValidAsync(apiKey, context))
                 {
                     context.Result = new UnauthorizedResult();
                 }
@@ -54,14 +55,14 @@ namespace Authentication
 
         public class ApiKeyValidator : IApiKeyValidator
         {
-            public bool IsValid(string apiKey, ref AuthorizationFilterContext context)
+            public async Task<bool> IsValidAsync(string apiKey, AuthorizationFilterContext context)
             {
                 if (apiKey == null)
                 {
                     return false;
                 }
 
-                ApplicationUser? user = new ApiKey().GetUserFromApiKey(apiKey);
+                ApplicationUser? user = await new ApiKey().GetUserFromApiKey(apiKey);
                 if (user != null)
                 {
                     // If the user is found, we set the ClaimsPrincipal for the context
@@ -84,7 +85,7 @@ namespace Authentication
 
         public interface IApiKeyValidator
         {
-            bool IsValid(string apiKey, ref AuthorizationFilterContext context);
+            Task<bool> IsValidAsync(string apiKey, AuthorizationFilterContext context);
         }
 
         public string? GetApiKey(string userId)
@@ -131,12 +132,12 @@ namespace Authentication
             return newKey;
         }
 
-        public ApplicationUser? GetUserFromApiKey(string apiKey)
+        public async Task<ApplicationUser?> GetUserFromApiKey(string apiKey)
         {
             string cacheKey = ApiKeyCacheNamePrefix + ":" + apiKey;
             if (Config.RedisConfiguration.Enabled)
             {
-                string? cachedUser = hasheous.Classes.RedisConnection.GetDatabase(0).StringGet(cacheKey);
+                string? cachedUser = await hasheous.Classes.RedisConnection.GetDatabase(0).StringGetAsync(cacheKey);
                 if (cachedUser != null)
                 {
                     return Newtonsoft.Json.JsonConvert.DeserializeObject<ApplicationUser>(cachedUser);
@@ -164,14 +165,14 @@ namespace Authentication
             {
                 string userId = data.Rows[0]["UserId"].ToString();
                 UserStore userStore = new UserStore(db);
-                user = userStore.FindByIdAsync(userId, default).Result;
+                user = await userStore.FindByIdAsync(userId, default);
             }
 
             // Cache the user
             string serializedUser = Newtonsoft.Json.JsonConvert.SerializeObject(user);
             if (Config.RedisConfiguration.Enabled)
             {
-                hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(cacheKey, serializedUser, TimeSpan.FromSeconds(CacheDuration));
+                await hasheous.Classes.RedisConnection.GetDatabase(0).StringSetAsync(cacheKey, serializedUser, TimeSpan.FromSeconds(CacheDuration));
             }
             else
             {

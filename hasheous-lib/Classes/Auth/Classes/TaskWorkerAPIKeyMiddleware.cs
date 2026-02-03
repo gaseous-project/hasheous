@@ -29,7 +29,7 @@ namespace Authentication
             }
         }
 
-        public class TaskWorkerAPIKeyAuthorizationFilter : IAuthorizationFilter
+        public class TaskWorkerAPIKeyAuthorizationFilter : IAsyncAuthorizationFilter
         {
             private readonly ITaskWorkerAPIKeyValidator _TaskWorkerAPIKeyValidator;
 
@@ -38,12 +38,12 @@ namespace Authentication
                 _TaskWorkerAPIKeyValidator = TaskWorkerAPIKeyValidator;
             }
 
-            public void OnAuthorization(AuthorizationFilterContext context)
+            public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
             {
                 string apiKey = context.HttpContext.Request.Headers[APIKeyHeaderName];
                 string publicId = (string)context.RouteData.Values["publicid"];
 
-                if (!_TaskWorkerAPIKeyValidator.IsValid(apiKey, publicId, ref context))
+                if (apiKey == null || publicId == null || !await _TaskWorkerAPIKeyValidator.IsValidAsync(apiKey, publicId, context))
                 {
                     context.Result = new UnauthorizedResult();
                 }
@@ -52,7 +52,7 @@ namespace Authentication
 
         public class TaskWorkerAPIKeyValidator : ITaskWorkerAPIKeyValidator
         {
-            public bool IsValid(string apiKey, string publicId, ref AuthorizationFilterContext context)
+            public async Task<bool> IsValidAsync(string apiKey, string publicId, AuthorizationFilterContext context)
             {
                 if (apiKey == null || publicId == null)
                 {
@@ -63,7 +63,7 @@ namespace Authentication
                 // check the cache first
                 if (Config.RedisConfiguration.Enabled)
                 {
-                    string? cachedValue = hasheous.Classes.RedisConnection.GetDatabase(0).StringGet(cacheKey);
+                    string? cachedValue = await hasheous.Classes.RedisConnection.GetDatabase(0).StringGetAsync(cacheKey);
                     if (cachedValue != null)
                     {
                         bool cachedItem = Newtonsoft.Json.JsonConvert.DeserializeObject<bool>(cachedValue);
@@ -91,7 +91,7 @@ namespace Authentication
                 // store in cache
                 if (Config.RedisConfiguration.Enabled)
                 {
-                    hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(cacheKey, Newtonsoft.Json.JsonConvert.SerializeObject(isValid), TimeSpan.FromSeconds(CacheDuration));
+                    await hasheous.Classes.RedisConnection.GetDatabase(0).StringSetAsync(cacheKey, Newtonsoft.Json.JsonConvert.SerializeObject(isValid), TimeSpan.FromSeconds(CacheDuration));
                 }
 
                 return isValid;
@@ -100,7 +100,7 @@ namespace Authentication
 
         public interface ITaskWorkerAPIKeyValidator
         {
-            bool IsValid(string apiKey, string publicId, ref AuthorizationFilterContext context);
+            Task<bool> IsValidAsync(string apiKey, string publicId, AuthorizationFilterContext context);
         }
     }
 }

@@ -4,6 +4,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Security.Policy;
 using System.Text.RegularExpressions;
 using Classes;
+using hasheous.Classes;
 using NuGet.Packaging;
 
 namespace TheGamesDB.SQL
@@ -12,6 +13,17 @@ namespace TheGamesDB.SQL
     {
         public T? GetMetadata<T>(QueryModel queryModel)
         {
+            // check cache first
+            string cacheKey = RedisConnection.GenerateKey("TheGamesDB-MetadataQuery", typeof(T).Name + "-" + queryModel);
+
+            if (Config.RedisConfiguration.Enabled)
+            {
+                if (RedisConnection.CacheItemExists(cacheKey).Result)
+                {
+                    return RedisConnection.GetCacheItem<T>(cacheKey).Result;
+                }
+            }
+
             // set up variables
             string typeName = typeof(T).Name;
 

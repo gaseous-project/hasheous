@@ -29,7 +29,7 @@ namespace hasheous_server.Classes.Tasks.Clients
         public static async Task<Dictionary<string, string>> RegisterClient(string userAPIKey, string clientName, string version, List<Capabilities>? capabilities = null, Guid? publicId = null)
         {
             // resolve userAPIKey to user account
-            var user = GetUserObjectFromAPIKey(userAPIKey);
+            var user = await GetUserObjectFromAPIKey(userAPIKey);
 
             // check roles
             var userRolesTable = new Authentication.UserRolesTable(db);
@@ -114,18 +114,6 @@ namespace hasheous_server.Classes.Tasks.Clients
             // create cache key
             string cacheKey = hasheous.Classes.RedisConnection.GenerateKey("TaskWorkerAPIKeys", clientAPIKey + publicId);
 
-            // // check cache first
-            // if (Config.RedisConfiguration.Enabled)
-            // {
-            //     string? cachedValue = hasheous.Classes.RedisConnection.GetDatabase(0).StringGet(cacheKey);
-            //     if (cachedValue != null)
-            //     {
-            //         ClientModel? cachedItem = Newtonsoft.Json.JsonConvert.DeserializeObject<ClientModel>(cachedValue);
-
-            //         return cachedItem;
-            //     }
-            // }
-
             DataTable dt = await db.ExecuteCMDAsync("SELECT * FROM Task_Clients WHERE api_key = @api_key AND public_id = @public_id LIMIT 1;", new Dictionary<string, object>
             {
                 { "@api_key", clientAPIKey },
@@ -135,11 +123,7 @@ namespace hasheous_server.Classes.Tasks.Clients
             {
                 return null;
             }
-            else
-            {
-                // // cache the result
-                // hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(cacheKey, Newtonsoft.Json.JsonConvert.SerializeObject(new ClientModel(dt.Rows[0])), TimeSpan.FromSeconds(3600)); // cache for 1 hour
-            }
+
             return new ClientModel(dt.Rows[0]);
         }
 
@@ -400,11 +384,11 @@ namespace hasheous_server.Classes.Tasks.Clients
             throw new Exception("Unable to generate a unique client API key after multiple attempts.");
         }
 
-        private static Authentication.ApplicationUser GetUserObjectFromAPIKey(string userAPIKey)
+        private static async Task<Authentication.ApplicationUser> GetUserObjectFromAPIKey(string userAPIKey)
         {
             // resolve userAPIKey to user account
             Authentication.ApiKey apiKeyAuth = new Authentication.ApiKey();
-            var user = apiKeyAuth.GetUserFromApiKey(userAPIKey);
+            var user = await apiKeyAuth.GetUserFromApiKey(userAPIKey);
             if (user == null)
             {
                 throw new Exception("Invalid API Key");

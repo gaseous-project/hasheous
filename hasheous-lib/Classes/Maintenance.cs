@@ -51,7 +51,6 @@ namespace Classes
             // clean other caches if needed
             CleanupCachesBySize(new string[]
             {
-                Config.LibraryConfiguration.LibrarySignaturesProcessedDirectory,
                 Config.LibraryConfiguration.LibraryTempDirectory,
                 Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_GiantBomb, "Images"),
                 Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB, "Images"),

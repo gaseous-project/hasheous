@@ -428,7 +428,7 @@ public static class StartupExtensions
                     string cacheKey = $"PageCache:{id}";
                     if (Config.RedisConfiguration.Enabled)
                     {
-                        string? cachedData = hasheous.Classes.RedisConnection.GetDatabase(0).StringGet(cacheKey);
+                        string? cachedData = await hasheous.Classes.RedisConnection.GetDatabase(0).StringGetAsync(cacheKey);
                         if (!string.IsNullOrEmpty(cachedData))
                         {
                             html = html.Replace("<!--OG_INJECT-->", cachedData);
