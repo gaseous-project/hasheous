@@ -1456,6 +1456,12 @@ namespace hasheous_server.Classes
                 case DataObjectType.Game:
                     foreach (DataObjectItem.MetadataItem newMetadataItem in model.Metadata)
                     {
+                        // skip none
+                        if (newMetadataItem.Source == Metadata.Communications.MetadataSources.None)
+                        {
+                            continue;
+                        }
+
                         string newMetadataId = "";
 
                         switch (newMetadataItem.Source)
@@ -1908,6 +1914,12 @@ namespace hasheous_server.Classes
             // process each metadata source
             foreach (MetadataSources metadataSource in allMetadataSources)
             {
+                // skip if type is none
+                if (metadataSource == MetadataSources.None)
+                {
+                    continue;
+                }
+
                 // skip if it's an unsupported source type
                 if (!ProcessSources.Contains(metadataSource))
                 {
@@ -2132,6 +2144,9 @@ namespace hasheous_server.Classes
                 {
                     updatedDataObject.Metadata = new List<DataObjectItem.MetadataItem>();
                 }
+
+                // remove any none sources from metadataUpdates (they shouldn't be here, but lets be certain)
+                metadataUpdates.RemoveAll(x => x.Source == MetadataSources.None);
 
                 // apply metadata updates
                 foreach (DataObjectItem.MetadataItem metadataUpdate in metadataUpdates)
