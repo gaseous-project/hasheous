@@ -1,4 +1,5 @@
 using System.Data;
+using HasheousClient.Models;
 
 namespace Classes
 {
@@ -123,6 +124,23 @@ namespace Classes
                     }
                 }
             }
+
+            // delete all metadata sources of type None - this shouldn't happen, but just in case
+            sql = "DELETE FROM DataObjects_MetadataMap WHERE SourceId = @sourceid LIMIT 1000; SELECT ROW_COUNT() AS AffectedRows;";
+            Dictionary<string, object> dbDict = new Dictionary<string, object>
+            {
+                { "@sourceid", MetadataSources.None }
+            };
+            do
+            {
+                DataTable response = await db.ExecuteCMDAsync(sql, dbDict);
+                int affectedRows = Convert.ToInt32(response.Rows[0]["AffectedRows"]);
+                if (affectedRows == 0)
+                {
+                    break;
+                }
+                Logging.Log(Logging.LogType.Information, "Maintenance", "Deleted " + affectedRows + " metadata mappings with source None.");
+            } while (true);
         }
 
         /// <summary>
