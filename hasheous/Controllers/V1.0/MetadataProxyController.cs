@@ -1472,7 +1472,7 @@ namespace hasheous_server.Controllers.v1_0
                         break;
 
                     case "TheGamesDB":
-                        var tgdbGameData = GetGamesByGameID(GameID, "*", "boxart, platform", 1, 10);
+                        var tgdbGameData = GetGamesByGameID(GameID, "*, players, publishers, genres, overview, last_updated, rating, platform, coop, youtube, os, processor, ram, hdd, video, sound, alternates", "boxart, platform", 1, 10);
                         // extract the json response
                         string? tgdbGame = null;
                         HasheousClient.Models.Metadata.TheGamesDb.GamesByGameID? tgdbGameObj = null;
