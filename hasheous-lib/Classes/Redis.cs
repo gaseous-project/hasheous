@@ -177,6 +177,12 @@ namespace hasheous.Classes
         /// </remarks>
         public async static Task SetCacheItem<T>(string cacheKey, T data, TimeSpan? expiry = null)
         {
+            // if expiry is greater than 24 hours or null, set it to 24 hours to prevent stale data
+            if (expiry == null || expiry > TimeSpan.FromHours(24))
+            {
+                expiry = TimeSpan.FromHours(24);
+            }
+
             if (Config.RedisConfiguration.Enabled)
             {
                 var settings = new Newtonsoft.Json.JsonSerializerSettings

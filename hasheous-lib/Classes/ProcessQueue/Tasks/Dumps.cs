@@ -55,7 +55,7 @@ namespace Classes.ProcessQueue
             return null;
         }
 
-        private TimeSpan cacheDuration = TimeSpan.FromDays(3);
+        private TimeSpan cacheDuration = TimeSpan.FromDays(1);
 
         private Newtonsoft.Json.JsonSerializerSettings jsonSettings = new Newtonsoft.Json.JsonSerializerSettings
         {

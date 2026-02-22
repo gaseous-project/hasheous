@@ -296,7 +296,7 @@ namespace hasheous_server.Controllers.v1_0
                 // store in cache
                 if (Config.RedisConfiguration.Enabled)
                 {
-                    await RedisConnection.SetCacheItem<Dictionary<string, object>>(cacheKey, returnValueDict, TimeSpan.FromDays(7));
+                    await RedisConnection.SetCacheItem<Dictionary<string, object>>(cacheKey, returnValueDict, TimeSpan.FromDays(1));
                 }
 
                 return Ok(returnValueDict);
@@ -358,7 +358,7 @@ namespace hasheous_server.Controllers.v1_0
                 // store in cache
                 if (Config.RedisConfiguration.Enabled)
                 {
-                    await RedisConnection.SetCacheItem<List<HasheousClient.Models.Metadata.IGDB.Platform>>(cacheKey, results.ToList(), TimeSpan.FromDays(7));
+                    await RedisConnection.SetCacheItem<List<HasheousClient.Models.Metadata.IGDB.Platform>>(cacheKey, results.ToList(), TimeSpan.FromDays(1));
                 }
 
                 return Ok(results);
@@ -391,7 +391,7 @@ namespace hasheous_server.Controllers.v1_0
                 // store in cache
                 if (Config.RedisConfiguration.Enabled)
                 {
-                    await RedisConnection.SetCacheItem<List<HasheousClient.Models.Metadata.IGDB.Platform>>(cacheKey, searchCache, TimeSpan.FromDays(7));
+                    await RedisConnection.SetCacheItem<List<HasheousClient.Models.Metadata.IGDB.Platform>>(cacheKey, searchCache, TimeSpan.FromDays(1));
                 }
 
                 return Ok(searchCache);
@@ -447,7 +447,7 @@ namespace hasheous_server.Controllers.v1_0
                 // store in cache
                 if (Config.RedisConfiguration.Enabled)
                 {
-                    await RedisConnection.SetCacheItem<List<HasheousClient.Models.Metadata.IGDB.Game>>(cacheKey, results.ToList(), TimeSpan.FromDays(7));
+                    await RedisConnection.SetCacheItem<List<HasheousClient.Models.Metadata.IGDB.Game>>(cacheKey, results.ToList(), TimeSpan.FromDays(1));
                 }
 
                 return Ok(results);
@@ -479,7 +479,7 @@ namespace hasheous_server.Controllers.v1_0
                 // store in cache
                 if (Config.RedisConfiguration.Enabled)
                 {
-                    await RedisConnection.SetCacheItem<List<HasheousClient.Models.Metadata.IGDB.Game>>(cacheKey, searchCache, TimeSpan.FromDays(7));
+                    await RedisConnection.SetCacheItem<List<HasheousClient.Models.Metadata.IGDB.Game>>(cacheKey, searchCache, TimeSpan.FromDays(1));
                 }
 
                 return Ok(searchCache);
