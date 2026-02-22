@@ -122,7 +122,7 @@ namespace Classes.Insights
             // check if the query is cached
             if (Config.RedisConfiguration.Enabled)
             {
-                string? cachedData = RedisConnection.GetDatabase(0).StringGet(cacheKey);
+                string? cachedData = await RedisConnection.GetDatabase(0).StringGetAsync(cacheKey);
                 if (cachedData != null)
                 {
                     // if cached data is found, deserialize it and return
@@ -349,7 +349,8 @@ namespace Classes.Insights
                 // drop aggregated data from Insights_API_Requests older than 40 days
                 string deleteSql = @"
                 DELETE FROM Insights_API_Requests
-                WHERE event_datetime < @deleteBefore LIMIT 1000;";
+                WHERE event_datetime < @deleteBefore LIMIT 1000;
+                SELECT ROW_COUNT() as rows_deleted;";
                 Dictionary<string, object> deleteParams = new Dictionary<string, object>
                 {
                     { "@deleteBefore", now.AddDays(-40) }
@@ -360,7 +361,7 @@ namespace Classes.Insights
                 {
                     Logging.Log(Logging.LogType.Information, "Insights", "Pruning old Insights_API_Requests data older than 40 days...");
                     DataTable deleteResult = await db.ExecuteCMDAsync(deleteSql, deleteParams);
-                    rowsDeleted = deleteResult.Rows.Count;
+                    rowsDeleted = deleteResult.Rows.Count > 0 ? Convert.ToInt32(deleteResult.Rows[0]["rows_deleted"]) : 0;
                 } while (rowsDeleted > 0);
             }
         }
@@ -706,7 +707,7 @@ namespace Classes.Insights
             {
                 clientAPIKey = apiKeyValue.ToString();
                 ClientApiKey clientApiKeyResolver = new ClientApiKey();
-                ClientApiKeyItem? clientApiKeyItem = clientApiKeyResolver.GetAppFromApiKey(clientAPIKey);
+                ClientApiKeyItem? clientApiKeyItem = await clientApiKeyResolver.GetAppFromApiKeyAsync(clientAPIKey);
                 if (clientApiKeyItem != null)
                 {
                     clientAPIKeyId = (long)clientApiKeyItem.KeyId;
@@ -728,7 +729,7 @@ namespace Classes.Insights
                 // If the user has not opted out of storing user information, we will try to get the user ID
                 if (httpContext.Request.Headers.TryGetValue(ApiKey.ApiKeyHeaderName, out var userIdHeader))
                 {
-                    ApplicationUser? user = new ApiKey().GetUserFromApiKey(userIdHeader.ToString());
+                    ApplicationUser? user = await new ApiKey().GetUserFromApiKey(userIdHeader.ToString());
                     if (user != null)
                     {
                         userId = user.Id;
@@ -739,7 +740,7 @@ namespace Classes.Insights
                     // check the cache first
                     if (Config.RedisConfiguration.Enabled)
                     {
-                        string? cachedUserId = hasheous.Classes.RedisConnection.GetDatabase(0).StringGet("Insights:User:" + httpContext.User.Identity.Name);
+                        string? cachedUserId = await hasheous.Classes.RedisConnection.GetDatabase(0).StringGetAsync("Insights:User:" + httpContext.User.Identity.Name);
                         if (cachedUserId != null)
                         {
                             userId = cachedUserId;

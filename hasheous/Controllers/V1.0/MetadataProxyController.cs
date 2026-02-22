@@ -8,6 +8,7 @@ using System.Web;
 using Classes;
 using Classes.Insights;
 using Classes.Metadata;
+using hasheous.Classes;
 using hasheous_server.Classes.Metadata;
 using hasheous_server.Classes.Metadata.IGDB;
 using HasheousClient;
@@ -89,6 +90,17 @@ namespace hasheous_server.Controllers.v1_0
             if (Id == 0 && slug == "")
             {
                 return BadRequest();
+            }
+
+            // check cache first
+            string cacheKey = RedisConnection.GenerateKey("MetadataProxy-IGDB", routeName + Id.ToString() + slug + expandColumns);
+
+            if (Config.RedisConfiguration.Enabled)
+            {
+                if (await RedisConnection.CacheItemExists(cacheKey))
+                {
+                    return Ok(await RedisConnection.GetCacheItem<Dictionary<string, object>>(cacheKey));
+                }
             }
 
             // define variable for slug response
@@ -281,6 +293,12 @@ namespace hasheous_server.Controllers.v1_0
 
             if (returnValueDict != null)
             {
+                // store in cache
+                if (Config.RedisConfiguration.Enabled)
+                {
+                    await RedisConnection.SetCacheItem<Dictionary<string, object>>(cacheKey, returnValueDict, TimeSpan.FromDays(1));
+                }
+
                 return Ok(returnValueDict);
             }
             else
@@ -317,6 +335,16 @@ namespace hasheous_server.Controllers.v1_0
             string searchFields = "fields abbreviation,alternative_name,category,checksum,created_at,generation,name,platform_family,platform_logo,slug,summary,updated_at,url,versions,websites; ";
             searchBody += "where name ~ *\"" + SearchString + "\"*;";
 
+            // check cache first
+            string cacheKey = RedisConnection.GenerateKey("MetadataProxy-IGDB", "Search-Platform" + SearchString);
+            if (Config.RedisConfiguration.Enabled)
+            {
+                if (await RedisConnection.CacheItemExists(cacheKey))
+                {
+                    return Ok(await RedisConnection.GetCacheItem<List<HasheousClient.Models.Metadata.IGDB.Platform>>(cacheKey));
+                }
+            }
+
             if (Config.IGDB.UseDumps == true && Config.IGDB.DumpsAvailable == true)
             {
                 // use dumps if available
@@ -325,6 +353,12 @@ namespace hasheous_server.Controllers.v1_0
                 if (results == null || results.Length == 0)
                 {
                     return NotFound(new Dictionary<string, string> { { "Error", "No platforms found matching the search criteria." } });
+                }
+
+                // store in cache
+                if (Config.RedisConfiguration.Enabled)
+                {
+                    await RedisConnection.SetCacheItem<List<HasheousClient.Models.Metadata.IGDB.Platform>>(cacheKey, results.ToList(), TimeSpan.FromDays(1));
                 }
 
                 return Ok(results);
@@ -352,6 +386,12 @@ namespace hasheous_server.Controllers.v1_0
                     Communications.SetSearchCache<List<HasheousClient.Models.Metadata.IGDB.Platform>>(searchFields, searchBody, platforms);
 
                     searchCache = platforms;
+                }
+
+                // store in cache
+                if (Config.RedisConfiguration.Enabled)
+                {
+                    await RedisConnection.SetCacheItem<List<HasheousClient.Models.Metadata.IGDB.Platform>>(cacheKey, searchCache, TimeSpan.FromDays(1));
                 }
 
                 return Ok(searchCache);
@@ -384,6 +424,16 @@ namespace hasheous_server.Controllers.v1_0
             searchBody += "where platforms = (" + PlatformId + ");";
             searchBody += "limit 100;";
 
+            // check cache first
+            string cacheKey = RedisConnection.GenerateKey("MetadataProxy-IGDB", "Search-Platform-Game" + PlatformId.ToString() + SearchString);
+            if (Config.RedisConfiguration.Enabled)
+            {
+                if (await RedisConnection.CacheItemExists(cacheKey))
+                {
+                    return Ok(await RedisConnection.GetCacheItem<List<HasheousClient.Models.Metadata.IGDB.Game>>(cacheKey));
+                }
+            }
+
             if (Config.IGDB.UseDumps == true && Config.IGDB.DumpsAvailable == true)
             {
                 // use dumps if available
@@ -392,6 +442,12 @@ namespace hasheous_server.Controllers.v1_0
                 if (results == null || results.Length == 0)
                 {
                     return NotFound(new Dictionary<string, string> { { "Error", "No platforms found matching the search criteria." } });
+                }
+
+                // store in cache
+                if (Config.RedisConfiguration.Enabled)
+                {
+                    await RedisConnection.SetCacheItem<List<HasheousClient.Models.Metadata.IGDB.Game>>(cacheKey, results.ToList(), TimeSpan.FromDays(1));
                 }
 
                 return Ok(results);
@@ -418,6 +474,12 @@ namespace hasheous_server.Controllers.v1_0
                     Communications.SetSearchCache<List<HasheousClient.Models.Metadata.IGDB.Game>>(searchFields, searchBody, games);
 
                     searchCache = games;
+                }
+
+                // store in cache
+                if (Config.RedisConfiguration.Enabled)
+                {
+                    await RedisConnection.SetCacheItem<List<HasheousClient.Models.Metadata.IGDB.Game>>(cacheKey, searchCache, TimeSpan.FromDays(1));
                 }
 
                 return Ok(searchCache);
@@ -1410,7 +1472,7 @@ namespace hasheous_server.Controllers.v1_0
                         break;
 
                     case "TheGamesDB":
-                        var tgdbGameData = GetGamesByGameID(GameID, "*", "boxart, platform", 1, 10);
+                        var tgdbGameData = GetGamesByGameID(GameID, "*, players, publishers, genres, overview, last_updated, rating, platform, coop, youtube, os, processor, ram, hdd, video, sound, alternates", "boxart, platform", 1, 10);
                         // extract the json response
                         string? tgdbGame = null;
                         HasheousClient.Models.Metadata.TheGamesDb.GamesByGameID? tgdbGameObj = null;

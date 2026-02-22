@@ -77,10 +77,6 @@ namespace TOSEC
                 // delete the zip
                 File.Delete(tempZipPath);
 
-                // cleanup signature processed directory
-                string tosecProcessedDir = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesProcessedDirectory, "TOSEC");
-                if (Directory.Exists(tosecProcessedDir)) { Directory.Delete(tosecProcessedDir, true); }
-
                 // move extracted files to processing directory
                 string tosecProcessingDir = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesDirectory, "TOSEC");
                 if (Directory.Exists(tosecProcessingDir)) { Directory.Delete(tosecProcessingDir, true); }

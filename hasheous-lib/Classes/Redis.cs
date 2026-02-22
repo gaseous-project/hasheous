@@ -83,14 +83,14 @@ namespace hasheous.Classes
         /// <remarks>
         /// Use cautiously; this deletes every key the server reports, not limited to a specific application prefix.
         /// </remarks>
-        public static void PurgeCache()
+        public async static Task PurgeCache()
         {
             var server = Connection.GetServer(Config.RedisConfiguration.HostName + ":" + Config.RedisConfiguration.Port);
             var keys = server.Keys();
 
             foreach (var key in keys)
             {
-                GetDatabase(0).KeyDelete(key);
+                await GetDatabase(0).KeyDeleteAsync(key);
             }
         }
 
@@ -99,7 +99,7 @@ namespace hasheous.Classes
         /// </summary>
         /// <param name="prefix">The logical prefix used to namespace keys (e.g., "HashLookup").</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="prefix"/> is <c>null</c> or empty.</exception>
-        public static void PurgeCache(string prefix)
+        public async static Task PurgeCache(string prefix)
         {
             if (string.IsNullOrEmpty(prefix))
             {
@@ -111,7 +111,7 @@ namespace hasheous.Classes
 
             foreach (var key in keys)
             {
-                GetDatabase(0).KeyDelete(key);
+                await GetDatabase(0).KeyDeleteAsync(key);
             }
         }
 
@@ -120,11 +120,11 @@ namespace hasheous.Classes
         /// </summary>
         /// <param name="cacheKey">The full Redis key to check.</param>
         /// <returns><c>true</c> if the key exists and Redis is enabled; otherwise <c>false</c>.</returns>
-        public static bool CacheItemExists(string cacheKey)
+        public async static Task<bool> CacheItemExists(string cacheKey)
         {
             if (Config.RedisConfiguration.Enabled)
             {
-                return RedisConnection.GetDatabase(0).KeyExists(cacheKey);
+                return await RedisConnection.GetDatabase(0).KeyExistsAsync(cacheKey);
             }
             return false;
         }
@@ -138,14 +138,14 @@ namespace hasheous.Classes
         /// <remarks>
         /// Uses Newtonsoft.Json with <see cref="Newtonsoft.Json.TypeNameHandling.All"/> to preserve type information.
         /// </remarks>
-        public static T? GetCacheItem<T>(string cacheKey)
+        public async static Task<T?> GetCacheItem<T>(string cacheKey)
         {
             // check redis cache first
             if (Config.RedisConfiguration.Enabled)
             {
-                if (RedisConnection.GetDatabase(0).KeyExists(cacheKey))
+                if (await RedisConnection.GetDatabase(0).KeyExistsAsync(cacheKey))
                 {
-                    string? cachedData = RedisConnection.GetDatabase(0).StringGet(cacheKey);
+                    string? cachedData = await RedisConnection.GetDatabase(0).StringGetAsync(cacheKey);
                     if (cachedData != null)
                     {
                         // if cached data is found, deserialize it and return
@@ -175,8 +175,14 @@ namespace hasheous.Classes
         /// <remarks>
         /// Serialization uses Newtonsoft.Json with <see cref="Newtonsoft.Json.TypeNameHandling.All"/> and ignores nulls.
         /// </remarks>
-        public static void SetCacheItem<T>(string cacheKey, T data, TimeSpan? expiry = null)
+        public async static Task SetCacheItem<T>(string cacheKey, T data, TimeSpan? expiry = null)
         {
+            // if expiry is greater than 24 hours or null, set it to 24 hours to prevent stale data
+            if (expiry == null || expiry > TimeSpan.FromHours(24))
+            {
+                expiry = TimeSpan.FromHours(24);
+            }
+
             if (Config.RedisConfiguration.Enabled)
             {
                 var settings = new Newtonsoft.Json.JsonSerializerSettings
@@ -185,7 +191,7 @@ namespace hasheous.Classes
                     NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore
                 };
                 string serializedData = Newtonsoft.Json.JsonConvert.SerializeObject(data, settings);
-                RedisConnection.GetDatabase(0).StringSet(cacheKey, serializedData, expiry);
+                await RedisConnection.GetDatabase(0).StringSetAsync(cacheKey, serializedData, expiry, false);
             }
         }
     }

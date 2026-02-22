@@ -22,6 +22,7 @@ namespace HasheousServerHost.Classes.CLI
             Console.WriteLine("  --version                  Display the version of the service");
             Console.WriteLine("  --service <name>           Specify the service name to run");
             Console.WriteLine("  --reportingserver <url>    Specify the reporting server URL");
+            Console.WriteLine("  --processid <id>           Specify the process ID for the service instance");
             Console.WriteLine("  --correlationid <id>       Specify a correlation ID for logging");
             Console.WriteLine("");
             Console.WriteLine("Available services:");

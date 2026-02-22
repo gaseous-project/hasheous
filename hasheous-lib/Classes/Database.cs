@@ -620,6 +620,12 @@ namespace Classes
 					string existingType = result.Rows[0]["Type"].ToString();
 					if (existingType.ToLower().Split("(")[0] != columnType.ToLower().Split("(")[0] && existingType != "text" && existingType != "longtext")
 					{
+						// check for BOOLEAN vs TINYINT(1) mismatch
+						if (existingType.ToLower() == "tinyint(1)" && columnType.ToLower() == "boolean")
+						{
+							continue; // consider this a match
+						}
+
 						// If the type does not match, we cannot change the column type in MySQL without dropping it first
 						Console.WriteLine($"Column '{columnName}' in table '{tableName}' already exists with type '{existingType}', but expected type is '{columnType}'.");
 						string alterColumnQuery = $"ALTER TABLE `{databaseName}`.`{tableName}` MODIFY COLUMN `{columnName}` {columnType}";

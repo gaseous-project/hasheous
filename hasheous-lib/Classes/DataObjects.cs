@@ -220,6 +220,90 @@ namespace hasheous_server.Classes
                 } }
         };
 
+        /// <summary>
+        /// Static cache of metadata handler types, keyed by MetadataSources.
+        /// Initialized lazily on first use to avoid reflection overhead.
+        /// </summary>
+        private static Dictionary<MetadataSources, Type>? _metadataHandlerTypeCache;
+        private static Dictionary<MetadataSources, MetadataLib.IMetadata>? _metadataHandlerInstanceCache;
+
+        /// <summary>
+        /// Gets or builds the cached mapping of MetadataSources to IMetadata handler types.
+        /// Performs reflection once and caches the result to avoid expensive lookups in nested loops.
+        /// </summary>
+        private static Dictionary<MetadataSources, Type> GetMetadataHandlerTypeCache()
+        {
+            if (_metadataHandlerTypeCache != null)
+                return _metadataHandlerTypeCache;
+
+            _metadataHandlerTypeCache = new Dictionary<MetadataSources, Type>();
+
+            // Get all IMetadata implementations from the assembly
+            var metadataTypes = typeof(MetadataLib.IMetadata).Assembly.GetTypes()
+                .Where(t => typeof(MetadataLib.IMetadata).IsAssignableFrom(t) && !t.IsInterface);
+
+            foreach (var type in metadataTypes)
+            {
+                try
+                {
+                    // Create a single instance to determine its MetadataSource
+                    var instance = Activator.CreateInstance(type) as MetadataLib.IMetadata;
+                    if (instance != null)
+                    {
+                        _metadataHandlerTypeCache[instance.MetadataSource] = type;
+                    }
+                }
+                catch
+                {
+                    // Skip types that cannot be instantiated
+                }
+            }
+
+            return _metadataHandlerTypeCache;
+        }
+
+        /// <summary>
+        /// Gets or builds the cached mapping of MetadataSources to IMetadata handler instances.
+        /// Reuses handler instances across searches if they are stateless/thread-safe.
+        /// </summary>
+        private static Dictionary<MetadataSources, MetadataLib.IMetadata> GetMetadataHandlerInstanceCache()
+        {
+            if (_metadataHandlerInstanceCache != null)
+                return _metadataHandlerInstanceCache;
+
+            _metadataHandlerInstanceCache = new Dictionary<MetadataSources, MetadataLib.IMetadata>();
+            var typeCache = GetMetadataHandlerTypeCache();
+
+            foreach (var kvp in typeCache)
+            {
+                try
+                {
+                    var instance = Activator.CreateInstance(kvp.Value) as MetadataLib.IMetadata;
+                    if (instance != null)
+                    {
+                        _metadataHandlerInstanceCache[kvp.Key] = instance;
+                    }
+                }
+                catch
+                {
+                    // Skip types that cannot be instantiated
+                }
+            }
+
+            return _metadataHandlerInstanceCache;
+        }
+
+        /// <summary>
+        /// Generates a Redis cache key for a data object based on its type and ID. Use this to ensure standardised key names.
+        /// </summary>
+        /// <param name="objectType">The type of the data object.</param>
+        /// <param name="objectId">The unique identifier of the data object.</param>
+        /// <returns>A string representing the Redis cache key.</returns>
+        public static string DataObjectCacheKey(DataObjectType objectType, long objectId)
+        {
+            return RedisConnection.GenerateKey("DataObject", objectType.ToString() + objectId.ToString());
+        }
+
         public async Task<DataObjectsList> GetDataObjects(DataObjectType objectType, int pageNumber = 0, int pageSize = 0, string? search = null, bool GetChildRelations = false, bool GetMetadataMap = true, AttributeItem.AttributeName? filterAttribute = null, string? filterValue = null, ApplicationUser? user = null)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
@@ -450,10 +534,19 @@ namespace hasheous_server.Classes
                 { "updateddate", DateTime.UtcNow }
             });
 
-            // purge redis cache of all keys for this object type
-            if (Config.RedisConfiguration.Enabled)
+            // get the object type
+            DataObjectItem? item = GetDataObject(DataObjectId).Result;
+            if (item != null)
             {
-                RedisConnection.PurgeCache("DataObject");
+                DataObjectType objectType = item.ObjectType;
+
+                // generate a cache key for this object id
+                string cacheKey = DataObjectCacheKey(objectType, DataObjectId);
+                // purge redis cache of this object
+                if (Config.RedisConfiguration.Enabled)
+                {
+                    RedisConnection.GetDatabase(0).KeyDelete(cacheKey);
+                }
             }
         }
 
@@ -1025,12 +1118,6 @@ namespace hasheous_server.Classes
                     break;
             }
 
-            // purge redis cache of all keys for this object type
-            if (Config.RedisConfiguration.Enabled)
-            {
-                RedisConnection.PurgeCache("DataObject");
-            }
-
             return await GetDataObject(objectType, (long)(ulong)data.Rows[0][0]);
         }
 
@@ -1050,10 +1137,12 @@ namespace hasheous_server.Classes
 
             db.ExecuteNonQuery(sql, dbDict);
 
-            // purge redis cache of all keys for this object type
+            // generate a cache key for this object id
+            string cacheKey = DataObjectCacheKey(objectType, id);
+            // purge redis cache of this object
             if (Config.RedisConfiguration.Enabled)
             {
-                RedisConnection.PurgeCache("DataObject");
+                RedisConnection.GetDatabase(0).KeyDelete(cacheKey);
             }
 
             if (allowSearch)
@@ -1107,7 +1196,8 @@ namespace hasheous_server.Classes
             // purge redis cache of all keys for this object type
             if (Config.RedisConfiguration.Enabled)
             {
-                RedisConnection.PurgeCache("DataObject");
+                string cacheKey = DataObjectCacheKey(objectType, id);
+                RedisConnection.GetDatabase(0).KeyDelete(cacheKey);
             }
         }
 
@@ -1127,10 +1217,12 @@ namespace hasheous_server.Classes
 
             db.ExecuteNonQuery(sql, dbDict);
 
-            // purge redis cache of all keys for this object type
+            // generate a cache key for this object id
+            string cacheKey = DataObjectCacheKey(objectType, id);
+            // purge redis cache of this object
             if (Config.RedisConfiguration.Enabled)
             {
-                RedisConnection.PurgeCache("DataObject");
+                RedisConnection.GetDatabase(0).KeyDelete(cacheKey);
             }
 
             DataObjectItem EditedObject = await GetDataObject(objectType, id);
@@ -1433,6 +1525,12 @@ namespace hasheous_server.Classes
                 case DataObjectType.Game:
                     foreach (DataObjectItem.MetadataItem newMetadataItem in model.Metadata)
                     {
+                        // skip none
+                        if (newMetadataItem.Source == Metadata.Communications.MetadataSources.None)
+                        {
+                            continue;
+                        }
+
                         string newMetadataId = "";
 
                         switch (newMetadataItem.Source)
@@ -1527,6 +1625,26 @@ namespace hasheous_server.Classes
                                         { "source", existingMetadataItem.Source },
                                         { "winningvotecount", 0 },
                                         { "totalvotecount", 0 }
+                                    });
+                                }
+                            }
+
+                            if (trustModelMetadataSearchType == true)
+                            {
+                                // update next search field if match method is NoMatch or Automatic
+                                if (new List<BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod?>{
+                                    BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
+                                    BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic,
+                                    BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.AutomaticTooManyMatches
+                                }.Contains(matchMethod))
+                                {
+                                    // update next search regardless of changes
+                                    sql = "UPDATE DataObject_MetadataMap SET LastSearched=@lastsearched, NextSearch=@nextsearch WHERE DataObjectId=@id AND SourceId=@source;";
+                                    db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                                        { "id", id },
+                                        { "source", newMetadataItem.Source },
+                                        { "lastsearched", newMetadataItem.LastSearch },
+                                        { "nextsearch", newMetadataItem.NextSearch }
                                     });
                                 }
                             }
@@ -1890,7 +2008,7 @@ namespace hasheous_server.Classes
         /// </summary>
         public async Task DataObjectMetadataSearch(DataObjectType objectType, bool ForceSearch = false)
         {
-            await _DataObjectMetadataSearch2(objectType, null, ForceSearch);
+            await _DataObjectMetadataSearch(objectType, null, ForceSearch);
         }
 
         /// <summary>
@@ -1904,7 +2022,7 @@ namespace hasheous_server.Classes
                 case DataObjectType.Company:
                 case DataObjectType.Platform:
                 case DataObjectType.Game:
-                    await _DataObjectMetadataSearch2(objectType, id, ForceSearch);
+                    await _DataObjectMetadataSearch(objectType, id, ForceSearch);
                     break;
 
                 default:
@@ -1912,724 +2030,44 @@ namespace hasheous_server.Classes
             }
         }
 
-        private async Task<MatchItem?> _DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch)
+        // do not search for metadata if the matchmethod is Manual, ManualByAdmin, or Voted
+        private static List<BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod> dontSearchMatchMethods = [
+            BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Manual,
+            BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin,
+            BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Voted
+        ];
+
+        // get all metadata sources
+        private static MetadataSources[] allMetadataSources = (MetadataSources[])Enum.GetValues(typeof(MetadataSources));
+
+        private async Task _DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch)
         {
-            MatchItem? DataObjectSearchResults = new MatchItem
-            {
-                MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
-                MetadataId = ""
-            };
-
-            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql;
-            Dictionary<string, object> dbDict;
-
-            List<DataObjectItem> DataObjectsToProcess = new List<DataObjectItem>();
-
-            if (id != null)
-            {
-                DataObjectsToProcess.Add(await GetDataObject(objectType, (long)id));
-            }
-            else
-            {
-                // DataObjectsToProcess.AddRange(GetDataObjects(objectType).Objects);
-                sql = @"
-                    SELECT DISTINCT
-                        DataObject.*, DDMM.LastSearched
-                    FROM
-                        DataObject
-                            JOIN 
-                        (SELECT 
-                            DataObjectId, LastSearched
-                        FROM
-                            DataObject_MetadataMap GROUP BY DataObjectId ORDER BY LastSearched) DDMM ON DataObject.Id = DDMM.DataObjectId
-                    WHERE
-                        ObjectType = @objecttype AND DDMM.LastSearched < @lastsearched
-                    ORDER BY DataObject.`Name`;
-                ";
-                dbDict = new Dictionary<string, object>{
-                    { "objecttype", objectType },
-                    { "lastsearched", DateTime.UtcNow.AddDays(-5) }
-                };
-
-                DataTable data = db.ExecuteCMD(sql, dbDict);
-                foreach (DataRow row in data.Rows)
-                {
-                    DataObjectItem item = await BuildDataObject(objectType, (long)row["Id"], row, false, true);
-                    DataObjectsToProcess.Add(item);
-                }
-
-                if (DataObjectsToProcess.Count == 0)
-                {
-                    return null;
-                }
-
-                sql = "";
-                dbDict = new Dictionary<string, object> { };
-            }
-
-            // search for metadata
-            int processedObjectCount = 0;
-            foreach (DataObjectItem item in DataObjectsToProcess)
-            {
-                processedObjectCount++;
-
-                Logging.Log(Logging.LogType.Information, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Searching for metadata for " + item.Name + " (" + item.ObjectType + ") Id: " + item.Id);
-
-                List<string> SearchCandidates = GetSearchCandidates(item.Name);
-
-                Logging.Log(Logging.LogType.Information, "Metadata Match", "Search candidates: " + string.Join(", ", SearchCandidates));
-
-                foreach (Metadata.Communications.MetadataSources sourceType in Enum.GetValues(typeof(Metadata.Communications.MetadataSources)))
-                {
-                    if (sourceType == MetadataSources.None)
-                    {
-                        continue;
-                    }
-
-                    // get the metadataItem from the DataObjectItem for the sourceType
-                    DataObjectItem.MetadataItem metadata = item.Metadata.Find(x => x.Source == sourceType);
-                    bool insertMetadata = false;
-                    if (metadata == null)
-                    {
-                        insertMetadata = true;
-
-                        // create new metadata item
-                        metadata = new DataObjectItem.MetadataItem(objectType)
-                        {
-                            Id = "",
-                            MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
-                            Source = sourceType,
-                            LastSearch = DateTime.UtcNow.AddMonths(-3),
-                            NextSearch = DateTime.UtcNow.AddMonths(-1),
-                            WinningVoteCount = 0,
-                            TotalVoteCount = 0
-                        };
-                    }
-
-                    // set defaults in case no match is made
-                    dbDict = new Dictionary<string, object>{
-                        { "id", item.Id },
-                        { "metadataid", "" },
-                        { "srcid", (int)metadata.Source },
-                        { "method", BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch },
-                        { "lastsearched", DateTime.UtcNow },
-                        { "nextsearch", DateTime.UtcNow.AddMonths(1) }
-                    };
-
-                    // since we have a full local copy of each metadata source, we can always check if the match is correct - except if the match method is Manual, ManualByAdmin, or Voted which are assumed to be correct as they are set by the users
-                    List<BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod> dontSearchMatchMethods = [
-                        BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Manual,
-                        BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin,
-                        BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Voted
-                    ];
-
-                    if (!dontSearchMatchMethods.Contains((BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod)metadata.MatchMethod))
-                    {
-                        // if the next search is in the past, or if we are forcing a search, then we can search for metadata
-                        if (ForceSearch || metadata.NextSearch < DateTime.UtcNow)
-                        {
-                            // searching is allowed
-                            try
-                            {
-                                Logging.Log(Logging.LogType.Information, "Metadata Match", "Searching " + metadata.Source + ": " + item.Name + " (" + item.Id + ") Type: " + item.ObjectType);
-                                switch (metadata.Source)
-                                {
-                                    case Metadata.Communications.MetadataSources.IGDB:
-                                        switch (objectType)
-                                        {
-                                            case DataObjectType.Company:
-                                                DataObjectSearchResults = await GetDataObject<IGDB.Models.Company>(MetadataSources.IGDB, IGDBClient.Endpoints.Companies, "fields *;", "where name ~ *\"" + item.Name + "\"");
-                                                break;
-
-                                            case DataObjectType.Platform:
-                                                DataObjectSearchResults = await GetDataObject<IGDB.Models.Platform>(MetadataSources.IGDB, IGDBClient.Endpoints.Platforms, "fields *;", "where name ~ *\"" + item.Name + "\"");
-                                                break;
-
-                                            case DataObjectType.Game:
-                                                long? PlatformId = null;
-
-                                                if (metadata.Id.Length > 0)
-                                                {
-                                                    // database look up
-                                                    sql = "SELECT * FROM igdb.games WHERE slug=@slug;";
-                                                    if (dbDict.ContainsKey("slug"))
-                                                    {
-                                                        dbDict["slug"] = metadata.Id;
-                                                    }
-                                                    else
-                                                    {
-                                                        dbDict.Add("slug", metadata.Id);
-                                                    }
-                                                    DataTable gameData = db.ExecuteCMD(sql, dbDict);
-                                                    if (gameData.Rows.Count > 0)
-                                                    {
-                                                        // we have a match, update the metadata.id to the id
-                                                        DataObjectSearchResults = new MatchItem
-                                                        {
-                                                            MatchMethod = (BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod)metadata.MatchMethod,
-                                                            MetadataId = gameData.Rows[0]["id"].ToString()
-                                                        };
-
-                                                        sql = "UPDATE DataObject_MetadataMap SET MetadataId=@metadataid WHERE DataObjectId=@id AND SourceId=@srcid;";
-                                                        dbDict["metadataid"] = DataObjectSearchResults.MetadataId;
-                                                        dbDict["id"] = item.Id;
-                                                        dbDict["srcid"] = (int)MetadataSources.IGDB;
-
-                                                        db.ExecuteNonQuery(sql, dbDict);
-
-                                                        Logging.Log(Logging.LogType.Information, "Metadata Match", "IGDB slug correction: Found match for slug: " + metadata.Id + ", updated metadata.id to: " + DataObjectSearchResults.MetadataId);
-
-                                                        continue;
-                                                    }
-                                                    else
-                                                    {
-                                                        // no match found, continue with the search
-                                                        Logging.Log(Logging.LogType.Information, "Metadata Match", "IGDB slug correction: No match found for slug: " + metadata.Id + ", continuing with search. Note: existing match may be cleared.");
-                                                    }
-                                                }
-
-                                                foreach (AttributeItem attribute in item.Attributes)
-                                                {
-                                                    if (attribute.attributeType == AttributeItem.AttributeType.ObjectRelationship)
-                                                    {
-                                                        if (attribute.attributeRelationType == DataObjectType.Platform)
-                                                        {
-                                                            DataObjectItem platformDO;
-                                                            if (attribute.Value.GetType() == typeof(DataObjectItem))
-                                                            {
-                                                                platformDO = (DataObjectItem)attribute.Value;
-                                                            }
-                                                            else
-                                                            {
-                                                                RelationItem relationItem = (RelationItem)attribute.Value;
-                                                                platformDO = await GetDataObject(DataObjectType.Platform, relationItem.relationId);
-                                                            }
-
-                                                            foreach (DataObjectItem.MetadataItem provider in platformDO.Metadata)
-                                                            {
-                                                                if (provider.Source == MetadataSources.IGDB && (
-                                                                    provider.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic ||
-                                                                    provider.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Manual ||
-                                                                    provider.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin
-                                                                    )
-                                                                )
-                                                                {
-                                                                    // check if provider.id is a long
-                                                                    if (long.TryParse(provider.Id, out long platformIdLong))
-                                                                    {
-                                                                        PlatformId = platformIdLong;
-                                                                    }
-                                                                    else
-                                                                    {
-                                                                        IGDB.Models.Platform platform = await Metadata.IGDB.Metadata.GetMetadata<IGDB.Models.Platform>((string?)provider.Id);
-                                                                        PlatformId = platform.Id;
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-
-                                                if (PlatformId != null)
-                                                {
-                                                    bool SearchComplete = false;
-                                                    foreach (string SearchCandidate in SearchCandidates)
-                                                    {
-                                                        foreach (Games.SearchType searchType in Enum.GetValues(typeof(Games.SearchType)))
-                                                        {
-                                                            IGDB.Models.Game[] games = Games.SearchForGame(SearchCandidate, (long)PlatformId, searchType);
-                                                            if (games != null)
-                                                            {
-                                                                if (games.Length == 1)
-                                                                {
-                                                                    // exact match!
-                                                                    DataObjectSearchResults = new MatchItem
-                                                                    {
-                                                                        MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic,
-                                                                        MetadataId = games[0].Id.ToString()
-                                                                    };
-                                                                    SearchComplete = true;
-                                                                    break;
-                                                                }
-                                                                else if (games.Length > 1)
-                                                                {
-                                                                    // too many matches - high likelihood of sequels and other variants
-                                                                    foreach (Game game in games)
-                                                                    {
-                                                                        if (game.Name == SearchCandidate)
-                                                                        {
-                                                                            // found game title matches the search candidate
-                                                                            DataObjectSearchResults = new MatchItem
-                                                                            {
-                                                                                MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic,
-                                                                                MetadataId = game.Id.ToString()
-                                                                            };
-                                                                            SearchComplete = true;
-                                                                            break;
-                                                                        }
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                        if (SearchComplete == true)
-                                                        {
-                                                            break;
-                                                        }
-                                                    }
-                                                }
-                                                else
-                                                {
-                                                    DataObjectSearchResults = new MatchItem
-                                                    {
-                                                        MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
-                                                        MetadataId = ""
-                                                    };
-                                                }
-                                                break;
-
-                                            default:
-                                                DataObjectSearchResults = new()
-                                                {
-                                                    MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
-                                                    MetadataId = ""
-                                                };
-                                                break;
-                                        }
-
-                                        dbDict["method"] = DataObjectSearchResults.MatchMethod;
-                                        dbDict["metadataid"] = DataObjectSearchResults.MetadataId;
-
-                                        break;
-
-                                    case Metadata.Communications.MetadataSources.TheGamesDb:
-                                        TheGamesDB.JSON.TheGamesDBDatabase tgdbMetadata = TheGamesDB.JSON.MetadataQuery.metadata;
-                                        switch (objectType)
-                                        {
-                                            case DataObjectType.Platform:
-                                                foreach (KeyValuePair<string, TheGamesDB.JSON.TheGamesDBDatabase.IncludeItem.PlatformItem.DataItem> metadataPlatform in tgdbMetadata.include.platform.data)
-                                                {
-                                                    if (
-                                                        (metadataPlatform.Value.name == item.Name) ||
-                                                        (metadataPlatform.Value.alias == item.Name))
-                                                    {
-                                                        // we have a match, add the tgdb platform id to the data object
-                                                        dbDict["metadataid"] = metadataPlatform.Key;
-                                                        dbDict["method"] = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic;
-                                                        break;
-                                                    }
-                                                }
-                                                break;
-
-                                            case DataObjectType.Game:
-                                                // get the game platform if set
-                                                long tgdbPlaformId = 0;
-                                                AttributeItem tgdbPlatformAttribute = item.Attributes.Find(x => x.attributeName == AttributeItem.AttributeName.Platform && x.attributeType == AttributeItem.AttributeType.ObjectRelationship);
-
-                                                if (tgdbPlatformAttribute != null)
-                                                {
-                                                    // get the associated platform dataobject
-                                                    DataObjectItem tgdbPlatformDO;
-                                                    if (tgdbPlatformAttribute.Value.GetType() == typeof(DataObjectItem))
-                                                    {
-                                                        tgdbPlatformDO = (DataObjectItem)tgdbPlatformAttribute.Value;
-                                                    }
-                                                    else
-                                                    {
-                                                        RelationItem relationItem = (RelationItem)tgdbPlatformAttribute.Value;
-                                                        tgdbPlatformDO = await GetDataObject(DataObjectType.Platform, relationItem.relationId);
-                                                    }
-
-                                                    // check if tgdbPlatformDO has a configured metadata value for TheGamesDB
-                                                    DataObjectItem.MetadataItem tgdbPlatformMetadata = tgdbPlatformDO.Metadata.Find(x => x.Source == MetadataSources.TheGamesDb);
-                                                    if (tgdbPlatformMetadata != null && tgdbPlatformMetadata.Id != "")
-                                                    {
-                                                        // get the platform id
-                                                        tgdbPlaformId = long.Parse(tgdbPlatformMetadata.Id);
-
-                                                        // search for games
-                                                        bool SearchComplete = false;
-                                                        foreach (string SearchCandidate in SearchCandidates)
-                                                        {
-                                                            foreach (TheGamesDB.JSON.TheGamesDBDatabase.DataItem.GameItem metadataGame in tgdbMetadata.data.games)
-                                                            {
-                                                                if (metadataGame.platform == tgdbPlaformId)
-                                                                {
-                                                                    if (
-                                                                        metadataGame.game_title == SearchCandidate ||
-                                                                        (
-                                                                            metadataGame.alternates != null &&
-                                                                            metadataGame.alternates.Contains(SearchCandidate)
-                                                                        )
-                                                                    )
-                                                                    {
-                                                                        // we have a match, add the tgdb game id to the data object
-                                                                        dbDict["metadataid"] = metadataGame.id;
-                                                                        dbDict["method"] = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic;
-                                                                        SearchComplete = true;
-                                                                        break;
-                                                                    }
-                                                                }
-                                                            }
-                                                            if (SearchComplete == true)
-                                                            {
-                                                                break;
-                                                            }
-                                                        }
-                                                    }
-                                                }
-
-                                                break;
-                                        }
-                                        break;
-
-                                    case MetadataSources.RetroAchievements:
-                                        switch (objectType)
-                                        {
-                                            case DataObjectType.Platform:
-                                                // load platforms JSON
-                                                string platformsJsonPath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_RetroAchievements, "platforms.json");
-                                                if (File.Exists(platformsJsonPath))
-                                                {
-                                                    string platformsJson = File.ReadAllText(platformsJsonPath);
-                                                    List<RetroAchievements.Models.PlatformModel> platforms = Newtonsoft.Json.JsonConvert.DeserializeObject<List<RetroAchievements.Models.PlatformModel>>(platformsJson);
-
-                                                    // search for platform
-                                                    foreach (RetroAchievements.Models.PlatformModel platform in platforms)
-                                                    {
-                                                        if (platform.Name.ToLower().Trim() == item.Name.ToLower().Trim())
-                                                        {
-                                                            dbDict["metadataid"] = platform.ID;
-                                                            dbDict["method"] = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic;
-                                                            break;
-                                                        }
-                                                    }
-                                                }
-                                                break;
-
-                                            case DataObjectType.Game:
-                                                // get the game platform if set
-                                                long raPlaformId = 0;
-                                                AttributeItem raPlatformAttribute = item.Attributes.Find(x => x.attributeName == AttributeItem.AttributeName.Platform && x.attributeType == AttributeItem.AttributeType.ObjectRelationship);
-
-                                                if (raPlatformAttribute != null)
-                                                {
-                                                    // get the associated platform dataobject
-                                                    DataObjectItem raPlatformDO;
-                                                    if (raPlatformAttribute.Value.GetType() == typeof(DataObjectItem))
-                                                    {
-                                                        raPlatformDO = (DataObjectItem)raPlatformAttribute.Value;
-                                                    }
-                                                    else
-                                                    {
-                                                        RelationItem relationItem = (RelationItem)raPlatformAttribute.Value;
-                                                        raPlatformDO = await GetDataObject(DataObjectType.Platform, relationItem.relationId);
-                                                    }
-
-                                                    // check if raPlatformDO has a configured metadata value for RetroAchievements
-                                                    DataObjectItem.MetadataItem raPlatformMetadata = raPlatformDO.Metadata.Find(x => x.Source == MetadataSources.RetroAchievements);
-                                                    if (raPlatformMetadata != null && raPlatformMetadata.Id != "")
-                                                    {
-                                                        // get the platform id
-                                                        raPlaformId = long.Parse(raPlatformMetadata.Id);
-
-                                                        // load games json for the specified raPlatformId
-                                                        List<RetroAchievements.Models.GameModel> raGames = new List<RetroAchievements.Models.GameModel>();
-                                                        string gamesJsonPath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_RetroAchievements, raPlaformId.ToString());
-                                                        if (File.Exists(gamesJsonPath))
-                                                        {
-                                                            string[] gamesJsonFiles = Directory.GetFiles(gamesJsonPath, "*.json");
-                                                            foreach (string gamesJsonFile in gamesJsonFiles)
-                                                            {
-                                                                string gamesJson = File.ReadAllText(gamesJsonFile);
-                                                                List<RetroAchievements.Models.GameModel> games = Newtonsoft.Json.JsonConvert.DeserializeObject<List<RetroAchievements.Models.GameModel>>(gamesJson);
-                                                                raGames.AddRange(games);
-                                                            }
-
-                                                            // search for games
-                                                            bool SearchComplete = false;
-                                                            foreach (string SearchCandidate in SearchCandidates)
-                                                            {
-                                                                foreach (RetroAchievements.Models.GameModel metadataGame in raGames)
-                                                                {
-                                                                    if (metadataGame.ConsoleID == raPlaformId)
-                                                                    {
-                                                                        // strip leading tags from game name. e.g. "~hack~ ~demo~" or "~hack~"
-                                                                        string gameName = metadataGame.Title;
-                                                                        string category = "";
-                                                                        if (gameName.StartsWith("~"))
-                                                                        {
-                                                                            string pattern = @"~(.*?)~\s";
-                                                                            MatchCollection matches = Regex.Matches(gameName, pattern);
-                                                                            foreach (Match match in matches)
-                                                                            {
-                                                                                if (category.Length > 1)
-                                                                                {
-                                                                                    category += ",";
-                                                                                }
-                                                                                category += match.Groups[1].Value.Trim();
-                                                                            }
-
-                                                                            // set gameName to everything after the last "~ "
-                                                                            gameName = gameName.Substring(gameName.LastIndexOf("~ ") + 2);
-                                                                        }
-                                                                        if (gameName == SearchCandidate)
-                                                                        {
-                                                                            // we have a match, add the tgdb game id to the data object
-                                                                            dbDict["metadataid"] = metadataGame.ID;
-                                                                            dbDict["method"] = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic;
-                                                                            SearchComplete = true;
-                                                                            break;
-                                                                        }
-                                                                    }
-                                                                }
-                                                                if (SearchComplete == true)
-                                                                {
-                                                                    break;
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-
-                                                break;
-                                        }
-                                        break;
-
-                                    case MetadataSources.GiantBomb:
-                                        switch (objectType)
-                                        {
-                                            case DataObjectType.Platform:
-                                                // get the platform id from the name
-                                                long platformId = GiantBomb.MetadataQuery.PlatformLookup(item.Name);
-                                                if (platformId > 0)
-                                                {
-                                                    dbDict["metadataid"] = platformId.ToString();
-                                                    dbDict["method"] = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic;
-                                                }
-                                                break;
-
-                                            case DataObjectType.Game:
-                                                // check if the IGDB dataset has an entry for this game - get the IGDB metadata slug if available
-                                                string? igdbId = item.Metadata.Find(x => x.Source == MetadataSources.IGDB)?.ImmutableId;
-                                                if (igdbId != null && igdbId != "")
-                                                {
-                                                    // get the game from the IGDB dumps if available
-                                                    if (long.TryParse(igdbId, out long igdbIdLong))
-                                                    {
-                                                        igdbId = igdbIdLong.ToString();
-                                                    }
-                                                    HasheousClient.Models.Metadata.IGDB.Game? igdbGame = await Metadata.IGDB.Metadata.GetMetadata<HasheousClient.Models.Metadata.IGDB.Game>(igdbIdLong);
-                                                    if (igdbGame != null)
-                                                    {
-                                                        // get the GiantBomb ID from the IGDB game
-                                                        if (igdbGame.ExternalGames != null && igdbGame.ExternalGames.Count > 0)
-                                                        {
-                                                            foreach (var externalGame in igdbGame.ExternalGames)
-                                                            {
-                                                                HasheousClient.Models.Metadata.IGDB.ExternalGame? exGame = await Metadata.IGDB.Metadata.GetMetadata<HasheousClient.Models.Metadata.IGDB.ExternalGame>(externalGame);
-                                                                if (exGame != null && exGame.ExternalGameSource != null)
-                                                                {
-                                                                    if (exGame.ExternalGameSource == 3)
-                                                                    {
-                                                                        // we have a GiantBomb ID, use this
-                                                                        dbDict["metadataid"] = exGame.Uid;
-                                                                        dbDict["method"] = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic;
-                                                                        break;
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                                else
-                                                {
-                                                    // fall back to searching for the game name in the downloaded GiantBomb dumps - if available
-
-                                                    // get the platform of this dataobject
-                                                    long? gbPlatformId = null;
-                                                    AttributeItem platformAttribute = item.Attributes.Find(x => x.attributeName == AttributeItem.AttributeName.Platform && x.attributeType == AttributeItem.AttributeType.ObjectRelationship);
-                                                    if (platformAttribute != null)
-                                                    {
-                                                        // get the associated platform dataobject
-                                                        DataObjectItem platformDO;
-                                                        if (platformAttribute.Value.GetType() == typeof(DataObjectItem))
-                                                        {
-                                                            platformDO = (DataObjectItem)platformAttribute.Value;
-                                                        }
-                                                        else
-                                                        {
-                                                            RelationItem relationItem = (RelationItem)platformAttribute.Value;
-                                                            platformDO = await GetDataObject(DataObjectType.Platform, relationItem.relationId);
-                                                        }
-                                                        // check if platformDO has a configured metadata value for GiantBomb
-                                                        DataObjectItem.MetadataItem platformMetadata = platformDO.Metadata.Find(x => x.Source == MetadataSources.GiantBomb);
-                                                        if (platformMetadata != null && platformMetadata.Id != "")
-                                                        {
-                                                            // get the platform id
-                                                            gbPlatformId = long.Parse(platformMetadata.Id);
-                                                        }
-                                                    }
-
-                                                    if (gbPlatformId != null)
-                                                    {
-                                                        // search for games
-                                                        bool SearchComplete = false;
-                                                        foreach (string SearchCandidate in SearchCandidates)
-                                                        {
-                                                            // get the game id from the GiantBomb dumps
-                                                            long gameId = GiantBomb.MetadataQuery.GameLookup((long)gbPlatformId, SearchCandidate);
-                                                            if (gameId > 0)
-                                                            {
-                                                                // we have a match, add the GiantBomb game id to the data object
-                                                                dbDict["metadataid"] = gameId.ToString();
-                                                                dbDict["method"] = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic;
-                                                                SearchComplete = true;
-                                                                break;
-                                                            }
-                                                        }
-                                                        if (SearchComplete == true)
-                                                        {
-                                                            break;
-                                                        }
-                                                    }
-                                                }
-
-                                                break;
-
-                                        }
-                                        break;
-
-                                    case MetadataSources.Wikipedia:
-                                        switch (objectType)
-                                        {
-                                            case DataObjectType.Game:
-                                                // check if the IGDB dataset has an entry for this game - get the IGDB metadata slug if available
-                                                string? igdbId = item.Metadata.Find(x => x.Source == MetadataSources.IGDB)?.ImmutableId;
-                                                if (igdbId != null && igdbId != "")
-                                                {
-                                                    // get the game from the IGDB dumps if available
-                                                    if (long.TryParse(igdbId, out long igdbIdLong))
-                                                    {
-                                                        igdbId = igdbIdLong.ToString();
-                                                    }
-                                                    HasheousClient.Models.Metadata.IGDB.Game? igdbGame = await Metadata.IGDB.Metadata.GetMetadata<HasheousClient.Models.Metadata.IGDB.Game>(igdbIdLong);
-                                                    if (igdbGame != null)
-                                                    {
-                                                        // get the wikipedia link from the IGDB game
-                                                        if (igdbGame.Websites != null && igdbGame.Websites.Count > 0)
-                                                        {
-                                                            foreach (var website in igdbGame.Websites)
-                                                            {
-                                                                HasheousClient.Models.Metadata.IGDB.Website? webGame = await Metadata.IGDB.Metadata.GetMetadata<HasheousClient.Models.Metadata.IGDB.Website>(website);
-                                                                if (webGame != null)
-                                                                {
-                                                                    if (webGame.Type == 3)
-                                                                    {
-                                                                        // we have a GiantBomb ID, use this
-                                                                        dbDict["metadataid"] = webGame.Url;
-                                                                        dbDict["method"] = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic;
-                                                                        break;
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                                break;
-
-                                        }
-                                        break;
-
-                                    default:
-                                        // no metadata source found, set to no match
-                                        DataObjectSearchResults.MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch;
-                                        DataObjectSearchResults.MetadataId = "";
-                                        break;
-                                }
-
-                                Logging.Log(Logging.LogType.Information, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - " + item.ObjectType + " " + item.Name + " " + metadata.MatchMethod + " to " + metadata.Source + " metadata: " + metadata.Id);
-
-                                if (insertMetadata == true)
-                                {
-                                    sql = "INSERT INTO DataObject_MetadataMap (DataObjectId, MetadataId, SourceId, MatchMethod, LastSearched, NextSearch) VALUES (@id, @metadataid, @srcid, @method, @lastsearched, @nextsearch);";
-                                }
-                                else
-                                {
-                                    sql = "UPDATE DataObject_MetadataMap SET MetadataId=@metadataid, MatchMethod=@method, LastSearched=@lastsearched, NextSearch=@nextsearch WHERE DataObjectId=@id AND SourceId=@srcid;";
-                                }
-                                if (dbDict.ContainsKey("nextsearch"))
-                                {
-                                    dbDict.Remove("nextsearch");
-                                }
-                                switch (DataObjectSearchResults.MatchMethod)
-                                {
-                                    case BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic:
-                                    case BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.AutomaticTooManyMatches:
-                                        dbDict.Add("nextsearch", DateTime.UtcNow.AddMonths(6));
-                                        break;
-                                    case BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch:
-                                        dbDict.Add("nextsearch", DateTime.UtcNow.AddMonths(1));
-                                        break;
-                                    default:
-                                        dbDict.Add("nextsearch", DateTime.UtcNow.AddDays(1));
-                                        break;
-                                }
-                                db.ExecuteNonQuery(sql, dbDict);
-                            }
-                            catch (Exception ex)
-                            {
-                                Logging.Log(Logging.LogType.Warning, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Error processing metadata search", ex);
-                            }
-                        }
-                    }
-                }
-
-                // get metadata cover if new object is a game
-                if (objectType == DataObjectType.Game)
-                {
-                    BackgroundMetadataMatcher.BackgroundMetadataMatcher metadataMatcher = new BackgroundMetadataMatcher.BackgroundMetadataMatcher();
-                    await metadataMatcher.GetGameArtwork((long)item.Id, ForceSearch);
-                }
-
-                // update date
-                UpdateDataObjectDate((long)item.Id);
-            }
-
-            return DataObjectSearchResults;
-        }
-
-        private async Task _DataObjectMetadataSearch2(DataObjectType objectType, long? id, bool ForceSearch)
-        {
-            List<MetadataSources> ProcessSources = new List<MetadataSources>
-            {
+            HashSet<MetadataSources> ProcessSources = [
                 MetadataSources.IGDB,
                 MetadataSources.TheGamesDb,
                 MetadataSources.RetroAchievements,
                 MetadataSources.GiantBomb
-            };
+            ];
 
-            MatchItem? DataObjectSearchResults = new MatchItem
-            {
-                MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
-                MetadataId = ""
-            };
+            // set now time
+            DateTime now = DateTime.UtcNow;
 
-            // purge redis cache of all keys for this object type
-            if (Config.RedisConfiguration.Enabled)
-            {
-                RedisConnection.PurgeCache("DataObject");
-            }
+            // set up report sending
+            string logName = $"{Config.LogName}-MetadataMatchSearch";
 
-            // set up the list of objects that need to be processed
-            List<DataObjectItem> DataObjectsToProcess = new List<DataObjectItem>();
+            // set up randomiser
+            Random rand = new Random();
+
+            // start processing each object
+            int processedObjectCount = 0;
+
             if (id != null)
             {
                 // get a single data object
                 DataObjectItem? singleDataObject = await GetDataObject(objectType, (long)id);
                 if (singleDataObject != null)
                 {
-                    DataObjectsToProcess.Add(singleDataObject);
+                    await _DataObjectMetadataSearch_Apply(singleDataObject, logName, rand, objectType, id, ForceSearch, now, ProcessSources, 1, 1);
                 }
                 else
                 {
@@ -2639,344 +2077,392 @@ namespace hasheous_server.Classes
             }
             else
             {
-                // get all data objects of the specified type that need metadata searching - any item last searched more than 5 days ago
-                DataTable data = await Config.database.ExecuteCMDAsync(@"
-                    SELECT DISTINCT
-                        DataObject.*, DDMM.LastSearched
+                // get all data objects of the specified type that need metadata searching - any item who's next search date is in the past.
+                Logging.SendReport(logName, 0, 0, $"Querying database for {objectType} data objects needing metadata search...");
+
+                Dictionary<string, object> dbDict = new Dictionary<string, object>
+                {
+                    { "@objecttype", objectType },
+                    { "@nextsearched", now }
+                };
+
+                // first all record ids
+                DataTable ids = await Config.database.ExecuteCMDAsync(@"
+                    SELECT
+                        DataObject.Id, DDMM.NextSearch
                     FROM
                         DataObject
                             JOIN 
                         (SELECT 
-                            DataObjectId, LastSearched
+                            DataObjectId, NextSearch
                         FROM
-                            DataObject_MetadataMap GROUP BY DataObjectId ORDER BY LastSearched) DDMM ON DataObject.Id = DDMM.DataObjectId
+                            DataObject_MetadataMap
+                        WHERE
+                            SourceId IN (" + string.Join(", ", ProcessSources.Select(s => (int)s)) + @") AND MatchMethod IN (0, 1)
+                        GROUP BY DataObjectId
+                        ORDER BY NextSearch ASC) DDMM ON DataObject.Id = DDMM.DataObjectId
                     WHERE
-                        ObjectType = @objecttype AND DDMM.LastSearched < @lastsearched
-                    ORDER BY DataObject.`Name`;
-                ", new Dictionary<string, object>
+                        ObjectType = @objecttype AND DDMM.NextSearch < @nextsearched;
+                ", dbDict);
+                if (ids.Rows.Count > 0)
                 {
-                    { "@objecttype", objectType },
-                    { "@lastsearched", DateTime.UtcNow.AddDays(-5) }
-                });
+                    // start processing data objects
+                    foreach (DataRow row in ids.Rows)
+                    {
+                        processedObjectCount++;
 
-                foreach (DataRow row in data.Rows)
+                        var item = await GetDataObject(objectType, (long)row["Id"]);
+                        if (item != null)
+                        {
+                            await _DataObjectMetadataSearch_Apply(item, logName, rand, objectType, id, ForceSearch, now, ProcessSources, processedObjectCount, ids.Rows.Count);
+                        }
+
+                        // sleep every 5 rows for half a second to prevent the system from being overwhelmed
+                        if (processedObjectCount % 5 == 0)
+                        {
+                            await Task.Delay(500);
+                        }
+                    }
+                }
+            }
+
+            Logging.SendReport(logName, null, null, $"Metadata search complete for {processedObjectCount} {objectType} data objects.");
+        }
+
+        private async Task _DataObjectMetadataSearch_Apply(DataObjectItem item, string logName, Random rand, DataObjectType objectType, long? id, bool ForceSearch, DateTime now, HashSet<MetadataSources> ProcessSources, int processedObjectCount, int objectTotalCount)
+        {
+
+            DataObjectItem? itemPlatform = null;
+            if (item.ObjectType == DataObjectType.Game)
+            {
+                if (item.Attributes != null && item.Attributes.Count > 0)
                 {
-                    DataObjectItem item = await BuildDataObject(objectType, (long)row["Id"], row, false, true);
-                    DataObjectsToProcess.Add(item);
+                    AttributeItem? platformAttribute = item.Attributes.Find(x => x.attributeName == AttributeItem.AttributeName.Platform && x.attributeType == AttributeItem.AttributeType.ObjectRelationship);
+                    if (platformAttribute != null)
+                    {
+                        // get the associated platform dataobject
+                        if (platformAttribute.Value.GetType() == typeof(DataObjectItem))
+                        {
+                            itemPlatform = (DataObjectItem)platformAttribute.Value;
+                        }
+                        else
+                        {
+                            RelationItem relationItem = (RelationItem)platformAttribute.Value;
+                            itemPlatform = await GetDataObject(DataObjectType.Platform, relationItem.relationId);
+                        }
+                    }
                 }
 
-                if (DataObjectsToProcess.Count == 0)
+                if (itemPlatform == null)
                 {
+                    Logging.Log(Logging.LogType.Warning, "Metadata Match", $"{processedObjectCount} / {objectTotalCount} - Skipping game {item.Name} as no platform is mapped.");
                     return;
                 }
             }
 
-            // start processing each object
-            int processedObjectCount = 0;
-            foreach (DataObjectItem item in DataObjectsToProcess)
+            // generate a list of search candidates
+            List<string> SearchCandidates = GetSearchCandidates(item.Name);
+
+            Logging.Log(Logging.LogType.Information, "Metadata Match", $"{processedObjectCount} / {objectTotalCount} - Searching for metadata for {string.Join(", ", SearchCandidates)} ({item.ObjectType}) Id: {item.Id}");
+            Logging.SendReport(logName, processedObjectCount, objectTotalCount, $"Searching for metadata for {string.Join(", ", SearchCandidates)} ({item.ObjectType})", true);
+
+            List<DataObjectItem.MetadataItem> metadataUpdates = new List<MetadataItem>();
+
+            // calculate a dates to search next time should we not find any matches, or need to refresh automatic matches
+            // day count should be randomised to ensure that we don't spend multiple days processing records
+            // automatic and automaticetoomanymatches - should be between 6 and 12 months
+            int automaticNextDay = rand.Next(180, 365);
+            // nomatch - should be between 1 and 6 months
+            int noMatchNextDay = rand.Next(30, 180);
+            // default - just one day
+            int defaultNextDay = 1;
+
+            // process each metadata source
+            foreach (MetadataSources metadataSource in allMetadataSources)
             {
-                processedObjectCount++;
-
-                // if item is a game type, we need to first determine if a platform is mapped
-                DataObjectItem? itemPlatform = null;
-                if (item.ObjectType == DataObjectType.Game)
+                // skip if type is none
+                if (metadataSource == MetadataSources.None)
                 {
-                    if (item.Attributes != null && item.Attributes.Count > 0)
-                    {
-                        AttributeItem? platformAttribute = item.Attributes.Find(x => x.attributeName == AttributeItem.AttributeName.Platform && x.attributeType == AttributeItem.AttributeType.ObjectRelationship);
-                        if (platformAttribute != null)
-                        {
-                            // get the associated platform dataobject
-                            if (platformAttribute.Value.GetType() == typeof(DataObjectItem))
-                            {
-                                itemPlatform = (DataObjectItem)platformAttribute.Value;
-                            }
-                            else
-                            {
-                                RelationItem relationItem = (RelationItem)platformAttribute.Value;
-                                itemPlatform = await GetDataObject(DataObjectType.Platform, relationItem.relationId);
-                            }
-                        }
-                    }
-
-                    if (itemPlatform == null)
-                    {
-                        Logging.Log(Logging.LogType.Warning, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Skipping game " + item.Name + " as no platform is mapped.");
-                        continue;
-                    }
+                    continue;
                 }
 
-                // generate a list of search candidates
-                List<string> SearchCandidates = GetSearchCandidates(item.Name);
-
-                Logging.Log(Logging.LogType.Information, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Searching for metadata for " + string.Join(", ", SearchCandidates) + " (" + item.ObjectType + ") Id: " + item.Id);
-
-                List<DataObjectItem.MetadataItem> metadataUpdates = new List<MetadataItem>();
-
-                // calculate a dates to search next time should we not find any matches, or need to refresh automatic matches
-                // day count should be randomised to ensure that we don't spend multiple days processing records
-                // automatic and automaticetoomanymatches - should be between 6 and 12 months
-                int automaticNextDay = new Random().Next(180, 365);
-                // nomatch - should be between 1 and 6 months
-                int noMatchNextDay = new Random().Next(30, 180);
-                // default - just one day
-                int defaultNextDay = 1;
-
-                // process each metadata source
-                foreach (MetadataSources metadataSource in Enum.GetValues(typeof(MetadataSources)))
+                // skip if it's an unsupported source type
+                if (!ProcessSources.Contains(metadataSource))
                 {
-                    // skip if it's an unsupported source type
-                    if (!ProcessSources.Contains(metadataSource))
-                    {
-                        continue;
-                    }
-
-                    // setup search options
-                    Dictionary<string, object> searchOptions = new Dictionary<string, object>();
-
-                    // if item type is game, search platformItem for an metadata source that equals metadataSource - if not found, skip
-                    DataObjectItem.MetadataItem? platformMetadata = null;
-                    if (item.ObjectType == DataObjectType.Game && itemPlatform != null)
-                    {
-                        if (itemPlatform != null && itemPlatform.Metadata != null && itemPlatform.Metadata.Count > 0)
-                        {
-                            // check if platform has metadata for this source
-                            platformMetadata = itemPlatform.Metadata.Find(x => x.Source == metadataSource);
-                            if (!String.IsNullOrEmpty(platformMetadata?.ImmutableId))
-                            {
-                                searchOptions.Add("platformId", long.Parse(platformMetadata.ImmutableId ?? "0"));
-                            }
-                            else
-                            {
-                                platformMetadata = null;
-                            }
-                        }
-
-                        if (platformMetadata == null)
-                        {
-                            Logging.Log(Logging.LogType.Warning, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Skipping metadata source " + metadataSource + " for game " + item.Name + " as no platform metadata is mapped.");
-                            continue;
-                        }
-                    }
-
-                    // find the class that implements IMetadata for this source in the namespace hasheous_server.Classes.MetadataLib where the property MetadataSource = metadataSource
-                    var metadataHandlerType = typeof(MetadataLib.IMetadata).Assembly.GetTypes()
-                        .Where(t => typeof(MetadataLib.IMetadata).IsAssignableFrom(t) && !t.IsInterface)
-                        .FirstOrDefault(t =>
-                        {
-                            var instance = Activator.CreateInstance(t) as MetadataLib.IMetadata;
-                            return instance?.MetadataSource == metadataSource;
-                        });
-
-                    if (metadataHandlerType == null)
-                    {
-                        // No handler found for this metadata source, skip it
-                        Logging.Log(Logging.LogType.Warning, "Metadata Match", $"No IMetadata handler found for source: {metadataSource}");
-                        continue;
-                    }
-
-                    var metadataHandler = Activator.CreateInstance(metadataHandlerType) as MetadataLib.IMetadata;
-
-                    if (metadataHandler == null)
-                    {
-                        // Unable to create instance of the handler, skip it
-                        Logging.Log(Logging.LogType.Warning, "Metadata Match", $"Unable to create instance of IMetadata handler for source: {metadataSource}");
-                        continue;
-                    }
-
-                    // get the metadataitem from the dataobject - if not present, create a new one
-                    // default to new
-                    DataObjectItem.MetadataItem metadata = new DataObjectItem.MetadataItem(objectType)
-                    {
-                        Id = "",
-                        MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
-                        Source = metadataSource,
-                        LastSearch = DateTime.UtcNow.AddMonths(-3),
-                        NextSearch = DateTime.UtcNow.AddMonths(-1),
-                        WinningVoteCount = 0,
-                        TotalVoteCount = 0
-                    };
+                    // set the next search date to 6 months in the future to avoid rechecking too often
+                    DataObjectItem.MetadataItem? existingMetadata = null;
                     if (item.Metadata != null)
                     {
-                        DataObjectItem.MetadataItem? metadataFromItem = item.Metadata.Find(x => x.Source == metadataSource);
-                        if (metadataFromItem != null)
-                        {
-                            metadata = metadataFromItem;
-                        }
+                        existingMetadata = item.Metadata.Find(x => x.Source == metadataSource);
                     }
-
-                    // do not search for metadata if the matchmethod is Manual, ManualByAdmin, or Voted
-                    List<BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod> dontSearchMatchMethods = [
-                        BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Manual,
-                        BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin,
-                        BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Voted
-                    ];
-
-                    if (metadata.MatchMethod == null || !dontSearchMatchMethods.Contains((BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod)metadata.MatchMethod))
+                    if (existingMetadata != null)
                     {
-                        // if the next search is in the past, or if we are forcing a search, then we can search for metadata
-                        if (ForceSearch || metadata.NextSearch < DateTime.UtcNow)
-                        {
-                            // searching is allowed
-                            Logging.Log(Logging.LogType.Information, "Metadata Match", "Checking " + metadataSource + "...");
-
-                            try
-                            {
-                                // perform the search
-                                DataObjects.MatchItem searchResult = await metadataHandler.FindMatchItemAsync(item, SearchCandidates, searchOptions);
-
-                                // update the metadata item with the search results
-                                metadata.Id = searchResult.MetadataId;
-                                metadata.MatchMethod = searchResult.MatchMethod;
-                                metadata.LastSearch = DateTime.UtcNow;
-                                switch (metadata.MatchMethod)
-                                {
-                                    case BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic:
-                                    case BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.AutomaticTooManyMatches:
-                                        metadata.NextSearch = DateTime.UtcNow.AddDays(automaticNextDay);
-                                        break;
-                                    case BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch:
-                                        metadata.NextSearch = DateTime.UtcNow.AddDays(noMatchNextDay);
-                                        break;
-                                    default:
-                                        metadata.NextSearch = DateTime.UtcNow.AddDays(defaultNextDay);
-                                        break;
-                                }
-
-                                // add to updates list
-                                metadataUpdates.Add(metadata);
-
-                                Logging.Log(Logging.LogType.Information, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - " + item.ObjectType + " " + item.Name + " " + metadata.MatchMethod + " to " + metadata.Source + " metadata: " + metadata.Id);
-                            }
-                            catch (Exception ex)
-                            {
-                                Logging.Log(Logging.LogType.Warning, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Error processing metadata search", ex);
-                            }
-                        }
+                        existingMetadata.NextSearch = now.AddDays(noMatchNextDay);
+                        metadataUpdates.Add(existingMetadata);
                     }
-
-                    if (metadataSource == MetadataSources.IGDB && metadata.ImmutableId != null && metadata.ImmutableId != "")
+                    else
                     {
-                        // IGDB metadata found, we can use this to check other metadata sources
-                        // if (item.Metadata.Find(x => x.Source == MetadataSources.Wikipedia) == null)
-                        // {
-                        // no wikipedia metadata present, try to get it from IGDB
-                        var wiki = new MetadataLib.MetadataWikipedia();
-                        try
+                        // no existing metadata map - create a default one
+                        DataObjectItem.MetadataItem newMetadata = new DataObjectItem.MetadataItem(objectType)
                         {
-                            var wikiMetadataResults = await wiki.FindMatchItemAsync(item, SearchCandidates, new Dictionary<string, object>
-                            {
-                                { "igdbGameId", long.Parse(metadata.ImmutableId) }
-                            });
-                            if (wikiMetadataResults != null && wikiMetadataResults.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic)
-                            {
-                                // update the metadata item with the search results
-                                DataObjectItem.MetadataItem wikiMetadata = new DataObjectItem.MetadataItem(objectType)
-                                {
-                                    Id = wikiMetadataResults.MetadataId,
-                                    MatchMethod = wikiMetadataResults.MatchMethod,
-                                    Source = MetadataSources.Wikipedia,
-                                    LastSearch = DateTime.UtcNow,
-                                    NextSearch = DateTime.UtcNow.AddMonths(6),
-                                    WinningVoteCount = 0,
-                                    TotalVoteCount = 0
-                                };
-
-                                // add to updates list
-                                metadataUpdates.Add(wikiMetadata);
-
-                                Logging.Log(Logging.LogType.Information, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - " + item.ObjectType + " " + item.Name + " " + wikiMetadata.MatchMethod + " to " + wikiMetadata.Source + " metadata: " + wikiMetadata.Id);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Logging.Log(Logging.LogType.Warning, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Error processing Wikipedia metadata search", ex);
-                        }
-                        // }
+                            Id = "",
+                            MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
+                            Source = metadataSource,
+                            LastSearch = now,
+                            NextSearch = now.AddDays(noMatchNextDay),
+                            WinningVoteCount = 0,
+                            TotalVoteCount = 0
+                        };
+                        metadataUpdates.Add(newMetadata);
                     }
+                    continue;
                 }
 
-                // clone DataObject to a new object incorporating any metadata updates - skip if no changes
-                if (metadataUpdates.Count > 0)
+                // setup search options
+                Dictionary<string, object> searchOptions = new Dictionary<string, object>();
+
+                // if item type is game, search platformItem for an metadata source that equals metadataSource - if not found, skip
+                DataObjectItem.MetadataItem? platformMetadata = null;
+                if (item.ObjectType == DataObjectType.Game && itemPlatform != null)
                 {
-                    DataObjectItem updatedDataObject = new DataObjectItem()
+                    if (itemPlatform != null && itemPlatform.Metadata != null && itemPlatform.Metadata.Count > 0)
                     {
-                        Id = item.Id,
-                        Name = item.Name,
-                        ObjectType = item.ObjectType,
-                        Permissions = item.Permissions,
-                        SignatureDataObjects = item.SignatureDataObjects,
-                        UpdatedDate = DateTime.UtcNow,
-                        UserPermissions = item.UserPermissions,
-                        CreatedDate = item.CreatedDate,
-                        Attributes = item.Attributes,
-                        Metadata = item.Metadata
-                    };
-
-                    if (updatedDataObject.Metadata == null)
-                    {
-                        updatedDataObject.Metadata = new List<DataObjectItem.MetadataItem>();
-                    }
-
-                    // apply metadata updates
-                    foreach (DataObjectItem.MetadataItem metadataUpdate in metadataUpdates)
-                    {
-                        // check if metadata source already exists
-                        DataObjectItem.MetadataItem? existingMetadata = updatedDataObject.Metadata.Find(x => x.Source == metadataUpdate.Source);
-                        if (existingMetadata != null)
+                        // check if platform has metadata for this source
+                        platformMetadata = itemPlatform.Metadata.Find(x => x.Source == metadataSource);
+                        if (!String.IsNullOrEmpty(platformMetadata?.ImmutableId))
                         {
-                            // update existing
-                            existingMetadata.Id = metadataUpdate.Id;
-                            existingMetadata.MatchMethod = metadataUpdate.MatchMethod;
-                            existingMetadata.LastSearch = metadataUpdate.LastSearch;
-                            existingMetadata.NextSearch = metadataUpdate.NextSearch;
-                            existingMetadata.WinningVoteCount = metadataUpdate.WinningVoteCount;
-                            existingMetadata.TotalVoteCount = metadataUpdate.TotalVoteCount;
+                            searchOptions.Add("platformId", long.Parse(platformMetadata.ImmutableId ?? "0"));
                         }
                         else
                         {
-                            // add new
-                            updatedDataObject.Metadata.Add(metadataUpdate);
+                            platformMetadata = null;
                         }
                     }
 
-                    // save updated data object
-                    await EditDataObject(updatedDataObject.ObjectType, updatedDataObject.Id, (DataObjectItem)updatedDataObject, null, true);
-                }
-
-                // ensure there are tasks for this item
-                var tasks = TaskManagement.GetAllTasks(item.Id);
-                bool aiTaskPresent = false;
-                foreach (var task in tasks)
-                {
-                    if (task.TaskName == Models.Tasks.TaskType.AIDescriptionAndTagging)
+                    if (platformMetadata == null)
                     {
-                        aiTaskPresent = true;
-                        break;
+                        Logging.Log(Logging.LogType.Warning, "Metadata Match", $"{processedObjectCount} / {objectTotalCount} - Skipping metadata source {metadataSource} for game {item.Name} as no platform metadata is mapped.");
+
+                        // set the next search date to 6 months in the future to avoid rechecking too often
+                        DataObjectItem.MetadataItem? existingMetadata = null;
+                        if (item.Metadata != null)
+                        {
+                            existingMetadata = item.Metadata.Find(x => x.Source == metadataSource);
+                        }
+                        if (existingMetadata != null)
+                        {
+                            existingMetadata.NextSearch = now.AddDays(noMatchNextDay);
+                            metadataUpdates.Add(existingMetadata);
+                        }
+                        else
+                        {
+                            // no existing metadata map - create a default one
+                            DataObjectItem.MetadataItem newMetadata = new DataObjectItem.MetadataItem(objectType)
+                            {
+                                Id = "",
+                                MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
+                                Source = metadataSource,
+                                LastSearch = now,
+                                NextSearch = now.AddDays(noMatchNextDay),
+                                WinningVoteCount = 0,
+                                TotalVoteCount = 0
+                            };
+                            metadataUpdates.Add(newMetadata);
+                        }
+
+                        continue;
                     }
                 }
-                // get metadata cover if new object is a game
-                if (objectType == DataObjectType.Game)
+
+                // Get metadata handler instance from cache (avoids expensive reflection + instantiation in nested loop)
+                var metadataHandlerCache = GetMetadataHandlerInstanceCache();
+
+                if (!metadataHandlerCache.TryGetValue(metadataSource, out var metadataHandler))
                 {
+                    // No handler found for this metadata source, skip it
+                    Logging.Log(Logging.LogType.Warning, "Metadata Match", $"No IMetadata handler found for source: {metadataSource}");
+                    continue;
+                }
+
+                // get the metadataitem from the dataobject - if not present, create a new one
+                // default to new
+                DataObjectItem.MetadataItem metadata = new DataObjectItem.MetadataItem(objectType)
+                {
+                    Id = "",
+                    MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
+                    Source = metadataSource,
+                    LastSearch = now,
+                    NextSearch = now.AddMonths(-1),
+                    WinningVoteCount = 0,
+                    TotalVoteCount = 0
+                };
+                if (item.Metadata != null)
+                {
+                    DataObjectItem.MetadataItem? metadataFromItem = item.Metadata.Find(x => x.Source == metadataSource);
+                    if (metadataFromItem != null)
+                    {
+                        metadata = metadataFromItem;
+                    }
+                }
+
+                if (metadata.MatchMethod == null || !dontSearchMatchMethods.Contains((BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod)metadata.MatchMethod))
+                {
+                    // if the next search is in the past, or if we are forcing a search, then we can search for metadata
+                    if (ForceSearch || metadata.NextSearch < now)
+                    {
+                        // searching is allowed
+                        Logging.Log(Logging.LogType.Information, "Metadata Match", $"Checking {metadataSource}...");
+
+                        try
+                        {
+                            // perform the search
+                            DataObjects.MatchItem searchResult = await metadataHandler.FindMatchItemAsync(item, SearchCandidates, searchOptions);
+
+                            // update the metadata item with the search results
+                            metadata.Id = searchResult.MetadataId;
+                            metadata.MatchMethod = searchResult.MatchMethod;
+                            metadata.LastSearch = now;
+                            switch (metadata.MatchMethod)
+                            {
+                                case BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic:
+                                case BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.AutomaticTooManyMatches:
+                                    metadata.NextSearch = now.AddDays(automaticNextDay);
+                                    break;
+                                case BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch:
+                                    metadata.NextSearch = now.AddDays(noMatchNextDay);
+                                    break;
+                                default:
+                                    metadata.NextSearch = now.AddDays(defaultNextDay);
+                                    break;
+                            }
+
+                            // add to updates list
+                            metadataUpdates.Add(metadata);
+
+                            Logging.Log(Logging.LogType.Information, "Metadata Match", $"{processedObjectCount} / {objectTotalCount} - {item.ObjectType} {item.Name} {metadata.MatchMethod} to {metadata.Source} metadata: {metadata.Id}");
+                        }
+                        catch (Exception ex)
+                        {
+                            Logging.Log(Logging.LogType.Warning, "Metadata Match", $"{processedObjectCount} / {objectTotalCount} - Error processing metadata search", ex);
+                        }
+                    }
+                }
+
+                if (metadataSource == MetadataSources.IGDB && metadata.ImmutableId != null && metadata.ImmutableId != "")
+                {
+                    // IGDB metadata found, we can use this to check other metadata sources
+                    // if (item.Metadata.Find(x => x.Source == MetadataSources.Wikipedia) == null)
+                    // {
+                    // no wikipedia metadata present, try to get it from IGDB
+                    var wiki = new MetadataLib.MetadataWikipedia();
                     try
                     {
-                        BackgroundMetadataMatcher.BackgroundMetadataMatcher metadataMatcher = new BackgroundMetadataMatcher.BackgroundMetadataMatcher();
-                        await metadataMatcher.GetGameArtwork((long)item.Id, ForceSearch);
+                        var wikiMetadataResults = await wiki.FindMatchItemAsync(item, SearchCandidates, new Dictionary<string, object>
+                            {
+                                { "igdbGameId", long.Parse(metadata.ImmutableId) }
+                            });
+                        if (wikiMetadataResults != null && wikiMetadataResults.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic)
+                        {
+                            // update the metadata item with the search results
+                            DataObjectItem.MetadataItem wikiMetadata = new DataObjectItem.MetadataItem(objectType)
+                            {
+                                Id = wikiMetadataResults.MetadataId,
+                                MatchMethod = wikiMetadataResults.MatchMethod,
+                                Source = MetadataSources.Wikipedia,
+                                LastSearch = now,
+                                NextSearch = now.AddMonths(6),
+                                WinningVoteCount = 0,
+                                TotalVoteCount = 0
+                            };
+
+                            // add to updates list
+                            metadataUpdates.Add(wikiMetadata);
+
+                            Logging.Log(Logging.LogType.Information, "Metadata Match", $"{processedObjectCount} / {objectTotalCount} - {item.ObjectType} {item.Name} {wikiMetadata.MatchMethod} to {wikiMetadata.Source} metadata: {wikiMetadata.Id}");
+                        }
                     }
                     catch (Exception ex)
                     {
-                        Logging.Log(Logging.LogType.Warning, "Metadata Match", processedObjectCount + " / " + DataObjectsToProcess.Count + " - Error processing game artwork metadata search", ex);
+                        Logging.Log(Logging.LogType.Warning, "Metadata Match", $"{processedObjectCount} / {objectTotalCount} - Error processing Wikipedia metadata search", ex);
+                    }
+                    // }
+                }
+            }
+
+            // clone DataObject to a new object incorporating any metadata updates - skip if no changes
+            if (metadataUpdates.Count > 0)
+            {
+                DataObjectItem updatedDataObject = new DataObjectItem()
+                {
+                    Id = item.Id,
+                    Name = item.Name,
+                    ObjectType = item.ObjectType,
+                    Permissions = item.Permissions,
+                    SignatureDataObjects = item.SignatureDataObjects,
+                    UpdatedDate = now,
+                    UserPermissions = item.UserPermissions,
+                    CreatedDate = item.CreatedDate,
+                    Attributes = item.Attributes,
+                    Metadata = item.Metadata
+                };
+
+                if (updatedDataObject.Metadata == null)
+                {
+                    updatedDataObject.Metadata = new List<DataObjectItem.MetadataItem>();
+                }
+
+                // remove any none sources from metadataUpdates (they shouldn't be here, but lets be certain)
+                metadataUpdates.RemoveAll(x => x.Source == MetadataSources.None);
+
+                // apply metadata updates
+                foreach (DataObjectItem.MetadataItem metadataUpdate in metadataUpdates)
+                {
+                    // check if metadata source already exists
+                    DataObjectItem.MetadataItem? existingMetadata = updatedDataObject.Metadata.Find(x => x.Source == metadataUpdate.Source);
+                    if (existingMetadata != null)
+                    {
+                        // update existing
+                        existingMetadata.Id = metadataUpdate.Id;
+                        existingMetadata.MatchMethod = metadataUpdate.MatchMethod;
+                        existingMetadata.LastSearch = now;
+                        existingMetadata.NextSearch = metadataUpdate.NextSearch;
+                        existingMetadata.WinningVoteCount = metadataUpdate.WinningVoteCount;
+                        existingMetadata.TotalVoteCount = metadataUpdate.TotalVoteCount;
+                    }
+                    else
+                    {
+                        // add new
+                        updatedDataObject.Metadata.Add(metadataUpdate);
                     }
                 }
 
-                // update date
-                UpdateDataObjectDate((long)item.Id);
+                // save updated data object
+                _ = EditDataObject(updatedDataObject.ObjectType, updatedDataObject.Id, (DataObjectItem)updatedDataObject, true);
+            }
 
-                // enqueue AI description and tagging task if not already present
-                if (aiTaskPresent == false)
+            // ensure there are tasks for this item
+            bool aiTaskPresent = TaskManagement.GetAllTasks(item.Id).Any(t => t.TaskName == Models.Tasks.TaskType.AIDescriptionAndTagging);
+            // get metadata cover if new object is a game
+            if (objectType == DataObjectType.Game)
+            {
+                try
                 {
-                    TaskManagement.EnqueueTask(item.Id, Models.Tasks.TaskType.AIDescriptionAndTagging);
+                    BackgroundMetadataMatcher.BackgroundMetadataMatcher metadataMatcher = new BackgroundMetadataMatcher.BackgroundMetadataMatcher();
+                    _ = metadataMatcher.GetGameArtwork((long)item.Id, ForceSearch);
                 }
+                catch (Exception ex)
+                {
+                    Logging.Log(Logging.LogType.Warning, "Metadata Match", $"{processedObjectCount} / {objectTotalCount} - Error processing game artwork metadata search", ex);
+                }
+            }
+
+            // update date
+            UpdateDataObjectDate((long)item.Id);
+
+            // enqueue AI description and tagging task if not already present
+            if (aiTaskPresent == false)
+            {
+                TaskManagement.EnqueueTask(item.Id, Models.Tasks.TaskType.AIDescriptionAndTagging);
             }
         }
 

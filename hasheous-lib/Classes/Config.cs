@@ -968,17 +968,6 @@ namespace Classes
                 }
 
                 /// <summary>
-                /// Gets the directory path for processed library signatures.
-                /// </summary>
-                public string LibrarySignaturesProcessedDirectory
-                {
-                    get
-                    {
-                        return Path.Combine(LibraryRootDirectory, "Signatures - Processed");
-                    }
-                }
-
-                /// <summary>
                 /// Gets the directory path for temporary files within the library root directory.
                 /// </summary>
                 public string LibraryTempDirectory

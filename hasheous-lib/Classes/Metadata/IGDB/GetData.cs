@@ -234,23 +234,24 @@ namespace hasheous_server.Classes.Metadata.IGDB
                         trimmedPart = trimmedPart.Substring(5).Trim();
                     }
 
-                    // parse the query into conditions
-                    bool insideQuotes = false;
-                    string currentCondition = string.Empty;
-                    foreach (var character in trimmedPart)
-                    {
-                        if (character == '"' || character == '\'')
-                        {
-                            insideQuotes = !insideQuotes; // toggle the insideQuotes flag
-                        }
+                    // Extract string literals to prevent processing operators inside them
+                    Dictionary<string, string> stringLiterals = new Dictionary<string, string>();
+                    string processedPart = ExtractStringLiterals(trimmedPart, stringLiterals);
 
-                        if (!insideQuotes && (character == '&' || character == '|'))
+                    // parse the query into conditions
+                    string currentCondition = string.Empty;
+                    foreach (var character in processedPart)
+                    {
+                        if (character == '&' || character == '|')
                         {
                             // we have reached a condition separator, so we need to split the query
                             if (!string.IsNullOrEmpty(currentCondition))
                             {
+                                // restore string literals before parsing the condition
+                                string restoredCondition = RestoreStringLiterals(currentCondition, stringLiterals);
+
                                 // parse the condition into a SQLCondition object
-                                SQLCondition sqlCondition = new SQLCondition(currentCondition);
+                                SQLCondition sqlCondition = new SQLCondition(restoredCondition);
 
                                 // determine the type of condition based on the separator
                                 if (character == '&')
@@ -278,7 +279,8 @@ namespace hasheous_server.Classes.Metadata.IGDB
                     // if there is a remaining condition, add it to the list
                     if (!string.IsNullOrEmpty(currentCondition))
                     {
-                        SQLCondition sqlCondition = new SQLCondition(currentCondition);
+                        string restoredCondition = RestoreStringLiterals(currentCondition, stringLiterals);
+                        SQLCondition sqlCondition = new SQLCondition(restoredCondition);
                         conditions.Add(sqlCondition);
                     }
                 }
@@ -459,6 +461,82 @@ namespace hasheous_server.Classes.Metadata.IGDB
 
             // return the SQL query object
             return sqlQuery;
+        }
+
+        /// <summary>
+        /// Extracts string literals from a condition string and replaces them with placeholders.
+        /// This prevents operators (like &amp; or |) inside quoted strings from being treated as separators.
+        /// </summary>
+        /// <param name="input">The input condition string containing quoted literals</param>
+        /// <param name="literals">Dictionary to store the extracted literal values</param>
+        /// <returns>The input string with literals replaced by placeholders</returns>
+        private static string ExtractStringLiterals(string input, Dictionary<string, string> literals)
+        {
+            StringBuilder result = new StringBuilder();
+            int literalCount = 0;
+
+            for (int i = 0; i < input.Length; i++)
+            {
+                char current = input[i];
+
+                // Check if we're at the start of a quoted string (accounting for escaped quotes)
+                if ((current == '"' || current == '\'') && (i == 0 || input[i - 1] != '\\'))
+                {
+                    char quoteChar = current;
+                    int startIndex = i + 1; // Start after the opening quote
+                    int endIndex = startIndex;
+
+                    // Find the closing quote
+                    while (endIndex < input.Length)
+                    {
+                        if (input[endIndex] == quoteChar && (endIndex == 0 || input[endIndex - 1] != '\\'))
+                        {
+                            break;
+                        }
+                        endIndex++;
+                    }
+
+                    // Extract the string literal (without quotes)
+                    if (endIndex < input.Length)
+                    {
+                        string literalValue = input.Substring(startIndex, endIndex - startIndex);
+                        string placeholder = $"__LITERAL_{literalCount}__";
+                        literals[placeholder] = literalValue;
+                        result.Append(placeholder);
+                        i = endIndex; // Skip past the closing quote
+                        literalCount++;
+                    }
+                    else
+                    {
+                        // Unclosed quote, just add the character
+                        result.Append(current);
+                    }
+                }
+                else
+                {
+                    result.Append(current);
+                }
+            }
+
+            return result.ToString();
+        }
+
+        /// <summary>
+        /// Restores string literals that were previously extracted via ExtractStringLiterals.
+        /// </summary>
+        /// <param name="input">The input string with placeholders</param>
+        /// <param name="literals">Dictionary containing the original literal values</param>
+        /// <returns>The input string with placeholders replaced by original values</returns>
+        private static string RestoreStringLiterals(string input, Dictionary<string, string> literals)
+        {
+            string result = input;
+
+            foreach (var kvp in literals)
+            {
+                result = result.Replace(kvp.Key, kvp.Value);
+            }
+
+            return result;
         }
 
         private class SQLQuery

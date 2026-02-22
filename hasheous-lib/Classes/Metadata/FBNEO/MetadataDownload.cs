@@ -25,7 +25,6 @@ namespace FBNEO
                     if (!cloneSuccess)
                     {
                         Logging.Log(Logging.LogType.Warning, SourceName, $"{SourceName} repository is already up to date; no changes detected.");
-                        return;
                     }
                 }
                 catch (Exception ex)
@@ -33,17 +32,16 @@ namespace FBNEO
                     throw new Exception($"Failed to clone or refresh {SourceName} repository from '{GitUrl}': {ex.Message}", ex);
                 }
 
-                // cleanup signature processed directory
-                string tosecProcessedDir = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesProcessedDirectory, "FBNeo");
-                if (Directory.Exists(tosecProcessedDir)) { Directory.Delete(tosecProcessedDir, true); }
-
                 // copy the signature files to the processing directory
                 string datFile = Path.Combine(extractDir, "dats");
                 if (Directory.Exists(datFile))
                 {
+                    string destDir = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesDirectory, "FBNeo");
+                    if (Directory.Exists(destDir)) { Directory.Delete(destDir, true); }
+                    Directory.CreateDirectory(destDir);
                     foreach (var file in Directory.GetFiles(datFile, "*.dat", SearchOption.TopDirectoryOnly))
                     {
-                        string destFile = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesDirectory, "FBNeo", Path.GetFileName(file));
+                        string destFile = Path.Combine(destDir, Path.GetFileName(file));
                         File.Copy(file, destFile, true);
                     }
                 }

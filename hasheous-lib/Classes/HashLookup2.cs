@@ -143,7 +143,7 @@ namespace Classes
                     string publisherCacheKey = RedisConnection.GenerateKey("HashLookup", new { Type = DataObjects.DataObjectType.Company, Id = discoveredSignature.Game.PublisherId });
                     if (Config.RedisConfiguration.Enabled)
                     {
-                        string? cachedPublisher = RedisConnection.GetDatabase(0).StringGet(publisherCacheKey);
+                        string? cachedPublisher = await RedisConnection.GetDatabase(0).StringGetAsync(publisherCacheKey);
                         if (cachedPublisher != null && cachedPublisher != "")
                         {
                             // get the publisher from the cache
@@ -186,7 +186,7 @@ namespace Classes
                 string platformCacheKey = RedisConnection.GenerateKey("HashLookup", new { Type = DataObjects.DataObjectType.Platform, Id = discoveredSignature.Game.SystemId });
                 if (Config.RedisConfiguration.Enabled)
                 {
-                    string? cachedPlatform = RedisConnection.GetDatabase(0).StringGet(platformCacheKey);
+                    string? cachedPlatform = await RedisConnection.GetDatabase(0).StringGetAsync(platformCacheKey);
                     if (cachedPlatform != null && cachedPlatform != "")
                     {
                         // get the platform from the cache
@@ -229,7 +229,7 @@ namespace Classes
                 string gameCacheKey = RedisConnection.GenerateKey("HashLookup", new { Type = DataObjects.DataObjectType.Game, Id = discoveredSignature.Game.Id });
                 if (Config.RedisConfiguration.Enabled)
                 {
-                    string? cachedGame = RedisConnection.GetDatabase(0).StringGet(gameCacheKey);
+                    string? cachedGame = await RedisConnection.GetDatabase(0).StringGetAsync(gameCacheKey);
                     if (cachedGame != null && cachedGame != "")
                     {
                         // get the game from the cache

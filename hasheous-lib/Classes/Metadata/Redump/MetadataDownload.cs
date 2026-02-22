@@ -36,8 +36,10 @@ namespace Redump
                 var mainDiv = doc.DocumentNode.SelectSingleNode("//div[@id='main']");
                 var table = mainDiv.SelectSingleNode(".//table");
                 var rows = table.SelectNodes(".//tr");
+                int currentRow = 0;
                 foreach (var row in rows.Skip(1)) // Skip header row
                 {
+                    currentRow++;
                     string platformName = "";
                     string cueSheetLink = "";
                     string platformLink = "";
@@ -75,6 +77,7 @@ namespace Redump
 
                     // Download the datfile
                     Logging.Log(Logging.LogType.Information, "Redump", $"Downloading datfile for platform {platformName} from {platformLink}");
+                    Logging.SendReport(Config.LogName, currentRow, rows.Count, $"Downloading datfile for platform {platformName}");
                     string downloadPath = System.IO.Path.Combine(tempDir, $"{platformName}.zip");
                     await DownloadTools.DownloadFile(new Uri(platformLink), downloadPath);
                     // Extract the datfile
@@ -139,10 +142,6 @@ namespace Redump
                         }
                     }
                 }
-
-                // cleanup signature processed directory
-                string redumpProcessedDir = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesProcessedDirectory, "Redump");
-                if (Directory.Exists(redumpProcessedDir)) { Directory.Delete(redumpProcessedDir, true); }
 
                 // move extracted files to processing directory
                 string redumpProcessingDir = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesDirectory, "Redump");

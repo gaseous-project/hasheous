@@ -6,14 +6,24 @@ namespace Classes.ProcessQueue
     public class SignatureIngestor : IQueueTask
     {
         /// <inheritdoc/>
-        public List<QueueItemType> Blocks => new List<QueueItemType>();
+        public List<QueueItemType> Blocks => new List<QueueItemType>{
+            QueueItemType.FetchFBNEOMetadata,
+            QueueItemType.FetchMAMERedumpMetadata,
+            QueueItemType.FetchPureDOSDATMetadata,
+            QueueItemType.FetchRedumpMetadata,
+            QueueItemType.FetchRetroAchievementsMetadata,
+            QueueItemType.FetchTOSECMetadata,
+            QueueItemType.FetchWHDLoadMetadata
+        };
 
         /// <inheritdoc/>
         public async Task<object?> ExecuteAsync()
         {
             XML.XMLIngestor tIngest = new XML.XMLIngestor();
 
-            foreach (int i in Enum.GetValues(typeof(gaseous_signature_parser.parser.SignatureParser)))
+            var parserTypes = Enum.GetValues(typeof(gaseous_signature_parser.parser.SignatureParser));
+
+            foreach (int i in parserTypes)
             {
                 gaseous_signature_parser.parser.SignatureParser parserType = (gaseous_signature_parser.parser.SignatureParser)i;
                 if (
@@ -23,19 +33,13 @@ namespace Classes.ProcessQueue
                 {
 
                     string SignaturePath = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesDirectory, parserType.ToString());
-                    string SignatureProcessedPath = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesProcessedDirectory, parserType.ToString());
 
                     if (!Directory.Exists(SignaturePath))
                     {
                         Directory.CreateDirectory(SignaturePath);
                     }
 
-                    if (!Directory.Exists(SignatureProcessedPath))
-                    {
-                        Directory.CreateDirectory(SignatureProcessedPath);
-                    }
-
-                    await tIngest.Import(SignaturePath, SignatureProcessedPath, parserType);
+                    await tIngest.Import(SignaturePath, parserType);
                 }
             }
 

@@ -69,80 +69,7 @@ namespace hasheous_server.Controllers.v1_0
 
             var user = await _userManager.GetUserAsync(User);
 
-            // check the redis cache for the data
-            // build a cache key from the url including the query parameters
-            string unencodedCacheKey = Request.Path + "?";
-            foreach (var query in Request.Query)
-            {
-                string? value = query.Value.ToString();
-                if (query.Key == "pageNumber")
-                {
-                    value = pageNumber.ToString();
-                }
-                unencodedCacheKey += $"{query.Key}={value}&";
-            }
-
-            // remove the trailing '&' if it exists
-            if (unencodedCacheKey.EndsWith("&"))
-            {
-                unencodedCacheKey = unencodedCacheKey.TrimEnd('&');
-            }
-            // generate a cache key for the data object
-            string userId = "Anonymous";
-            if (user != null)
-            {
-                userId = user.Id;
-            }
-            string cacheKey = RedisConnection.GenerateKey($"{userId}DataObjectList", ObjectType.ToString() + unencodedCacheKey);
-
-            if (Config.RedisConfiguration.Enabled)
-            {
-                if (ObjectType != Classes.DataObjects.DataObjectType.App)
-                {
-                    string? cachedData = hasheous.Classes.RedisConnection.GetDatabase(0).StringGet(cacheKey);
-                    if (cachedData != null)
-                    {
-                        // if cached data is found, deserialize it and return
-                        DataObjectsList? dataObjectsList = Newtonsoft.Json.JsonConvert.DeserializeObject<DataObjectsList>(cachedData);
-
-                        if (dataObjectsList != null)
-                        {
-                            return Ok(dataObjectsList);
-                        }
-                    }
-                }
-            }
-
             objectsList = await DataObjects.GetDataObjects(ObjectType, pageNumber, pageSize, search, getchildrelations, getMetadata, filterAttribute, filterValue, user);
-
-            if (objectsList != null && Config.RedisConfiguration.Enabled)
-            {
-                if (ObjectType != Classes.DataObjects.DataObjectType.App)
-                {
-                    // store the data in the cache
-                    hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(cacheKey, Newtonsoft.Json.JsonConvert.SerializeObject(objectsList), TimeSpan.FromMinutes(5));
-
-                    if (cacheBehind)
-                    {
-                        // cache the previous page if it exists
-                        if (pageNumber > 1)
-                        {
-                            // call the same method with the previous page number
-                            _ = DataObjectsList(ObjectType, search, pageNumber - 1, pageSize, getchildrelations, filterAttribute, filterValue, getMetadata, false, false);
-                        }
-                    }
-
-                    if (cacheAhead)
-                    {
-                        // cache the next page if it exists
-                        if (pageNumber < objectsList.TotalPages)
-                        {
-                            // call the same method with the next page number
-                            _ = DataObjectsList(ObjectType, search, pageNumber + 1, pageSize, getchildrelations, filterAttribute, filterValue, getMetadata, false, false);
-                        }
-                    }
-                }
-            }
 
             return Ok(objectsList);
         }
@@ -159,6 +86,16 @@ namespace hasheous_server.Controllers.v1_0
             if (!Enum.IsDefined(typeof(Classes.DataObjects.DataObjectType), ObjectType))
             {
                 return BadRequest("Invalid ObjectType provided.");
+            }
+
+            string cacheKey = hasheous_server.Classes.DataObjects.DataObjectCacheKey(ObjectType, Id);
+
+            if (Config.RedisConfiguration.Enabled)
+            {
+                if (await RedisConnection.CacheItemExists(cacheKey))
+                {
+                    return Ok(await RedisConnection.GetCacheItem<Models.DataObjectItem>(cacheKey));
+                }
             }
 
             hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
@@ -198,6 +135,14 @@ namespace hasheous_server.Controllers.v1_0
                     if (DataObject.Permissions.Contains(DataObjectPermission.PermissionType.Update))
                     {
                         DataObject.UserPermissions = dataObjectPermission.GetObjectPermissionList(DataObject.Id);
+                    }
+                }
+                else
+                {
+                    // cache any non-app object
+                    if (Config.RedisConfiguration.Enabled)
+                    {
+                        await RedisConnection.SetCacheItem(cacheKey, DataObject);
                     }
                 }
 

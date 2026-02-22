@@ -1,4 +1,5 @@
 using System.Data;
+using HasheousClient.Models;
 
 namespace Classes
 {
@@ -51,7 +52,6 @@ namespace Classes
             // clean other caches if needed
             CleanupCachesBySize(new string[]
             {
-                Config.LibraryConfiguration.LibrarySignaturesProcessedDirectory,
                 Config.LibraryConfiguration.LibraryTempDirectory,
                 Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_GiantBomb, "Images"),
                 Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB, "Images"),
@@ -124,6 +124,23 @@ namespace Classes
                     }
                 }
             }
+
+            // delete all metadata sources of type None - this shouldn't happen, but just in case
+            sql = "DELETE FROM DataObject_MetadataMap WHERE SourceId = @sourceid LIMIT 1000; SELECT ROW_COUNT() AS AffectedRows;";
+            Dictionary<string, object> dbDict = new Dictionary<string, object>
+            {
+                { "@sourceid", MetadataSources.None }
+            };
+            do
+            {
+                DataTable response = await db.ExecuteCMDAsync(sql, dbDict);
+                int affectedRows = Convert.ToInt32(response.Rows[0]["AffectedRows"]);
+                if (affectedRows == 0)
+                {
+                    break;
+                }
+                Logging.Log(Logging.LogType.Information, "Maintenance", "Deleted " + affectedRows + " metadata mappings with source None.");
+            } while (true);
         }
 
         /// <summary>
@@ -143,6 +160,7 @@ namespace Classes
             int StatusCounter = 1;
             foreach (DataRow row in tables.Rows)
             {
+                Logging.SendReport(Config.LogName, StatusCounter, tables.Rows.Count, "Optimising table " + row[0].ToString(), true);
                 sql = "OPTIMIZE TABLE " + row[0].ToString();
                 DataTable response = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>(), 240);
                 foreach (DataRow responseRow in response.Rows)
