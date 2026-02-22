@@ -2437,7 +2437,7 @@ namespace hasheous_server.Classes
                 }
 
                 // save updated data object
-                _ = EditDataObject(updatedDataObject.ObjectType, updatedDataObject.Id, (DataObjectItem)updatedDataObject, true);
+                _ = EditDataObject(updatedDataObject.ObjectType, updatedDataObject.Id, (DataObjectItem)updatedDataObject, null, true);
             }
 
             // ensure there are tasks for this item
