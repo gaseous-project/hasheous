@@ -13,7 +13,7 @@ fetch('/api/v1/DataObjects/' + pageType + '/' + objectId)
         return response.json();
     })
     .then(dataObject => {
-        document.getElementById('dataObjectName').textContent = dataObject.Name;
+        document.getElementById('dataObjectName').textContent = dataObject.name;
     })
     .catch(error => {
         console.error('Error fetching data object:', error);
@@ -38,7 +38,7 @@ function loadHistory(page) {
         .then(data => {
             document.getElementById('historyLoading').style.display = 'none';
             
-            if (data.History && data.History.length > 0) {
+            if (data.history && data.history.length > 0) {
                 displayHistory(data);
                 document.getElementById('historyContent').style.display = 'block';
             } else {
@@ -56,14 +56,14 @@ function displayHistory(data) {
     const historyRecordsDiv = document.getElementById('historyRecords');
     historyRecordsDiv.innerHTML = '';
     
-    totalPages = data.TotalPages;
+    totalPages = data.totalPages;
     
-    data.History.forEach(record => {
+    data.history.forEach(record => {
         const recordDiv = document.createElement('div');
         recordDiv.className = 'history-record';
         
         // Format timestamp
-        const timestamp = new Date(record.ChangeTimestamp);
+        const timestamp = new Date(record.changeTimestamp);
         const formattedTime = timestamp.toLocaleString();
         
         // Create header with timestamp and rollback button
@@ -87,11 +87,11 @@ function displayHistory(data) {
             
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
-            checkbox.id = 'confirm-' + record.Id;
+            checkbox.id = 'confirm-' + record.id;
             checkbox.className = 'rollback-confirm-checkbox';
             
             const checkboxLabel = document.createElement('label');
-            checkboxLabel.htmlFor = 'confirm-' + record.Id;
+            checkboxLabel.htmlFor = 'confirm-' + record.id;
             checkboxLabel.setAttribute('data-lang', 'rollbackconfirm');
             checkboxLabel.textContent = 'I confirm I want to rollback to this version';
             
@@ -102,7 +102,7 @@ function displayHistory(data) {
             rollbackButton.className = 'rollback-button';
             rollbackButton.disabled = true;
             rollbackButton.innerHTML = '<span data-lang="rollback">Rollback</span>';
-            rollbackButton.onclick = () => performRollback(record.Id);
+            rollbackButton.onclick = () => performRollback(record.id);
             
             // Enable/disable rollback button based on checkbox
             checkbox.addEventListener('change', function() {
@@ -121,7 +121,7 @@ function displayHistory(data) {
         jsonDiv.className = 'history-json';
         
         // Pre-edit JSON section
-        if (record.PreEditJson) {
+        if (record.preEditJson) {
             const preEditSection = document.createElement('div');
             preEditSection.className = 'json-section';
             
@@ -133,7 +133,7 @@ function displayHistory(data) {
             preEditContent.className = 'json-content';
             
             const preEditPre = document.createElement('pre');
-            preEditPre.textContent = JSON.stringify(record.PreEditJson, null, 2);
+            preEditPre.textContent = JSON.stringify(record.preEditJson, null, 2);
             
             preEditContent.appendChild(preEditPre);
             preEditSection.appendChild(preEditTitle);
@@ -142,7 +142,7 @@ function displayHistory(data) {
         }
         
         // Diff JSON section
-        if (record.DiffJson) {
+        if (record.diffJson) {
             const diffSection = document.createElement('div');
             diffSection.className = 'json-section';
             
@@ -154,7 +154,7 @@ function displayHistory(data) {
             diffContent.className = 'json-content';
             
             const diffPre = document.createElement('pre');
-            diffPre.textContent = JSON.stringify(record.DiffJson, null, 2);
+            diffPre.textContent = JSON.stringify(record.diffJson, null, 2);
             
             diffContent.appendChild(diffPre);
             diffSection.appendChild(diffTitle);
@@ -176,19 +176,19 @@ function displayHistory(data) {
 
 function updatePagination(data) {
     const pageInfo = document.getElementById('historyPageInfo');
-    pageInfo.textContent = `Page ${data.PageNumber} of ${data.TotalPages}`;
+    pageInfo.textContent = `Page ${data.pageNumber} of ${data.totalPages}`;
     
     const prevButton = document.getElementById('historyPrevPage');
     const nextButton = document.getElementById('historyNextPage');
     
-    if (data.PageNumber > 1) {
+    if (data.pageNumber > 1) {
         prevButton.style.display = 'inline-block';
         prevButton.onclick = () => loadHistory(currentPage - 1);
     } else {
         prevButton.style.display = 'none';
     }
     
-    if (data.PageNumber < data.TotalPages) {
+    if (data.pageNumber < data.totalPages) {
         nextButton.style.display = 'inline-block';
         nextButton.onclick = () => loadHistory(currentPage + 1);
     } else {
