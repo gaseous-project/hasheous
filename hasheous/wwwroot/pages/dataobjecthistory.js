@@ -212,5 +212,10 @@ function performRollback(historyId) {
         });
 }
 
+// Back button handler
+document.getElementById('backToDetail').addEventListener("click", function (e) {
+    window.location.replace("/index.html?page=dataobjectdetail&type=" + pageType + "&id=" + objectId);
+});
+
 // Load initial history
 loadHistory(1);
