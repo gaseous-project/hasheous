@@ -66,6 +66,10 @@ document.getElementById('dataObjectEdit').addEventListener("click", function (e)
     window.location.replace("/index.html?page=dataobjectedit&type=" + pageType + "&id=" + getQueryString('id', 'int'));
 });
 
+document.getElementById('dataObjectHistory').addEventListener("click", function (e) {
+    window.location.replace("/index.html?page=dataobjecthistory&type=" + pageType + "&id=" + getQueryString('id', 'int'));
+});
+
 document.getElementById('dataObjectDelete').addEventListener("click", function (e) {
     postData('/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int'), 'DELETE', {})
         .then(function (success) {

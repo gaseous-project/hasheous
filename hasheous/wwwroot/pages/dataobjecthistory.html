@@ -1,0 +1,97 @@
+<h1>
+    <span data-lang="historyfor">History for</span>: <span id="dataObjectName"></span>
+</h1>
+
+<div class="page_content_box">
+    <div id="historySection">
+        <div id="historyLoading" style="text-align: center; padding: 20px;">
+            <span data-lang="loading">Loading...</span>
+        </div>
+        
+        <div id="historyContent" style="display: none;">
+            <div id="historyRecords"></div>
+            
+            <div id="historyPagination" style="margin-top: 20px; text-align: center;">
+                <button id="historyPrevPage" style="display: none;">← <span data-lang="previous">Previous</span></button>
+                <span id="historyPageInfo" style="margin: 0 20px;"></span>
+                <button id="historyNextPage" style="display: none;"><span data-lang="next">Next</span> →</button>
+            </div>
+        </div>
+        
+        <div id="noHistory" style="display: none; text-align: center; padding: 20px;">
+            <p data-lang="nohostoryrecords">No history records found</p>
+        </div>
+    </div>
+</div>
+
+<style>
+    .history-record {
+        border: 1px solid var(--element-border-color);
+        border-radius: var(--element-border-radius);
+        margin-bottom: 20px;
+        padding: 15px;
+        background-color: var(--page-background);
+    }
+    
+    .history-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid var(--element-border-color);
+    }
+    
+    .history-timestamp {
+        font-weight: bold;
+        font-size: 1.1em;
+    }
+    
+    .history-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .history-checkbox {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    
+    .history-json {
+        margin-top: 10px;
+    }
+    
+    .json-section {
+        margin-bottom: 15px;
+    }
+    
+    .json-section h4 {
+        margin: 5px 0;
+        color: var(--text-color);
+    }
+    
+    .json-content {
+        background-color: var(--code-background, #f5f5f5);
+        border: 1px solid var(--element-border-color);
+        border-radius: 4px;
+        padding: 10px;
+        overflow-x: auto;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    
+    .json-content pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9em;
+    }
+    
+    .rollback-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+</style>
