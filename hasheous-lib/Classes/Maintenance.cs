@@ -1,4 +1,5 @@
 using System.Data;
+using System.Security.Cryptography.Xml;
 using HasheousClient.Models;
 
 namespace Classes
@@ -141,6 +142,16 @@ namespace Classes
                 }
                 Logging.Log(Logging.LogType.Information, "Maintenance", "Deleted " + affectedRows + " metadata mappings with source None.");
             } while (true);
+
+            // delete all games that have no platform defined - these are likely to be incomplete entries that won't be fixed
+            sql = "SELECT DataObject.Id, DataObject.Name FROM DataObject LEFT JOIN (SELECT * FROM DataObject_Attributes WHERE AttributeName=4) DOA ON DataObject.Id = DOA.DataObjectId WHERE DataObject.ObjectType=2 AND DOA.AttributeRelation IS NULL;";
+            DataTable gamesWithoutPlatform = await db.ExecuteCMDAsync(sql);
+            hasheous_server.Classes.DataObjects dataObjects = new hasheous_server.Classes.DataObjects();
+            foreach (DataRow row in gamesWithoutPlatform.Rows)
+            {
+                long gameId = Convert.ToInt64(row["Id"]);
+                dataObjects.DeleteDataObject(hasheous_server.Classes.DataObjects.DataObjectType.Game, gameId);
+            }
         }
 
         /// <summary>
