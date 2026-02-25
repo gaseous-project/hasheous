@@ -206,7 +206,7 @@ namespace hasheous_server.Controllers.v1_0
                 }
                 else
                 {
-                    DataObjects.DeleteDataObject(ObjectType, Id);
+                    await DataObjects.DeleteDataObject(ObjectType, Id, user);
                     return Ok();
                 }
             }
@@ -232,7 +232,7 @@ namespace hasheous_server.Controllers.v1_0
             {
                 hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
-                Models.DataObjectItem? DataObject = await DataObjects.EditDataObject(ObjectType, Id, model);
+                Models.DataObjectItem? DataObject = await DataObjects.EditDataObject(ObjectType, Id, model, user);
 
                 if (DataObject == null)
                 {
@@ -268,7 +268,7 @@ namespace hasheous_server.Controllers.v1_0
                 {
                     hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
-                    Models.DataObjectItem? DataObject = await DataObjects.EditDataObject(ObjectType, Id, model);
+                    Models.DataObjectItem? DataObject = await DataObjects.EditDataObject(ObjectType, Id, model, user);
 
                     if (DataObject == null)
                     {
@@ -602,7 +602,7 @@ namespace hasheous_server.Controllers.v1_0
                         return BadRequest("The target object must be of the same type as the source object.");
                     }
 
-                    var result = DataObjects.MergeObjects(DataObject, TargetDataObject, Commit);
+                    var result = await DataObjects.MergeObjects(DataObject, TargetDataObject, Commit);
                     return Ok(result);
                 }
             }
@@ -707,6 +707,146 @@ namespace hasheous_server.Controllers.v1_0
             {
                 return NotFound();
             }
+        }
+
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [AllowAnonymous]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [Route("{ObjectType}/{Id}/History")]
+        public async Task<IActionResult> GetDataObjectHistory(Classes.DataObjects.DataObjectType ObjectType, long Id, int pageNumber = 1, int pageSize = 50)
+        {
+            hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
+
+            Models.DataObjectItem? DataObject = await DataObjects.GetDataObject(ObjectType, Id);
+
+            if (DataObject == null)
+            {
+                return NotFound();
+            }
+
+            // Validate pagination parameters
+            if (pageNumber < 1) pageNumber = 1;
+            if (pageSize < 1) pageSize = 50;
+            if (pageSize > 100) pageSize = 100; // Max page size to prevent abuse
+
+            // Calculate offset
+            int offset = (pageNumber - 1) * pageSize;
+
+            // Get total count
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string countSql = @"SELECT COUNT(*) as Total 
+                               FROM DataObjectHistory 
+                               WHERE ObjectId = @objectId AND ObjectType = @objectType";
+            
+            Dictionary<string, object> countDict = new Dictionary<string, object>
+            {
+                { "objectId", Id },
+                { "objectType", (int)ObjectType }
+            };
+
+            var countResult = await db.ExecuteCMDAsync(countSql, countDict);
+            int totalRecords = 0;
+            if (countResult.Rows.Count > 0)
+            {
+                totalRecords = Convert.ToInt32(countResult.Rows[0]["Total"]);
+            }
+
+            // Get history from database with pagination
+            string sql = @"SELECT Id, ObjectId, ObjectType, UserId, ChangeTimestamp, PreEditJson, DiffJson 
+                          FROM DataObjectHistory 
+                          WHERE ObjectId = @objectId AND ObjectType = @objectType 
+                          ORDER BY ChangeTimestamp DESC
+                          LIMIT @limit OFFSET @offset";
+            
+            Dictionary<string, object> dbDict = new Dictionary<string, object>
+            {
+                { "objectId", Id },
+                { "objectType", (int)ObjectType },
+                { "limit", pageSize },
+                { "offset", offset }
+            };
+
+            var historyData = await db.ExecuteCMDAsync(sql, dbDict);
+            
+            var historyList = new List<object>();
+            
+            // Check if user is admin or moderator to show UserId
+            bool canSeeUserId = User.IsInRole("Admin") || User.IsInRole("Moderator");
+            
+            foreach (System.Data.DataRow row in historyData.Rows)
+            {
+                byte[] preEditCompressed = (byte[])row["PreEditJson"];
+                byte[] diffCompressed = (byte[])row["DiffJson"];
+                
+                string preEditJson = DataObjects.DecompressString(preEditCompressed);
+                string diffJson = DataObjects.DecompressString(diffCompressed);
+                
+                var historyItem = new Dictionary<string, object>
+                {
+                    { "Id", row["Id"] },
+                    { "ObjectId", row["ObjectId"] },
+                    { "ObjectType", row["ObjectType"] },
+                    { "ChangeTimestamp", row["ChangeTimestamp"] },
+                    { "PreEditJson", Newtonsoft.Json.JsonConvert.DeserializeObject(preEditJson) },
+                    { "DiffJson", Newtonsoft.Json.JsonConvert.DeserializeObject(diffJson) }
+                };
+                
+                // Only include UserId if user has permission
+                if (canSeeUserId && row["UserId"] != DBNull.Value)
+                {
+                    historyItem.Add("UserId", row["UserId"]);
+                }
+                
+                historyList.Add(historyItem);
+            }
+
+            // Calculate total pages
+            int totalPages = (int)Math.Ceiling((double)totalRecords / pageSize);
+
+            // Return paginated result
+            var result = new
+            {
+                History = historyList,
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                TotalRecords = totalRecords,
+                TotalPages = totalPages
+            };
+
+            return Ok(result);
+        }
+
+        [MapToApiVersion("1.0")]
+        [HttpPost]
+        [Authorize(Roles = "Admin,Moderator")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [Route("{ObjectType}/{Id}/Rollback/{HistoryId}")]
+        public async Task<IActionResult> RollbackDataObject(Classes.DataObjects.DataObjectType ObjectType, long Id, long HistoryId)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            
+            hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
+
+            // Check if object exists (including soft-deleted ones for restoration purposes)
+            Models.DataObjectItem? DataObject = await DataObjects.GetDataObject(ObjectType, Id, true, true, true, true);
+
+            if (DataObject == null)
+            {
+                return NotFound("DataObject not found");
+            }
+
+            // Perform rollback
+            Models.DataObjectItem? restoredObject = await DataObjects.RollbackDataObject(ObjectType, Id, HistoryId, user);
+
+            if (restoredObject == null)
+            {
+                return BadRequest("Failed to rollback. History record not found or rollback failed.");
+            }
+
+            return Ok(restoredObject);
         }
     }
 }

@@ -333,5 +333,18 @@
     "similargame": "Similar Games",
     "similarcompany": "Similar Companies",
     "similarplatform": "Similar Platforms",
-    "servicetaskstatus": "Distributed Task Status"
+    "servicetaskstatus": "Distributed Task Status",
+    "viewhistory": "View History",
+    "history": "History",
+    "changetimestamp": "Change Timestamp",
+    "changes": "Changes",
+    "rollback": "Rollback",
+    "rollbackconfirm": "I confirm I want to rollback to this version",
+    "rollbacksuccess": "Successfully rolled back to previous version",
+    "rollbackfailed": "Failed to rollback",
+    "nohostoryrecords": "No history records found",
+    "preeditjson": "Previous State",
+    "diffjson": "Changes Made",
+    "historyfor": "History for",
+    "backtodetail": "Back to Detail"
 }
