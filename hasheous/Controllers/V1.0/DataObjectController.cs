@@ -15,7 +15,7 @@ namespace hasheous_server.Controllers.v1_0
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]/")]
     [ApiVersion("1.0")]
-    [ApiExplorerSettings(IgnoreApi = true)]
+    [ApiExplorerSettings(IgnoreApi = false)]
     [Authorize]
     public class DataObjectsController : ControllerBase
     {
@@ -633,6 +633,24 @@ namespace hasheous_server.Controllers.v1_0
             {
                 return Ok(await DataObjects.GetSimilarDataObjects(DataObject, filterTagType));
             }
+        }
+
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [AllowAnonymous]
+        [Route("{ObjectType}/{Id}/Duplicates")]
+        public async Task<IActionResult> GetDuplicateDataObjects(Classes.DataObjects.DataObjectType ObjectType, long Id, int pageNumber = 0, int pageSize = 0)
+        {
+            hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
+
+            hasheous_server.Models.DataObjectsList? objectsList;
+
+            var user = await _userManager.GetUserAsync(User);
+
+            objectsList = await DataObjects.GetDuplicateDataObjects(ObjectType, Id, pageNumber, pageSize);
+
+            return Ok(objectsList);
         }
 
         [MapToApiVersion("1.0")]

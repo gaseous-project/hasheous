@@ -215,7 +215,13 @@ namespace Classes
         {
             if (report != null)
             {
-                _ = report.SendAsync(progressItemKey, count, total, description, performETACalculation);
+                _ = report.SendAsync(progressItemKey, count, total, description, performETACalculation).ContinueWith(task =>
+                {
+                    if (task.IsFaulted)
+                    {
+                        Console.WriteLine($"[Logging.SendReport] Error sending report: {task.Exception?.InnerException?.Message}");
+                    }
+                }, TaskScheduler.Default);
             }
         }
 

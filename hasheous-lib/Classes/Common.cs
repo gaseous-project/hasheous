@@ -144,6 +144,200 @@ namespace Classes
 			}
 		}
 
+		public class Numbers
+		{
+			private static readonly Dictionary<int, string> NumberWords = new Dictionary<int, string>
+			{
+				{ 0, "Zero" },
+				{ 1, "One" },
+				{ 2, "Two" },
+				{ 3, "Three" },
+				{ 4, "Four" },
+				{ 5, "Five" },
+				{ 6, "Six" },
+				{ 7, "Seven" },
+				{ 8, "Eight" },
+				{ 9, "Nine" },
+				{ 10, "Ten" },
+				{ 11, "Eleven" },
+				{ 12, "Twelve" },
+				{ 13, "Thirteen" },
+				{ 14, "Fourteen" },
+				{ 15, "Fifteen" },
+				{ 16, "Sixteen" },
+				{ 17, "Seventeen" },
+				{ 18, "Eighteen" },
+				{ 19, "Nineteen" },
+				{ 20, "Twenty" },
+				{ 30, "Thirty" },
+				{ 40, "Forty" },
+				{ 50, "Fifty" },
+				{ 60, "Sixty" },
+				{ 70, "Seventy" },
+				{ 80, "Eighty" },
+				{ 90, "Ninety" },
+				{ 100, "Hundred" },
+				{ 1000, "Thousand" },
+				{ 1000000, "Million" },
+				{ 1000000000, "Billion" }
+			};
+
+			private static readonly Dictionary<string, int> WordsToNumber = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+			{
+				{ "Zero", 0 },
+				{ "One", 1 },
+				{ "Two", 2 },
+				{ "Three", 3 },
+				{ "Four", 4 },
+				{ "Five", 5 },
+				{ "Six", 6 },
+				{ "Seven", 7 },
+				{ "Eight", 8 },
+				{ "Nine", 9 },
+				{ "Ten", 10 },
+				{ "Eleven", 11 },
+				{ "Twelve", 12 },
+				{ "Thirteen", 13 },
+				{ "Fourteen", 14 },
+				{ "Fifteen", 15 },
+				{ "Sixteen", 16 },
+				{ "Seventeen", 17 },
+				{ "Eighteen", 18 },
+				{ "Nineteen", 19 },
+				{ "Twenty", 20 },
+				{ "Thirty", 30 },
+				{ "Forty", 40 },
+				{ "Fifty", 50 },
+				{ "Sixty", 60 },
+				{ "Seventy", 70 },
+				{ "Eighty", 80 },
+				{ "Ninety", 90 },
+				{ "Hundred", 100 },
+				{ "Thousand", 1000 },
+				{ "Million", 1000000 },
+				{ "Billion", 1000000000 }
+			};
+
+			/// <summary>
+			/// Converts a number to its English word representation.
+			/// </summary>
+			/// <param name="number">The number to convert (0 to 999,999,999).</param>
+			/// <returns>The English word representation of the number.</returns>
+			public static string NumberToWords(int number)
+			{
+				if (number < 0 || number > 999999999)
+					throw new ArgumentOutOfRangeException(nameof(number), "Value must be in the range 0-999,999,999.");
+
+				if (number == 0)
+					return "Zero";
+
+				if (NumberWords.TryGetValue(number, out var word))
+					return word;
+
+				List<string> parts = new List<string>();
+
+				// Billions
+				int billions = number / 1000000000;
+				if (billions > 0)
+				{
+					parts.Add(NumberToWords(billions) + " Billion");
+					number %= 1000000000;
+				}
+
+				// Millions
+				int millions = number / 1000000;
+				if (millions > 0)
+				{
+					parts.Add(NumberToWords(millions) + " Million");
+					number %= 1000000;
+				}
+
+				// Thousands
+				int thousands = number / 1000;
+				if (thousands > 0)
+				{
+					parts.Add(NumberToWords(thousands) + " Thousand");
+					number %= 1000;
+				}
+
+				// Hundreds
+				int hundreds = number / 100;
+				if (hundreds > 0)
+				{
+					parts.Add(NumberWords[hundreds] + " Hundred");
+					number %= 100;
+				}
+
+				// Ones and Tens
+				if (number > 0)
+				{
+					if (number < 20)
+					{
+						parts.Add(NumberWords[number]);
+					}
+					else
+					{
+						int tens = number / 10;
+						int ones = number % 10;
+						string tensWord = NumberWords[tens * 10];
+						if (ones > 0)
+						{
+							parts.Add(tensWord + " " + NumberWords[ones]);
+						}
+						else
+						{
+							parts.Add(tensWord);
+						}
+					}
+				}
+
+				return string.Join(" ", parts);
+			}
+
+			/// <summary>
+			/// Converts English number words to an integer.
+			/// Handles written forms like "Twenty One", "One Hundred Thirty Four", etc.
+			/// </summary>
+			/// <param name="words">The English words representing a number.</param>
+			/// <returns>The integer representation, or null if conversion fails.</returns>
+			public static int? WordsToNumbers(string words)
+			{
+				if (string.IsNullOrWhiteSpace(words))
+					return null;
+
+				// Normalize spacing and remove extra whitespace
+				words = Regex.Replace(words.Trim(), @"\s+", " ");
+				string[] tokens = words.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+				int result = 0;
+				int current = 0;
+
+				foreach (string token in tokens)
+				{
+					if (!WordsToNumber.TryGetValue(token, out int value))
+						return null; // Invalid token
+
+					if (value >= 1000)
+					{
+						current += result;
+						result = current * value;
+						current = 0;
+					}
+					else if (value == 100)
+					{
+						current *= value;
+					}
+					else
+					{
+						current += value;
+					}
+				}
+
+				result += current;
+				return result >= 0 ? result : null;
+			}
+		}
+
 		public class hashObject
 		{
 			public hashObject()

@@ -15,14 +15,23 @@ namespace hasheous_server.Classes.Report
         {
             this.processId = processId;
             this.correlationId = correlationId;
-
-            this.httpClient.BaseAddress = new Uri(reportingServerUrl);
+            this.reportingServerUrl = reportingServerUrl;
         }
 
-        private HttpClient httpClient = new HttpClient();
+        private static readonly HttpClient httpClient = new HttpClient(new SocketsHttpHandler
+        {
+            AllowAutoRedirect = false,
+            PooledConnectionLifetime = TimeSpan.FromSeconds(300),
+        })
+        {
+            Timeout = TimeSpan.FromSeconds(30)
+        };
+
+        private static readonly SemaphoreSlim sendSemaphore = new SemaphoreSlim(1, 1);
 
         private string processId;
         private string correlationId;
+        private string reportingServerUrl;
 
         /// <summary>
         /// Shared instance of the report model used to aggregate reporting data across the host process.
@@ -61,22 +70,31 @@ namespace hasheous_server.Classes.Report
             }
 
             // send to reporting server if configured
-            if (this.httpClient.BaseAddress != null)
+            if (!string.IsNullOrEmpty(this.reportingServerUrl))
             {
-                var jsonContent = System.Text.Json.JsonSerializer.Serialize(_reportModel);
-                var content = new StringContent(jsonContent, System.Text.Encoding.UTF8, "application/json");
-
+                // Acquire semaphore to serialize requests
+                await sendSemaphore.WaitAsync();
                 try
                 {
-                    string url = $"/api/v1/BackgroundTasks/{this.processId.ToString()}/{this.correlationId.ToString()}/report";
-                    Console.WriteLine($"Sending report to {httpClient.BaseAddress}{url}");
-                    var response = await httpClient.PostAsync(url, content);
-                    response.EnsureSuccessStatusCode();
+                    var jsonContent = System.Text.Json.JsonSerializer.Serialize(_reportModel);
+                    var content = new StringContent(jsonContent, System.Text.Encoding.UTF8, "application/json");
+
+                    try
+                    {
+                        string url = $"{this.reportingServerUrl}/api/v1.0/BackgroundTasks/{this.processId}/{this.correlationId}/report";
+                        Console.WriteLine($"Sending report to {url}");
+                        var response = await httpClient.PostAsync(url, content);
+                        response.EnsureSuccessStatusCode();
+                    }
+                    catch (Exception ex)
+                    {
+                        // Log the error but do not throw
+                        Console.WriteLine($"Failed to send report to server: {ex.Message}");
+                    }
                 }
-                catch (Exception ex)
+                finally
                 {
-                    // Log the error but do not throw
-                    Console.WriteLine($"Failed to send report to server: {ex.Message}");
+                    sendSemaphore.Release();
                 }
             }
         }
