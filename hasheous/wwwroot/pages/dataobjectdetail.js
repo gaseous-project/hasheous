@@ -658,9 +658,13 @@ function renderContent() {
                     let checkboxes = document.querySelectorAll('.duplicateCheckbox');
                     checkboxes.forEach(function (checkbox) {
                         checkbox.checked = selectAllCheckbox.checked;
-                        let event = new Event('change');
-                        checkbox.dispatchEvent(event);
                     });
+                    let mergeButton = document.getElementById('dataObjectMergeDuplicates');
+                    if (selectAllCheckbox.checked) {
+                        mergeButton.removeAttribute('disabled');
+                    } else {
+                        mergeButton.setAttribute('disabled', 'disabled');
+                    }
                 });
                 headerRow.appendChild(checkHeader);
 
