@@ -105,7 +105,7 @@ document.getElementById('dataObjectMerge').addEventListener("click", function (e
 });
 
 let dataObjectMergeDuplicates = document.getElementById('dataObjectMergeDuplicates');
-dataObjectMergeDuplicates.addEventListener("click", function (e) {
+dataObjectMergeDuplicates.addEventListener("click", async function (e) {
     let selectedIds = Array.from(document.querySelectorAll('.duplicateCheckbox:checked')).map(checkbox => checkbox.getAttribute('data-id'));
     if (selectedIds.length == 0) {
         alert('Please select at least one duplicate to merge.');
@@ -116,8 +116,9 @@ dataObjectMergeDuplicates.addEventListener("click", function (e) {
     dataObjectMergeDuplicates.setAttribute('disabled', 'disabled');
     document.querySelectorAll('.duplicateCheckbox').forEach(checkbox => checkbox.setAttribute('disabled', 'disabled'));
 
-    selectedIds.forEach(async element => {
-        await fetch('/api/v1/DataObjects/' + pageType + '/' + element + '/MergeObject?TargetId=' + getQueryString('id', 'int') + '&commit=true', {
+    // Create an array of promises for all merge operations
+    const mergePromises = selectedIds.map(element => {
+        return fetch('/api/v1/DataObjects/' + pageType + '/' + element + '/MergeObject?TargetId=' + getQueryString('id', 'int') + '&commit=true', {
             method: 'GET'
         }).then(async function (response) {
             if (!response.ok) {
@@ -135,11 +136,16 @@ dataObjectMergeDuplicates.addEventListener("click", function (e) {
             } else {
                 alert('An error occurred while merging data objects. Please try again.');
             }
+            return success;
         }).catch((error) => {
             console.warn(error);
             alert('An error occurred while merging data objects: ' + error.message);
+            return false;
         });
     });
+
+    // Wait for all merge operations to complete
+    await Promise.all(mergePromises);
 
     document.querySelectorAll('.duplicateCheckbox').forEach(checkbox => { checkbox.removeAttribute('disabled'); checkbox.checked = false; });
 
