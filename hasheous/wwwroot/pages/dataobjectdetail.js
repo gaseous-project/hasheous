@@ -7,6 +7,7 @@ let showEditControls = false;
 let showMergeControls = false;
 let showRescanButton = false;
 let showMetadataSubmitButton = false;
+let loadDuplicates = false;
 
 if (userProfile != null && userProfile.Roles != null) {
     switch (pageType) {
@@ -15,6 +16,7 @@ if (userProfile != null && userProfile.Roles != null) {
             if (userProfile.Roles.includes('Moderator') || userProfile.Roles.includes('Admin')) {
                 showEditControls = true;
                 showMergeControls = true;
+                loadDuplicates = true;
             }
 
             // show metadata submit and rescan buttons to all signed in users
@@ -23,6 +25,9 @@ if (userProfile != null && userProfile.Roles != null) {
             break;
 
         case "platform":
+            if (userProfile.Roles.includes('Moderator') || userProfile.Roles.includes('Admin')) {
+                loadDuplicates = true;
+            }
         case "app":
             if (userProfile.Roles.includes('Admin')) {
                 showEditControls = true;
@@ -97,6 +102,48 @@ document.getElementById('dataObjectMerge').addEventListener("click", function (e
         console.warn(error);
         alert('An error occurred while merging data objects: ' + error.message);
     });
+});
+
+let dataObjectMergeDuplicates = document.getElementById('dataObjectMergeDuplicates');
+dataObjectMergeDuplicates.addEventListener("click", function (e) {
+    let selectedIds = Array.from(document.querySelectorAll('.duplicateCheckbox:checked')).map(checkbox => checkbox.getAttribute('data-id'));
+    if (selectedIds.length == 0) {
+        alert('Please select at least one duplicate to merge.');
+        return;
+    }
+
+    // disable the button and all checkboxes to prevent multiple submissions
+    dataObjectMergeDuplicates.setAttribute('disabled', 'disabled');
+    document.querySelectorAll('.duplicateCheckbox').forEach(checkbox => checkbox.setAttribute('disabled', 'disabled'));
+
+    selectedIds.forEach(async element => {
+        await fetch('/api/v1/DataObjects/' + pageType + '/' + element + '/MergeObject?TargetId=' + getQueryString('id', 'int') + '&commit=true', {
+            method: 'GET'
+        }).then(async function (response) {
+            if (!response.ok) {
+                throw new Error('Failed to merge data objects');
+            }
+            return response.json();
+        }).then((success) => {
+            console.log(success);
+            if (success) {
+                // select the row with the matching data-id and remove it from the table
+                let row = document.querySelector('.duplicateRow[data-id="' + element + '"]');
+                if (row) {
+                    row.remove();
+                }
+            } else {
+                alert('An error occurred while merging data objects. Please try again.');
+            }
+        }).catch((error) => {
+            console.warn(error);
+            alert('An error occurred while merging data objects: ' + error.message);
+        });
+    });
+
+    document.querySelectorAll('.duplicateCheckbox').forEach(checkbox => { checkbox.removeAttribute('disabled'); checkbox.checked = false; });
+
+    location.reload();
 });
 
 let rescanButton = document.getElementById('metadatarescan');
@@ -584,6 +631,132 @@ function renderContent() {
             false
         );
         document.getElementById('dataObjectMetadataMap').appendChild(newMetadataMapTable);
+    }
+
+    if (loadDuplicates) {
+        fetch('/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int') + '/Duplicates', {
+            method: 'GET'
+        }).then(async function (response) {
+            if (!response.ok) {
+                throw new Error('Failed to fetch duplicate data objects');
+            }
+            return response.json();
+        }).then(function (success) {
+            if (success.objects.length > 0) {
+                document.getElementById('dataObjectDuplicates').style.display = '';
+
+                let duplicatesTable = document.createElement('table');
+
+                // add header row
+                let headerRow = document.createElement('tr');
+
+                let checkHeader = document.createElement('th');
+                checkHeader.classList.add('tableheadcell');
+                checkHeader.innerHTML = '<input type="checkbox" id="selectAllDuplicates">';
+                let selectAllCheckbox = checkHeader.querySelector('#selectAllDuplicates');
+                selectAllCheckbox.addEventListener('change', function () {
+                    let checkboxes = document.querySelectorAll('.duplicateCheckbox');
+                    checkboxes.forEach(function (checkbox) {
+                        checkbox.checked = selectAllCheckbox.checked;
+                        let event = new Event('change');
+                        checkbox.dispatchEvent(event);
+                    });
+                });
+                headerRow.appendChild(checkHeader);
+
+                let idHeader = document.createElement('th');
+                idHeader.classList.add('tableheadcell');
+                idHeader.innerHTML = 'ID';
+                headerRow.appendChild(idHeader);
+
+                let nameHeader = document.createElement('th');
+                nameHeader.classList.add('tableheadcell');
+                nameHeader.innerHTML = lang.getLang('name');
+                headerRow.appendChild(nameHeader);
+
+                if (pageType == "game") {
+                    let platformHeader = document.createElement('th');
+                    platformHeader.classList.add('tableheadcell');
+                    platformHeader.innerHTML = lang.getLang('platform');
+                    headerRow.appendChild(platformHeader);
+
+                    let publisherHeader = document.createElement('th');
+                    publisherHeader.classList.add('tableheadcell');
+                    publisherHeader.innerHTML = lang.getLang('publisher');
+                    headerRow.appendChild(publisherHeader);
+                }
+
+                duplicatesTable.appendChild(headerRow);
+
+                success.objects.forEach(element => {
+                    let row = document.createElement('tr');
+                    row.classList.add('duplicateRow');
+                    row.setAttribute('data-id', element.id);
+
+                    let checkCell = document.createElement('td');
+                    checkCell.innerHTML = '<input type="checkbox" class="duplicateCheckbox" data-id="' + element.id + '">';
+                    let checkbox = checkCell.querySelector('.duplicateCheckbox');
+                    checkbox.addEventListener('change', function () {
+                        let selectAllCheckbox = checkHeader.querySelector('#selectAllDuplicates');
+                        let selectedCheckboxes = document.querySelectorAll('.duplicateCheckbox:checked');
+                        let mergeButton = document.getElementById('dataObjectMergeDuplicates');
+                        if (selectedCheckboxes.length >= 1) {
+                            mergeButton.removeAttribute('disabled');
+                            if (selectedCheckboxes.length === document.querySelectorAll('.duplicateCheckbox').length) {
+                                selectAllCheckbox.checked = true;
+                            } else {
+                                selectAllCheckbox.checked = false;
+                            }
+                        } else {
+                            mergeButton.setAttribute('disabled', 'disabled');
+                            selectAllCheckbox.checked = false;
+                        }
+                    });
+                    checkCell.classList.add('tablecell');
+                    row.appendChild(checkCell);
+
+                    let idCell = document.createElement('td');
+                    idCell.innerHTML = element.id;
+                    idCell.classList.add('tablecell');
+                    row.appendChild(idCell);
+
+                    let nameCell = document.createElement('td');
+                    nameCell.innerHTML = '<a href="/index.html?page=dataobjectdetail&type=' + pageType + '&id=' + element.id + '">' + element.name + '</a>';
+                    nameCell.classList.add('tablecell');
+                    row.appendChild(nameCell);
+
+                    if (pageType == "game") {
+                        let platformCell = document.createElement('td');
+                        platformCell.classList.add('tablecell');
+                        let platformAttribute = element.attributes.find(attr => attr.attributeName === 'Platform');
+                        if (platformAttribute) {
+                            platformCell.innerHTML = platformAttribute.value.name;
+                        } else {
+                            platformCell.innerHTML = "";
+                        }
+                        row.appendChild(platformCell);
+
+                        let publisherCell = document.createElement('td');
+                        publisherCell.classList.add('tablecell');
+                        let publisherAttribute = element.attributes.find(attr => attr.attributeName === 'Publisher');
+                        if (publisherAttribute) {
+                            publisherCell.innerHTML = publisherAttribute.value.name;
+                        } else {
+                            publisherCell.innerHTML = "";
+                        }
+                        row.appendChild(publisherCell);
+                    }
+
+                    duplicatesTable.appendChild(row);
+                });
+
+                document.getElementById('dataObjectDuplicates').appendChild(duplicatesTable);
+            }
+        },
+            function (error) {
+                console.warn(error);
+            }
+        );
     }
 
     switch (pageType) {

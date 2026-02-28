@@ -400,6 +400,113 @@ namespace hasheous_server.Classes
             return objectsList;
         }
 
+        public async Task<Models.DataObjectsList> GetDuplicateDataObjects(DataObjectType objectType, long id, int pageNumber = 0, int pageSize = 0)
+        {
+            DataObjectsList dataObjectList = new DataObjectsList
+            {
+                Objects = new List<DataObjectItem>(),
+                Count = 0,
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                TotalPages = 0
+            };
+
+            DataObjectItem? originalItem = await GetDataObject(objectType, id, true, true, true);
+
+            if (originalItem == null)
+            {
+                return dataObjectList;
+            }
+
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql;
+            List<string> names = [.. GetSearchCandidates(originalItem.Name)];
+
+
+            Dictionary<string, object> dbDict = new Dictionary<string, object>{
+                { "objecttype", objectType },
+                { "id", id }
+            };
+
+            string nameFragment = "";
+            for (int i = 0; i < names.Count; i++)
+            {
+                dbDict.Add("name" + i, names[i]);
+                if (i > 0)
+                {
+                    nameFragment += " OR ";
+                }
+                nameFragment += "DataObject.`Name` = @name" + i;
+            }
+
+            switch (objectType)
+            {
+                case DataObjectType.Game:
+                    // looking for items with the same name and platform
+                    sql = $"SELECT * FROM DataObject LEFT JOIN DataObject_Attributes ON DataObject.`Id` = DataObject_Attributes.`DataObjectId` AND DataObject_Attributes.`AttributeName` = 4 WHERE DataObject.`ObjectType` = @objecttype AND DataObject.`Id` <> @id AND ({nameFragment}) AND DataObject_Attributes.`AttributeRelation` = @platformid;";
+                    AttributeItem? platformAttribute = originalItem.Attributes?.FirstOrDefault(a => a.attributeName == AttributeItem.AttributeName.Platform);
+                    if (platformAttribute == null)
+                    {
+                        return dataObjectList;
+                    }
+                    DataObjectItem? platformObject = (DataObjectItem?)platformAttribute.Value;
+
+                    if (platformObject == null)
+                    {
+                        return dataObjectList;
+                    }
+
+                    long platformId = platformObject.Id;
+                    dbDict.Add("platformid", platformId);
+                    break;
+
+                default:
+                    // looking for items with the same name
+                    sql = $"SELECT * FROM DataObject WHERE DataObject.`ObjectType` = @objecttype AND DataObject.`Id` <> @id AND ({nameFragment});";
+                    break;
+            }
+
+            DataTable data = db.ExecuteCMD(sql, dbDict);
+
+            List<Models.DataObjectItem> DataObjects = new List<Models.DataObjectItem>();
+
+            // compile data for return
+            int pageOffset = pageSize * (pageNumber - 1);
+            for (int i = pageOffset; i < data.Rows.Count; i++)
+            {
+                if (pageNumber != 0 && pageSize != 0)
+                {
+                    if (i >= (pageOffset + pageSize))
+                    {
+                        break;
+                    }
+                }
+
+                Models.DataObjectItem item = await BuildDataObject(
+                    objectType,
+                    (long)data.Rows[i]["Id"],
+                    data.Rows[i],
+                    true,
+                    false,
+                    false
+                );
+
+                DataObjects.Add(item);
+            }
+
+            float pageCount = (float)data.Rows.Count / (float)pageSize;
+            DataObjectsList objectsList = new DataObjectsList
+            {
+                Objects = DataObjects,
+                Count = data.Rows.Count,
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                TotalPages = (int)Math.Ceiling(pageCount)
+            };
+
+            return objectsList;
+        }
+
         public async Task<Models.DataObjectItem?> GetDataObject(long id)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
@@ -550,6 +657,19 @@ namespace hasheous_server.Classes
             if (GetSignatureData == true)
             {
                 signatureItems = await GetSignatures(ObjectType, id);
+
+                List<string> aliases = GetSearchCandidates((string)row["Name"]);
+                if (aliases.Count > 1)
+                {
+                    AttributeItem aliasesAttribute = new AttributeItem
+                    {
+                        attributeName = AttributeItem.AttributeName.SearchAliases,
+                        attributeType = AttributeItem.AttributeType.LongString,
+                        attributeRelationType = DataObjectType.None,
+                        Value = String.Join(", ", aliases)
+                    };
+                    attributes.Add(aliasesAttribute);
+                }
 
                 // get extra attributes based on dataobjecttype
                 switch (ObjectType)
@@ -2200,82 +2320,212 @@ namespace hasheous_server.Classes
             }
         }
 
-        private static List<string> GetSearchCandidates(string GameName)
+        public static List<string> GetSearchCandidates(string GameName)
         {
-            // remove version numbers from name
-            GameName = Regex.Replace(GameName, @"v(\d+\.)?(\d+\.)?(\*|\d+)$", "").Trim();
-            GameName = Regex.Replace(GameName, @"Rev (\d+\.)?(\d+\.)?(\*|\d+)$", "").Trim();
-
-            // assumption: no games have () in their titles so we'll remove them
-            int idx = GameName.IndexOf('(');
-            if (idx >= 0)
+            if (string.IsNullOrWhiteSpace(GameName))
             {
-                GameName = GameName.Substring(0, idx);
+                return new List<string>();
             }
 
-            List<string> SearchCandidates = new List<string>();
-            SearchCandidates.Add(GameName.Trim());
-            if (GameName.Contains(" - "))
+            List<string> searchCandidates = new List<string>();
+
+            string NormalizeWhitespace(string value)
             {
-                SearchCandidates.Add(GameName.Replace(" - ", ": ").Trim());
-                SearchCandidates.Add(GameName.Substring(0, GameName.IndexOf(" - ")).Trim());
-            }
-            if (GameName.Contains(": "))
-            {
-                SearchCandidates.Add(GameName.Substring(0, GameName.IndexOf(": ")).Trim());
+                return Regex.Replace(value, @"\s+", " ").Trim();
             }
 
-            // strip any leading "The " from the game name
-            if (GameName.StartsWith("The ", StringComparison.OrdinalIgnoreCase))
+            string NormalizeDashes(string value)
             {
-                SearchCandidates.Add(GameName.Substring(4).Trim());
+                return Regex.Replace(value, @"[\u2012\u2013\u2014\u2015\u2212]", "-");
             }
 
-            // strip any ", The" from the end of the game name
-            if (GameName.EndsWith(", The", StringComparison.OrdinalIgnoreCase))
+            void AddCandidate(string value)
             {
-                SearchCandidates.Add(GameName.Substring(0, GameName.Length - 5).Trim());
-            }
-
-            // strip any leading "A " from the game name
-            if (GameName.StartsWith("A ", StringComparison.OrdinalIgnoreCase))
-            {
-                SearchCandidates.Add(GameName.Substring(2).Trim());
-            }
-
-            // strip any leading "An " from the game name
-            if (GameName.StartsWith("An ", StringComparison.OrdinalIgnoreCase))
-            {
-                SearchCandidates.Add(GameName.Substring(3).Trim());
-            }
-
-            // add the original name as a candidate
-            SearchCandidates.Add(GameName);
-
-            // loop all candidates and convert roman numerals to numbers
-            List<string> tempSearchCandidates = SearchCandidates.ToList();
-            foreach (var candidate in tempSearchCandidates.Select((o, i) => new { Value = o, Index = i }))
-            {
-                string? romanNumeral = Common.RomanNumerals.FindFirstRomanNumeral(candidate.Value);
-                if (!String.IsNullOrEmpty(romanNumeral))
+                string normalized = NormalizeWhitespace(value);
+                if (!string.IsNullOrWhiteSpace(normalized))
                 {
-                    string newCandidate = candidate.Value.Replace(romanNumeral, Common.RomanNumerals.RomanToInt(romanNumeral).ToString());
-                    if (candidate.Index + 1 == tempSearchCandidates.Count)
-                        SearchCandidates.Add(newCandidate); // add a new candidate if the roman numeral is at the end
-                    else
-                        SearchCandidates.Insert(candidate.Index + 1, newCandidate); // insert a new candidate after the current one
+                    searchCandidates.Add(normalized);
                 }
             }
 
-            // remove duplicates
-            SearchCandidates = SearchCandidates.Distinct().ToList();
+            string baseName = NormalizeWhitespace(GameName);
+            AddCandidate(baseName);
 
-            // remove any empty candidates
-            SearchCandidates.RemoveAll(x => string.IsNullOrWhiteSpace(x));
+            string dashNormalized = NormalizeDashes(baseName);
+            if (!string.Equals(dashNormalized, baseName, StringComparison.Ordinal))
+            {
+                AddCandidate(dashNormalized);
+            }
 
-            Logging.Log(Logging.LogType.Information, "Import Game", "Search candidates: " + String.Join(", ", SearchCandidates));
+            // remove common trailing version/revision markers while keeping the original
+            string versionStripped = Regex.Replace(dashNormalized, @"\s*(?:v|ver\.?|version)\s*(\d+(?:\.\d+)*)\s*$", "", RegexOptions.IgnoreCase);
+            if (!string.Equals(versionStripped, dashNormalized, StringComparison.Ordinal))
+            {
+                AddCandidate(versionStripped);
+            }
 
-            return SearchCandidates;
+            string revisionStripped = Regex.Replace(dashNormalized, @"\s*(?:rev(?:ision)?\.?)(?:\s*[A-Za-z0-9]+)?\s*$", "", RegexOptions.IgnoreCase);
+            if (!string.Equals(revisionStripped, dashNormalized, StringComparison.Ordinal))
+            {
+                AddCandidate(revisionStripped);
+            }
+
+            // remove trailing bracketed metadata while keeping the original
+            string bracketStripped = Regex.Replace(dashNormalized, @"\s*[\(\[][^\)\]]+[\)\]]\s*$", "", RegexOptions.IgnoreCase);
+            if (!string.Equals(bracketStripped, dashNormalized, StringComparison.Ordinal))
+            {
+                AddCandidate(bracketStripped);
+            }
+
+            void AddDelimiterVariants(string value)
+            {
+                if (value.Contains(" - ", StringComparison.Ordinal))
+                {
+                    AddCandidate(value.Replace(" - ", ": "));
+                    AddCandidate(value.Replace(" - ", " "));
+                }
+
+                if (value.Contains(": ", StringComparison.Ordinal))
+                {
+                    AddCandidate(value.Replace(": ", " "));
+                }
+            }
+
+            void AddArticleVariants(string value)
+            {
+                if (value.StartsWith("The ", StringComparison.OrdinalIgnoreCase))
+                {
+                    string without = value.Substring(4).Trim();
+                    AddCandidate(without);
+                    AddCandidate($"{without}, The");
+                }
+
+                if (value.StartsWith("A ", StringComparison.OrdinalIgnoreCase))
+                {
+                    string without = value.Substring(2).Trim();
+                    AddCandidate(without);
+                    AddCandidate($"{without}, A");
+                }
+
+                if (value.StartsWith("An ", StringComparison.OrdinalIgnoreCase))
+                {
+                    string without = value.Substring(3).Trim();
+                    AddCandidate(without);
+                    AddCandidate($"{without}, An");
+                }
+
+                if (value.EndsWith(", The", StringComparison.OrdinalIgnoreCase))
+                {
+                    string without = value.Substring(0, value.Length - 5).Trim();
+                    AddCandidate(without);
+                    AddCandidate($"The {without}");
+                }
+
+                if (value.EndsWith(", A", StringComparison.OrdinalIgnoreCase))
+                {
+                    string without = value.Substring(0, value.Length - 3).Trim();
+                    AddCandidate(without);
+                    AddCandidate($"A {without}");
+                }
+
+                if (value.EndsWith(", An", StringComparison.OrdinalIgnoreCase))
+                {
+                    string without = value.Substring(0, value.Length - 4).Trim();
+                    AddCandidate(without);
+                    AddCandidate($"An {without}");
+                }
+            }
+
+            // expand with delimiter and article variants
+            foreach (string candidate in searchCandidates.ToList())
+            {
+                AddDelimiterVariants(candidate);
+                AddArticleVariants(candidate);
+            }
+
+            // convert roman numerals to numbers (token-based)
+            foreach (string candidate in searchCandidates.ToList())
+            {
+                string romanConverted = Regex.Replace(candidate, @"\b[IVXLCDM]+\b", match =>
+                {
+                    return Common.RomanNumerals.RomanToInt(match.Value).ToString();
+                }, RegexOptions.IgnoreCase);
+
+                if (!string.Equals(romanConverted, candidate, StringComparison.Ordinal))
+                {
+                    AddCandidate(romanConverted);
+                }
+            }
+
+            // convert numbers to roman numerals (token-based)
+            foreach (string candidate in searchCandidates.ToList())
+            {
+                string numberToRoman = Regex.Replace(candidate, @"\b(\d+)\b", match =>
+                {
+                    if (int.TryParse(match.Groups[1].Value, out int num) && num >= 1 && num <= 3999)
+                    {
+                        return Common.RomanNumerals.IntToRoman(num);
+                    }
+                    return match.Value;
+                });
+
+                if (!string.Equals(numberToRoman, candidate, StringComparison.Ordinal))
+                {
+                    AddCandidate(numberToRoman);
+                }
+            }
+
+            // convert numbers to English words and vice versa (token-based)
+            foreach (string candidate in searchCandidates.ToList())
+            {
+                // Convert numbers to words
+                string numberToWords = Regex.Replace(candidate, @"\b(\d+)\b", match =>
+                {
+                    if (int.TryParse(match.Groups[1].Value, out int num) && num >= 0 && num <= 999999999)
+                    {
+                        return Common.Numbers.NumberToWords(num);
+                    }
+                    return match.Value;
+                });
+
+                if (!string.Equals(numberToWords, candidate, StringComparison.Ordinal))
+                {
+                    AddCandidate(numberToWords);
+                }
+
+                // Convert English number words to numbers (look for sequences of number words)
+                string wordsToNumber = Regex.Replace(candidate, @"\b(?:Zero|One|Two|Three|Four|Five|Six|Seven|Eight|Nine|Ten|Eleven|Twelve|Thirteen|Fourteen|Fifteen|Sixteen|Seventeen|Eighteen|Nineteen|Twenty|Thirty|Forty|Fifty|Sixty|Seventy|Eighty|Ninety|Hundred|Thousand|Million|Billion)(?:\s+(?:Zero|One|Two|Three|Four|Five|Six|Seven|Eight|Nine|Ten|Eleven|Twelve|Thirteen|Fourteen|Fifteen|Sixteen|Seventeen|Eighteen|Nineteen|Twenty|Thirty|Forty|Fifty|Sixty|Seventy|Eighty|Ninety|Hundred|Thousand|Million|Billion))*\b", match =>
+                {
+                    var result = Common.Numbers.WordsToNumbers(match.Value);
+                    return result.HasValue ? result.Value.ToString() : match.Value;
+                }, RegexOptions.IgnoreCase);
+
+                if (!string.Equals(wordsToNumber, candidate, StringComparison.Ordinal))
+                {
+                    AddCandidate(wordsToNumber);
+                }
+            }
+
+            // remove duplicates while preserving order
+            List<string> distinctCandidates = new List<string>();
+            HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string candidate in searchCandidates)
+            {
+                string normalized = NormalizeWhitespace(candidate);
+                if (string.IsNullOrWhiteSpace(normalized))
+                {
+                    continue;
+                }
+
+                if (seen.Add(normalized))
+                {
+                    distinctCandidates.Add(normalized);
+                }
+            }
+
+            Logging.Log(Logging.LogType.Information, "Import Game", "Search candidates: " + String.Join(", ", distinctCandidates));
+
+            return distinctCandidates;
         }
 
         public async Task<MatchItem> GetDataObject<T>(MetadataSources Source, string Endpoint, string Fields, string Query)

@@ -46,7 +46,8 @@ namespace hasheous_server.Models
             Public = 19,
             DumpFile = 20,
             Tags = 21,
-            AIDescription = 22
+            AIDescription = 22,
+            SearchAliases = 23
         }
 
         public long? Id { get; set; }

@@ -333,5 +333,8 @@
     "similargame": "Similar Games",
     "similarcompany": "Similar Companies",
     "similarplatform": "Similar Platforms",
-    "servicetaskstatus": "Distributed Task Status"
+    "servicetaskstatus": "Distributed Task Status",
+    "possibleduplicates": "Possible Duplicates",
+    "mergeduplicates": "Merge Duplicates",
+    "searchaliases": "Search Aliases"
 }
