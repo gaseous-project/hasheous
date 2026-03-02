@@ -1,7 +1,7 @@
-using Microsoft.AspNetCore.Mvc;
 using Classes;
-using Microsoft.AspNetCore.Authorization;
 using Classes.ProcessQueue;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
 namespace hasheous_server.Controllers.v1_0
 {
@@ -85,7 +85,7 @@ namespace hasheous_server.Controllers.v1_0
         {
             if (Config.RedisConfiguration.Enabled == true)
             {
-                hasheous.Classes.RedisConnection.PurgeCache();
+                _ = hasheous.Classes.RedisConnection.PurgeCache();
             }
 
             return Ok();
