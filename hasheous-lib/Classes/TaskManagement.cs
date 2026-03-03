@@ -294,7 +294,8 @@ namespace hasheous_server.Classes.Tasks.Clients
                 LIMIT 1
                 FOR UPDATE SKIP LOCKED;";
 
-            // Use a subquery-based UPDATE that will atomically update the row we just locked
+            // UPDATE using the same logic to identify the task
+            // This ensures we're updating the same row that the SELECT would return
             string updateSql = @"UPDATE Task_Queue 
                 SET client_id = @client_id, 
                     status = @status, 
@@ -322,22 +323,23 @@ namespace hasheous_server.Classes.Tasks.Clients
                     ) AS subquery
                 );";
 
+            // Execute both in transaction: SELECT first to lock the row, then UPDATE
             var transactionCommands = new List<Database.SQLTransactionItem>
             {
+                new Database.SQLTransactionItem(selectSql, new Dictionary<string, object>
+                {
+                    { "@client_id", client.Id }
+                }),
                 new Database.SQLTransactionItem(updateSql, new Dictionary<string, object>
                 {
                     { "@client_id", client.Id },
                     { "@status", (int)QueueItemStatus.Assigned },
                     { "@start_time", now },
                     { "@completion_time", now }
-                }),
-                new Database.SQLTransactionItem(selectSql, new Dictionary<string, object>
-                {
-                    { "@client_id", client.Id }
                 })
             };
 
-            // Execute both commands in a single transaction
+            // Execute transaction with SELECT first, then UPDATE
             DataTable dt = await db.ExecuteTransactionCMDAsync(transactionCommands);
 
             if (dt.Rows.Count == 0)
