@@ -281,9 +281,8 @@ namespace Classes
 			}
 		}
 
-		public void ExecuteTransactionCMD(List<SQLTransactionItem> CommandList, int Timeout = 60)
+		public DataTable ExecuteTransactionCMD(List<SQLTransactionItem> CommandList, int Timeout = 60)
 		{
-			object conn;
 			switch (_ConnectorType)
 			{
 				case databaseType.MySql:
@@ -297,10 +296,34 @@ namespace Classes
 							commands.Add(nCmd);
 						}
 
-						conn = new MySQLServerConnector(_ConnectionString);
-						((MySQLServerConnector)conn).TransactionExecCMD(commands, Timeout);
-						break;
+						var conn = new MySQLServerConnector(_ConnectionString);
+						return conn.TransactionExecCMD(commands, Timeout);
 					}
+				default:
+					return new DataTable();
+			}
+		}
+
+		public async Task<DataTable> ExecuteTransactionCMDAsync(List<SQLTransactionItem> CommandList, int Timeout = 60)
+		{
+			switch (_ConnectorType)
+			{
+				case databaseType.MySql:
+					{
+						var commands = new List<Dictionary<string, object>>();
+						foreach (SQLTransactionItem CommandItem in CommandList)
+						{
+							var nCmd = new Dictionary<string, object>();
+							nCmd.Add("sql", CommandItem.SQLCommand);
+							nCmd.Add("values", CommandItem.Parameters);
+							commands.Add(nCmd);
+						}
+
+						var conn = new MySQLServerConnector(_ConnectionString);
+						return await conn.TransactionExecCMDAsync(commands, Timeout);
+					}
+				default:
+					return new DataTable();
 			}
 		}
 
@@ -448,24 +471,96 @@ namespace Classes
 				return result;
 			}
 
-			public void TransactionExecCMD(List<Dictionary<string, object>> Parameters, int Timeout)
+			public DataTable TransactionExecCMD(List<Dictionary<string, object>> Parameters, int Timeout)
 			{
 				var conn = new MySqlConnection(DBConn);
 				conn.Open();
-				var command = conn.CreateCommand();
-				MySqlTransaction transaction;
-				transaction = conn.BeginTransaction();
-				command.Connection = conn;
-				command.Transaction = transaction;
-				foreach (Dictionary<string, object> Parameter in Parameters)
+				var transaction = conn.BeginTransaction();
+				DataTable result = new DataTable();
+
+				try
 				{
-					var cmd = buildcommand(conn, Parameter["sql"].ToString(), (Dictionary<string, object>)Parameter["values"], Timeout);
-					cmd.Transaction = transaction;
-					cmd.ExecuteNonQuery();
+					foreach (Dictionary<string, object> Parameter in Parameters)
+					{
+						var cmd = buildcommand(conn, Parameter["sql"].ToString(), (Dictionary<string, object>)Parameter["values"], Timeout);
+						cmd.Transaction = transaction;
+
+						// Execute the command and capture results from SELECT queries
+						if (Parameter["sql"].ToString()?.Trim().StartsWith("SELECT", StringComparison.OrdinalIgnoreCase) == true)
+						{
+							// SELECT query - capture the result (overwrite previous results to get the last SELECT)
+							result = new DataTable();
+							using (var reader = cmd.ExecuteReader())
+							{
+								result.Load(reader);
+							}
+						}
+						else
+						{
+							// UPDATE/INSERT/DELETE
+							cmd.ExecuteNonQuery();
+						}
+					}
+
+					transaction.Commit();
+				}
+				catch (Exception ex)
+				{
+					transaction.Rollback();
+					throw;
+				}
+				finally
+				{
+					conn.Close();
 				}
 
-				transaction.Commit();
-				conn.Close();
+				return result;
+			}
+
+			public async Task<DataTable> TransactionExecCMDAsync(List<Dictionary<string, object>> Parameters, int Timeout)
+			{
+				var conn = new MySqlConnection(DBConn);
+				await conn.OpenAsync();
+				var transaction = await conn.BeginTransactionAsync();
+				DataTable result = new DataTable();
+
+				try
+				{
+					foreach (Dictionary<string, object> Parameter in Parameters)
+					{
+						var cmd = buildcommand(conn, Parameter["sql"].ToString(), (Dictionary<string, object>)Parameter["values"], Timeout);
+						cmd.Transaction = transaction;
+
+						// Execute the command and capture results from SELECT queries
+						if (Parameter["sql"].ToString()?.Trim().StartsWith("SELECT", StringComparison.OrdinalIgnoreCase) == true)
+						{
+							// SELECT query - capture the result (overwrite previous results to get the last SELECT)
+							result = new DataTable();
+							using (var reader = await cmd.ExecuteReaderAsync())
+							{
+								result.Load(reader);
+							}
+						}
+						else
+						{
+							// UPDATE/INSERT/DELETE
+							await cmd.ExecuteNonQueryAsync();
+						}
+					}
+
+					await transaction.CommitAsync();
+				}
+				catch (Exception ex)
+				{
+					await transaction.RollbackAsync();
+					throw;
+				}
+				finally
+				{
+					await conn.CloseAsync();
+				}
+
+				return result;
 			}
 
 			private MySqlCommand buildcommand(MySqlConnection Conn, string SQL, Dictionary<string, object> Parameters, int Timeout)

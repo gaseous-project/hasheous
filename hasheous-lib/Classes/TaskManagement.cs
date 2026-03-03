@@ -270,8 +270,15 @@ namespace hasheous_server.Classes.Tasks.Clients
                 throw new Exception("Invalid client API key or public ID.");
             }
 
-            // find the next task suitable for this client - the task must match the client's capabilities
-            string sql = @"SELECT tq.id AS id, tq.create_time AS create_time, tq.dataobjectid AS dataobjectid, tq.task_name AS task_name, tq.status AS status, tq.client_id AS client_id, tq.parameters AS parameters, tq.result AS result, tq.error_message AS error_message, tq.start_time AS start_time, tq.completion_time AS completion_time
+            // Use a transaction with SELECT FOR UPDATE SKIP LOCKED to prevent race conditions
+            // when multiple clients request jobs simultaneously.
+            // The FOR UPDATE SKIP LOCKED ensures that each concurrent client gets a different task.
+            DateTime now = DateTime.UtcNow;
+
+            // Step 1: SELECT with FOR UPDATE SKIP LOCKED (locks the row)
+            // Step 2: UPDATE the locked row to assign it
+            // Both must happen in the same transaction!
+            string selectSql = @"SELECT tq.id AS id, tq.create_time AS create_time, tq.dataobjectid AS dataobjectid, tq.task_name AS task_name, tq.status AS status, tq.client_id AS client_id, tq.parameters AS parameters, tq.result AS result, tq.error_message AS error_message, tq.start_time AS start_time, tq.completion_time AS completion_time
                 FROM Task_Queue tq
                 LEFT JOIN Task_Queue_Capabilities tqc ON tq.id = tqc.task_queue_id
                 WHERE tq.status = 0
@@ -284,11 +291,55 @@ namespace hasheous_server.Classes.Tasks.Clients
                 )
                 GROUP BY tq.id
                 ORDER BY tq.create_time ASC
-                LIMIT 1;";
-            DataTable dt = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>
+                LIMIT 1
+                FOR UPDATE SKIP LOCKED;";
+
+            // Use a subquery-based UPDATE that will atomically update the row we just locked
+            string updateSql = @"UPDATE Task_Queue 
+                SET client_id = @client_id, 
+                    status = @status, 
+                    start_time = @start_time,
+                    completion_time = @completion_time,
+                    result = '',
+                    error_message = ''
+                WHERE id IN (
+                    SELECT id FROM (
+                        SELECT tq.id
+                        FROM Task_Queue tq
+                        LEFT JOIN Task_Queue_Capabilities tqc ON tq.id = tqc.task_queue_id
+                        WHERE tq.status = 0
+                        AND (tq.client_id IS NULL OR tq.client_id = @client_id)
+                        AND NOT EXISTS (
+                            SELECT 1 
+                            FROM Task_Queue_Capabilities tqc_required
+                            WHERE tqc_required.task_queue_id = tq.id
+                            AND tqc_required.capability_id NOT IN (" + string.Join(", ", client.Capabilities.Select(c => ((int)c).ToString())) + @")
+                        )
+                        GROUP BY tq.id
+                        ORDER BY tq.create_time ASC
+                        LIMIT 1
+                        FOR UPDATE SKIP LOCKED
+                    ) AS subquery
+                );";
+
+            var transactionCommands = new List<Database.SQLTransactionItem>
             {
-                { "@client_id", client.Id }
-            });
+                new Database.SQLTransactionItem(updateSql, new Dictionary<string, object>
+                {
+                    { "@client_id", client.Id },
+                    { "@status", (int)QueueItemStatus.Assigned },
+                    { "@start_time", now },
+                    { "@completion_time", now }
+                }),
+                new Database.SQLTransactionItem(selectSql, new Dictionary<string, object>
+                {
+                    { "@client_id", client.Id }
+                })
+            };
+
+            // Execute both commands in a single transaction
+            DataTable dt = await db.ExecuteTransactionCMDAsync(transactionCommands);
+
             if (dt.Rows.Count == 0)
             {
                 // no task available
@@ -297,17 +348,14 @@ namespace hasheous_server.Classes.Tasks.Clients
 
             QueueItemModel task = new QueueItemModel(dt.Rows[0]);
 
-            // assign the task to this client if not already assigned
-            if (task.ClientId == null || task.ClientId != client.Id)
-            {
-                task.ClientId = client.Id;
-                task.Status = QueueItemStatus.Assigned;
-                task.StartedAt = DateTime.UtcNow;
-                task.CompletedAt = DateTime.UtcNow;
-                task.Result = "";
-                task.ErrorMessage = "";
-                await task.Commit();
-            }
+            // The task has already been updated by the transaction
+            // Update the local object to reflect the database state
+            task.ClientId = client.Id;
+            task.Status = QueueItemStatus.Assigned;
+            task.StartedAt = now;
+            task.CompletedAt = now;
+            task.Result = "";
+            task.ErrorMessage = "";
 
             return task;
         }
