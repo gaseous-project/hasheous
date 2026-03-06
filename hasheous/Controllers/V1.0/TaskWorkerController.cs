@@ -197,6 +197,7 @@ namespace hasheous_server.Controllers.v1_0
         /// Retrieves the next job assigned to the specified task worker client. If a job is already assigned, it returns that job.
         /// </summary>
         /// <param name="publicid">The public identifier of the client requesting a job.</param>
+        /// <param name="numberOfTasks">The number of tasks to retrieve (optional, default is 1).</param>
         /// <returns>An IActionResult containing the job details or null if no job is available.</returns>
         [MapToApiVersion("1.0")]
         [HttpGet]

@@ -263,7 +263,7 @@ namespace hasheous_server.Classes.Tasks.Clients
         /// <param name="clientAPIKey">The API key of the client.</param>
         /// <param name="publicId">The public client ID.</param>
         /// <param name="numberOfTasks">The number of tasks to retrieve (optional).</param>
-        public async static Task<List<QueueItemModel>?> ClientGetTask(string clientAPIKey, string publicId, int numberOfTasks = 1)
+        public async static Task<object?> ClientGetTask(string clientAPIKey, string publicId, int numberOfTasks = 1)
         {
             if (numberOfTasks <= 0)
             {
@@ -278,6 +278,16 @@ namespace hasheous_server.Classes.Tasks.Clients
             if (client == null)
             {
                 throw new Exception("Invalid client API key or public ID.");
+            }
+
+            // clients older than 1.1.0 expect a single task back
+            if (client.ClientVersion != null)
+            {
+                Version clientVersion = new Version(client.ClientVersion);
+                if (clientVersion.Major == 1 && clientVersion.Minor == 0)
+                {
+                    numberOfTasks = 1;
+                }
             }
 
             // Use a transaction with SELECT FOR UPDATE SKIP LOCKED to prevent race conditions
@@ -370,6 +380,16 @@ namespace hasheous_server.Classes.Tasks.Clients
                 task.CompletedAt = now;
                 task.Result = "";
                 task.ErrorMessage = "";
+
+                // clients older than 1.1.0 expect a single task back
+                if (client.ClientVersion != null)
+                {
+                    Version clientVersion = new Version(client.ClientVersion);
+                    if (clientVersion.Major == 1 && clientVersion.Minor == 0)
+                    {
+                        return task; // only return the first task for older clients
+                    }
+                }
 
                 tasks.Add(task);
             }
