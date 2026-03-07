@@ -250,6 +250,10 @@ namespace hasheous_server.Models.Tasks
         /// </summary>
         public async Task Unregister()
         {
+            // update the database to unassign any tasks currently assigned to this client
+            await Config.database.ExecuteCMDAsync("UPDATE Task_Queue SET client_id = NULL, status = @status WHERE client_id = @id", new Dictionary<string, object>
+            { { "@id", this.Id }, { "@status", QueueItemStatus.Pending } });
+
             // update the database to remove this client
             await Config.database.ExecuteCMDAsync("DELETE FROM Task_Clients WHERE id = @id", new Dictionary<string, object>
             { { "@id", this.Id } });
