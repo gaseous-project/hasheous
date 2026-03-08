@@ -258,21 +258,42 @@ namespace hasheous_server.Classes.Tasks.Clients
         }
 
         /// <summary>
-        /// Retrieves the next available task for the specified client, or the currently assigned one if it exists.
+        /// Retrieves the next available tasks for the specified client. Returns unassigned pending tasks and any tasks already assigned to this client in Assigned or InProgress status.
         /// </summary>
         /// <param name="clientAPIKey">The API key of the client.</param>
         /// <param name="publicId">The public client ID.</param>
-        public async static Task<QueueItemModel?> ClientGetTask(string clientAPIKey, string publicId)
+        /// <param name="numberOfTasks">The number of tasks to retrieve (optional).</param>
+        public async static Task<object?> ClientGetTask(string clientAPIKey, string publicId, int numberOfTasks = 1)
         {
+            if (numberOfTasks <= 0)
+            {
+                numberOfTasks = 1; // default to 1 task if invalid number provided
+            }
+            else if (numberOfTasks > 20)
+            {
+                numberOfTasks = 20; // cap at 20 tasks to prevent overload
+            }
+
             ClientModel? client = await GetClientByAPIKeyAndPublicId(clientAPIKey, publicId);
             if (client == null)
             {
                 throw new Exception("Invalid client API key or public ID.");
             }
 
+            // clients older than 1.1.0 expect a single task back
+            if (client.ClientVersion != null)
+            {
+                Version clientVersion = new Version(client.ClientVersion);
+                if (clientVersion.Major == 1 && clientVersion.Minor == 0)
+                {
+                    numberOfTasks = 1;
+                }
+            }
+
             // Use a transaction with SELECT FOR UPDATE SKIP LOCKED to prevent race conditions
             // when multiple clients request jobs simultaneously.
             // The FOR UPDATE SKIP LOCKED ensures that each concurrent client gets a different task.
+            // Selects: unassigned pending tasks (status=0, client_id IS NULL) OR tasks assigned to this client in Assigned/InProgress status (status=10/20, client_id=@client_id)
             DateTime now = DateTime.UtcNow;
 
             // Step 1: SELECT with FOR UPDATE SKIP LOCKED (locks the row)
@@ -281,8 +302,7 @@ namespace hasheous_server.Classes.Tasks.Clients
             string selectSql = @"SELECT tq.id AS id, tq.create_time AS create_time, tq.dataobjectid AS dataobjectid, tq.task_name AS task_name, tq.status AS status, tq.client_id AS client_id, tq.parameters AS parameters, tq.result AS result, tq.error_message AS error_message, tq.start_time AS start_time, tq.completion_time AS completion_time
                 FROM Task_Queue tq
                 LEFT JOIN Task_Queue_Capabilities tqc ON tq.id = tqc.task_queue_id
-                WHERE tq.status = 0
-                AND (tq.client_id IS NULL OR tq.client_id = @client_id)
+                WHERE ((tq.status = 0 AND tq.client_id IS NULL) OR ((tq.status = 10 OR tq.status = 20) AND tq.client_id = @client_id))
                 AND NOT EXISTS (
                     SELECT 1 
                     FROM Task_Queue_Capabilities tqc_required
@@ -291,7 +311,7 @@ namespace hasheous_server.Classes.Tasks.Clients
                 )
                 GROUP BY tq.id
                 ORDER BY tq.create_time ASC
-                LIMIT 1
+                LIMIT " + numberOfTasks + @"
                 FOR UPDATE SKIP LOCKED;";
 
             // UPDATE using the same logic to identify the task
@@ -308,8 +328,7 @@ namespace hasheous_server.Classes.Tasks.Clients
                         SELECT tq.id
                         FROM Task_Queue tq
                         LEFT JOIN Task_Queue_Capabilities tqc ON tq.id = tqc.task_queue_id
-                        WHERE tq.status = 0
-                        AND (tq.client_id IS NULL OR tq.client_id = @client_id)
+                        WHERE ((tq.status = 0 AND tq.client_id IS NULL) OR ((tq.status = 10 OR tq.status = 20) AND tq.client_id = @client_id))
                         AND NOT EXISTS (
                             SELECT 1 
                             FROM Task_Queue_Capabilities tqc_required
@@ -318,7 +337,7 @@ namespace hasheous_server.Classes.Tasks.Clients
                         )
                         GROUP BY tq.id
                         ORDER BY tq.create_time ASC
-                        LIMIT 1
+                        LIMIT " + numberOfTasks + @"
                         FOR UPDATE SKIP LOCKED
                     ) AS subquery
                 );";
@@ -348,18 +367,34 @@ namespace hasheous_server.Classes.Tasks.Clients
                 return null;
             }
 
-            QueueItemModel task = new QueueItemModel(dt.Rows[0]);
+            List<QueueItemModel> tasks = new List<QueueItemModel>();
+            foreach (DataRow row in dt.Rows)
+            {
+                QueueItemModel task = new QueueItemModel(row);
 
-            // The task has already been updated by the transaction
-            // Update the local object to reflect the database state
-            task.ClientId = client.Id;
-            task.Status = QueueItemStatus.Assigned;
-            task.StartedAt = now;
-            task.CompletedAt = now;
-            task.Result = "";
-            task.ErrorMessage = "";
+                // The task has already been updated by the transaction
+                // Update the local object to reflect the database state
+                task.ClientId = client.Id;
+                task.Status = QueueItemStatus.Assigned;
+                task.StartedAt = now;
+                task.CompletedAt = now;
+                task.Result = "";
+                task.ErrorMessage = "";
 
-            return task;
+                // clients older than 1.1.0 expect a single task back
+                if (client.ClientVersion != null)
+                {
+                    Version clientVersion = new Version(client.ClientVersion);
+                    if (clientVersion.Major == 1 && clientVersion.Minor == 0)
+                    {
+                        return task; // only return the first task for older clients
+                    }
+                }
+
+                tasks.Add(task);
+            }
+
+            return tasks;
         }
 
         /// <summary>

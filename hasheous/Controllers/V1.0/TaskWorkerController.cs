@@ -197,6 +197,7 @@ namespace hasheous_server.Controllers.v1_0
         /// Retrieves the next job assigned to the specified task worker client. If a job is already assigned, it returns that job.
         /// </summary>
         /// <param name="publicid">The public identifier of the client requesting a job.</param>
+        /// <param name="numberOfTasks">The number of tasks to retrieve (optional, default is 1).</param>
         /// <returns>An IActionResult containing the job details or null if no job is available.</returns>
         [MapToApiVersion("1.0")]
         [HttpGet]
@@ -204,7 +205,7 @@ namespace hasheous_server.Controllers.v1_0
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [Route("clients/{publicid}/job")]
-        public async Task<IActionResult> GetJobForClient(string publicid)
+        public async Task<IActionResult> GetJobForClient(string publicid, [FromQuery] int numberOfTasks = 1)
         {
             // get the api key from the header
             string? apiKey = Request.Headers.TryGetValue(Authentication.TaskWorkerAPIKey.APIKeyHeaderName, out var headerValue) ? headerValue.FirstOrDefault() : null;
@@ -213,7 +214,7 @@ namespace hasheous_server.Controllers.v1_0
                 return Unauthorized("API key is missing.");
             }
 
-            var job = await ClientManagement.ClientGetTask(apiKey, publicid);
+            var job = await ClientManagement.ClientGetTask(apiKey, publicid, numberOfTasks);
 
             return Ok(job);
         }
