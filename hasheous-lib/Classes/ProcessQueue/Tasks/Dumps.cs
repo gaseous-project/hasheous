@@ -201,7 +201,7 @@ namespace Classes.ProcessQueue
                             // if counter is a multiple of 10, introduce a short delay
                             if (totalGamesProcessed % 10 == 0)
                             {
-                                await Task.Delay(1000); // 1 second delay
+                                await Task.Delay(500); // 0.5 second delay
                             }
                         }
                         catch (Exception ex)
