@@ -213,15 +213,22 @@ namespace Classes
         /// <param name="performETACalculation">If true, performs ETA calculation for the progress item.</param>
         static public void SendReport(string progressItemKey, int? count, int? total, string description, bool performETACalculation = false)
         {
-            if (report != null)
+            try
             {
-                _ = report.SendAsync(progressItemKey, count, total, description, performETACalculation).ContinueWith(task =>
+                if (report != null)
                 {
-                    if (task.IsFaulted)
+                    _ = report.SendAsync(progressItemKey, count, total, description, performETACalculation).ContinueWith(task =>
                     {
-                        Console.WriteLine($"[Logging.SendReport] Error sending report: {task.Exception?.InnerException?.Message}");
-                    }
-                }, TaskScheduler.Default);
+                        if (task.IsFaulted)
+                        {
+                            // swallow any exceptions from sending the report to avoid impacting the main process
+                        }
+                    }, TaskScheduler.Default);
+                }
+            }
+            catch
+            {
+                // swallow any exceptions from sending the report to avoid impacting the main process
             }
         }
 
