@@ -67,6 +67,22 @@ namespace Classes.ProcessQueue
             }
         };
 
+        private static string SanitizeFileName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return "Unknown";
+            }
+
+            string sanitized = name.Trim();
+            foreach (char c in Path.GetInvalidFileNameChars())
+            {
+                sanitized = sanitized.Replace(c, '_');
+            }
+
+            return string.IsNullOrWhiteSpace(sanitized) ? "Unknown" : sanitized;
+        }
+
         private async Task<object?> DumpMetadataAsync()
         {
             string outputPath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory, "Content");
@@ -95,6 +111,8 @@ namespace Classes.ProcessQueue
 
             // initialize the DataObjects class
             DataObjects dataObjects = new DataObjects();
+
+            Dictionary<long, DataObjectItem> platformDataCache = new Dictionary<long, DataObjectItem>();
 
             // step 1: get all game data objects
             // This will fetch all game data objects, which can be paginated.
@@ -145,7 +163,8 @@ namespace Classes.ProcessQueue
                                 }
                             }
 
-                            string platformPath = Path.Combine(outputPath, platformName);
+                            string safePlatformName = SanitizeFileName(platformName);
+                            string platformPath = Path.Combine(outputPath, safePlatformName);
                             if (!Directory.Exists(platformPath))
                             {
                                 Directory.CreateDirectory(platformPath);
@@ -154,17 +173,28 @@ namespace Classes.ProcessQueue
                                 if (platformItem != null)
                                 {
                                     DataObjectItem? platformDataObject;
-                                    string platformCacheKey = RedisConnection.GenerateKey("Dumps", "Platform_" + platformItem.Id.ToString());
-                                    if (await RedisConnection.CacheItemExists(platformCacheKey))
+                                    if (platformDataCache.TryGetValue(platformItem.Id, out DataObjectItem cachedPlatform))
                                     {
-                                        platformDataObject = await RedisConnection.GetCacheItem<DataObjectItem>(platformCacheKey);
+                                        platformDataObject = cachedPlatform;
                                     }
                                     else
                                     {
-                                        platformDataObject = await dataObjects.GetDataObject(DataObjects.DataObjectType.Platform, platformItem.Id);
+                                        string platformCacheKey = RedisConnection.GenerateKey("Dumps", "Platform_" + platformItem.Id.ToString());
+                                        if (await RedisConnection.CacheItemExists(platformCacheKey))
+                                        {
+                                            platformDataObject = await RedisConnection.GetCacheItem<DataObjectItem>(platformCacheKey);
+                                        }
+                                        else
+                                        {
+                                            platformDataObject = await dataObjects.GetDataObject(DataObjects.DataObjectType.Platform, platformItem.Id);
+                                            if (platformDataObject != null)
+                                            {
+                                                await RedisConnection.SetCacheItem<DataObjectItem>(platformCacheKey, platformDataObject, cacheDuration);
+                                            }
+                                        }
                                         if (platformDataObject != null)
                                         {
-                                            await RedisConnection.SetCacheItem<DataObjectItem>(platformCacheKey, platformDataObject, cacheDuration);
+                                            platformDataCache[platformItem.Id] = platformDataObject;
                                         }
                                     }
                                     if (platformDataObject != null)
@@ -180,18 +210,14 @@ namespace Classes.ProcessQueue
                             }
 
                             // Add to the list of platforms if not already present
-                            if (!platforms.Contains(platformName))
+                            if (!platforms.Contains(safePlatformName))
                             {
-                                platforms.Add(platformName);
+                                platforms.Add(safePlatformName);
                             }
 
                             // Ensure the file name is safe for writing to disk
                             string unsafeFileName = $"{dataObject.Name.Trim()} ({dataObject.Id}).json";
-                            foreach (char c in Path.GetInvalidFileNameChars())
-                            {
-                                unsafeFileName = unsafeFileName.Replace(c, '_');
-                            }
-                            string fileName = unsafeFileName;
+                            string fileName = SanitizeFileName(unsafeFileName);
                             string filePath = Path.Combine(platformPath, fileName);
 
                             // serialize the dictionary to JSON and write to file
@@ -249,11 +275,7 @@ namespace Classes.ProcessQueue
                     string platformSourcePath = Path.Combine(outputPath, platform);
                     if (Directory.Exists(platformSourcePath))
                     {
-                        string safePlatformName = platform;
-                        foreach (char c in Path.GetInvalidFileNameChars())
-                        {
-                            safePlatformName = safePlatformName.Replace(c, '_');
-                        }
+                        string safePlatformName = SanitizeFileName(platform);
                         string platformZipPath = Path.Combine(platformTempZipFilePath, $"{safePlatformName}.zip");
                         System.IO.Compression.ZipFile.CreateFromDirectory(platformSourcePath, platformZipPath, System.IO.Compression.CompressionLevel.SmallestSize, false);
                         // generate md5 checksum for the zip
