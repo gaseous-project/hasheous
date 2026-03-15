@@ -82,14 +82,12 @@ namespace hasheous_server.Classes.Report
                     try
                     {
                         string url = $"{this.reportingServerUrl}/api/v1.0/BackgroundTasks/{this.processId}/{this.correlationId}/report";
-                        Console.WriteLine($"Sending report to {url}");
                         var response = await httpClient.PostAsync(url, content);
                         response.EnsureSuccessStatusCode();
                     }
-                    catch (Exception ex)
+                    catch
                     {
-                        // Log the error but do not throw
-                        Console.WriteLine($"Failed to send report to server: {ex.Message}");
+                        // swallow the error to prevent reporting issues to the console
                     }
                 }
                 finally

@@ -2523,7 +2523,8 @@ namespace hasheous_server.Classes
                 }
             }
 
-            Logging.Log(Logging.LogType.Information, "Import Game", "Search candidates: " + String.Join(", ", distinctCandidates));
+            // remove blank entries and any entries that are just punctuation or dashes
+            distinctCandidates = distinctCandidates.Where(c => !string.IsNullOrWhiteSpace(c) && c.Any(char.IsLetterOrDigit)).ToList();
 
             return distinctCandidates;
         }
