@@ -43,5 +43,6 @@
     <PackageReference Include="Microsoft.Build" Version="17.11.48" />
     <EmbeddedResource Include="Support\*.txt" />
     <EmbeddedResource Include="Schema\hasheous-*.sql" />
+    <EmbeddedResource Include="Support\Localisation\*.json" />
   </ItemGroup>
 </Project>

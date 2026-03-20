@@ -299,7 +299,7 @@ namespace hasheous_server.Classes.Tasks.Clients
             // Step 1: SELECT with FOR UPDATE SKIP LOCKED (locks the row)
             // Step 2: UPDATE the locked row to assign it
             // Both must happen in the same transaction!
-            string selectSql = @"SELECT tq.id AS id, tq.create_time AS create_time, tq.dataobjectid AS dataobjectid, tq.task_name AS task_name, tq.status AS status, tq.client_id AS client_id, tq.parameters AS parameters, tq.result AS result, tq.error_message AS error_message, tq.start_time AS start_time, tq.completion_time AS completion_time
+            string selectSql = @"SELECT tq.id AS id, tq.create_time AS create_time, tq.dataobjectid AS dataobjectid, tq.task_name AS task_name, tq.status AS status, tq.priority AS priority, tq.identifier AS identifier, tq.client_id AS client_id, tq.parameters AS parameters, tq.result AS result, tq.error_message AS error_message, tq.start_time AS start_time, tq.completion_time AS completion_time
                 FROM Task_Queue tq
                 LEFT JOIN Task_Queue_Capabilities tqc ON tq.id = tqc.task_queue_id
                 WHERE ((tq.status = 0 AND tq.client_id IS NULL) OR ((tq.status = 10 OR tq.status = 20) AND tq.client_id = @client_id))
@@ -310,7 +310,7 @@ namespace hasheous_server.Classes.Tasks.Clients
                     AND tqc_required.capability_id NOT IN (" + string.Join(", ", client.Capabilities.Select(c => ((int)c).ToString())) + @")
                 )
                 GROUP BY tq.id
-                ORDER BY tq.create_time ASC
+                ORDER BY tq.priority DESC, tq.create_time ASC
                 LIMIT " + numberOfTasks + @"
                 FOR UPDATE SKIP LOCKED;";
 
@@ -503,6 +503,30 @@ namespace hasheous_server.Classes.Tasks.Clients
         }
 
         /// <summary>
+        /// Enqueues a new task of the specified type with the given identifier, priority, capabilities, and parameters. This overload allows for more explicit control over the task properties and is intended for internal system use.
+        /// </summary>
+        /// <param name="tasktype">The type of the task to enqueue.</param>
+        /// <param name="identifier">A unique identifier for the task.</param>
+        /// <param name="priority">The priority of the task.</param>
+        /// <param name="capabilities">A list of capabilities required to process the task.</param>
+        /// <param name="parameters">A dictionary containing task-specific parameters.</param>
+        /// <returns>The enqueued <see cref="QueueItemModel"/> instance.</returns>
+        public static QueueItemModel EnqueueTask(TaskType tasktype, string identifier, int priority, List<Capabilities> capabilities, Dictionary<string, string>? parameters)
+        {
+            // make sure a task with this name and identifier don't already exist
+            var existingTasks = GetAllTasks(tasktype, identifier);
+            if (existingTasks.Count > 0)
+            {
+                return existingTasks[0]; // return the existing task instead of creating a new one
+            }
+
+            parameters = BuildTaskParams(tasktype, identifier, parameters).Result;
+
+            QueueItemModel task = new QueueItemModel(tasktype, capabilities, priority, identifier, parameters);
+            return task;
+        }
+
+        /// <summary>
         /// Enqueues a new task using default capabilities for Internet and DiskSpace and optional task-specific parameters.
         /// This overload will augment the provided parameters and capabilities based on the TaskType before delegating to the main EnqueueTask implementation.
         /// </summary>
@@ -510,7 +534,7 @@ namespace hasheous_server.Classes.Tasks.Clients
         /// <param name="taskType">The type of the task to enqueue.</param>
         /// <param name="parameters">Optional dictionary of task-specific parameters that may be modified or extended by the method.</param>
         /// <returns>The enqueued <see cref="QueueItemModel"/> instance.</returns>
-        public static QueueItemModel? EnqueueTask(long dataObjectId, TaskType taskType, Dictionary<string, string>? parameters = null)
+        public async static Task<QueueItemModel?> EnqueueTask(long dataObjectId, TaskType taskType, Dictionary<string, string>? parameters = null)
         {
             // default capabilities to Internet and DiskSpace
             List<Capabilities> capabilities = new List<Capabilities>
@@ -528,7 +552,7 @@ namespace hasheous_server.Classes.Tasks.Clients
             {
                 case TaskType.AIDescriptionAndTagging:
                     capabilities.Add(Capabilities.AI);
-                    Dictionary<string, string>? aiParams = BuildTaskParams(dataObjectId, taskType, parameters);
+                    Dictionary<string, string>? aiParams = await BuildDataObjectTaskParams(dataObjectId, taskType, parameters);
                     if (aiParams != null)
                     {
                         if (!aiParams.ContainsKey("prompt_description") || !aiParams.ContainsKey("prompt_tags") || !aiParams.ContainsKey("sources") ||
@@ -605,6 +629,21 @@ namespace hasheous_server.Classes.Tasks.Clients
             });
         }
 
+        /// <summary>
+        /// Retrieves all tasks in the queue for the specified task type and identifier. This allows for fetching tasks that may not be associated with a specific data object but are categorized by type and identifier.
+        /// </summary>
+        /// <param name="taskType">The type of the task to filter by.</param>
+        /// <param name="identifier">The identifier to filter tasks by.</param>
+        /// <returns>A list of <see cref="QueueItemModel"/> instances that match the specified task type and identifier.</returns>
+        public static List<QueueItemModel> GetAllTasks(TaskType taskType, string identifier)
+        {
+            return GetAllTasksInternal("SELECT * FROM `Task_Queue` WHERE `task_name` = @task_name AND `identifier` = @identifier;", new Dictionary<string, object>
+            {
+                { "@task_name", taskType },
+                { "@identifier", identifier }
+            });
+        }
+
         public static QueueItemStatus? GetClientTaskStatus(long clientId)
         {
             List<int> activeStatuses = new List<int>
@@ -666,7 +705,7 @@ namespace hasheous_server.Classes.Tasks.Clients
             _ = task.Commit();
         }
 
-        public static Dictionary<string, string>? BuildTaskParams(long dataObjectId, TaskType taskType, Dictionary<string, string>? parameters = null)
+        public async static Task<Dictionary<string, string>?> BuildDataObjectTaskParams(long dataObjectId, TaskType taskType, Dictionary<string, string>? parameters = null)
         {
             if (parameters == null)
             {
@@ -685,7 +724,7 @@ namespace hasheous_server.Classes.Tasks.Clients
 
                     // get the data object for use in prompt generation
                     var dataObjects = new DataObjects();
-                    var dataObject = dataObjects.GetDataObject(dataObjectId).Result;
+                    var dataObject = await dataObjects.GetDataObject(dataObjectId);
                     if (dataObject == null)
                     {
                         throw new Exception("Data object not found.");
@@ -726,7 +765,7 @@ namespace hasheous_server.Classes.Tasks.Clients
                                     else
                                     {
                                         RelationItem relationItem = (RelationItem)platformAttribute.Value;
-                                        itemPlatform = dataObjects.GetDataObject(DataObjectType.Platform, relationItem.relationId).Result;
+                                        itemPlatform = await dataObjects.GetDataObject(DataObjectType.Platform, relationItem.relationId);
                                     }
                                 }
                             }
@@ -756,7 +795,7 @@ namespace hasheous_server.Classes.Tasks.Clients
                                     {
                                         case Metadata.Communications.MetadataSources.IGDB:
                                             sql = "SELECT `summary` FROM `igdb`.`games` WHERE `id` = @id LIMIT 1;";
-                                            dt = Config.database.ExecuteCMD(sql, new Dictionary<string, object>
+                                            dt = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object>
                                             {
                                                 { "@id", metadataItem.ImmutableId}
                                             });
@@ -771,7 +810,7 @@ namespace hasheous_server.Classes.Tasks.Clients
                                             break;
                                         case Metadata.Communications.MetadataSources.TheGamesDb:
                                             sql = "SELECT `overview` FROM `thegamesdb`.`games` WHERE `id` = @id LIMIT 1;";
-                                            dt = Config.database.ExecuteCMD(sql, new Dictionary<string, object>
+                                            dt = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object>
                                             {
                                                 { "@id", metadataItem.ImmutableId}
                                             });
@@ -786,7 +825,7 @@ namespace hasheous_server.Classes.Tasks.Clients
                                             break;
                                         case Metadata.Communications.MetadataSources.GiantBomb:
                                             sql = "SELECT `description` FROM `giantbomb`.`Game` WHERE `id` = @id LIMIT 1;";
-                                            dt = Config.database.ExecuteCMD(sql, new Dictionary<string, object>
+                                            dt = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object>
                                             {
                                                 { "@id", metadataItem.ImmutableId}
                                             });
@@ -805,7 +844,7 @@ namespace hasheous_server.Classes.Tasks.Clients
                                             {
                                                 break;
                                             }
-                                            string? wikiContent = GetWikipediaContent(metadataItem.ImmutableId);
+                                            string? wikiContent = await GetWikipediaContent(metadataItem.ImmutableId);
                                             if (wikiContent != "")
                                             {
                                                 parameters.Add("Source_Wikipedia", wikiContent ?? "");
@@ -853,7 +892,7 @@ namespace hasheous_server.Classes.Tasks.Clients
                                     {
                                         case Metadata.Communications.MetadataSources.IGDB:
                                             sql = "SELECT `summary` FROM `igdb`.`platforms` WHERE `id` = @id LIMIT 1;";
-                                            dt = Config.database.ExecuteCMD(sql, new Dictionary<string, object>
+                                            dt = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object>
                                             {
                                                 { "@id", metadataItem.ImmutableId}
                                             });
@@ -870,7 +909,7 @@ namespace hasheous_server.Classes.Tasks.Clients
                                             break;
                                         case Metadata.Communications.MetadataSources.TheGamesDb:
                                             sql = "SELECT `overview` FROM `thegamesdb`.`platforms` WHERE `id` = @id LIMIT 1;";
-                                            dt = Config.database.ExecuteCMD(sql, new Dictionary<string, object>
+                                            dt = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object>
                                             {
                                                 { "@id", metadataItem.ImmutableId}
                                             });
@@ -885,7 +924,7 @@ namespace hasheous_server.Classes.Tasks.Clients
                                             break;
                                         case Metadata.Communications.MetadataSources.GiantBomb:
                                             sql = "SELECT `description` FROM `giantbomb`.`Platform` WHERE `id` = @id LIMIT 1;";
-                                            dt = Config.database.ExecuteCMD(sql, new Dictionary<string, object>
+                                            dt = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object>
                                             {
                                                 { "@id", metadataItem.ImmutableId}
                                             });
@@ -904,7 +943,7 @@ namespace hasheous_server.Classes.Tasks.Clients
                                             {
                                                 break;
                                             }
-                                            string? wikiContent = GetWikipediaContent(metadataItem.ImmutableId);
+                                            string? wikiContent = await GetWikipediaContent(metadataItem.ImmutableId);
                                             if (wikiContent != "")
                                             {
                                                 parameters.Add("Source_Wikipedia", wikiContent ?? "");
@@ -930,6 +969,58 @@ namespace hasheous_server.Classes.Tasks.Clients
             return parameters;
         }
 
+        public static async Task<Dictionary<string, string>> BuildTaskParams(TaskType taskType, string identifier, Dictionary<string, string>? parameters = null)
+        {
+            if (parameters == null)
+            {
+                parameters = new Dictionary<string, string>();
+            }
+
+            switch (taskType)
+            {
+                case TaskType.AILanguageFileTranslation:
+                    // split the identifier into language and locale (if provided)
+                    string[] parts = identifier.Split('-');
+                    string language = parts[0];
+                    string? locale = parts.Length > 1 ? parts[1] : null;
+
+                    // get the language names
+                    var cultureInfo = new System.Globalization.CultureInfo(identifier);
+                    string languageNameInEnglish = cultureInfo.EnglishName;
+                    string fullLanguageNameInEnglish = languageNameInEnglish;
+                    if (languageNameInEnglish.Contains('('))
+                    {
+                        languageNameInEnglish = languageNameInEnglish.Substring(0, languageNameInEnglish.IndexOf('(')).Trim();
+                    }
+                    parameters.Add("language_name_in_english", languageNameInEnglish);
+                    // get the locale name in English - if the language name is "English (Australia)", return only the "Australia" part
+                    if (locale != null)
+                    {
+                        string localeNameInEnglish = cultureInfo.EnglishName;
+                        if (localeNameInEnglish.Contains('('))
+                        {
+                            localeNameInEnglish = localeNameInEnglish.Substring(localeNameInEnglish.IndexOf('(') + 1, localeNameInEnglish.IndexOf(')') - localeNameInEnglish.IndexOf('(') - 1).Trim();
+                        }
+                        parameters.Add("locale_name_in_english", localeNameInEnglish);
+                    }
+
+                    // set the model to use for translation - we want to use a smaller model for this task since the input is small and we're supporting the use of low spec GPU's
+                    parameters.Add("model", "translategemma:4b");
+
+                    // set the prompt - we'll be looping through the strings and translating each one in turn. The task runner will do concatination of the strings themselves
+                    string prompt = @$"You are a professional English (en) to {fullLanguageNameInEnglish} ({identifier}) translator. Your goal is to accurately convey the meaning and nuances of the original English (en) text while adhering to {fullLanguageNameInEnglish} grammar, vocabulary, and cultural sensitivities.
+Produce only the {fullLanguageNameInEnglish} translation, without any additional explanations or commentary. Please translate the following English (en) text into {fullLanguageNameInEnglish}:" +
+@"\n" +
+@"\n" +
+@$"<TEXT_TO_TRANSLATE>";
+                    parameters.Add("prompt", prompt);
+
+                    break;
+            }
+
+            return parameters;
+        }
+
         private static int WikiCallsInLastSecond = 0;
         private static DateTime LastWikiCallTime = DateTime.MinValue;
 
@@ -938,7 +1029,7 @@ namespace hasheous_server.Classes.Tasks.Clients
             return System.Text.RegularExpressions.Regex.IsMatch(path, @"%[0-9A-Fa-f]{2}");
         }
 
-        private static string GetWikipediaContent(string address)
+        private static async Task<string> GetWikipediaContent(string address)
         {
             // Try to parse the address as-is first
             if (!Uri.TryCreate(address, UriKind.Absolute, out Uri? wikiUri))
@@ -1017,10 +1108,10 @@ namespace hasheous_server.Classes.Tasks.Clients
                 // set the user agent
                 client.DefaultRequestHeaders.UserAgent.ParseAdd("Hasheous/1.0");
 
-                var response = client.GetAsync(wikiApiUrl).Result;
+                var response = await client.GetAsync(wikiApiUrl);
                 if (response.IsSuccessStatusCode)
                 {
-                    var content = response.Content.ReadAsStringAsync().Result;
+                    var content = await response.Content.ReadAsStringAsync();
                     if (content.Length > 0)
                     {
                         // the content is html - we need to extract the text content and remove any unneeded sections, and convert to a markdown-like format

@@ -64,6 +64,46 @@ namespace hasheous_server.Models.Tasks
         }
 
         /// <summary>
+        /// Initializes a new instance of the <see cref="QueueItemModel"/> class with the specified task type, required capabilities, priority, identifier, and optional parameters.
+        /// </summary>
+        /// <param name="taskType">The type of task to be performed.</param>
+        /// <param name="requiredCapabilities">The list of required capabilities for this task.</param>
+        /// <param name="priority">The priority of the task.</param>
+        /// <param name="identifier">The identifier for the task.</param>
+        /// <param name="parameters">Optional parameters for the task.</param>
+        public QueueItemModel(TaskType taskType, List<Capabilities> requiredCapabilities, int priority, string identifier, Dictionary<string, string>? parameters = null)
+        {
+            this._CreatedAt = DateTime.UtcNow;
+            this._TaskName = taskType;
+            this._RequiredCapabilities = requiredCapabilities;
+            this.Priority = priority;
+            this.Identifier = identifier;
+            this.Parameters = parameters;
+            this.Status = QueueItemStatus.Pending;
+
+            // Id will be set when saved to database
+            DataTable dt = Config.database.ExecuteCMD("INSERT INTO `Task_Queue` (`create_time`, `task_name`, `priority`, `identifier`, `status`, `required_capabilities`, `parameters`) VALUES (@created_at, @task_name, @priority, @identifier, @status, @required_capabilities, @parameters); SELECT LAST_INSERT_ID();", new Dictionary<string, object>
+            {
+                { "@created_at", this._CreatedAt },
+                { "@task_name", (int)this._TaskName },
+                { "@priority", this.Priority },
+                { "@identifier", this.Identifier },
+                { "@status", (int)this.Status },
+                { "@required_capabilities", System.Text.Json.JsonSerializer.Serialize(this.RequiredCapabilities) },
+                { "@parameters", System.Text.Json.JsonSerializer.Serialize(this.Parameters) ?? "{}"}
+            });
+            foreach (Capabilities capability in requiredCapabilities)
+            {
+                Config.database.ExecuteCMD("INSERT INTO `Task_Queue_Capabilities` (`task_queue_id`, `capability_id`) VALUES (@task_queue_id, @capability_id);", new Dictionary<string, object>
+                {
+                    { "@task_queue_id", dt.Rows[0][0] },
+                    { "@capability_id", (int)capability }
+                });
+            }
+            this._Id = Convert.ToInt64(dt.Rows[0][0]);
+        }
+
+        /// <summary>
         /// Gets the unique identifier for the queue item.
         /// </summary>
         public long Id { get { return _Id; } }
@@ -76,10 +116,20 @@ namespace hasheous_server.Models.Tasks
         private DateTime _CreatedAt { get; set; }
 
         /// <summary>
-        /// Gets the identifier of the associated data object.
+        /// Gets or sets the priority of the queue item, where higher values indicate higher priority. This can be used by the task processing system to determine the order in which tasks should be executed, with higher priority tasks being processed before lower priority ones.
         /// </summary>
-        public long DataObjectId { get { return _DataObjectId; } }
-        private long _DataObjectId { get; set; }
+        public int Priority { get; set; }
+
+        /// <summary>
+        /// Gets or sets an optional identifier for the queue item, which can be used to group related tasks together or to provide additional context for the task. This can be useful for tracking and managing tasks that are part of a larger workflow or operation.
+        /// </summary>
+        public string Identifier { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets the optional identifier of the associated data object.
+        /// </summary>
+        public long? DataObjectId { get { return _DataObjectId; } }
+        private long? _DataObjectId { get; set; }
 
         /// <summary>
         /// Gets the type of task to be performed.
@@ -140,7 +190,14 @@ namespace hasheous_server.Models.Tasks
             this.StartedAt = null;
             this.CompletedAt = null;
 
-            this.Parameters = TaskManagement.BuildTaskParams(this.DataObjectId, this.TaskName);
+            if (this.DataObjectId != null)
+            {
+                this.Parameters = await TaskManagement.BuildDataObjectTaskParams((long)this.DataObjectId, this.TaskName);
+            }
+            else
+            {
+                this.Parameters = await TaskManagement.BuildTaskParams(this.TaskName, this.Identifier, this.Parameters);
+            }
 
             switch (this.TaskName)
             {
@@ -180,8 +237,10 @@ namespace hasheous_server.Models.Tasks
 
             this._Id = (long)row.Field<long>("id");
             this._CreatedAt = row.Field<DateTime>("create_time");
-            this._DataObjectId = (long)row.Field<long>("dataobjectid");
+            this._DataObjectId = row.IsNull("dataobjectid") ? null : (long?)row.Field<long>("dataobjectid") ?? null;
             this._TaskName = (TaskType)row.Field<int>("task_name");
+            this.Priority = row.Field<int>("priority");
+            this.Identifier = row.IsNull("identifier") ? string.Empty : row.Field<string>("identifier") ?? string.Empty;
             this.Status = (QueueItemStatus)row.Field<int>("status");
             this.ClientId = row.IsNull("client_id") ? null : (long?)row.Field<long>("client_id");
             this.Parameters = row.IsNull("parameters") ? null : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(row.Field<string>("parameters") ?? "{}");
@@ -222,10 +281,12 @@ namespace hasheous_server.Models.Tasks
         /// </summary>
         public async Task Commit()
         {
-            await Config.database.ExecuteCMDAsync("UPDATE `Task_Queue` SET `status` = @status, `client_id` = @client_id, `parameters` = @parameters, `result` = @result, `error_message` = @error_message, `start_time` = @started_at, `completion_time` = @completed_at WHERE `id` = @id", new Dictionary<string, object>
+            await Config.database.ExecuteCMDAsync("UPDATE `Task_Queue` SET `status` = @status, `priority` = @priority, `identifier` = @identifier, `client_id` = @client_id, `parameters` = @parameters, `result` = @result, `error_message` = @error_message, `start_time` = @started_at, `completion_time` = @completed_at WHERE `id` = @id", new Dictionary<string, object>
             {
                 { "@id", this.Id },
                 { "@status", this.Status },
+                { "@priority", this.Priority },
+                { "@identifier", this.Identifier },
                 { "@client_id", this.ClientId ?? (object)DBNull.Value },
                 { "@parameters", this.Parameters != null ? System.Text.Json.JsonSerializer.Serialize(this.Parameters) : (object)DBNull.Value },
                 { "@result", this.Result ?? (object)DBNull.Value },
@@ -283,7 +344,17 @@ namespace hasheous_server.Models.Tasks
         /// <summary>
         /// Task for AI description generation and tagging.
         /// </summary>
-        AIDescriptionAndTagging = 0
+        AIDescriptionAndTagging = 0,
+
+        /// <summary>
+        /// Task for AI language file translation.
+        /// </summary>
+        AILanguageFileTranslation = 10,
+
+        /// <summary>
+        /// Task for AI language key translation.
+        /// </summary>
+        AILanguageKeyTranslation = 11
     }
 
     /// <summary>

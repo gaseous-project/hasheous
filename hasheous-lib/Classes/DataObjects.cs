@@ -1850,7 +1850,7 @@ namespace hasheous_server.Classes
                 else
                 {
                     // no tagging task exists - create one
-                    TaskManagement.EnqueueTask((long)id, Models.Tasks.TaskType.AIDescriptionAndTagging);
+                    await TaskManagement.EnqueueTask((long)id, Models.Tasks.TaskType.AIDescriptionAndTagging);
                 }
             }
 
@@ -2316,7 +2316,7 @@ namespace hasheous_server.Classes
             // enqueue AI description and tagging task if not already present
             if (aiTaskPresent == false)
             {
-                TaskManagement.EnqueueTask(item.Id, Models.Tasks.TaskType.AIDescriptionAndTagging);
+                await TaskManagement.EnqueueTask(item.Id, Models.Tasks.TaskType.AIDescriptionAndTagging);
             }
         }
 

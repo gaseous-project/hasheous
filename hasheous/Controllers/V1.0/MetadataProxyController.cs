@@ -332,7 +332,7 @@ namespace hasheous_server.Controllers.v1_0
         public async Task<IActionResult> SearchMetadata_Platform(string SearchString)
         {
             string searchBody = "";
-            string searchFields = "fields abbreviation,alternative_name,category,checksum,created_at,generation,name,platform_family,platform_logo,slug,summary,updated_at,url,versions,websites; ";
+            string searchFields = "fields *; ";
             searchBody += "where name ~ *\"" + SearchString + "\"*;";
 
             // check cache first

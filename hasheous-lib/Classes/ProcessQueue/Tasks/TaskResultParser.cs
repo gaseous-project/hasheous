@@ -55,7 +55,7 @@ namespace Classes.ProcessQueue
                         hasheous_server.Models.DataObjectItem? dataObject = null;
                         if (taskItem.DataObjectId > 0)
                         {
-                            dataObject = await dataObjects.GetDataObject(taskItem.DataObjectId);
+                            dataObject = await dataObjects.GetDataObject((long)taskItem.DataObjectId);
                         }
 
                         // process the task result

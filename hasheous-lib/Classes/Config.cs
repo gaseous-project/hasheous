@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Data;
-using Newtonsoft.Json;
-using IGDB.Models;
 using hasheous_server.Classes.Metadata;
-using StackExchange.Redis;
+using IGDB.Models;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Newtonsoft.Json;
+using StackExchange.Redis;
 
 namespace Classes
 {
@@ -762,6 +762,17 @@ namespace Classes
                 }
 
                 /// <summary>
+                /// Gets the directory path for library languages, which is a subdirectory under the library root directory.
+                /// </summary>
+                public string LibraryLanguageDirectory
+                {
+                    get
+                    {
+                        return Path.Combine(LibraryRootDirectory, "Languages");
+                    }
+                }
+
+                /// <summary>
                 /// Gets the directory path for library uploads.
                 /// </summary>
                 public string LibraryUploadDirectory
@@ -1005,6 +1016,7 @@ namespace Classes
                 public void InitLibrary()
                 {
                     if (!Directory.Exists(LibraryRootDirectory)) { Directory.CreateDirectory(LibraryRootDirectory); }
+                    if (!Directory.Exists(LibraryLanguageDirectory)) { Directory.CreateDirectory(LibraryLanguageDirectory); }
                     if (!Directory.Exists(LibraryUploadDirectory)) { Directory.CreateDirectory(LibraryUploadDirectory); }
                     if (!Directory.Exists(LibraryMetadataDirectory)) { Directory.CreateDirectory(LibraryMetadataDirectory); }
                     if (!Directory.Exists(LibraryMetadataDirectory_Hasheous)) { Directory.CreateDirectory(LibraryMetadataDirectory_Hasheous); }
