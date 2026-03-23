@@ -13,15 +13,42 @@ namespace hasheous_server.Classes
         private static Dictionary<string, LocalisationEntry> Languages = new Dictionary<string, LocalisationEntry>();
 
         /// <summary>
+        /// Gets all localisation dictionaries for all available languages.
+        /// </summary>
+        /// <returns>A dictionary of language codes and their corresponding localisation dictionaries.</returns>
+        public async static Task<Dictionary<string, Dictionary<string, string>>> GetAllLocalisations()
+        {
+            PruneLocalisationCache();
+
+            // Load all available languages
+            var allLocalisations = new Dictionary<string, Dictionary<string, string>>();
+            string[] localisationFiles = Directory.GetFiles(Config.LibraryConfiguration.LibraryLanguageDirectory, "*.json");
+            foreach (string localisationFile in localisationFiles)
+            {
+                var CultureInfo = System.Globalization.CultureInfo.GetCultureInfo(Path.GetFileNameWithoutExtension(localisationFile));
+                Dictionary<string, string> localisationStrings = new Dictionary<string, string>
+                {
+                    { "language_name_in_english", CultureInfo.EnglishName },
+                    { "language_name_localised", CultureInfo.NativeName }
+                };
+                allLocalisations[Path.GetFileNameWithoutExtension(localisationFile)] = localisationStrings;
+            }
+            return allLocalisations;
+        }
+
+        /// <summary>
         /// Gets a localisation dictionary for the requested language using English as a fallback and overriding with requested language values when available.
         /// </summary>
         /// <param name="language">The language code to load, such as "en" or "fr".</param>
         /// <returns>A merged dictionary of localisation keys and values for the requested language.</returns>
         public async static Task<Dictionary<string, string>> GetLanguageStrings(string language)
         {
+            PruneLocalisationCache();
+
             // check cache first to avoid unnecessary file reads and deserialization, which can be expensive operations. If the requested language is already in the cache, we can just return the cached localisation strings. This can help improve performance, especially if there are a lot of localisation keys or if the localisation files are large.
             if (Languages.ContainsKey(language))
             {
+                Languages[language].LoadedTime = DateTime.UtcNow; // update the loaded time so that we can keep it in the cache longer, since it's being actively used
                 return Languages[language].Strings;
             }
 
@@ -32,6 +59,23 @@ namespace hasheous_server.Classes
             Languages[language] = localisationEntry;
 
             return localisationEntry.Strings;
+        }
+
+        private static void PruneLocalisationCache()
+        {
+            // prune old languages from the cache to save memory
+            List<string> languagesToRemove = new List<string>();
+            foreach (var kvp in Languages)
+            {
+                if (kvp.Value.LoadedTime < DateTime.UtcNow.AddMinutes(-10))
+                {
+                    languagesToRemove.Add(kvp.Key);
+                }
+            }
+            foreach (string languageToRemove in languagesToRemove)
+            {
+                Languages.Remove(languageToRemove);
+            }
         }
 
         /// <summary>
@@ -120,9 +164,9 @@ namespace hasheous_server.Classes
                     localisationEntry.Region = rootLocalisationEntry.Region;
 
                     // merge the root localisation entry with the English localisation entry, with the root values taking precedence over the English values
-                    foreach (var kvp in rootLocalisationEntry.Strings)
+                    foreach (var kvp in rootLocalisationEntry.LanguageStrings)
                     {
-                        localisationEntry.Strings[kvp.Key] = kvp.Value;
+                        localisationEntry.LanguageStrings[kvp.Key] = kvp.Value;
                     }
 
                     // if the root localisation entry has a friendly name, use it instead of the English friendly name
@@ -211,27 +255,77 @@ namespace hasheous_server.Classes
             // check if the root language file exists in the library directory
             string enRootLanguageFilePath = Path.Combine(Config.LibraryConfiguration.LibraryLanguageDirectory, "en.json");
 
-            // language files in the language directory are the "source of truth" for localisation, so if the English language file doesn't exist there, we need to create it from the embedded resources
-            if (File.Exists(enRootLanguageFilePath))
-            {
-                File.Delete(enRootLanguageFilePath);
-            }
+            // deserialise the English language file from the embedded resource into a variable for comparison to the on disk version - we're looking for differences to the already saved version
+            // if differences are found, we'll kick off tasks to regenerate the changed localisation keys for all languages
+            LocalisationEntry? embeddedEnglishLocalisationEntry = null;
 
-            // if the english language file doesn't exist, we need to load it from the embedded resources and save it to the library directory
             using (Stream? stream = typeof(Localisation).Assembly.GetManifestResourceStream($"hasheous_lib.Support.Localisation.en.json"))
             {
                 if (stream != null)
                 {
                     using (StreamReader reader = new StreamReader(stream))
                     {
-                        if (!Directory.Exists(Config.LibraryConfiguration.LibraryLanguageDirectory))
-                        {
-                            Directory.CreateDirectory(Config.LibraryConfiguration.LibraryLanguageDirectory);
-                        }
-
-                        string json = reader.ReadToEnd();
-                        File.WriteAllText(enRootLanguageFilePath, json);
+                        string json = await reader.ReadToEndAsync();
+                        embeddedEnglishLocalisationEntry = JsonConvert.DeserializeObject<LocalisationEntry>(json);
                     }
+                }
+            }
+
+            if (embeddedEnglishLocalisationEntry == null)
+            {
+                // something bad happened here, we should have the English localisation file as an embedded resource, so if we can't load it, we can just return and hope that the file exists on disk, since without the English localisation file, the localisation system can't function properly
+                throw new Exception("Failed to load required base English localisation from embedded resources.");
+            }
+
+            // check if there is an existing English language file on disk
+            // - if not, save the embedded English language file to disk so we have a base localisation to work from
+            // - if there is, compare it to the embedded English language file and if there are differences, kick off tasks to regenerate the changed localisation keys for all languages, since English is the base localisation that all other localisations are built on top of, so changes to the English localisation may require updates to the other localisations as well
+            if (!File.Exists(enRootLanguageFilePath))
+            {
+                string json = JsonConvert.SerializeObject(embeddedEnglishLocalisationEntry, Formatting.Indented);
+                await File.WriteAllTextAsync(enRootLanguageFilePath, json);
+            }
+            else
+            {
+                string existingJson = await File.ReadAllTextAsync(enRootLanguageFilePath);
+                LocalisationEntry? existingEnglishLocalisationEntry = JsonConvert.DeserializeObject<LocalisationEntry>(existingJson);
+
+                bool changesMade = false;
+                if (existingEnglishLocalisationEntry != null)
+                {
+                    // compare the embedded English localisation entry to the existing English localisation entry on disk, and if there are differences, kick off tasks to regenerate the changed localisation keys for all languages
+                    foreach (var kvp in embeddedEnglishLocalisationEntry.Strings)
+                    {
+                        // update the existing English file
+                        if (!existingEnglishLocalisationEntry.LanguageStrings.ContainsKey(kvp.Key) || existingEnglishLocalisationEntry.LanguageStrings[kvp.Key].Value != kvp.Value)
+                        {
+                            // there is a difference between the embedded English localisation entry and the existing English localisation entry on disk for this localisation key, so we need to update the English localisation file on disk with the new value, and then kick off tasks to regenerate this localisation key for all other languages, since English is the base localisation that all other localisations are built on top of, so changes to the English localisation may require updates to the other localisations as well
+                            existingEnglishLocalisationEntry.LanguageStrings[kvp.Key] = new LocalisationEntry.StringItem { Value = kvp.Value, IsAITranslated = false, IsFallback = false, LastUpdated = DateTime.UtcNow };
+
+                            // find all other language files and regenerate this key
+                            string[] localisationFiles = Directory.GetFiles(Config.LibraryConfiguration.LibraryLanguageDirectory, "*.json");
+                            foreach (string localisationFile in localisationFiles)
+                            {
+                                string fileName = Path.GetFileNameWithoutExtension(localisationFile);
+                                if (fileName == "en")
+                                {
+                                    continue; // skip the English language file
+                                }
+
+                                // this key is missing from the localisation entry, so we need to enqueue a task to generate it using AI translation
+                                TaskManagement.EnqueueTask(Models.Tasks.TaskType.AILanguageKeyTranslation, $"{fileName}|{kvp.Key}", 11, new List<hasheous_server.Models.Tasks.Capabilities> { Models.Tasks.Capabilities.Internet, Models.Tasks.Capabilities.DiskSpace, Models.Tasks.Capabilities.AI }, new Dictionary<string, string> { });
+                            }
+
+                            changesMade = true;
+                        }
+                    }
+                }
+
+                if (changesMade)
+                {
+                    // update the English localisation file on disk with the new value
+                    string json = JsonConvert.SerializeObject(existingEnglishLocalisationEntry, Formatting.Indented);
+                    File.WriteAllText(enRootLanguageFilePath, json);
                 }
             }
 
@@ -373,6 +467,11 @@ namespace hasheous_server.Classes
                 [System.Text.Json.Serialization.JsonIgnore]
                 [Newtonsoft.Json.JsonIgnore]
                 public bool IsFallback { get; set; } = false;
+
+                /// <summary>
+                /// The time when the localisation string was last updated. This can be used to determine when to review and potentially update the localisation string, especially if it was generated using AI translation or if it is a fallback value from the English localisation file, as these may need to be reviewed and updated more frequently to ensure accuracy and relevance for users.
+                /// </summary>
+                public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
             }
 
             /// <summary>
@@ -420,7 +519,7 @@ namespace hasheous_server.Classes
             /// </summary>
             [System.Text.Json.Serialization.JsonIgnore]
             [Newtonsoft.Json.JsonIgnore]
-            public DateTime LoadedTime { get; private set; } = DateTime.UtcNow;
+            public DateTime LoadedTime { get; set; } = DateTime.UtcNow;
         }
     }
 }

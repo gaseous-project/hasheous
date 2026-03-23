@@ -1,7 +1,9 @@
 using System.Data;
+using hasheous_server.Classes;
 using hasheous_server.Models.Tasks;
 using HasheousClient.Models;
 using Newtonsoft.Json;
+using static hasheous_server.Classes.Localisation;
 
 namespace Classes.ProcessQueue
 {
@@ -196,6 +198,47 @@ namespace Classes.ProcessQueue
                                         }
                                     }
                                 }
+                                break;
+
+                            case TaskType.AILanguageFileTranslation:
+                                string outputLanguageFile = Path.Combine(Config.LibraryConfiguration.LibraryLanguageDirectory, $"{taskItem.Identifier}.json");
+                                Dictionary<string, string>? aiLanguageResults = JsonConvert.DeserializeObject<Dictionary<string, string>>(taskItem.Result ?? "");
+
+                                if (File.Exists(outputLanguageFile))
+                                {
+                                    File.Delete(outputLanguageFile);
+                                }
+
+                                string[] identifierParts = taskItem.Identifier.Split('-');
+                                string language = identifierParts[0];
+                                string region = "";
+                                if (identifierParts.Length > 1)
+                                {
+                                    region = identifierParts[1];
+                                }
+                                var cultureInfo = new System.Globalization.CultureInfo(taskItem.Identifier);
+
+                                LocalisationEntry newLocalisationEntry = new LocalisationEntry
+                                {
+                                    Language = language,
+                                    Region = region,
+                                    FriendlyName = cultureInfo.EnglishName,
+                                    LocalisedFriendlyName = cultureInfo.NativeName,
+                                    LanguageStrings = new Dictionary<string, LocalisationEntry.StringItem>()
+                                };
+
+                                foreach (var kvp in aiLanguageResults ?? new Dictionary<string, string>())
+                                {
+                                    newLocalisationEntry.LanguageStrings[kvp.Key] = new LocalisationEntry.StringItem { Value = kvp.Value, IsAITranslated = true, IsFallback = false, LastUpdated = DateTime.UtcNow };
+                                }
+
+                                // save the new localisation file to disk
+                                string newLocalisationJson = JsonConvert.SerializeObject(newLocalisationEntry, Formatting.Indented);
+                                await File.WriteAllTextAsync(outputLanguageFile, newLocalisationJson);
+
+                                // force a load to ensure the new localisation is available in the system
+                                await Localisation.GetLanguageStrings(taskItem.Identifier);
+
                                 break;
                         }
 

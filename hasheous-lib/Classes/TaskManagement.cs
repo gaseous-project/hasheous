@@ -1004,15 +1004,16 @@ namespace hasheous_server.Classes.Tasks.Clients
                         parameters.Add("locale_name_in_english", localeNameInEnglish);
                     }
 
-                    // set the model to use for translation - we want to use a smaller model for this task since the input is small and we're supporting the use of low spec GPU's
-                    parameters.Add("model", "translategemma:4b");
+                    // set the model to use for translation
+                    parameters.Add("model", "translategemma:12b");
 
                     // set the prompt - we'll be looping through the strings and translating each one in turn. The task runner will do concatination of the strings themselves
-                    string prompt = @$"You are a professional English (en) to {fullLanguageNameInEnglish} ({identifier}) translator. Your goal is to accurately convey the meaning and nuances of the original English (en) text while adhering to {fullLanguageNameInEnglish} grammar, vocabulary, and cultural sensitivities.
-Produce only the {fullLanguageNameInEnglish} translation, without any additional explanations or commentary. Please translate the following English (en) text into {fullLanguageNameInEnglish}:" +
-@"\n" +
-@"\n" +
-@$"<TEXT_TO_TRANSLATE>";
+                    string prompt = @$"You are a professional English (en-US) to {fullLanguageNameInEnglish} ({identifier}) translator. You are translating UI text elements from a website. Your goal is to accurately convey the meaning and nuances of the original English (en-US) text while adhering to {fullLanguageNameInEnglish} ({identifier}) grammar, vocabulary, and cultural sensitivities.
+                    
+                    Produce only the {fullLanguageNameInEnglish} ({identifier}) translation, without any additional explanations or commentary, or extra punctuation. Please translate the following English (en-US) text into {fullLanguageNameInEnglish} ({identifier}):
+                    
+                    
+                    <TEXT_TO_TRANSLATE>";
                     parameters.Add("prompt", prompt);
 
                     break;
