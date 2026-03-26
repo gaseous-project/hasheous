@@ -198,6 +198,8 @@
     "tosec.b": "Bad Dump",
     "tosec.a": "Alternate",
     "tosec.!": "Known Verified Dump",
+    "tosec.categories": "Categories",
+    "tosec.filetype": "File Type",
     "termsofservice": "Terms of Service",
     "termsofservicetext": "<p>Hasheous is a free service provided to the community with the aim of fairly satisfying the needs of the community.</p><p>As such, Hasheous has a rate limiter, and caching in place in order to limit the impact to the service (and therefore the cost of hosting) due to heavy users.</p><p>The Hasheous team reserves the right to suspend or block users who:<ul><li>exceed or circumvent these limits and place undue strain on the service</li><li>engage in offensive or abusive activity while using the service</li></ul></p><p>Hasheous is a free service, and as such, the Hasheous team cannot be held responsible for any loss of data, or any other issues that may arise from the use of the service.</p><p>Hasheous does not and will not provide binaries or links to copyrighted material.</p><p>By using Hasheous, you agree to these terms.</p>",
     "privacypolicy": "Privacy Policy",
