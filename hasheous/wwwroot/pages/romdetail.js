@@ -134,10 +134,18 @@ fetch('/api/v1.0/Signatures/Rom/ById/' + romId, {
                     break;
 
                 default:
+                    // check if value is an array, if so join with comma
+                    let valueString = '';
+                    if (Array.isArray(value)) {
+                        valueString = value.join(', ');
+                    } else {
+                        valueString = value;
+                    }
+
                     attributeArray.push(
                         {
                             "attribute": lang.getLang(success.signatureSource.toLowerCase() + "." + key),
-                            "value": value.trim().replace(/(?:\r\n|\r|\n)/g, '<br>').trim()
+                            "value": valueString.trim().replace(/(?:\r\n|\r|\n)/g, '<br>').trim()
                         });
                     break;
             }
