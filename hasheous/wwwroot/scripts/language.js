@@ -82,6 +82,16 @@ class language {
     // }
 
     getLang(token, substituteArray) {
+        // check if token is null or undefined
+        if (token === null || token === undefined) {
+            return '';
+        }
+
+        // check if token is not a string
+        if (typeof token !== 'string') {
+            return token;
+        }
+
         let page = getQueryString('page', 'string');
         switch (page) {
             case "dataobjects":

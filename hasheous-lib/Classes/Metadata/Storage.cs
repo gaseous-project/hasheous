@@ -18,7 +18,8 @@ namespace Classes.Metadata
 
         public enum TablePrefix
         {
-            IGDB
+            IGDB,
+            ScreenScraper
         }
 
         private static string GetTableName(TablePrefix prefix, string Endpoint)
@@ -129,6 +130,14 @@ namespace Classes.Metadata
                         if (objectProperty != null)
                         {
                             string compareName = objectProperty.PropertyType.Name.ToLower().Split("`")[0];
+                            if (compareName == "nullable")
+                            {
+                                Type? underlyingType = Nullable.GetUnderlyingType(objectProperty.PropertyType);
+                                if (underlyingType != null)
+                                {
+                                    compareName = underlyingType.Name.ToLower().Split("`")[0];
+                                }
+                            }
                             var objectValue = objectProperty.GetValue(ObjectToCache);
                             if (objectValue != null)
                             {
@@ -149,6 +158,10 @@ namespace Classes.Metadata
                                         break;
                                     case "int32[]":
                                     case "int64[]":
+                                        newObjectValue = Newtonsoft.Json.JsonConvert.SerializeObject(objectValue);
+                                        objectDict[key.Key] = newObjectValue;
+                                        break;
+                                    case "list":
                                         newObjectValue = Newtonsoft.Json.JsonConvert.SerializeObject(objectValue);
                                         objectDict[key.Key] = newObjectValue;
                                         break;
@@ -208,11 +221,16 @@ namespace Classes.Metadata
                     if (dataRow[property.Name] != DBNull.Value)
                     {
                         string objectTypeName = property.PropertyType.Name.ToLower().Split("`")[0];
+                        Type? nullableUnderlyingType = null;
                         string subObjectTypeName = "";
                         object? objectToStore = null;
                         if (objectTypeName == "nullable")
                         {
-                            objectTypeName = property.PropertyType.UnderlyingSystemType.ToString().Split("`1")[1].Replace("[System.", "").Replace("]", "").ToLower();
+                            nullableUnderlyingType = Nullable.GetUnderlyingType(property.PropertyType);
+                            if (nullableUnderlyingType != null)
+                            {
+                                objectTypeName = nullableUnderlyingType.Name.ToLower().Split("`")[0];
+                            }
                         }
                         try
                         {
@@ -225,6 +243,14 @@ namespace Classes.Metadata
                                 case "datetimeoffset":
                                     DateTimeOffset? storedDate = (DateTime?)dataRow[property.Name];
                                     property.SetValue(EndpointType, storedDate);
+                                    break;
+                                case "list":
+                                    string listJson = dataRow[property.Name]?.ToString() ?? "[]";
+                                    object? listObject = Newtonsoft.Json.JsonConvert.DeserializeObject(listJson, property.PropertyType);
+                                    if (listObject != null)
+                                    {
+                                        property.SetValue(EndpointType, listObject);
+                                    }
                                     break;
                                 case "identityorvalue":
                                     subObjectTypeName = property.PropertyType.UnderlyingSystemType.ToString().Split("`1")[1].Replace("[IGDB.Models.", "").Replace("]", "");

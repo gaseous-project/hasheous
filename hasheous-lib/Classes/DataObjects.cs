@@ -1900,7 +1900,8 @@ namespace hasheous_server.Classes
                 MetadataSources.IGDB,
                 MetadataSources.TheGamesDb,
                 MetadataSources.RetroAchievements,
-                MetadataSources.GiantBomb
+                MetadataSources.GiantBomb,
+                MetadataSources.ScreenScraper
             ];
 
             // set now time

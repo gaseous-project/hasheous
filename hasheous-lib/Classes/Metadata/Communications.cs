@@ -206,7 +206,12 @@ namespace hasheous_server.Classes.Metadata
             /// <summary>
             /// SteamGridDb - queries SteamGridDb service for metadata
             /// </summary>
-            SteamGridDb
+            SteamGridDb,
+
+            /// <summary>
+            /// ScreenScraper - queries ScreenScraper service for metadata
+            /// </summary>
+            ScreenScraper
         }
 
         /// <summary>
