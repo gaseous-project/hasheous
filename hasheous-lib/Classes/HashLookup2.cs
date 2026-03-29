@@ -161,7 +161,8 @@ namespace Classes
                             publisher = await dataObjects.NewDataObject(DataObjects.DataObjectType.Company, new DataObjectItemModel
                             {
                                 Name = discoveredSignature.Game.Publisher
-                            });
+                            }, allowSearch: false);
+
                             // add signature mappinto to publisher
                             dataObjects.AddSignature(publisher.Id, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
 
@@ -212,7 +213,8 @@ namespace Classes
                     platform = await dataObjects.NewDataObject(DataObjects.DataObjectType.Platform, new DataObjectItemModel
                     {
                         Name = discoveredSignature.Game.System
-                    });
+                    }, allowSearch: false);
+
                     // add signature mapping to platform
                     dataObjects.AddSignature(platform.Id, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId);
 
@@ -279,7 +281,7 @@ namespace Classes
                         game = await dataObjects.NewDataObject(DataObjects.DataObjectType.Game, new DataObjectItemModel
                         {
                             Name = gameName
-                        });
+                        }, allowSearch: false);
 
                         // add platform reference
                         await dataObjects.AddAttribute(game.Id, new AttributeItem
@@ -300,8 +302,6 @@ namespace Classes
                                 Value = publisher.Id
                             });
                         }
-                        // force metadata search
-                        await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true);
                     }
                     else if (game == null && !this.ForceSearch)
                     {
@@ -359,6 +359,9 @@ namespace Classes
                             }
                         }
                     }
+
+                    // force metadata search
+                    await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true);
 
                     // re-get the game
                     game = await dataObjects.GetDataObject(DataObjects.DataObjectType.Game, game.Id);

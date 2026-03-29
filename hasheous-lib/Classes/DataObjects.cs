@@ -1148,7 +1148,7 @@ namespace hasheous_server.Classes
             return attribute;
         }
 
-        public async Task<Models.DataObjectItem> NewDataObject(DataObjectType objectType, Models.DataObjectItemModel model, ApplicationUser? user = null)
+        public async Task<Models.DataObjectItem> NewDataObject(DataObjectType objectType, Models.DataObjectItemModel model, ApplicationUser? user = null, bool allowSearch = true)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "INSERT INTO DataObject (`Name`, `ObjectType`, `CreatedDate`, `UpdatedDate`) VALUES (@name, @objecttype, @createddate, @updateddate); SELECT LAST_INSERT_ID();";
@@ -1184,7 +1184,10 @@ namespace hasheous_server.Classes
                         }
                     }
 
-                    await DataObjectMetadataSearch(objectType, (long)(ulong)data.Rows[0][0]);
+                    if (allowSearch)
+                    {
+                        await DataObjectMetadataSearch(objectType, (long)(ulong)data.Rows[0][0]);
+                    }
                     break;
 
                 case DataObjectType.App:
