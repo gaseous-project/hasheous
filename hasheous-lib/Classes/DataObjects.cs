@@ -1897,6 +1897,17 @@ namespace hasheous_server.Classes
         // get all metadata sources
         private static MetadataSources[] allMetadataSources = (MetadataSources[])Enum.GetValues(typeof(MetadataSources));
 
+        // Tokens commonly found in titles/platform names that should not be interpreted as Roman numerals.
+        private static readonly List<string> RomanConversionAcronymExclusions = new List<string>
+        {
+            "CD",
+            "DVD",
+            "PS",
+            "PSP",
+            "VR",
+            "3DO"
+        };
+
         private async Task _DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch)
         {
             HashSet<MetadataSources> ProcessSources = [
@@ -2383,15 +2394,28 @@ namespace hasheous_server.Classes
 
             void AddDelimiterVariants(string value)
             {
-                if (value.Contains(" - ", StringComparison.Ordinal))
+                // normalize and expand delimiter variations so comparisons can match API results
+                // regardless of whether separators are spaces, hyphens, or colons.
+                string hyphenTight = Regex.Replace(value, @"\s*-\s*", "-");
+                string hyphenSpaced = Regex.Replace(value, @"\s*-\s*", " - ");
+                string hyphenToSpace = Regex.Replace(value, @"\s*-\s*", " ");
+                string hyphenToColon = Regex.Replace(value, @"\s*-\s*", ": ");
+
+                AddCandidate(hyphenTight);
+                AddCandidate(hyphenSpaced);
+                AddCandidate(hyphenToSpace);
+                AddCandidate(hyphenToColon);
+
+                // if a value has spaces but no hyphens, generate a hyphenated variant.
+                if (!value.Contains("-", StringComparison.Ordinal) && value.Contains(" ", StringComparison.Ordinal))
                 {
-                    AddCandidate(value.Replace(" - ", ": "));
-                    AddCandidate(value.Replace(" - ", " "));
+                    AddCandidate(Regex.Replace(value, @"\s+", "-"));
                 }
 
-                if (value.Contains(": ", StringComparison.Ordinal))
+                if (value.Contains(":", StringComparison.Ordinal))
                 {
-                    AddCandidate(value.Replace(": ", " "));
+                    AddCandidate(Regex.Replace(value, @"\s*:\s*", " "));
+                    AddCandidate(Regex.Replace(value, @"\s*:\s*", " - "));
                 }
             }
 
@@ -2452,7 +2476,20 @@ namespace hasheous_server.Classes
             {
                 string romanConverted = Regex.Replace(candidate, @"\b[IVXLCDM]+\b", match =>
                 {
-                    return Common.RomanNumerals.RomanToInt(match.Value).ToString();
+                    string token = match.Value;
+
+                    if (RomanConversionAcronymExclusions.Contains(token, StringComparer.OrdinalIgnoreCase))
+                    {
+                        return token;
+                    }
+
+                    int parsed = Common.RomanNumerals.RomanToInt(token);
+                    if (parsed >= 1 && parsed <= 30)
+                    {
+                        return parsed.ToString();
+                    }
+
+                    return token;
                 }, RegexOptions.IgnoreCase);
 
                 if (!string.Equals(romanConverted, candidate, StringComparison.Ordinal))
@@ -2466,7 +2503,7 @@ namespace hasheous_server.Classes
             {
                 string numberToRoman = Regex.Replace(candidate, @"\b(\d+)\b", match =>
                 {
-                    if (int.TryParse(match.Groups[1].Value, out int num) && num >= 1 && num <= 3999)
+                    if (int.TryParse(match.Groups[1].Value, out int num) && num >= 1 && num <= 30)
                     {
                         return Common.RomanNumerals.IntToRoman(num);
                     }
@@ -2485,7 +2522,7 @@ namespace hasheous_server.Classes
                 // Convert numbers to words
                 string numberToWords = Regex.Replace(candidate, @"\b(\d+)\b", match =>
                 {
-                    if (int.TryParse(match.Groups[1].Value, out int num) && num >= 0 && num <= 999999999)
+                    if (int.TryParse(match.Groups[1].Value, out int num) && num >= 1 && num <= 30)
                     {
                         return Common.Numbers.NumberToWords(num);
                     }
@@ -2501,7 +2538,12 @@ namespace hasheous_server.Classes
                 string wordsToNumber = Regex.Replace(candidate, @"\b(?:Zero|One|Two|Three|Four|Five|Six|Seven|Eight|Nine|Ten|Eleven|Twelve|Thirteen|Fourteen|Fifteen|Sixteen|Seventeen|Eighteen|Nineteen|Twenty|Thirty|Forty|Fifty|Sixty|Seventy|Eighty|Ninety|Hundred|Thousand|Million|Billion)(?:\s+(?:Zero|One|Two|Three|Four|Five|Six|Seven|Eight|Nine|Ten|Eleven|Twelve|Thirteen|Fourteen|Fifteen|Sixteen|Seventeen|Eighteen|Nineteen|Twenty|Thirty|Forty|Fifty|Sixty|Seventy|Eighty|Ninety|Hundred|Thousand|Million|Billion))*\b", match =>
                 {
                     var result = Common.Numbers.WordsToNumbers(match.Value);
-                    return result.HasValue ? result.Value.ToString() : match.Value;
+                    if (result.HasValue && result.Value >= 1 && result.Value <= 30)
+                    {
+                        return result.Value.ToString();
+                    }
+
+                    return match.Value;
                 }, RegexOptions.IgnoreCase);
 
                 if (!string.Equals(wordsToNumber, candidate, StringComparison.Ordinal))
