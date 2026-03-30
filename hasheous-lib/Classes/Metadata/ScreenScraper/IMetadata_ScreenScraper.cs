@@ -1,4 +1,5 @@
 using System.Data;
+using System.Net;
 using Classes;
 using Classes.Metadata;
 using hasheous_server.Classes.Metadata;
@@ -121,6 +122,7 @@ namespace hasheous_server.Classes.MetadataLib
 
                 foreach (Signatures_Games_2.RomItem romItem in romItems)
                 {
+                    // first check if we have the hash in our local cache mapping table to avoid unnecessary API calls
                     string sql = "SELECT GameId FROM Screenscraper_HashToGameMap WHERE Hash = @Hash AND HashType = @HashType LIMIT 1";
                     Dictionary<string, object> parameters = new Dictionary<string, object>();
 
@@ -143,6 +145,15 @@ namespace hasheous_server.Classes.MetadataLib
                     else
                     {
                         // if we don't have a hash to search for, skip this ROM
+                        continue;
+                    }
+
+                    // now check if the the hash is in our cache of failed hash lookups to avoid unnecessary API calls for hashes we know won't return results
+                    string failedsql = "SELECT COUNT(1) FROM Screenscraper_FailedHashLookups WHERE Hash = @Hash AND HashType = @HashType";
+                    DataTable failedLookupResult = await Config.database.ExecuteCMDAsync(failedsql, parameters);
+                    if (failedLookupResult.Rows.Count > 0 && int.TryParse(failedLookupResult.Rows[0][0].ToString(), out int failedLookupCount) && failedLookupCount > 0)
+                    {
+                        // we have a failed lookup for this hash, skip the API call
                         continue;
                     }
 
@@ -237,6 +248,26 @@ namespace hasheous_server.Classes.MetadataLib
                             }
 
                             break; // exit the loop after the first successful match
+                        }
+                    }
+                    catch (HttpRequestException httpEx)
+                    {
+                        switch (httpEx.StatusCode)
+                        {
+                            case HttpStatusCode.NotFound:
+                                // 404 Not Found means we don't have metadata for this ROM hash, so we can cache this result to avoid unnecessary API calls in the future
+                                sql = "INSERT INTO Screenscraper_FailedHashLookups (Hash, HashType, LookupDate) VALUES (@Hash, @HashType, @LookupDate)";
+                                await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object> { { "@Hash", hashUsed }, { "@HashType", parameters["@HashType"] }, { "@LookupDate", DateTime.UtcNow } });
+
+                                Logging.Log(Logging.LogType.Information, "ScreenScraper", $"No metadata found for ROM hash {hashUsed}. Caching this result to avoid future API calls for this hash.");
+                                break;
+                            case HttpStatusCode.Unauthorized:
+                                Logging.Log(Logging.LogType.Critical, "Screenscraper", "Unauthorized access to ScreenScraper API. Please check your API credentials and ensure they are valid.");
+                                break;
+                            default:
+                                // log the error and continue with the next hash
+                                Logging.Log(Logging.LogType.Critical, "ScreenScraper", $"HTTP error querying ScreenScraper API for ROM hash {hashUsed}: {httpEx.Message}");
+                                break;
                         }
                     }
                     catch (Exception ex)
