@@ -42,11 +42,11 @@ namespace hasheous_server.Classes.MetadataLib
         public Communications.MetadataSources MetadataSource => Communications.MetadataSources.ScreenScraper;
 
         /// <summary>
-        /// Connects to the ScreenScraper API and searches for matches based on the ROM hashes in the provided <paramref name="item"/>. The <paramref name="searchCandidates"/> value is ignored for ScreenScraper metadata matching since it relies on ROM hash matching rather than name-based searching. The <paramref name="options"/> parameter is also ignored for ScreenScraper metadata matching since no additional options are needed for ROM hash searching.
+        /// Connects to the ScreenScraper API and searches for matches based on the ROM hashes in the provided <paramref name="item"/>. The <paramref name="searchCandidates"/> value is ignored for ScreenScraper game metadata matching since it relies on ROM hash matching rather than name-based searching. The <paramref name="options"/> parameter is also ignored for ScreenScraper metadata matching since no additional options are needed for ROM hash searching.
         /// </summary>
         /// <param name="item">The data object item containing ROM hashes to search for.</param>
-        /// <param name="searchCandidates">Ignored for ScreenScraper metadata matching.</param>
-        /// <param name="options">Ignored for ScreenScraper metadata matching.</param>
+        /// <param name="searchCandidates">Ignored for ScreenScraper game metadata matching.</param>
+        /// <param name="options">Ignored for ScreenScraper game metadata matching.</param>
         /// <returns>A task representing the asynchronous operation, with a <see cref="DataObjects.MatchItem"/> result containing the metadata match.</returns>
         /// <exception cref="NotImplementedException"></exception>
         public async Task<DataObjects.MatchItem> FindMatchItemAsync(DataObjectItem item, List<string> searchCandidates, Dictionary<string, object>? options = null)
@@ -89,6 +89,30 @@ namespace hasheous_server.Classes.MetadataLib
                     return DataObjectSearchResults; // return no match to avoid making API calls when approaching the limit
                 }
             }
+
+            switch (item.ObjectType)
+            {
+                case DataObjects.DataObjectType.Game:
+                    DataObjectSearchResults = await GetGameDataAsync(item);
+                    break;
+                case DataObjects.DataObjectType.Platform:
+                    DataObjectSearchResults = await GetPlatformAsync(item, searchCandidates);
+                    break;
+                default:
+                    // ScreenScraper metadata matching is only implemented for games and platforms, so return no match for other types
+                    break;
+            }
+
+            return DataObjectSearchResults;
+        }
+
+        private async Task<DataObjects.MatchItem> GetGameDataAsync(DataObjectItem item)
+        {
+            hasheous_server.Classes.DataObjects.MatchItem? DataObjectSearchResults = new hasheous_server.Classes.DataObjects.MatchItem
+            {
+                MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
+                MetadataId = ""
+            };
 
             // get the first ROM hashs from the item to search for
             if (item.Attributes?.Find(a => a.attributeName == AttributeItem.AttributeName.ROMs) != null)
@@ -140,7 +164,7 @@ namespace hasheous_server.Classes.MetadataLib
                                     {
                                         // check file info to ensure the file is less than 30 days old
                                         FileInfo fileInfo = new FileInfo(cacheFilePath);
-                                        if (fileInfo.LastWriteTime > DateTime.Now.AddDays(-30))
+                                        if (fileInfo.LastWriteTimeUtc > DateTime.UtcNow.AddDays(-30))
                                         {
                                             // we have a valid cached file, return the match
                                             DataObjectSearchResults = new hasheous_server.Classes.DataObjects.MatchItem
@@ -224,6 +248,95 @@ namespace hasheous_server.Classes.MetadataLib
             }
 
             return DataObjectSearchResults;
+        }
+
+        private async Task<DataObjects.MatchItem> GetPlatformAsync(DataObjectItem item, List<string> SearchCandidates)
+        {
+            List<ssPlatform>? response = null;
+
+            // check if the cache file exists and is valid - file must be less than 30 days old to be valid
+            string cacheFilePath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_Screenscraper, "platforms.json");
+            if (File.Exists(cacheFilePath))
+            {
+                var platformFileInfo = new FileInfo(cacheFilePath);
+                if (platformFileInfo.LastWriteTimeUtc > DateTime.UtcNow.AddDays(-30))
+                {
+                    // cache file is valid, read from it
+                    string cachedData = File.ReadAllText(cacheFilePath);
+                    response = Newtonsoft.Json.JsonConvert.DeserializeObject<List<ssPlatform>>(cachedData);
+                }
+                else
+                {
+                    // cache file is too old, delete it
+                    File.Delete(cacheFilePath);
+                }
+            }
+
+            // if we don't have a valid cache, fetch from the API
+            if (response == null)
+            {
+                try
+                {
+                    var apiResponse = await HttpHelper.Get<PlatformItem>(PlatformItem.Endpoint());
+                    apiCallCount++; // increment API call count after making the call
+
+                    if (apiResponse != null && apiResponse.response != null && apiResponse.response.systemes != null)
+                    {
+                        response = apiResponse.response.systemes;
+
+                        // cache the response for future use
+                        Directory.CreateDirectory(Path.GetDirectoryName(cacheFilePath) ?? string.Empty);
+                        File.WriteAllText(cacheFilePath, Newtonsoft.Json.JsonConvert.SerializeObject(response));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // log the error and return no match
+                    Logging.Log(Logging.LogType.Critical, "ScreenScraper", $"Failed to fetch platforms from ScreenScraper API: {ex.Message}");
+                    return new hasheous_server.Classes.DataObjects.MatchItem
+                    {
+                        MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
+                        MetadataId = ""
+                    };
+                }
+            }
+
+            // search the platform response for the provided platform name candidates and return a match if found
+            foreach (var platform in response)
+            {
+                foreach (var candidate in SearchCandidates)
+                {
+                    // check the regional names
+                    if (!string.IsNullOrEmpty(candidate) && platform.noms != null && platform.noms.Any(n => n.Value != null && n.Value.Equals(candidate, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        return new hasheous_server.Classes.DataObjects.MatchItem
+                        {
+                            MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic,
+                            MetadataId = platform.id.ToString()
+                        };
+                    }
+
+                    // check noms_commun, which is a comma separated list of common names for the platform
+                    if (platform.noms.ContainsKey("noms_commun") && platform.noms["noms_commun"] != null)
+                    {
+                        var commonNames = platform.noms["noms_commun"].Split(',').Select(n => n.Trim());
+                        if (commonNames.Any(n => n.Equals(candidate, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            return new hasheous_server.Classes.DataObjects.MatchItem
+                            {
+                                MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic,
+                                MetadataId = platform.id.ToString()
+                            };
+                        }
+                    }
+                }
+            }
+
+            return new hasheous_server.Classes.DataObjects.MatchItem
+            {
+                MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
+                MetadataId = ""
+            };
         }
 
         /// <summary>
@@ -545,9 +658,9 @@ namespace hasheous_server.Classes.MetadataLib
         }
 
         /// <summary>
-        /// Represents a game media item for the ScreenScraper API, containing properties such as type, URL, region, and various hash values. This class is used to deserialize game media data from the ScreenScraper API responses, allowing for structured access to media information associated with games. The properties include the type of media (e.g., screenshot, box art), the URL where the media can be accessed, the region associated with the media, and various hash values (CRC, MD5, SHA1) for verifying the integrity of the media file. This structure provides a comprehensive representation of game media as returned by the ScreenScraper API.
+        /// Represents a media item for the ScreenScraper API, containing properties such as type, URL, region, and various hash values. This class is used to deserialize media data from the ScreenScraper API responses, allowing for structured access to media information. The properties include the type of media (e.g., screenshot, box art), the URL where the media can be accessed, the region associated with the media, and various hash values (CRC, MD5, SHA1) for verifying the integrity of the media file. This structure provides a comprehensive representation of media as returned by the ScreenScraper API.
         /// </summary>
-        public class ssGameMedia
+        public class ssMedia
         {
             /// <summary>
             /// Type of media, such as "screenshot", "boxart", "banner", etc., indicating the category or purpose of the media item. This property allows for structured access to media information based on its type, enabling the application to organize and present media effectively based on the type of media returned by the ScreenScraper API.
@@ -565,6 +678,10 @@ namespace hasheous_server.Classes.MetadataLib
             /// Region associated with the media, such as France, Europe, USA, or Japan. This property is used to identify the specific region for which the media information is relevant, allowing for localized metadata retrieval based on regional differences in game releases or information as returned by the ScreenScraper API.
             /// </summary>
             public string? region { get; set; }
+            /// <summary>
+            /// Indicates whether the media is the main media for the game (0 = no / 1 = yes). This property can be used to identify the primary media associated with a game, allowing for structured access to media information based on its significance or relevance to the game as returned by the ScreenScraper API.
+            /// </summary>
+            public string? support { get; set; }
             /// <summary>
             /// CRC hash value for the media file, used for verifying the integrity of the media file. This property allows for structured access to media information based on its CRC hash, enabling the application to validate the media file effectively based on the hash value provided by the ScreenScraper API.
             /// </summary>
@@ -755,11 +872,61 @@ namespace hasheous_server.Classes.MetadataLib
             /// <summary>
             /// List of media associated with the game, providing information about the various media types that apply to the game. This property allows for structured access to game information based on its media, enabling the application to manage and present metadata effectively based on the media information provided by the ScreenScraper API.
             /// </summary>
-            public List<ssGameMedia>? medias { get; set; }
+            public List<ssMedia>? medias { get; set; }
             /// <summary>
             /// List of ROMs associated with the game, providing information about the various ROM files that apply to the game. This property allows for structured access to game information based on its ROMs, enabling the application to manage and present metadata effectively based on the ROM information provided by the ScreenScraper API.
             /// </summary>
             public List<ssRom>? roms { get; set; }
+        }
+
+        /// <summary>
+        /// Represents a platform item for the ScreenScraper API, containing properties such as ID, parent ID, and names in different languages. This class is used to deserialize platform data from the ScreenScraper API responses, allowing for structured access to platform information associated with games. The properties include identifiers, parent-child relationships between platforms, and names in different languages, providing a comprehensive representation of platforms as returned by the ScreenScraper API.
+        /// </summary>
+        public class ssPlatform
+        {
+            /// <summary>
+            /// digital identifier of the system (to be provided again in other API requests)
+            /// </summary>
+            public long? id { get; set; }
+            /// <summary>
+            /// digital identifier of the parent system
+            /// </summary>
+            public long? parentid { get; set; }
+            /// List of names for the platform in different languages, providing localized information about the platform based on language preferences. This property allows for structured access to platform names in various languages, enabling the application to present platform information effectively based on the language preferences of users or regional differences in platform information as returned by the ScreenScraper API.
+            /// </summary>
+            public Dictionary<string, string> noms { get; set; }
+            /// <summary>
+            /// extensions of usable rom files (all emulators combined)
+            /// </summary>
+            public string? extensions { get; set; }
+            /// <summary>
+            /// Name of the system production company
+            /// </summary>
+            public string? compagnie { get; set; }
+            /// <summary>
+            /// System type (Arcade,Console,Portable Console,Arcade Emulation,Fipper,Online,Computer,Smartphone)
+            /// </summary>
+            public string? type { get; set; }
+            /// <summary>
+            /// Year of production start
+            /// </summary>
+            public string? datedebut { get; set; }
+            /// <summary>
+            /// Year of end of production
+            /// </summary>
+            public string? datefin { get; set; }
+            /// <summary>
+            /// Type(s) of roms
+            /// </summary>
+            public string? romtype { get; set; }
+            /// <summary>
+            /// Type of the original system media
+            /// </summary>
+            public string? romTypesListe { get; set; }
+            /// <summary>
+            /// List of media associated with the platform
+            /// </summary>
+            public List<ssMedia>? medias { get; set; }
         }
 
         /// <summary>
@@ -852,7 +1019,7 @@ namespace hasheous_server.Classes.MetadataLib
             public GameInfoResponse? response { get; set; }
 
             /// <summary>
-            /// 
+            /// Represents the response from the ScreenScraper API when fetching game information, including server status, user API usage details, and comprehensive game metadata. This class is used to deserialize the JSON response from the API and provides structured access to the server, user, and game information needed to manage API rate limits effectively while also providing detailed metadata about the game as returned by the ScreenScraper API.
             /// </summary>
             public class GameInfoResponse
             {
@@ -868,6 +1035,44 @@ namespace hasheous_server.Classes.MetadataLib
                 /// Detailed information about the game retrieved from the ScreenScraper API, including various metadata fields such as names, developer, publisher, player counts, ratings, classifications, release dates, genres, modes, franchises, and associated media. This property allows for structured access to comprehensive game information based on the data returned by the ScreenScraper API, enabling the application to manage and present metadata effectively based on the detailed information provided for each game.
                 /// </summary>
                 public ssGame? jeu { get; set; }
+            }
+        }
+
+        public class PlatformItem
+        {
+            /// <summary>
+            /// Gets the ScreenScraper API endpoint URL for retrieving platform information, which returns a list of all platforms available in the ScreenScraper database. Since the ScreenScraper API does not support server-side filtering for platforms, this endpoint retrieves all platforms, and any necessary filtering must be done client-side based on the data returned by the API. This method constructs the endpoint URL using the client ID and secret from the configuration settings, allowing for authenticated access to the ScreenScraper API to fetch platform metadata.
+            /// </summary>
+            public static string Endpoint()
+            {
+                // ScreenScraper's endpoint for platform metadata returns ALL platforms with no server side filtering
+                return $"https://api.screenscraper.fr/api2/systemesListe.php?devid=devid={Config.ScreenScraperConfiguration.DevClientId}&devpassword={Config.ScreenScraperConfiguration.DevSecret}&softname=Hasheous&output=json&ssid={Config.ScreenScraperConfiguration.ClientId}&sspassword={Config.ScreenScraperConfiguration.Secret}";
+            }
+
+            /// <summary>
+            /// Standard header for ScreenScraper API responses, containing information about the API version, request time, command requested, success status, and any error messages. This header is included in the user information response to provide context about the API request and response.
+            /// </summary>
+            public ssHeader? header { get; set; }
+
+            /// <summary>
+            /// Contains information about the ScreenScraper API servers and the user, including API usage and rate limit information, as well as detailed information about the platforms retrieved from the API. This information is used to manage API rate limits effectively by tracking how many calls have been made and when the limits will reset, while also providing structured access to comprehensive platform metadata based on the data returned by the ScreenScraper API. The server information provides insights into the current load on the API servers, while the user information tracks the API usage for the specific user account, allowing the application to avoid exceeding the limits and ensure smooth operation. The platform information includes various metadata fields such as platform names, release dates, manufacturers, and other relevant details, enabling the application to manage and present metadata effectively based on the detailed information provided for each platform.
+            /// </summary>
+            public PlatformInfoResponse? response { get; set; }
+
+            /// <summary>
+            /// Represents the response from the ScreenScraper API when fetching platform information, including server status, user API usage details, and comprehensive platform metadata. This class is used to deserialize the JSON response from the API and provides structured access to the server, user, and platform information needed to manage API rate limits effectively while also providing detailed metadata about the platforms as returned by the ScreenScraper API.
+            /// </summary>
+            public class PlatformInfoResponse
+            {
+                /// <summary>
+                /// Information about the ScreenScraper API servers, including CPU usage, thread counts, and API access details. This information helps gauge the current load on the API servers and can be used to make informed decisions about when to make API calls to avoid overloading the servers.
+                /// </summary>
+                public ssServeurs? serveurs { get; set; }
+
+                /// <summary>
+                /// Information about the ScreenScraper API user, including API usage and rate limit details. This information is crucial for managing API rate limits effectively by tracking how many calls have been made and when the limits will reset, allowing the application to avoid exceeding the limits and ensure smooth operation.
+                /// </summary>
+                public List<ssPlatform>? systemes { get; set; }
             }
         }
     }
