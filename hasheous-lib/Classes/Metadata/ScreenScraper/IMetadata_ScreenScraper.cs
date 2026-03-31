@@ -40,6 +40,11 @@ namespace hasheous_server.Classes.MetadataLib
         private static int maxApiCallsThresholdPercentage = 90;
 
         /// <summary>
+        /// Defines the delay in minutes to wait before retrying API calls after exceeding the API call limit. This delay is used when the application detects that it has approached or exceeded the API call limits based on the user information fetched from the ScreenScraper API. By implementing this delay, the application can avoid making further API calls that would be rejected due to rate limits and can instead wait until the limits are reset before resuming API interactions.
+        /// </summary>
+        private static int exceededAPICallDelayMinutes = 60;
+
+        /// <summary>
         /// Stores the user information retrieved from the ScreenScraper API, including the number of API calls used and the time until the next reset. This information is used to manage API rate limits by tracking how many calls have been made and when the limits will reset. The user information is fetched at regular intervals defined by <see cref="userInfoFetchIntervalMinutes"/> to ensure that the application has up-to-date information on API usage and can avoid exceeding the limits.
         /// </summary>
         private static ssUser? userItem;
@@ -76,10 +81,12 @@ namespace hasheous_server.Classes.MetadataLib
                 }
                 catch (Exception ex)
                 {
-                    // log the error and proceed without user info, but be cautious with API calls
+                    // Unable to determine remaining quota - treat as rate-limited to be safe.
                     Logging.Log(Logging.LogType.Critical, "ScreenScraper", $"Failed to fetch user info from ScreenScraper API: {ex.Message}");
 
-                    return DataObjectSearchResults; // return no match if we can't fetch user info to avoid making API calls without knowing the limits
+                    throw new MetadataRateLimitException(
+                        $"ScreenScraper: could not fetch user info to check API limits: {ex.Message}",
+                        DateTime.UtcNow.AddMinutes(userInfoFetchIntervalMinutes));
                 }
             }
 
@@ -93,7 +100,8 @@ namespace hasheous_server.Classes.MetadataLib
                 if (requestsTotal >= maxAllowedRequests)
                 {
                     Logging.Log(Logging.LogType.Warning, "ScreenScraper", $"Approaching API call limit: {requestsTotal}/{maxAllowedRequests} calls used. Stopping API calls to avoid exceeding the limit.");
-                    return DataObjectSearchResults; // return no match to avoid making API calls when approaching the limit
+                    throw new MetadataRateLimitException(
+                        $"ScreenScraper: daily request limit approached ({requestsTotal}/{maxAllowedRequests}).", DateTime.UtcNow.AddMinutes(exceededAPICallDelayMinutes));
                 }
 
                 int maxFailedRequestsPerDay = int.TryParse(userItem.maxrequestskoperday, out int maxFailedReq) ? maxFailedReq : 2000; // default to 2000
@@ -103,7 +111,8 @@ namespace hasheous_server.Classes.MetadataLib
                 if (failedRequestsTotal >= maxAllowedFailedRequests)
                 {
                     Logging.Log(Logging.LogType.Warning, "ScreenScraper", $"Approaching failed API call limit: {failedRequestsTotal}/{maxAllowedFailedRequests} failed calls used. Stopping API calls to avoid exceeding the limit.");
-                    return DataObjectSearchResults; // return no match to avoid making API calls when approaching the failed call limit
+                    throw new MetadataRateLimitException(
+                        $"ScreenScraper: daily failed-request limit approached ({failedRequestsTotal}/{maxAllowedFailedRequests}).", DateTime.UtcNow.AddMinutes(exceededAPICallDelayMinutes));
                 }
             }
 

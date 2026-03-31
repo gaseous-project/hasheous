@@ -2210,6 +2210,12 @@ namespace hasheous_server.Classes
 
                             Logging.Log(Logging.LogType.Information, "Metadata Match", $"{processedObjectCount} / {objectTotalCount} - {item.ObjectType} {item.Name} {metadata.MatchMethod} to {metadata.Source} metadata: {metadata.Id}");
                         }
+                        catch (MetadataLib.MetadataRateLimitException ex)
+                        {
+                            Logging.Log(Logging.LogType.Warning, "Metadata Match", $"{processedObjectCount} / {objectTotalCount} - Rate limit reached, retry after {ex.RetryAfter}", ex);
+                            metadata.NextSearch = ex.RetryAfter;
+                            metadataUpdates.Add(metadata);
+                        }
                         catch (Exception ex)
                         {
                             Logging.Log(Logging.LogType.Warning, "Metadata Match", $"{processedObjectCount} / {objectTotalCount} - Error processing metadata search", ex);

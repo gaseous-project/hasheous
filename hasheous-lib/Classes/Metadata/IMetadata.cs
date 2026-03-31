@@ -1,6 +1,29 @@
 namespace hasheous_server.Classes.MetadataLib
 {
     /// <summary>
+    /// Thrown by an <see cref="IMetadata"/> implementation when the upstream API rate limit has been
+    /// reached or approached, and the caller should defer the search until <see cref="RetryAfter"/>.
+    /// </summary>
+    public class MetadataRateLimitException : Exception
+    {
+        /// <summary>
+        /// The earliest UTC time at which the caller should retry the operation.
+        /// </summary>
+        public DateTime RetryAfter { get; }
+
+        /// <summary>
+        /// Initialises a new instance with an optional retry-after hint.
+        /// </summary>
+        /// <param name="message">Human-readable description of the limit that was hit.</param>
+        /// <param name="retryAfter">Earliest UTC time to retry; defaults to 1 hour from now if not supplied.</param>
+        public MetadataRateLimitException(string message, DateTime? retryAfter = null)
+            : base(message)
+        {
+            RetryAfter = retryAfter ?? DateTime.UtcNow.AddHours(1);
+        }
+    }
+
+    /// <summary>
     /// Provides metadata lookup capabilities and identifies the metadata source.
     /// Implementations can locate matching DataObjects.MatchItem instances for a given DataObjectType.
     /// </summary>
