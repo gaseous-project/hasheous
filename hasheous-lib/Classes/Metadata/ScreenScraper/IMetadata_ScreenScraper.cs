@@ -30,6 +30,11 @@ namespace hasheous_server.Classes.MetadataLib
         private static int apiCallCount = 0;
 
         /// <summary>
+        /// Tracks the number of failed match API calls made to the ScreenScraper API to manage API rate limits. Resets to 0 when user information is fetched to check the remaining API calls and reset time. This counter is incremented with each failed match API call (e.g., when a ROM hash lookup returns a 404 Not Found) made to the ScreenScraper API, and it helps ensure that the application does not exceed the daily limit of 2000 failed calls, which could lead to temporary blocking of the API access. By tracking both successful and failed API calls, the application can better manage its usage of the ScreenScraper API and avoid hitting rate limits.
+        /// </summary>
+        private static int apiFailedCallCount = 0;
+
+        /// <summary>
         /// Defines the threshold percentage of API calls used to stop making API calls.
         /// </summary>
         private static int maxApiCallsThresholdPercentage = 90;
@@ -37,7 +42,7 @@ namespace hasheous_server.Classes.MetadataLib
         /// <summary>
         /// Stores the user information retrieved from the ScreenScraper API, including the number of API calls used and the time until the next reset. This information is used to manage API rate limits by tracking how many calls have been made and when the limits will reset. The user information is fetched at regular intervals defined by <see cref="userInfoFetchIntervalMinutes"/> to ensure that the application has up-to-date information on API usage and can avoid exceeding the limits.
         /// </summary>
-        private static UserItem? userItem;
+        private static ssUser? userItem;
 
         /// <inheritdoc/>
         public Communications.MetadataSources MetadataSource => Communications.MetadataSources.ScreenScraper;
@@ -64,7 +69,8 @@ namespace hasheous_server.Classes.MetadataLib
                 // fetch user info from ScreenScraper API
                 try
                 {
-                    userItem = await HttpHelper.Get<UserItem>(UserItem.Endpoint());
+                    UserItem fullUserItem = await HttpHelper.Get<UserItem>(UserItem.Endpoint());
+                    userItem = fullUserItem.response.ssuser; // update the user information with the latest data from the API response
                     lastUserInfoFetchTime = DateTime.UtcNow;
                     apiCallCount = 0; // reset API call count after fetching user info
                 }
@@ -78,16 +84,26 @@ namespace hasheous_server.Classes.MetadataLib
             }
 
             // check if we are approaching the API call limit
-            if (userItem != null && userItem.response != null && userItem.response.ssuser != null)
+            if (userItem != null)
             {
-                int maxRequestsPerDay = int.TryParse(userItem.response.ssuser.maxrequestsperday, out int maxReq) ? maxReq : 10000; // default to 10000
-                int requestsToday = int.TryParse(userItem.response.ssuser.requeststoday, out int reqToday) ? reqToday : 0;
+                int maxRequestsPerDay = int.TryParse(userItem.maxrequestsperday, out int maxReq) ? maxReq : 10000; // default to 10000
+                int requestsToday = int.TryParse(userItem.requeststoday, out int reqToday) ? reqToday : 0;
                 int maxAllowedRequests = (int)(maxRequestsPerDay * (maxApiCallsThresholdPercentage / 100.0));
                 int requestsTotal = requestsToday + apiCallCount;
                 if (requestsTotal >= maxAllowedRequests)
                 {
                     Logging.Log(Logging.LogType.Warning, "ScreenScraper", $"Approaching API call limit: {requestsTotal}/{maxAllowedRequests} calls used. Stopping API calls to avoid exceeding the limit.");
                     return DataObjectSearchResults; // return no match to avoid making API calls when approaching the limit
+                }
+
+                int maxFailedRequestsPerDay = int.TryParse(userItem.maxrequestskoperday, out int maxFailedReq) ? maxFailedReq : 2000; // default to 2000
+                int failedRequestsToday = int.TryParse(userItem.requestskotoday, out int failedReqToday) ? failedReqToday : 0;
+                int maxAllowedFailedRequests = (int)(maxFailedRequestsPerDay * (maxApiCallsThresholdPercentage / 100.0));
+                int failedRequestsTotal = failedRequestsToday + apiFailedCallCount;
+                if (failedRequestsTotal >= maxAllowedFailedRequests)
+                {
+                    Logging.Log(Logging.LogType.Warning, "ScreenScraper", $"Approaching failed API call limit: {failedRequestsTotal}/{maxAllowedFailedRequests} failed calls used. Stopping API calls to avoid exceeding the limit.");
+                    return DataObjectSearchResults; // return no match to avoid making API calls when approaching the failed call limit
                 }
             }
 
@@ -202,6 +218,14 @@ namespace hasheous_server.Classes.MetadataLib
 
                         if (response != null && response.response != null && response.response.jeu != null && response.response.jeu.id != null)
                         {
+                            // capture the user information from the response to update our API usage tracking in case the user information has changed since we last fetched it
+                            if (response.response.ssuser != null)
+                            {
+                                userItem = response.response.ssuser; // update the user information with the latest data from the API response
+                                lastUserInfoFetchTime = DateTime.UtcNow; // update the last fetch time to now since we just got fresh user info from the API
+                                apiFailedCallCount = 0; // reset failed API call count after getting a successful response which indicates we are not currently blocked by rate limits
+                            }
+
                             // we have a match, return it
                             DataObjectSearchResults = new hasheous_server.Classes.DataObjects.MatchItem
                             {
@@ -258,6 +282,7 @@ namespace hasheous_server.Classes.MetadataLib
                                 // 404 Not Found means we don't have metadata for this ROM hash, so we can cache this result to avoid unnecessary API calls in the future
                                 sql = "INSERT INTO Screenscraper_FailedHashLookups (Hash, HashType, LookupDate) VALUES (@Hash, @HashType, @LookupDate)";
                                 await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object> { { "@Hash", hashUsed }, { "@HashType", parameters["@HashType"] }, { "@LookupDate", DateTime.UtcNow } });
+                                apiFailedCallCount++; // increment failed API call count since this is a failed lookup which counts against the failed call limit
 
                                 Logging.Log(Logging.LogType.Information, "ScreenScraper", $"No metadata found for ROM hash {hashUsed}. Caching this result to avoid future API calls for this hash.");
                                 break;
