@@ -27,10 +27,32 @@ namespace hasheous_server.Classes.MetadataLib
             switch (item.ObjectType)
             {
                 case DataObjects.DataObjectType.Company:
-                    DataObjectSearchResults = await dataObjects.GetDataObject<IGDB.Models.Company>(Metadata.Communications.MetadataSources.IGDB, IGDB.IGDBClient.Endpoints.Companies, "fields *;", "where name ~ *\"" + item.Name + "\"");
+                    foreach (string candidate in searchCandidates)
+                    {
+                        DataObjectSearchResults = await dataObjects.GetDataObject<IGDB.Models.Company>(Metadata.Communications.MetadataSources.IGDB, IGDB.IGDBClient.Endpoints.Companies, "fields *;", "where name ~ *\"" + candidate + "\"");
+                        if (DataObjectSearchResults != null && DataObjectSearchResults.MatchMethod != BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch)
+                        {
+                            break;
+                        }
+                    }
+                    if (DataObjectSearchResults == null || DataObjectSearchResults.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch)
+                    {
+                        DataObjectSearchResults = await dataObjects.GetDataObject<IGDB.Models.Company>(Metadata.Communications.MetadataSources.IGDB, IGDB.IGDBClient.Endpoints.Companies, "fields *;", "where name ~ *\"" + item.Name + "\"");
+                    }
                     break;
                 case DataObjects.DataObjectType.Platform:
-                    DataObjectSearchResults = await dataObjects.GetDataObject<IGDB.Models.Platform>(Metadata.Communications.MetadataSources.IGDB, IGDB.IGDBClient.Endpoints.Platforms, "fields *;", "where name ~ *\"" + item.Name + "\"");
+                    foreach (string candidate in searchCandidates)
+                    {
+                        DataObjectSearchResults = await dataObjects.GetDataObject<IGDB.Models.Platform>(Metadata.Communications.MetadataSources.IGDB, IGDB.IGDBClient.Endpoints.Platforms, "fields *;", "where name ~ *\"" + candidate + "\"");
+                        if (DataObjectSearchResults != null && DataObjectSearchResults.MatchMethod != BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch)
+                        {
+                            break;
+                        }
+                    }
+                    if (DataObjectSearchResults == null || DataObjectSearchResults.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch)
+                    {
+                        DataObjectSearchResults = await dataObjects.GetDataObject<IGDB.Models.Platform>(Metadata.Communications.MetadataSources.IGDB, IGDB.IGDBClient.Endpoints.Platforms, "fields *;", "where name ~ *\"" + item.Name + "\"");
+                    }
                     break;
                 case DataObjects.DataObjectType.Game:
                     bool searchComplete = false;

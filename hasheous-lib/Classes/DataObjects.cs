@@ -2343,6 +2343,7 @@ namespace hasheous_server.Classes
             }
 
             List<string> searchCandidates = new List<string>();
+            List<string> lowPriorityCandidates = new List<string>();
 
             string NormalizeWhitespace(string value)
             {
@@ -2360,6 +2361,15 @@ namespace hasheous_server.Classes
                 if (!string.IsNullOrWhiteSpace(normalized))
                 {
                     searchCandidates.Add(normalized);
+                }
+            }
+
+            void AddLowPriorityCandidate(string value)
+            {
+                string normalized = NormalizeWhitespace(value);
+                if (!string.IsNullOrWhiteSpace(normalized))
+                {
+                    lowPriorityCandidates.Add(normalized);
                 }
             }
 
@@ -2416,6 +2426,24 @@ namespace hasheous_server.Classes
                 {
                     AddCandidate(Regex.Replace(value, @"\s*:\s*", " "));
                     AddCandidate(Regex.Replace(value, @"\s*:\s*", " - "));
+                }
+
+                if (value.Contains("/", StringComparison.Ordinal))
+                {
+                    // Slash variants are useful but noisy; keep these as lower-priority candidates.
+                    AddLowPriorityCandidate(Regex.Replace(value, @"\s*/\s*", "/"));
+                    AddLowPriorityCandidate(Regex.Replace(value, @"\s*/\s*", " "));
+                    AddLowPriorityCandidate(Regex.Replace(value, @"\s*/\s*", " - "));
+
+                    string[] slashParts = Regex.Split(value, @"\s*/\s*")
+                        .Where(part => !string.IsNullOrWhiteSpace(part))
+                        .ToArray();
+
+                    if (slashParts.Length == 2)
+                    {
+                        AddLowPriorityCandidate(slashParts[0]);
+                        AddLowPriorityCandidate(slashParts[1]);
+                    }
                 }
             }
 
@@ -2551,6 +2579,9 @@ namespace hasheous_server.Classes
                     AddCandidate(wordsToNumber);
                 }
             }
+
+            // keep lower-confidence slash-derived candidates at the end to emulate weighting.
+            searchCandidates.AddRange(lowPriorityCandidates);
 
             // remove duplicates while preserving order
             List<string> distinctCandidates = new List<string>();
