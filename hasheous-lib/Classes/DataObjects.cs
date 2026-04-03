@@ -2153,6 +2153,13 @@ namespace hasheous_server.Classes
                     continue;
                 }
 
+                // check if the provider is enabled
+                if (!metadataHandler.Enabled)
+                {
+                    Logging.Log(Logging.LogType.Warning, "Metadata Match", $"Metadata provider for source {metadataSource} is not enabled. Skipping.");
+                    continue;
+                }
+
                 // get the metadataitem from the dataobject - if not present, create a new one
                 // default to new
                 DataObjectItem.MetadataItem metadata = new DataObjectItem.MetadataItem(objectType)

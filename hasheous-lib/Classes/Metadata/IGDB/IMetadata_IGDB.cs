@@ -1,5 +1,6 @@
 
 
+using Classes;
 using hasheous_server.Classes.Metadata.IGDB;
 
 namespace hasheous_server.Classes.MetadataLib
@@ -12,6 +13,15 @@ namespace hasheous_server.Classes.MetadataLib
     {
         /// <inheritdoc/>
         public Metadata.Communications.MetadataSources MetadataSource => Metadata.Communications.MetadataSources.IGDB;
+
+        /// <inheritdoc/>
+        public bool Enabled
+        {
+            get
+            {
+                return !String.IsNullOrEmpty(Config.IGDB.ClientId) && !String.IsNullOrEmpty(Config.IGDB.Secret);
+            }
+        }
 
         /// <inheritdoc/>
         public async Task<DataObjects.MatchItem> FindMatchItemAsync(hasheous_server.Models.DataObjectItem item, List<string> searchCandidates, Dictionary<string, object>? options = null)

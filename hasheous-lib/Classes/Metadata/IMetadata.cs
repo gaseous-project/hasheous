@@ -35,6 +35,11 @@ namespace hasheous_server.Classes.MetadataLib
         public Metadata.Communications.MetadataSources MetadataSource { get; }
 
         /// <summary>
+        /// Indicates whether this metadata provider is currently enabled and should be used for lookups.
+        /// </summary>
+        public bool Enabled { get; }
+
+        /// <summary>
         /// Finds a matching DataObjects.MatchItem for the specified data object type.
         /// </summary>
         /// <param name="item">The data object item to find a match for.</param>

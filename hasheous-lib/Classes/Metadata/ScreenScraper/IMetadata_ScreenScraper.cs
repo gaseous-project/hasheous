@@ -52,6 +52,15 @@ namespace hasheous_server.Classes.MetadataLib
         /// <inheritdoc/>
         public Communications.MetadataSources MetadataSource => Communications.MetadataSources.ScreenScraper;
 
+        /// <inheritdoc/>
+        public bool Enabled
+        {
+            get
+            {
+                return !String.IsNullOrEmpty(Config.ScreenScraperConfiguration.ClientId) && !String.IsNullOrEmpty(Config.ScreenScraperConfiguration.Secret) && !String.IsNullOrEmpty(Config.ScreenScraperConfiguration.DevClientId) && !String.IsNullOrEmpty(Config.ScreenScraperConfiguration.DevSecret);
+            }
+        }
+
         /// <summary>
         /// Connects to the ScreenScraper API and searches for matches based on the ROM hashes in the provided <paramref name="item"/>. The <paramref name="searchCandidates"/> value is ignored for ScreenScraper game metadata matching since it relies on ROM hash matching rather than name-based searching. The <paramref name="options"/> parameter is also ignored for ScreenScraper metadata matching since no additional options are needed for ROM hash searching.
         /// </summary>

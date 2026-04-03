@@ -13,6 +13,15 @@ namespace hasheous_server.Classes.MetadataLib
         public Metadata.Communications.MetadataSources MetadataSource => Metadata.Communications.MetadataSources.TheGamesDb;
 
         /// <inheritdoc/>
+        public bool Enabled
+        {
+            get
+            {
+                return true;
+            }
+        }
+
+        /// <inheritdoc/>
         public async Task<DataObjects.MatchItem> FindMatchItemAsync(hasheous_server.Models.DataObjectItem item, List<string> searchCandidates, Dictionary<string, object>? options = null)
         {
             TheGamesDB.SQL.MetadataQuery metadataQuery = new TheGamesDB.SQL.MetadataQuery();
