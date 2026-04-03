@@ -703,6 +703,9 @@ namespace Classes
 						case "IdentitiesOrValues`1":
 							columnType = "LONGTEXT";
 							break;
+						default:
+							columnType = "LONGTEXT";
+							break;
 					}
 				}
 

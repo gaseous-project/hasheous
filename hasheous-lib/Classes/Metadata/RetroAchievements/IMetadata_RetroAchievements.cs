@@ -11,6 +11,15 @@ namespace hasheous_server.Classes.MetadataLib
         public Metadata.Communications.MetadataSources MetadataSource => Metadata.Communications.MetadataSources.RetroAchievements;
 
         /// <inheritdoc/>
+        public bool Enabled
+        {
+            get
+            {
+                return !String.IsNullOrEmpty(Config.RetroAchievements.APIKey);
+            }
+        }
+
+        /// <inheritdoc/>
         public async Task<DataObjects.MatchItem> FindMatchItemAsync(hasheous_server.Models.DataObjectItem item, List<string> searchCandidates, Dictionary<string, object>? options = null)
         {
             hasheous_server.Classes.DataObjects.MatchItem? DataObjectSearchResults = new hasheous_server.Classes.DataObjects.MatchItem

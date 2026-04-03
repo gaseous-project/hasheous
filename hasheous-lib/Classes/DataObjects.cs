@@ -1148,7 +1148,7 @@ namespace hasheous_server.Classes
             return attribute;
         }
 
-        public async Task<Models.DataObjectItem> NewDataObject(DataObjectType objectType, Models.DataObjectItemModel model, ApplicationUser? user = null)
+        public async Task<Models.DataObjectItem> NewDataObject(DataObjectType objectType, Models.DataObjectItemModel model, ApplicationUser? user = null, bool allowSearch = true)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "INSERT INTO DataObject (`Name`, `ObjectType`, `CreatedDate`, `UpdatedDate`) VALUES (@name, @objecttype, @createddate, @updateddate); SELECT LAST_INSERT_ID();";
@@ -1184,7 +1184,10 @@ namespace hasheous_server.Classes
                         }
                     }
 
-                    await DataObjectMetadataSearch(objectType, (long)(ulong)data.Rows[0][0]);
+                    if (allowSearch)
+                    {
+                        await DataObjectMetadataSearch(objectType, (long)(ulong)data.Rows[0][0]);
+                    }
                     break;
 
                 case DataObjectType.App:
@@ -1894,13 +1897,25 @@ namespace hasheous_server.Classes
         // get all metadata sources
         private static MetadataSources[] allMetadataSources = (MetadataSources[])Enum.GetValues(typeof(MetadataSources));
 
+        // Tokens commonly found in titles/platform names that should not be interpreted as Roman numerals.
+        private static readonly List<string> RomanConversionAcronymExclusions = new List<string>
+        {
+            "CD",
+            "DVD",
+            "PS",
+            "PSP",
+            "VR",
+            "3DO"
+        };
+
         private async Task _DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch)
         {
             HashSet<MetadataSources> ProcessSources = [
                 MetadataSources.IGDB,
                 MetadataSources.TheGamesDb,
                 MetadataSources.RetroAchievements,
-                MetadataSources.GiantBomb
+                MetadataSources.GiantBomb,
+                MetadataSources.ScreenScraper
             ];
 
             // set now time
@@ -2138,6 +2153,13 @@ namespace hasheous_server.Classes
                     continue;
                 }
 
+                // check if the provider is enabled
+                if (!metadataHandler.Enabled)
+                {
+                    Logging.Log(Logging.LogType.Warning, "Metadata Match", $"Metadata provider for source {metadataSource} is not enabled. Skipping.");
+                    continue;
+                }
+
                 // get the metadataitem from the dataobject - if not present, create a new one
                 // default to new
                 DataObjectItem.MetadataItem metadata = new DataObjectItem.MetadataItem(objectType)
@@ -2194,6 +2216,12 @@ namespace hasheous_server.Classes
                             metadataUpdates.Add(metadata);
 
                             Logging.Log(Logging.LogType.Information, "Metadata Match", $"{processedObjectCount} / {objectTotalCount} - {item.ObjectType} {item.Name} {metadata.MatchMethod} to {metadata.Source} metadata: {metadata.Id}");
+                        }
+                        catch (MetadataLib.MetadataRateLimitException ex)
+                        {
+                            Logging.Log(Logging.LogType.Warning, "Metadata Match", $"{processedObjectCount} / {objectTotalCount} - Rate limit reached, retry after {ex.RetryAfter}", ex);
+                            metadata.NextSearch = ex.RetryAfter;
+                            metadataUpdates.Add(metadata);
                         }
                         catch (Exception ex)
                         {
@@ -2328,6 +2356,7 @@ namespace hasheous_server.Classes
             }
 
             List<string> searchCandidates = new List<string>();
+            List<string> lowPriorityCandidates = new List<string>();
 
             string NormalizeWhitespace(string value)
             {
@@ -2345,6 +2374,15 @@ namespace hasheous_server.Classes
                 if (!string.IsNullOrWhiteSpace(normalized))
                 {
                     searchCandidates.Add(normalized);
+                }
+            }
+
+            void AddLowPriorityCandidate(string value)
+            {
+                string normalized = NormalizeWhitespace(value);
+                if (!string.IsNullOrWhiteSpace(normalized))
+                {
+                    lowPriorityCandidates.Add(normalized);
                 }
             }
 
@@ -2379,15 +2417,46 @@ namespace hasheous_server.Classes
 
             void AddDelimiterVariants(string value)
             {
-                if (value.Contains(" - ", StringComparison.Ordinal))
+                // normalize and expand delimiter variations so comparisons can match API results
+                // regardless of whether separators are spaces, hyphens, or colons.
+                string hyphenTight = Regex.Replace(value, @"\s*-\s*", "-");
+                string hyphenSpaced = Regex.Replace(value, @"\s*-\s*", " - ");
+                string hyphenToSpace = Regex.Replace(value, @"\s*-\s*", " ");
+                string hyphenToColon = Regex.Replace(value, @"\s*-\s*", ": ");
+
+                AddCandidate(hyphenTight);
+                AddCandidate(hyphenSpaced);
+                AddCandidate(hyphenToSpace);
+                AddCandidate(hyphenToColon);
+
+                // if a value has spaces but no hyphens, generate a hyphenated variant.
+                if (!value.Contains("-", StringComparison.Ordinal) && value.Contains(" ", StringComparison.Ordinal))
                 {
-                    AddCandidate(value.Replace(" - ", ": "));
-                    AddCandidate(value.Replace(" - ", " "));
+                    AddCandidate(Regex.Replace(value, @"\s+", "-"));
                 }
 
-                if (value.Contains(": ", StringComparison.Ordinal))
+                if (value.Contains(":", StringComparison.Ordinal))
                 {
-                    AddCandidate(value.Replace(": ", " "));
+                    AddCandidate(Regex.Replace(value, @"\s*:\s*", " "));
+                    AddCandidate(Regex.Replace(value, @"\s*:\s*", " - "));
+                }
+
+                if (value.Contains("/", StringComparison.Ordinal))
+                {
+                    // Slash variants are useful but noisy; keep these as lower-priority candidates.
+                    AddLowPriorityCandidate(Regex.Replace(value, @"\s*/\s*", "/"));
+                    AddLowPriorityCandidate(Regex.Replace(value, @"\s*/\s*", " "));
+                    AddLowPriorityCandidate(Regex.Replace(value, @"\s*/\s*", " - "));
+
+                    string[] slashParts = Regex.Split(value, @"\s*/\s*")
+                        .Where(part => !string.IsNullOrWhiteSpace(part))
+                        .ToArray();
+
+                    if (slashParts.Length == 2)
+                    {
+                        AddLowPriorityCandidate(slashParts[0]);
+                        AddLowPriorityCandidate(slashParts[1]);
+                    }
                 }
             }
 
@@ -2448,7 +2517,20 @@ namespace hasheous_server.Classes
             {
                 string romanConverted = Regex.Replace(candidate, @"\b[IVXLCDM]+\b", match =>
                 {
-                    return Common.RomanNumerals.RomanToInt(match.Value).ToString();
+                    string token = match.Value;
+
+                    if (RomanConversionAcronymExclusions.Contains(token, StringComparer.OrdinalIgnoreCase))
+                    {
+                        return token;
+                    }
+
+                    int parsed = Common.RomanNumerals.RomanToInt(token);
+                    if (parsed >= 1 && parsed <= 30)
+                    {
+                        return parsed.ToString();
+                    }
+
+                    return token;
                 }, RegexOptions.IgnoreCase);
 
                 if (!string.Equals(romanConverted, candidate, StringComparison.Ordinal))
@@ -2462,7 +2544,7 @@ namespace hasheous_server.Classes
             {
                 string numberToRoman = Regex.Replace(candidate, @"\b(\d+)\b", match =>
                 {
-                    if (int.TryParse(match.Groups[1].Value, out int num) && num >= 1 && num <= 3999)
+                    if (int.TryParse(match.Groups[1].Value, out int num) && num >= 1 && num <= 30)
                     {
                         return Common.RomanNumerals.IntToRoman(num);
                     }
@@ -2481,7 +2563,7 @@ namespace hasheous_server.Classes
                 // Convert numbers to words
                 string numberToWords = Regex.Replace(candidate, @"\b(\d+)\b", match =>
                 {
-                    if (int.TryParse(match.Groups[1].Value, out int num) && num >= 0 && num <= 999999999)
+                    if (int.TryParse(match.Groups[1].Value, out int num) && num >= 1 && num <= 30)
                     {
                         return Common.Numbers.NumberToWords(num);
                     }
@@ -2497,7 +2579,12 @@ namespace hasheous_server.Classes
                 string wordsToNumber = Regex.Replace(candidate, @"\b(?:Zero|One|Two|Three|Four|Five|Six|Seven|Eight|Nine|Ten|Eleven|Twelve|Thirteen|Fourteen|Fifteen|Sixteen|Seventeen|Eighteen|Nineteen|Twenty|Thirty|Forty|Fifty|Sixty|Seventy|Eighty|Ninety|Hundred|Thousand|Million|Billion)(?:\s+(?:Zero|One|Two|Three|Four|Five|Six|Seven|Eight|Nine|Ten|Eleven|Twelve|Thirteen|Fourteen|Fifteen|Sixteen|Seventeen|Eighteen|Nineteen|Twenty|Thirty|Forty|Fifty|Sixty|Seventy|Eighty|Ninety|Hundred|Thousand|Million|Billion))*\b", match =>
                 {
                     var result = Common.Numbers.WordsToNumbers(match.Value);
-                    return result.HasValue ? result.Value.ToString() : match.Value;
+                    if (result.HasValue && result.Value >= 1 && result.Value <= 30)
+                    {
+                        return result.Value.ToString();
+                    }
+
+                    return match.Value;
                 }, RegexOptions.IgnoreCase);
 
                 if (!string.Equals(wordsToNumber, candidate, StringComparison.Ordinal))
@@ -2505,6 +2592,9 @@ namespace hasheous_server.Classes
                     AddCandidate(wordsToNumber);
                 }
             }
+
+            // keep lower-confidence slash-derived candidates at the end to emulate weighting.
+            searchCandidates.AddRange(lowPriorityCandidates);
 
             // remove duplicates while preserving order
             List<string> distinctCandidates = new List<string>();

@@ -240,6 +240,30 @@ namespace hasheous_server.Models
                             Template = "https://www.steamgriddb.com/game/{0}"
                         }
                     }
+                },
+                {
+                    Communications.MetadataSources.ScreenScraper,
+                    new List<LinkTemplateItem>
+                    {
+                        new LinkTemplateItem
+                        {
+                            Source = Communications.MetadataSources.ScreenScraper,
+                            ObjectType = DataObjects.DataObjectType.Company,
+                            Template = "https://www.screenscraper.fr/companieinfos.php?companyid={0}"
+                        },
+                        new LinkTemplateItem
+                        {
+                            Source = Communications.MetadataSources.ScreenScraper,
+                            ObjectType = DataObjects.DataObjectType.Platform,
+                            Template = "https://www.screenscraper.fr/systemeinfos.php?plateforme={0}"
+                        },
+                        new LinkTemplateItem
+                        {
+                            Source = Communications.MetadataSources.ScreenScraper,
+                            ObjectType = DataObjects.DataObjectType.Game,
+                            Template = "https://www.screenscraper.fr/gameinfos.php?gameid={0}"
+                        }
+                    }
                 }
             };
 

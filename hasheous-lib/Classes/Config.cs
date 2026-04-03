@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Data;
-using Newtonsoft.Json;
-using IGDB.Models;
 using hasheous_server.Classes.Metadata;
-using StackExchange.Redis;
+using IGDB.Models;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Newtonsoft.Json;
+using StackExchange.Redis;
 
 namespace Classes
 {
@@ -132,6 +132,17 @@ namespace Classes
             get
             {
                 return _config.GiantBombConfiguration;
+            }
+        }
+
+        /// <summary>
+        /// Gets the ScreenScraper configuration settings.
+        /// </summary>
+        public static ConfigFile.ScreenScraper ScreenScraperConfiguration
+        {
+            get
+            {
+                return _config.ScreenScraperConfiguration;
             }
         }
 
@@ -568,6 +579,11 @@ namespace Classes
             public GiantBomb GiantBombConfiguration = new GiantBomb();
 
             /// <summary>
+            /// Gets or sets the ScreenScraper configuration settings.
+            /// </summary>
+            public ScreenScraper ScreenScraperConfiguration = new ScreenScraper();
+
+            /// <summary>
             /// Gets or sets the social authentication configuration settings.
             /// </summary>
             public SocialAuth SocialAuthConfiguration = new SocialAuth();
@@ -920,6 +936,14 @@ namespace Classes
                     get
                     {
                         return Path.Combine(LibraryMetadataDirectory, "WHDLoad");
+                    }
+                }
+
+                public string LibraryMetadataDirectory_Screenscraper
+                {
+                    get
+                    {
+                        return Path.Combine(LibraryMetadataDirectory, "Screenscraper");
                     }
                 }
 
@@ -1288,6 +1312,89 @@ namespace Classes
                 /// Gets or sets the base URL for the GiantBomb API.
                 /// </summary>
                 public string BaseURL = "https://www.giantbomb.com/";
+            }
+
+            /// <summary>
+            /// Represents the ScreenScraper configuration settings.
+            /// </summary>
+            public class ScreenScraper
+            {
+                private static string _DefaultClientId
+                {
+                    get
+                    {
+                        if (!String.IsNullOrEmpty(Environment.GetEnvironmentVariable("screenscraperclientid")))
+                        {
+                            return Environment.GetEnvironmentVariable("screenscraperclientid");
+                        }
+                        else
+                        {
+                            return "";
+                        }
+                    }
+                }
+
+                private static string _DefaultSecret
+                {
+                    get
+                    {
+                        if (!String.IsNullOrEmpty(Environment.GetEnvironmentVariable("screenscraperclientsecret")))
+                        {
+                            return Environment.GetEnvironmentVariable("screenscraperclientsecret");
+                        }
+                        else
+                        {
+                            return "";
+                        }
+                    }
+                }
+
+                private static string _DefaultDevClientId
+                {
+                    get
+                    {
+                        if (!String.IsNullOrEmpty(Environment.GetEnvironmentVariable("screenscraperdevclientid")))
+                        {
+                            return Environment.GetEnvironmentVariable("screenscraperdevclientid");
+                        }
+                        else
+                        {
+                            return "";
+                        }
+                    }
+                }
+
+                private static string _DefaultDevSecret
+                {
+                    get
+                    {
+                        if (!String.IsNullOrEmpty(Environment.GetEnvironmentVariable("screenscraperdevclientsecret")))
+                        {
+                            return Environment.GetEnvironmentVariable("screenscraperdevclientsecret");
+                        }
+                        else
+                        {
+                            return "";
+                        }
+                    }
+                }
+
+                /// <summary>
+                /// Gets or sets the ScreenScraper client ID used for authenticating API requests.
+                /// </summary>
+                public string ClientId = _DefaultClientId;
+                /// <summary>
+                /// Gets or sets the ScreenScraper client secret used for authenticating API requests.
+                /// </summary>
+                public string Secret = _DefaultSecret;
+                /// <summary>
+                /// Gets or sets the ScreenScraper developer client ID used for authenticating API requests in development environments.
+                /// </summary>
+                public string DevClientId = _DefaultDevClientId;
+                /// <summary>
+                /// Gets or sets the ScreenScraper developer client secret used for authenticating API requests in development environments.
+                /// </summary>
+                public string DevSecret = _DefaultDevSecret;
             }
 
             /// <summary>
