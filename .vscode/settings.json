@@ -3,5 +3,14 @@
     "dotnet.formatting.organizeImportsOnFormat": true,
     "editor.formatOnPaste": true,
     "editor.formatOnSave": true,
-    "editor.formatOnType": true
+    "editor.formatOnType": true,
+    "github.copilot.chat.codeGeneration.instructions": [
+        { "file": ".github/copilot-instructions.md" }
+    ],
+    "github.copilot.chat.reviewSelection.instructions": [
+        { "file": ".github/copilot-instructions.md" }
+    ],
+    "github.copilot.chat.commitMessageGeneration.instructions": [
+        { "file": ".github/copilot-instructions.md" }
+    ]
 }

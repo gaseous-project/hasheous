@@ -1,0 +1,45 @@
+name: "Copilot Setup Steps"
+
+# Run setup steps when they change (validates correctness), and allow manual runs.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+  pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+
+jobs:
+  # This job name MUST be `copilot-setup-steps` — Copilot looks for it by name.
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Add private NuGet source
+        # NUGETKEY must be set as a secret in the `copilot` GitHub Actions environment.
+        # See: Settings → Environments → copilot → Environment secrets.
+        # continue-on-error allows forks and public contributors (who lack NUGETKEY) to
+        # still proceed; dotnet restore will fall back to public packages where possible.
+        run: |
+          dotnet nuget add source \
+            --username michael-j-green \
+            --password "${{ secrets.NUGETKEY }}" \
+            --store-password-in-clear-text \
+            --name github \
+            "https://nuget.pkg.github.com/gaseous-project/index.json"
+        continue-on-error: true
+
+      - name: Restore dependencies
+        run: dotnet restore

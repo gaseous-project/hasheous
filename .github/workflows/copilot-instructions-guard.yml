@@ -1,0 +1,58 @@
+name: Copilot Instructions Guard
+
+# Fail PRs that modify architecture/config files without updating the copilot instructions.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "hasheous/Program.cs"
+      - "hasheous/Controllers/**"
+      - "service-orchestrator/Program.cs"
+      - "hasheous-lib/Classes/Config.cs"
+      - "hasheous-lib/Classes/Database.cs"
+      - "hasheous-lib/Schema/**"
+      - "hasheous-lib/Classes/Redis*.cs"
+      - "hasheous-lib/Classes/SignatureIngestors/**"
+      - "hasheous/Properties/launchSettings.json"
+      - "service-orchestrator/Properties/launchSettings.json"
+      - "hasheous/docker/**"
+      - "service-orchestrator/docker/**"
+      - "docker-compose-build.yml"
+      - "README.MD"
+      - "README.md"
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if copilot-instructions.md was updated
+        id: check
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+
+          CHANGED=$(git diff --name-only "$BASE" "$HEAD")
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          if echo "$CHANGED" | grep -q "^\.github/copilot-instructions\.md$"; then
+            echo "instructions_updated=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "instructions_updated=false" >> "$GITHUB_OUTPUT"
+            echo "$CHANGED" | bash .github/scripts/copilot-instructions-help.sh .github/copilot-instructions.md
+          fi
+
+      - name: Fail if instructions not updated
+        if: steps.check.outputs.instructions_updated == 'false'
+        run: |
+          echo "::error file=.github/copilot-instructions.md::Architecture or config files changed but .github/copilot-instructions.md was not updated. Please review the hints above and update the instructions file."
+          exit 1
