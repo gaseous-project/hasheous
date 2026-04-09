@@ -379,24 +379,34 @@ HAVING
             };
 
             // if redump source, add cue sheet if it's available
-            if (retVal.SignatureSource == Signatures_Games_2.RomItem.SignatureSourceType.Redump)
+            switch (retVal.SignatureSource)
             {
-                // get the platform name from the database row
-                // we need this to find the cue sheet
-                if (sigDbRow.Table.Columns.Contains("Platform"))
-                {
-                    string platformName = (string)Common.ReturnValueIfNull(sigDbRow["Platform"], "");
-
-                    if (!string.IsNullOrEmpty(platformName))
+                case gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType.Redump:
+                    // get the platform name from the database row
+                    // we need this to find the cue sheet
+                    if (sigDbRow.Table.Columns.Contains("Platform"))
                     {
-                        // check if cue sheet is available
-                        string cueSheetPath = System.IO.Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_Redump, "cuesheets", platformName, Path.GetFileNameWithoutExtension(retVal.Name) + ".cue");
-                        if (System.IO.File.Exists(cueSheetPath))
+                        string platformName = (string)Common.ReturnValueIfNull(sigDbRow["Platform"], "");
+
+                        if (!string.IsNullOrEmpty(platformName))
                         {
-                            retVal.Attributes.Add("cuesheet", System.IO.File.ReadAllText(cueSheetPath));
+                            // check if cue sheet is available
+                            string cueSheetPath = System.IO.Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_Redump, "cuesheets", platformName, Path.GetFileNameWithoutExtension(retVal.Name) + ".cue");
+                            if (System.IO.File.Exists(cueSheetPath))
+                            {
+                                retVal.Attributes.Add("cuesheet", System.IO.File.ReadAllText(cueSheetPath));
+                            }
                         }
                     }
-                }
+                    break;
+                case gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType.TOSEC:
+                    // for TOSEC, check if the datfile has a disc number attribute and if so, add it to the attributes
+                    string cuePath = System.IO.Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_TOSEC, "cuesheets", Path.GetFileNameWithoutExtension(retVal.Name) + ".cue");
+                    if (File.Exists(cuePath))
+                    {
+                        retVal.Attributes.Add("cuesheet", File.ReadAllText(cuePath));
+                    }
+                    break;
             }
 
             return retVal;

@@ -81,10 +81,33 @@ namespace TOSEC
                 string tosecProcessingDir = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesDirectory, "TOSEC");
                 if (Directory.Exists(tosecProcessingDir)) { Directory.Delete(tosecProcessingDir, true); }
                 Directory.CreateDirectory(tosecProcessingDir);
-                foreach (var file in Directory.GetFiles(Path.Combine(extractDir, "TOSEC"), "*.dat", SearchOption.TopDirectoryOnly))
+                List<string> chiildPaths = new List<string>
                 {
-                    var destFile = Path.Combine(tosecProcessingDir, Path.GetFileName(file));
-                    File.Move(file, destFile);
+                    "TOSEC",
+                    "TOSEC-ISO"
+                };
+                foreach (var child in chiildPaths)
+                {
+                    Logging.Log(Logging.LogType.Information, "TOSEC", $"Processing extracted files from {child}...");
+                    foreach (var file in Directory.GetFiles(Path.Combine(extractDir, child), "*.dat", SearchOption.TopDirectoryOnly))
+                    {
+                        var destFile = Path.Combine(tosecProcessingDir, Path.GetFileName(file));
+                        File.Move(file, destFile);
+                    }
+                }
+
+                // move cuesheets if present - copy all *.cue files from the CUEs subdirectory recursively to the cuesheets processing directory
+                string cuesheetSourceDir = Path.Combine(extractDir, "CUEs");
+                string cuesheetDestDir = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_TOSEC, "cuesheets");
+                if (Directory.Exists(cuesheetSourceDir))
+                {
+                    Logging.Log(Logging.LogType.Information, "TOSEC", $"Processing cuesheets from {cuesheetSourceDir}...");
+                    foreach (var cueFile in Directory.GetFiles(cuesheetSourceDir, "*.cue", SearchOption.AllDirectories))
+                    {
+                        var destFile = Path.Combine(cuesheetDestDir, Path.GetFileName(cueFile));
+                        if (!Directory.Exists(cuesheetDestDir)) { Directory.CreateDirectory(cuesheetDestDir); }
+                        File.Copy(cueFile, destFile, overwrite: true);
+                    }
                 }
 
                 // cleanup temp directory
