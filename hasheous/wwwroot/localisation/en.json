@@ -265,6 +265,7 @@
     "servicefetchwhdloadmetadata": "Fetch WHDLoad Signatures",
     "servicefetchfbneometadata": "Fetch FBNEO Signatures",
     "servicefetchpuredosdatmetadata": "Fetch PureDOSDAT Signatures",
+    "servicefetchscreenscrapermetadata": "Fetch ScreenScraper Signatures",
     "servicehourlymaintenance_frontend": "Frontend Hourly Maintenance",
     "servicehourlymaintenance": "Hourly Maintenance",
     "servicedailymaintenance": "Daily Maintenance",
