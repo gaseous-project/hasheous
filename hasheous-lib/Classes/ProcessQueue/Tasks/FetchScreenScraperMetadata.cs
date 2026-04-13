@@ -42,11 +42,23 @@ namespace Classes.ProcessQueue
                         continue;
                     }
 
+                    if (signatureObject.Games == null || signatureObject.Games.Count == 0)
+                    {
+                        Logging.Log(Logging.LogType.Warning, "Fetch ScreenScraper", "Parsed metadata contains no games, skipping: " + metadataFile);
+                        continue;
+                    }
+
+                    if (signatureObject.Games[0].Roms == null || signatureObject.Games[0].Roms.Count == 0)
+                    {
+                        Logging.Log(Logging.LogType.Warning, "Fetch ScreenScraper", "Parsed metadata contains no roms, skipping: " + metadataFile);
+                        continue;
+                    }
+
                     DateTime now = DateTime.UtcNow;
                     bool processGames = false;
                     int sourceId = 0;
 
-                    string sourceName = $"{signatureObject.SourceType} - {signatureObject.Name}";
+                    string sourceName = $"{signatureObject.SourceType} - {signatureObject.Games[0].System} - {signatureObject.Name}";
 
                     string sql = "SELECT * FROM Signatures_Sources WHERE `SourceMD5`=@sourcemd5";
                     Dictionary<string, object> dbDict = new Dictionary<string, object>
