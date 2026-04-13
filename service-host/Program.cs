@@ -160,6 +160,10 @@ switch (taskType)
         Task = new FetchFBNEOMetadata();
         break;
 
+    case QueueItemType.FetchScreenScraperMetadata:
+        Task = new FetchScreenScraperMetadata();
+        break;
+
     case QueueItemType.HourlyMaintenance:
         Task = new HourlyMaintenance();
         break;

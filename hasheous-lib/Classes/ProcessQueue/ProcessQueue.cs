@@ -120,6 +120,10 @@ namespace Classes.ProcessQueue
                         Task = new FetchFBNEOMetadata();
                         break;
 
+                    case QueueItemType.FetchScreenScraperMetadata:
+                        Task = new FetchScreenScraperMetadata();
+                        break;
+
                     case QueueItemType.HourlyMaintenance_Frontend:
                         Task = new HourlyMaintenance_Frontend();
                         break;

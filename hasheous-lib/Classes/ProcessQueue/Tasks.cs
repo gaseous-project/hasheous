@@ -123,6 +123,11 @@ namespace Classes.ProcessQueue
         /// <summary>
         /// Task Result Parser
         /// </summary>
-        TaskResultParser
+        TaskResultParser,
+
+        /// <summary>
+        /// Fetches ScreenScraper metadata - uses already cached metadata files
+        /// </summary>
+        FetchScreenScraperMetadata
     }
 }

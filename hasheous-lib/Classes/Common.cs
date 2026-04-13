@@ -452,6 +452,25 @@ namespace Classes
 			}
 		}
 
+		public static string GetNameByCode(LookupTypes LookupType, string Code)
+		{
+			Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+			string sql = "SELECT `Value` FROM " + LookupType.ToString() + " WHERE Code = @code";
+			Dictionary<string, object> dbDict = new Dictionary<string, object>{
+				{ "code", Code }
+			};
+
+			DataTable data = db.ExecuteCMD(sql, dbDict);
+			if (data.Rows.Count == 0)
+			{
+				return "";
+			}
+			else
+			{
+				return (string)data.Rows[0]["Value"];
+			}
+		}
+
 		public enum LookupTypes
 		{
 			Country,
