@@ -19,6 +19,12 @@ namespace Classes.ProcessQueue
         {
             // get all of the ScreenScraper metadata in the cache
             string cachePath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_Screenscraper, "games");
+            if (!Directory.Exists(cachePath))
+            {
+                Logging.Log(Logging.LogType.Information, "Fetch ScreenScraper", "Cache directory not found, skipping: " + cachePath);
+                return null;
+            }
+
             string[] metadataFiles = Directory.GetFiles(cachePath, "*.json", SearchOption.AllDirectories);
 
             var parser = new gaseous_signature_parser.parser();
@@ -30,12 +36,17 @@ namespace Classes.ProcessQueue
                 {
                     // convert the game metadata to a signature object
                     var signatureObject = parser.ParseSignatureDAT(metadataFile, Parser: gaseous_signature_parser.parser.SignatureParser.ScreenScraper);
+                    if (signatureObject == null)
+                    {
+                        Logging.Log(Logging.LogType.Warning, "Fetch ScreenScraper", "Parsed metadata was null, skipping: " + metadataFile);
+                        continue;
+                    }
 
                     DateTime now = DateTime.UtcNow;
                     bool processGames = false;
                     int sourceId = 0;
 
-                    string sourceName = $"{signatureObject.SourceType.ToString()} - {signatureObject.Name}";
+                    string sourceName = $"{signatureObject.SourceType} - {signatureObject.Name}";
 
                     string sql = "SELECT * FROM Signatures_Sources WHERE `SourceMD5`=@sourcemd5";
                     Dictionary<string, object> dbDict = new Dictionary<string, object>

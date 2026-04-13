@@ -532,7 +532,8 @@ let signatureSources = {
     7: "RetroAchievements",
     8: "FBNeo",
     9: "PureDOSDAT",
-    11: "MAMERedump"
+    11: "MAMERedump",
+    98: "ScreenScraper"
 }
 
 let tagTypes = {

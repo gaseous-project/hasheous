@@ -10,6 +10,7 @@
     --signature-source-color-fbneo: #ff7f00;
     --signature-source-color-mameredump: #8b4513;
     --signature-source-color-puredosdat: #00ff00;
+    --signature-source-color-screenscraper: #0000ff;
 }
 
 .color-none {
@@ -54,4 +55,8 @@
 
 .color-puredosdat {
     background-color: var(--signature-source-color-puredosdat);
+}
+
+.color-screenscraper {
+    background-color: var(--signature-source-color-screenscraper);
 }

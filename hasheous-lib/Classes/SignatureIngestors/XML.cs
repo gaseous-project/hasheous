@@ -280,7 +280,8 @@ namespace XML
                                             { "code", country.Key.Trim() },
                                             { "name", country.Value.Trim() }
                                         };
-                            countryId = int.Parse((await db.ExecuteCMDAsync(sql, countryDict)).Rows[0][0].ToString());
+                            countryId = Convert.ToInt32((await db.ExecuteCMDAsync(sql, countryDict)).Rows[0][0]);
+                            Common.InvalidateLookupCache(Common.LookupTypes.Country);
                         }
                     }
 
@@ -313,7 +314,8 @@ namespace XML
                                                         { "code", language.Key.Trim() },
                                                         { "name", language.Value.Trim() }
                                                     };
-                            languageId = int.Parse((await db.ExecuteCMDAsync(sql, langDict)).Rows[0][0].ToString());
+                            languageId = Convert.ToInt32((await db.ExecuteCMDAsync(sql, langDict)).Rows[0][0]);
+                            Common.InvalidateLookupCache(Common.LookupTypes.Language);
                         }
                     }
 
