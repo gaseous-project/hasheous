@@ -153,6 +153,8 @@ namespace Classes.ProcessQueue
                             // process roms
                             foreach (var rom in game.Roms)
                             {
+                                rom.SignatureSource = gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType.ScreenScraper;
+
                                 // language
                                 Dictionary<string, string> romLanguageDict = new Dictionary<string, string>();
                                 if (rom.Language != null)
