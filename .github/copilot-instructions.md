@@ -52,6 +52,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
 - Background jobs
   - Add/adjust scheduled tasks in `service-orchestrator/Program.cs` under `QueueProcessor.QueueItems` (e.g., `FetchIGDBMetadata`, timings are minutes).
   - GiantBomb: when `Config.GiantBomb.APIKey` is present a `FetchGiantBombMetadata` job is queued (default 10080 minutes / 7 days) to refresh GiantBomb platform/game/image data.
+  - ScreenScraper: `FetchScreenScraperMetadata` is queued every 1440 minutes (24 hours). It reads cached metadata JSON under `Config.LibraryConfiguration.LibraryMetadataDirectory_Screenscraper/games` and imports records through `XML.XMLIngestor.ImportDatRecord(...)`.
   - Queue task refactor: obsolete blocking entries `GetMissingArtwork` and `MetadataMatchSearch` were removed from metadata fetch task `Blocks` lists. Don’t rely on them for future coordination.
 
 - JSON & serialization
@@ -81,6 +82,7 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 - Add a background job
   - Edit `service-orchestrator/Program.cs` and add a `QueueProcessor.QueueItem(QueueItemType.YourItem, <minutes>, false)` to `QueueProcessor.QueueItems`.
   - Implement the corresponding handler under `hasheous-lib/Classes/ProcessQueue/` (follow existing `QueueItemType` patterns).
+  - Wire the queue item into both dispatchers: `hasheous-lib/Classes/ProcessQueue/ProcessQueue.cs` and `service-host/Program.cs` so orchestrator and one-off service-host execution can resolve the task.
 
 - Add a DB migration
   - Create `hasheous-lib/Schema/hasheous-####.sql` using the next available number; `InitDB()` applies scripts in order and bumps `schema_version`.
@@ -133,6 +135,12 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
   - MAME Arcade: `MAME Arcade/`
   - MAME Mess: `MAME MESS/`
   - Redump: `Redump/`
+
+## ScreenScraper metadata
+- Background task: `QueueItemType.FetchScreenScraperMetadata`.
+- Local cache source: `~/.hasheous-server/Data/Metadata/ScreenScraper/games` (resolved from `Config.LibraryConfiguration.LibraryMetadataDirectory_Screenscraper`).
+- Import path: cached JSON files are parsed with `gaseous_signature_parser` (ScreenScraper parser mode), language/country short codes are normalized via `Common.GetNameByCode(...)`, then records are imported using `XML.XMLIngestor.ImportDatRecord(...)`.
+- Blocking behavior: this task blocks `QueueItemType.SignatureIngestor` while it runs.
 
 ## Common cache prefixes
 - `HashLookup`: entity details resolved during lookups (publisher/platform/game).

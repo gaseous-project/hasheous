@@ -414,42 +414,115 @@ namespace Classes
 			"desktop.ini"
 		};
 
+		private sealed class LookupCacheData
+		{
+			public LookupCacheData(Dictionary<string, int> idByCode, Dictionary<string, int> idByValue, Dictionary<string, string> valueByCode)
+			{
+				IdByCode = idByCode;
+				IdByValue = idByValue;
+				ValueByCode = valueByCode;
+			}
+
+			public Dictionary<string, int> IdByCode { get; }
+			public Dictionary<string, int> IdByValue { get; }
+			public Dictionary<string, string> ValueByCode { get; }
+		}
+
+		private static readonly ConcurrentDictionary<LookupTypes, LookupCacheData> _lookupCache =
+			new ConcurrentDictionary<LookupTypes, LookupCacheData>();
+		private static readonly object _lookupCacheSync = new object();
+
+		private static LookupCacheData GetOrLoadLookupCache(LookupTypes lookupType)
+		{
+			if (_lookupCache.TryGetValue(lookupType, out LookupCacheData? cached))
+			{
+				return cached;
+			}
+
+			lock (_lookupCacheSync)
+			{
+				if (_lookupCache.TryGetValue(lookupType, out cached))
+				{
+					return cached;
+				}
+
+				Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+				string sql = "SELECT `Id`, `Code`, `Value` FROM " + lookupType.ToString();
+				DataTable data = db.ExecuteCMD(sql, new Dictionary<string, object>());
+
+				Dictionary<string, int> idByCode = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+				Dictionary<string, int> idByValue = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+				Dictionary<string, string> valueByCode = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+				foreach (DataRow row in data.Rows)
+				{
+					int id = Convert.ToInt32(row["Id"]);
+					string code = Convert.ToString(ReturnValueIfNull(row["Code"], "")) ?? "";
+					string value = Convert.ToString(ReturnValueIfNull(row["Value"], "")) ?? "";
+
+					if (!idByCode.ContainsKey(code))
+					{
+						idByCode[code] = id;
+					}
+
+					if (!idByValue.ContainsKey(value))
+					{
+						idByValue[value] = id;
+					}
+
+					if (!valueByCode.ContainsKey(code))
+					{
+						valueByCode[code] = value;
+					}
+				}
+
+				cached = new LookupCacheData(idByCode, idByValue, valueByCode);
+				_lookupCache[lookupType] = cached;
+				return cached;
+			}
+		}
+
+		public static void InvalidateLookupCache(LookupTypes lookupType)
+		{
+			_lookupCache.TryRemove(lookupType, out _);
+		}
+
+		public static void InvalidateLookupCache()
+		{
+			_lookupCache.Clear();
+		}
+
 		public static int GetLookupByCode(LookupTypes LookupType, string Code)
 		{
-			Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-			string sql = "SELECT Id FROM " + LookupType.ToString() + " WHERE Code = @code";
-			Dictionary<string, object> dbDict = new Dictionary<string, object>{
-				{ "code", Code }
-			};
-
-			DataTable data = db.ExecuteCMD(sql, dbDict);
-			if (data.Rows.Count == 0)
+			if (string.IsNullOrWhiteSpace(Code))
 			{
 				return -1;
 			}
-			else
-			{
-				return (int)data.Rows[0]["Id"];
-			}
+
+			LookupCacheData cache = GetOrLoadLookupCache(LookupType);
+			return cache.IdByCode.TryGetValue(Code, out int id) ? id : -1;
 		}
 
 		public static int GetLookupByValue(LookupTypes LookupType, string Value)
 		{
-			Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-			string sql = "SELECT Id FROM " + LookupType.ToString() + " WHERE Value = @value";
-			Dictionary<string, object> dbDict = new Dictionary<string, object>{
-				{ "value", Value }
-			};
-
-			DataTable data = db.ExecuteCMD(sql, dbDict);
-			if (data.Rows.Count == 0)
+			if (string.IsNullOrWhiteSpace(Value))
 			{
 				return -1;
 			}
-			else
+
+			LookupCacheData cache = GetOrLoadLookupCache(LookupType);
+			return cache.IdByValue.TryGetValue(Value, out int id) ? id : -1;
+		}
+
+		public static string GetNameByCode(LookupTypes LookupType, string Code)
+		{
+			if (string.IsNullOrWhiteSpace(Code))
 			{
-				return (int)data.Rows[0]["Id"];
+				return "";
 			}
+
+			LookupCacheData cache = GetOrLoadLookupCache(LookupType);
+			return cache.ValueByCode.TryGetValue(Code, out string? value) ? value : "";
 		}
 
 		public enum LookupTypes

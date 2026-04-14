@@ -68,7 +68,8 @@ function LoadBackgroundTasks() {
                             "FetchMAMERedumpMetadata",
                             "FetchWHDLoadMetadata",
                             "FetchFBNEOMetadata",
-                            "FetchPureDOSDATMetadata"
+                            "FetchPureDOSDATMetadata",
+                            "FetchScreenScraperMetadata"
                         ],
                         "metadataproxy": [
                             "FetchIGDBMetadata",
