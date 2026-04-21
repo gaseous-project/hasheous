@@ -1863,23 +1863,23 @@ namespace hasheous_server.Classes
         /// <summary>
         /// Performs a metadata look up on DataObjects with no match metadata
         /// </summary>
-        public async Task DataObjectMetadataSearch(DataObjectType objectType, bool ForceSearch = false)
+        public async Task DataObjectMetadataSearch(DataObjectType objectType, bool ForceSearch = false, bool userInteractiveSession = false)
         {
-            await _DataObjectMetadataSearch(objectType, null, ForceSearch);
+            await _DataObjectMetadataSearch(objectType, null, ForceSearch, userInteractiveSession);
         }
 
         /// <summary>
         /// Performs a metadata look up on the selected DataObject if it has no metadata match
         /// </summary>
         /// <param name="id"></param>
-        public async Task DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch = false)
+        public async Task DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch = false, bool userInteractiveSession = false)
         {
             switch (objectType)
             {
                 case DataObjectType.Company:
                 case DataObjectType.Platform:
                 case DataObjectType.Game:
-                    await _DataObjectMetadataSearch(objectType, id, ForceSearch);
+                    await _DataObjectMetadataSearch(objectType, id, ForceSearch, userInteractiveSession);
                     break;
 
                 default:
@@ -1908,7 +1908,7 @@ namespace hasheous_server.Classes
             "3DO"
         };
 
-        private async Task _DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch)
+        private async Task _DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch, bool userInteractiveSession)
         {
             HashSet<MetadataSources> ProcessSources = [
                 MetadataSources.IGDB,
@@ -1936,7 +1936,7 @@ namespace hasheous_server.Classes
                 DataObjectItem? singleDataObject = await GetDataObject(objectType, (long)id);
                 if (singleDataObject != null)
                 {
-                    await _DataObjectMetadataSearch_Apply(singleDataObject, logName, rand, objectType, id, ForceSearch, now, ProcessSources, 1, 1);
+                    await _DataObjectMetadataSearch_Apply(singleDataObject, logName, rand, objectType, id, ForceSearch, now, ProcessSources, 1, 1, userInteractiveSession);
                 }
                 else
                 {
@@ -1983,7 +1983,7 @@ namespace hasheous_server.Classes
                         var item = await GetDataObject(objectType, (long)row["Id"]);
                         if (item != null)
                         {
-                            await _DataObjectMetadataSearch_Apply(item, logName, rand, objectType, id, ForceSearch, now, ProcessSources, processedObjectCount, ids.Rows.Count);
+                            await _DataObjectMetadataSearch_Apply(item, logName, rand, objectType, id, ForceSearch, now, ProcessSources, processedObjectCount, ids.Rows.Count, userInteractiveSession);
                         }
 
                         // sleep every 5 rows for half a second to prevent the system from being overwhelmed
@@ -1998,7 +1998,7 @@ namespace hasheous_server.Classes
             Logging.SendReport(logName, null, null, $"Metadata search complete for {processedObjectCount} {objectType} data objects.");
         }
 
-        private async Task _DataObjectMetadataSearch_Apply(DataObjectItem item, string logName, Random rand, DataObjectType objectType, long? id, bool ForceSearch, DateTime now, HashSet<MetadataSources> ProcessSources, int processedObjectCount, int objectTotalCount)
+        private async Task _DataObjectMetadataSearch_Apply(DataObjectItem item, string logName, Random rand, DataObjectType objectType, long? id, bool ForceSearch, DateTime now, HashSet<MetadataSources> ProcessSources, int processedObjectCount, int objectTotalCount, bool userInteractiveSession)
         {
 
             DataObjectItem? itemPlatform = null;
@@ -2191,8 +2191,38 @@ namespace hasheous_server.Classes
 
                         try
                         {
-                            // perform the search
-                            DataObjects.MatchItem searchResult = await metadataHandler.FindMatchItemAsync(item, SearchCandidates, searchOptions);
+                            DataObjects.MatchItem searchResult;
+                            // if we're running in a userInteractiveSession - that is any session initiated by a user (lookup API, or website) then we'll do a timeout on lookups as they can sometimes be long lasting.
+                            if (userInteractiveSession == true)
+                            {
+                                // perform the search with a 5-second timeout; if it exceeds the limit, the task
+                                // continues in the background and we return a default (NoMatch) result immediately
+                                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                                Task<DataObjects.MatchItem> searchTask = metadataHandler.FindMatchItemAsync(item, SearchCandidates, searchOptions);
+                                Task timeoutTask = Task.Delay(Timeout.Infinite, cts.Token);
+
+                                if (await Task.WhenAny(searchTask, timeoutTask) == searchTask)
+                                {
+                                    searchResult = await searchTask;
+                                }
+                                else
+                                {
+                                    Logging.Log(Logging.LogType.Warning, "Metadata Match", $"{processedObjectCount} / {objectTotalCount} - Metadata search for {item.Name} ({metadataSource}) timed out after 5 seconds; continuing in background.");
+                                    metadata.NextSearch = now.AddDays(defaultNextDay);
+                                    metadataUpdates.Add(metadata);
+                                    // let the background task finish on its own; move on to next source
+                                    _ = searchTask.ContinueWith(t =>
+                                    {
+                                        if (t.IsFaulted)
+                                            Logging.Log(Logging.LogType.Warning, "Metadata Match", $"Background metadata search for {item.Name} ({metadataSource}) faulted.", t.Exception);
+                                    }, TaskScheduler.Default);
+                                    continue;
+                                }
+                            }
+                            else
+                            {
+                                searchResult = await metadataHandler.FindMatchItemAsync(item, SearchCandidates, searchOptions);
+                            }
 
                             // update the metadata item with the search results
                             metadata.Id = searchResult.MetadataId;
