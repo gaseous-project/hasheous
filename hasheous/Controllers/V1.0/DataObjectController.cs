@@ -496,7 +496,11 @@ namespace hasheous_server.Controllers.v1_0
 
                 if (forceScan)
                 {
-                    await DataObjects.DataObjectMetadataSearch(ObjectType, Id, true, true);
+                    // Run with 10 second timeout for interactive sessions
+                    await Task.WhenAny(
+                        DataObjects.DataObjectMetadataSearch(ObjectType, Id, true),
+                        Task.Delay(TimeSpan.FromSeconds(10))
+                    );
                 }
 
                 return Ok(DataObjects.GetMetadataMap(ObjectType, Id));

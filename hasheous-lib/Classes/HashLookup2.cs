@@ -57,6 +57,12 @@ namespace Classes
         [System.Text.Json.Serialization.JsonIgnore]
         public bool ForceSearch { get; set; } = true;
 
+        /// <summary>
+        /// Enum representing the valid fields that can be returned in the HashLookup response. This is used to parse the returnFields parameter and determine which fields to include in the response.
+        /// </summary>
+        /// <remarks>
+        /// The returnFields parameter is a comma-separated list of fields that can be included in the HashLookup response. The valid options are defined in this enum. If returnFields is set to "All", all fields will be included in the response. If returnFields is set to a comma-separated list of specific fields, only those fields will be included in the response. The valid fields are: All, Publisher, Platform, Signatures, Metadata, Attributes.
+        /// </remarks>
         public enum ValidFields
         {
             All,
@@ -67,11 +73,28 @@ namespace Classes
             Attributes
         }
 
+        /// <summary>
+        /// Default constructor for HashLookup. This is required for deserialization, but will not initialize the object properly. Ensure that PerformLookup is called after using this constructor to populate the properties of the object.
+        /// </summary>
+        /// <remarks>
+        /// This constructor is primarily used for deserialization when returning a cached HashLookup result from Redis. In this case, the PerformLookup method will not be called, as the properties of the HashLookup object will already be populated with the cached data. However, if this constructor is used for any other purpose, it is important to call the PerformLookup method after instantiating the object to ensure that the properties are properly populated with the results of the hash lookup operation.
+        /// </remarks>
         public HashLookup()
         {
 
         }
 
+        /// <summary>
+        /// Constructor for HashLookup. Initializes the object with the provided parameters and performs the lookup operation.
+        /// </summary>
+        /// <param name="db">The database connection to use for the lookup operation.</param>
+        /// <param name="model">The HashLookupModel containing the hash values to look up.</param>
+        /// <param name="returnAllSources">If true, will return signatures from all sources. If false, will return only the first signature found. Default is false.</param>
+        /// <param name="returnFields">A comma-separated list of fields to return in the response. If "All", all fields will be returned. Default is "All".</param>
+        /// <param name="returnSources">A list of sources to return. If null, will return all sources. Default is null.</param>
+        /// <param name="forceSearch">If true, will force a search even if a cached result is available. Default is true.</param>
+        /// <exception cref="HashNotFoundException">Thrown if the provided hash is not found in any signature database.</exception>
+        /// <returns>A Task representing the asynchronous operation.</returns>
         public HashLookup(Database db, hasheous_server.Models.HashLookupModel model, bool? returnAllSources = false, string? returnFields = "All", List<gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType>? returnSources = null, bool? forceSearch = true)
         {
             this.db = db;
@@ -82,7 +105,13 @@ namespace Classes
             this.ForceSearch = forceSearch ?? true;
         }
 
-        public async Task PerformLookup()
+        /// <summary>
+        /// Perform the hash lookup operation. This will populate the properties of the HashLookup object with the results of the lookup.
+        /// </summary>
+        /// <param name="userInteractiveSession">If true, will run with a 5 second timeout for metadata search to ensure a timely response for the user. If false, will run without a timeout to ensure the most complete metadata possible, even if it takes a long time.</param>
+        /// <exception cref="HashNotFoundException">Thrown if the provided hash is not found in any signature database.</exception>
+        /// <returns>A Task representing the asynchronous operation.</returns>
+        public async Task PerformLookup(bool userInteractiveSession = false)
         {
             // parse return fields
             List<ValidFields> validFields = new List<ValidFields>();
@@ -167,7 +196,7 @@ namespace Classes
                             dataObjects.AddSignature(publisher.Id, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
 
                             // force metadata search
-                            await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Company, publisher.Id, true, true);
+                            await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Company, publisher.Id, true);
 
                             // re-get the publisher
                             publisher = await dataObjects.GetDataObject(DataObjects.DataObjectType.Company, publisher.Id);
@@ -219,7 +248,7 @@ namespace Classes
                     dataObjects.AddSignature(platform.Id, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId);
 
                     // force metadata search
-                    await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Platform, platform.Id, true, true);
+                    await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Platform, platform.Id, true);
 
                     // re-get the platform
                     platform = await dataObjects.GetDataObject(DataObjects.DataObjectType.Platform, platform.Id);
@@ -361,7 +390,19 @@ namespace Classes
                     }
 
                     // force metadata search
-                    await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true, true);
+                    if (userInteractiveSession)
+                    {
+                        // Run with 5 second timeout for interactive sessions
+                        await Task.WhenAny(
+                            dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true),
+                            Task.Delay(TimeSpan.FromSeconds(5))
+                        );
+                    }
+                    else
+                    {
+                        // Run without timeout for background operations
+                        await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true);
+                    }
 
                     // re-get the game
                     game = await dataObjects.GetDataObject(DataObjects.DataObjectType.Game, game.Id);
