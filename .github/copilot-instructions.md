@@ -54,6 +54,9 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - GiantBomb: when `Config.GiantBomb.APIKey` is present a `FetchGiantBombMetadata` job is queued (default 10080 minutes / 7 days) to refresh GiantBomb platform/game/image data.
   - ScreenScraper: `FetchScreenScraperMetadata` is queued every 1440 minutes (24 hours). It reads cached metadata JSON under `Config.LibraryConfiguration.LibraryMetadataDirectory_Screenscraper/games` and imports records through `XML.XMLIngestor.ImportDatRecord(...)`.
   - Queue task refactor: obsolete blocking entries `GetMissingArtwork` and `MetadataMatchSearch` were removed from metadata fetch task `Blocks` lists. Don’t rely on them for future coordination.
+  - Data object metadata guard: `DataObjects.DataObjectMetadataSearch(objectType, id?, ForceSearch)` now uses an atomic file lock under `~/.hasheous-server/Data/Metadata/Hasheous/DataObjectFlags` to prevent duplicate concurrent runs for the same `(objectType, id)` key.
+  - Guard behavior details: lock acquisition uses create-new semantics (`FileMode.CreateNew`) and keeps the lock handle open for the full search duration; lock-file collisions cause immediate skip/return.
+  - Stale lock policy: existing lock files are treated as valid for up to 1 hour; older lock files are deleted and lock acquisition is retried. For `id == null`, the lock key uses `all` (for example: `Game_all_MetadataSearchInProgress.flag`).
 
 - JSON & serialization
   - System.Text.Json and Newtonsoft are both configured: enums-as-strings, nulls ignored, max depth 64, indented output (Newtonsoft).

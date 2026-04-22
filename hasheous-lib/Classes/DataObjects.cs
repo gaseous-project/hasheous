@@ -1865,7 +1865,7 @@ namespace hasheous_server.Classes
         /// </summary>
         public async Task DataObjectMetadataSearch(DataObjectType objectType, bool ForceSearch = false)
         {
-            await _DataObjectMetadataSearch(objectType, null, ForceSearch);
+            await DataObjectMetadataSearch(objectType, null, ForceSearch);
         }
 
         /// <summary>
@@ -1874,6 +1874,13 @@ namespace hasheous_server.Classes
         /// <param name="id"></param>
         public async Task DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch = false)
         {
+            using MetadataSearchFlagLock? metadataSearchFlagLock = TryAcquireMetadataSearchFlagLock(objectType, id);
+            if (metadataSearchFlagLock == null)
+            {
+                return;
+            }
+
+            // begin search
             switch (objectType)
             {
                 case DataObjectType.Company:
@@ -1884,6 +1891,91 @@ namespace hasheous_server.Classes
 
                 default:
                     break;
+            }
+        }
+
+        private MetadataSearchFlagLock? TryAcquireMetadataSearchFlagLock(DataObjectType objectType, long? id)
+        {
+            // set in progress flag path
+            string inUseFlagPath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_Hasheous, "DataObjectFlags");
+            if (!Directory.Exists(inUseFlagPath))
+            {
+                Directory.CreateDirectory(inUseFlagPath);
+            }
+
+            string idLabel = id?.ToString() ?? "all";
+            string inUseFlagFile = Path.Combine(inUseFlagPath, $"{objectType}_{idLabel}_MetadataSearchInProgress.flag");
+
+            if (File.Exists(inUseFlagFile))
+            {
+                // flag exists - if it's less than an hour old, abort
+                DateTime flagCreationTime = File.GetCreationTimeUtc(inUseFlagFile);
+                if (flagCreationTime > DateTime.UtcNow.AddHours(-1))
+                {
+                    return null;
+                }
+
+                // flag is old - delete it and proceed
+                try
+                {
+                    File.Delete(inUseFlagFile);
+                }
+                catch (IOException)
+                {
+                    return null;
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    return null;
+                }
+            }
+
+            // atomically create lock file; if this fails, another worker already acquired it
+            try
+            {
+                FileStream lockStream = new FileStream(inUseFlagFile, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+                byte[] lockContents = System.Text.Encoding.UTF8.GetBytes("In Progress");
+                lockStream.Write(lockContents, 0, lockContents.Length);
+                lockStream.Flush(true);
+
+                return new MetadataSearchFlagLock(lockStream, inUseFlagFile);
+            }
+            catch (IOException)
+            {
+                return null;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return null;
+            }
+        }
+
+        private sealed class MetadataSearchFlagLock : IDisposable
+        {
+            private readonly FileStream _lockStream;
+            private readonly string _flagPath;
+
+            public MetadataSearchFlagLock(FileStream lockStream, string flagPath)
+            {
+                _lockStream = lockStream;
+                _flagPath = flagPath;
+            }
+
+            public void Dispose()
+            {
+                _lockStream.Dispose();
+
+                try
+                {
+                    if (File.Exists(_flagPath))
+                    {
+                        File.Delete(_flagPath);
+                    }
+                }
+                catch
+                {
+                    // no-op: stale lock handling is time-based and can recover
+                }
             }
         }
 

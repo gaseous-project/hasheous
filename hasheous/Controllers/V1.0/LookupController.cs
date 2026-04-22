@@ -77,7 +77,7 @@ namespace hasheous_server.Controllers.v1_0
                 }
 
                 HashLookup hashLookup = new HashLookup(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), model, returnAllSources, returnFields, returnSourcesList);
-                var lookupTask = hashLookup.PerformLookup();
+                var lookupTask = hashLookup.PerformLookup(true);
                 if (await Task.WhenAny(lookupTask, Task.Delay(TimeSpan.FromSeconds(10))) == lookupTask)
                 {
                     // Completed within timeout
