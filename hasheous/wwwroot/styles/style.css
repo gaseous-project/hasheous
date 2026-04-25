@@ -1015,3 +1015,55 @@ pre {
     border-radius: 3px;
     margin-right: 5px;
 }
+/* ── Hasheous Link button (mirrors Google/Microsoft sign-in button style) ── */
+.hasheous-link-button {
+    -moz-user-select: none;
+    -webkit-user-select: none;
+    -ms-user-select: none;
+    -webkit-appearance: none;
+    background-color: #ffffff;
+    background-image: none;
+    border: 1px solid #747775;
+    -webkit-border-radius: 10px;
+    border-radius: 10px;
+    -webkit-box-sizing: border-box;
+    box-sizing: border-box;
+    color: #1f1f1f;
+    cursor: pointer;
+    font-family: "Lato-Bold", "Lato", "Roboto", Arial, sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    height: 40px;
+    letter-spacing: 0.25px;
+    outline: none;
+    overflow: hidden;
+    padding: 0 12px;
+    position: relative;
+    text-align: center;
+    -webkit-transition: background-color .218s, border-color .218s, box-shadow .218s;
+    transition: background-color .218s, border-color .218s, box-shadow .218s;
+    vertical-align: middle;
+    white-space: nowrap;
+    min-width: min-content;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.hasheous-link-button .hasheous-link-button-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+.hasheous-link-button:not(:disabled):hover {
+    -webkit-box-shadow: 0 1px 2px 0 rgba(60, 64, 67, .30), 0 1px 3px 1px rgba(60, 64, 67, .15);
+    box-shadow: 0 1px 2px 0 rgba(60, 64, 67, .30), 0 1px 3px 1px rgba(60, 64, 67, .15);
+}
+
+.hasheous-link-button:disabled {
+    cursor: default;
+    background-color: #ffffff61;
+    border-color: #1f1f1f1f;
+    color: rgba(31, 31, 31, 0.38);
+}
