@@ -191,8 +191,8 @@ namespace Authentication
                             {
                                 Database updateDb = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
                                 updateDb.ExecuteNonQuery(
-                                    "UPDATE UserAppKeys SET `LastUsed` = @lastuused WHERE `APIKey` = @apikey",
-                                    new Dictionary<string, object> { { "lastuused", DateTime.UtcNow }, { "apikey", apiKey } }
+                                    "UPDATE UserAppKeys SET `LastUsed` = @lastused WHERE `APIKey` = @apikey",
+                                    new Dictionary<string, object> { { "lastused", DateTime.UtcNow }, { "apikey", apiKey } }
                                 );
                             }
                             catch { /* best-effort */ }

@@ -22,7 +22,7 @@ namespace hasheous_server.Controllers.v1_0
     /// <para>1. Open the authorisation popup:</para>
     /// <code>
     /// const popup = window.open(
-    ///   '/pages/link-app.html?clientApiKey=YOUR_CLIENT_API_KEY',
+    ///   '/pages/link-app.html?clientApiKey=YOUR_CLIENT_API_KEY&amp;targetOrigin=' + encodeURIComponent(window.location.origin),
     ///   'hasheousLink',
     ///   'width=480,height=640'
     /// );

@@ -416,11 +416,8 @@ function fetchLinkedApps() {
                     revokeBtn.classList.add('redbutton');
                     revokeBtn.addEventListener('click', () => {
                         revokeBtn.disabled = true;
-                        fetch('/api/v1/Account/AppLinks/' + app.id, {
-                            method: 'DELETE',
-                            credentials: 'include',
-                            headers: { 'Content-Type': 'application/json' }
-                        }).then(() => fetchLinkedApps());
+                        postData('/api/v1/Account/AppLinks/' + app.id, 'DELETE', {}, true)
+                            .then(() => fetchLinkedApps());
                     });
                     actionCell.appendChild(revokeBtn);
                 }

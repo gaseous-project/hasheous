@@ -34,7 +34,7 @@
 
     function sendToOpener(data) {
         if (window.opener && !window.opener.closed) {
-            window.opener.postMessage(Object.assign({ type: 'hasheous-link' }, data), '*');
+            window.opener.postMessage(Object.assign({ type: 'hasheous-link' }, data), targetOrigin);
         }
     }
 
@@ -46,6 +46,11 @@
     // ── State ─────────────────────────────────────────────────────────────────
 
     const clientApiKey = getQueryParam('clientApiKey');
+    // Callers may pass their own origin so postMessage can be restricted to that origin.
+    // If not provided, fall back to the opener's origin when available, then '*'.
+    const targetOrigin = getQueryParam('targetOrigin') ||
+        (window.opener && window.opener.location && window.opener.location.origin) ||
+        '*';
     let appInfo = null; // populated after AppInfo call
 
     // ── Localisation helper (falls back gracefully if lang is not loaded) ─────
