@@ -195,7 +195,11 @@ namespace Authentication
                                     new Dictionary<string, object> { { "lastused", DateTime.UtcNow }, { "apikey", apiKey } }
                                 );
                             }
-                            catch (Exception ex)
+                            catch (DataException ex)
+                            {
+                                Console.Error.WriteLine($"[APIKeyMiddleware] Failed to update UserAppKeys.LastUsed: {ex.Message}");
+                            }
+                            catch (InvalidOperationException ex)
                             {
                                 Console.Error.WriteLine($"[APIKeyMiddleware] Failed to update UserAppKeys.LastUsed: {ex.Message}");
                             }
