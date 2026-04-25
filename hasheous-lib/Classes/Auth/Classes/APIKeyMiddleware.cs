@@ -153,9 +153,10 @@ namespace Authentication
                 }
             }
 
-            // If not cached, fetch from database
+            // If not cached, fetch from database — check UserAPIKeys first, then UserAppKeys
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql = "SELECT * FROM UserAPIKeys WHERE `Key` = @apikey";
+
+            string sql = "SELECT `UserId` FROM UserAPIKeys WHERE `Key` = @apikey";
             DataTable data = db.ExecuteCMD(sql, new Dictionary<string, object>{
                 { "apikey", apiKey }
             });
@@ -166,6 +167,38 @@ namespace Authentication
                 string userId = data.Rows[0]["UserId"].ToString();
                 UserStore userStore = new UserStore(db);
                 user = await userStore.FindByIdAsync(userId, default);
+            }
+            else
+            {
+                // Fall through to app-linked keys
+                string appKeySql = "SELECT `UserId` FROM UserAppKeys WHERE `APIKey` = @apikey AND `Revoked` = 0";
+                DataTable appKeyData = db.ExecuteCMD(appKeySql, new Dictionary<string, object>{
+                    { "apikey", apiKey }
+                });
+
+                if (appKeyData.Rows.Count > 0)
+                {
+                    string userId = appKeyData.Rows[0]["UserId"].ToString();
+                    UserStore userStore = new UserStore(db);
+                    user = await userStore.FindByIdAsync(userId, default);
+
+                    if (user != null)
+                    {
+                        // Update LastUsed timestamp asynchronously (fire-and-forget, non-critical)
+                        _ = Task.Run(() =>
+                        {
+                            try
+                            {
+                                Database updateDb = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+                                updateDb.ExecuteNonQuery(
+                                    "UPDATE UserAppKeys SET `LastUsed` = @lastuused WHERE `APIKey` = @apikey",
+                                    new Dictionary<string, object> { { "lastuused", DateTime.UtcNow }, { "apikey", apiKey } }
+                                );
+                            }
+                            catch { /* best-effort */ }
+                        });
+                    }
+                }
             }
 
             // Cache the user
@@ -193,6 +226,21 @@ namespace Authentication
                 .Replace("/", "_");
 
             return base64String[..keyLength];
+        }
+
+        /// <summary>
+        /// Purges the cached API key entry for a given raw key string.
+        /// Call this after revoking an app-linked key so the cache does not serve the revoked key.
+        /// In-memory cache entries expire within the configured cache duration (2 hours).
+        /// </summary>
+        public static void PurgeApiKeyCache(string apiKey)
+        {
+            if (Config.RedisConfiguration.Enabled)
+            {
+                string cacheKey = ApiKeyCacheNamePrefix + ":" + apiKey;
+                hasheous.Classes.RedisConnection.GetDatabase(0).KeyDelete(cacheKey);
+            }
+            // In-memory cache entries will expire naturally after CacheDuration seconds
         }
     }
 }
