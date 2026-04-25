@@ -32,7 +32,29 @@
         });
     }
 
+    /**
+     * Returns true only when |origin| is a concrete scheme+host+port origin
+     * (i.e. not the wildcard '*', not the opaque 'null', and parseable by URL).
+     * This is used to guard postMessage so the API key is never broadcast to
+     * every window.
+     */
+    function isValidOrigin(origin) {
+        if (!origin || origin === '*' || origin === 'null') return false;
+        try {
+            const u = new URL(origin);
+            return u.origin === origin;
+        } catch (e) {
+            return false;
+        }
+    }
+
     function sendToOpener(data) {
+        if (!targetOrigin) {
+            // No valid target origin: refuse to send – the caller must supply
+            // targetOrigin as a query parameter.
+            console.error('hasheous-link: postMessage skipped – targetOrigin is missing or invalid.');
+            return;
+        }
         if (window.opener && !window.opener.closed) {
             window.opener.postMessage(Object.assign({ type: 'hasheous-link' }, data), targetOrigin);
         }
@@ -46,11 +68,11 @@
     // ── State ─────────────────────────────────────────────────────────────────
 
     const clientApiKey = getQueryParam('clientApiKey');
-    // Callers may pass their own origin so postMessage can be restricted to that origin.
-    // If not provided, fall back to the opener's origin when available, then '*'.
-    const targetOrigin = getQueryParam('targetOrigin') ||
-        (window.opener && window.opener.location && window.opener.location.origin) ||
-        '*';
+    // targetOrigin MUST be supplied by the caller as a query parameter so that
+    // postMessage is sent only to the expected opener window.  We do NOT fall
+    // back to '*' because that would expose the API key to any window.
+    const targetOriginParam = getQueryParam('targetOrigin');
+    const targetOrigin = isValidOrigin(targetOriginParam) ? targetOriginParam : null;
     let appInfo = null; // populated after AppInfo call
 
     // ── Localisation helper (falls back gracefully if lang is not loaded) ─────
@@ -66,6 +88,11 @@
     // ── Step 1: validate app ──────────────────────────────────────────────────
 
     async function loadAppInfo() {
+        if (!targetOrigin) {
+            showError(t('linkapp_error_body', 'This application could not be identified. Please contact the application developer.'));
+            return;
+        }
+
         if (!clientApiKey) {
             showError(t('linkapp_error_body', 'This application could not be identified. Please contact the application developer.'));
             return;

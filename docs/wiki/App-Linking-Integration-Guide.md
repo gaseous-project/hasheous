@@ -152,8 +152,10 @@ function startHasheousLink() {
 }
 ```
 
-> **Security note**: Always pass `targetOrigin` as your own application's origin.  
-> Hasheous will restrict `postMessage` to that origin so the API key cannot be intercepted by other frames.
+> **Security note**: `targetOrigin` is **required**. Hasheous rejects the flow and
+> shows an error page if `targetOrigin` is absent, is the wildcard `*`, or is not a
+> valid scheme+host+port origin. Always pass your application's own origin so that
+> the API key is sent only to your window and cannot be intercepted by other frames.
 
 ---
 
