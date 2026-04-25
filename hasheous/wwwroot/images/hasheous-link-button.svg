@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="40" viewBox="0 0 220 40" role="img" aria-label="Link to Hasheous">
+  <!-- Button background -->
+  <rect width="220" height="40" rx="10" ry="10" fill="#ffffff" stroke="#747775" stroke-width="1"/>
+
+  <!-- Hasheous "H" icon – simplified geometric mark in the brand navy/blue -->
+  <!-- Left vertical bar -->
+  <rect x="10" y="10" width="5" height="20" rx="1" fill="#001638"/>
+  <!-- Right vertical bar -->
+  <rect x="25" y="10" width="5" height="20" rx="1" fill="#001638"/>
+  <!-- Horizontal crossbar -->
+  <rect x="10" y="18" width="20" height="4" rx="1" fill="#001638"/>
+
+  <!-- Button label in Lato / sans-serif, matching Google button weight/size -->
+  <text x="44" y="25"
+        font-family="'Lato-Bold', 'Lato', 'Roboto', Arial, sans-serif"
+        font-size="14"
+        font-weight="600"
+        fill="#1f1f1f"
+        dominant-baseline="middle"
+        text-anchor="start">Link to Hasheous</text>
+</svg>
