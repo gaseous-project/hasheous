@@ -2007,7 +2007,8 @@ namespace hasheous_server.Classes
                 MetadataSources.TheGamesDb,
                 MetadataSources.RetroAchievements,
                 MetadataSources.GiantBomb,
-                MetadataSources.ScreenScraper
+                MetadataSources.ScreenScraper,
+                MetadataSources.SteamGridDb
             ];
 
             // set now time
