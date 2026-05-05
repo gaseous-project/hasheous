@@ -147,6 +147,17 @@ namespace Classes
         }
 
         /// <summary>
+        /// Gets the SteamGridDB configuration settings.
+        /// </summary>
+        public static ConfigFile.SteamGridDB SteamGridDBConfiguration
+        {
+            get
+            {
+                return _config.SteamGridDBConfiguration;
+            }
+        }
+
+        /// <summary>
         /// Gets the social authentication configuration settings.
         /// </summary>
         public static ConfigFile.SocialAuth SocialAuthConfiguration
@@ -582,6 +593,11 @@ namespace Classes
             /// Gets or sets the ScreenScraper configuration settings.
             /// </summary>
             public ScreenScraper ScreenScraperConfiguration = new ScreenScraper();
+
+            /// <summary>
+            /// Gets or sets the SteamGridDB configuration settings.
+            /// </summary>
+            public SteamGridDB SteamGridDBConfiguration = new SteamGridDB();
 
             /// <summary>
             /// Gets or sets the social authentication configuration settings.
@@ -1395,6 +1411,32 @@ namespace Classes
                 /// Gets or sets the ScreenScraper developer client secret used for authenticating API requests in development environments.
                 /// </summary>
                 public string DevSecret = _DefaultDevSecret;
+            }
+
+            /// <summary>
+            /// Represents the SteamGridDB configuration settings, including the API key for authenticating requests to the SteamGridDB service.
+            /// </summary>
+            public class SteamGridDB
+            {
+                private static string _DefaultAPIKey
+                {
+                    get
+                    {
+                        if (!String.IsNullOrEmpty(Environment.GetEnvironmentVariable("sgdbapikey")))
+                        {
+                            return Environment.GetEnvironmentVariable("sgdbapikey");
+                        }
+                        else
+                        {
+                            return "";
+                        }
+                    }
+                }
+
+                /// <summary>
+                /// Gets or sets the API key used for authenticating requests to the SteamGridDB service.
+                /// </summary>
+                public string APIKey = _DefaultAPIKey;
             }
 
             /// <summary>

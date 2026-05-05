@@ -26,6 +26,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - File: `~/.hasheous-server/config.json` (auto-updated on startup by `Config.UpdateConfig()`). Env vars (used by Docker): `dbhost`, `dbuser`, `dbpass`, `igdbclientid`, `igdbclientsecret`, `redisenabled`, `redishost`, `redisport`, `reportingserverurl`, etc.
   - Development mode disables client API key requirement (`Config.RequireClientAPIKey = false`) and enables developer exception page.
   - GiantBomb: set `gbapikey` env var (or update config.json) to enable GiantBomb metadata ingestion & proxy; optional `BaseURL` override (defaults to `https://www.giantbomb.com/`).
+  - SteamGridDB: set `sgdbapikey` env var (or update config.json -> `SteamGridDBConfiguration.APIKey`) to enable SteamGridDB metadata matching.
 
 - API versioning & routing
   - Controllers use `[ApiController]`, `[ApiVersion("1.0")]`, `[Route("api/v{version:apiVersion}/[controller]/")]`.
@@ -113,6 +114,16 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
   - Keep ignored lists small; if many fields are excluded consider crafting a purpose-built DTO instead.
   - For large collections, ensure ordering is deterministic before hashing (sort if source order can vary).
 
+### Strong name matching (new utility)
+- Helpers: `Common.GetStrongNameMatchScore(string candidate, string? resultName)` and `Common.IsStrongNameMatch(string candidate, string? resultName)`.
+- Purpose: conservative automatic name matching for metadata search results, with typo tolerance and token awareness.
+- Behavior:
+  - Tokenizes both sides and adds numeric shorthand variants (for example `c64` -> `64`).
+  - Pulls parenthetical aliases from result names (for example `Commodore 65 (C64)` also matches alias tokens).
+  - Requires every candidate token to map to a result token with exact or near-exact matching.
+  - Uses Levenshtein-based token scoring and penalizes unmatched extra result tokens/large length differences.
+  - Returns high score for exact matches; automatic acceptance threshold currently uses `>= 8` in SteamGridDB matching.
+
 - Email verification system
   - "Verified Email" role is automatically assigned/removed based on `user.EmailConfirmed` status.
   - Use `UpdateVerifiedEmailRole(user)` pattern after email confirmation changes.
@@ -144,6 +155,16 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 - Local cache source: `~/.hasheous-server/Data/Metadata/ScreenScraper/games` (resolved from `Config.LibraryConfiguration.LibraryMetadataDirectory_Screenscraper`).
 - Import path: cached JSON files are parsed with `gaseous_signature_parser` (ScreenScraper parser mode), language/country short codes are normalized via `Common.GetNameByCode(...)`, then records are imported using `XML.XMLIngestor.ImportDatRecord(...)`.
 - Blocking behavior: this task blocks `QueueItemType.SignatureIngestor` while it runs.
+
+## SteamGridDB metadata
+- Provider class: `hasheous-lib/Classes/Metadata/SteamGridDB/IMetadata_SteamGridDB.cs` (`MetadataSteamGridDB : IMetadata`).
+- Source enum: `MetadataSources.SteamGridDb` is now part of the metadata search source set.
+- Enablement: provider is enabled only when `Config.SteamGridDBConfiguration.APIKey` is populated (from `sgdbapikey` or config file).
+- Matching flow:
+  - Prepends the data object name to search candidates.
+  - If SteamGridDB returns exactly one game, it is accepted as an automatic match.
+  - If multiple games are returned, all results are scored with `Common.GetStrongNameMatchScore(...)`; best score wins, with shorter display name as tie-breaker.
+  - Automatic match is accepted only when best score is `>= 8`; otherwise falls back to no match.
 
 ## Common cache prefixes
 - `HashLookup`: entity details resolved during lookups (publisher/platform/game).
