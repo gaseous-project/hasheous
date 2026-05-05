@@ -6,6 +6,7 @@ using System.Web;
 using Authentication;
 using Classes;
 using hasheous_server.Classes;
+using hasheous_server.Models;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -734,6 +735,107 @@ namespace hasheous_server.Controllers.v1_0
             var linkedLogins = logins.Select(x => new { x.LoginProvider, x.ProviderKey }).ToList();
 
             return Ok(linkedLogins);
+        }
+
+        /// <summary>
+        /// Returns all app links (authorised client applications) for the current user.
+        /// </summary>
+        [HttpGet]
+        [Authorize]
+        [Route("AppLinks")]
+        public async Task<IActionResult> GetAppLinks()
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+                return Unauthorized();
+
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            string sql = @"
+                SELECT uak.`Id`, uak.`DataObjectId`, uak.`Created`, uak.`LastUsed`, uak.`Revoked`,
+                       dobj.`Name` AS AppName
+                FROM UserAppKeys uak
+                JOIN DataObject dobj ON dobj.`Id` = uak.`DataObjectId`
+                WHERE uak.`UserId` = @userid
+                ORDER BY dobj.`Name`";
+
+            DataTable data = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>
+            {
+                { "userid", user.Id }
+            });
+
+            var result = new List<object>();
+            foreach (DataRow row in data.Rows)
+            {
+                long dataObjectId = (long)row["DataObjectId"];
+
+                // Resolve logo URL from DataObject attributes
+                string? logoUrl = null;
+                string attrSql = "SELECT `AttributeValue` FROM DataObject_Attributes WHERE `DataObjectId` = @id AND `AttributeName` = @attrname LIMIT 1";
+                DataTable attrData = await db.ExecuteCMDAsync(attrSql, new Dictionary<string, object>
+                {
+                    { "id", dataObjectId },
+                    { "attrname", (int)AttributeItem.AttributeName.Logo }
+                });
+                if (attrData.Rows.Count > 0 && attrData.Rows[0]["AttributeValue"] != DBNull.Value)
+                {
+                    string logoValue = attrData.Rows[0]["AttributeValue"].ToString()!;
+                    if (!string.IsNullOrEmpty(logoValue))
+                    {
+                        logoUrl = $"/api/v1/Images/{logoValue}";
+                    }
+                }
+
+                result.Add(new
+                {
+                    Id = (long)row["Id"],
+                    DataObjectId = dataObjectId,
+                    AppName = row["AppName"].ToString(),
+                    LogoUrl = logoUrl,
+                    Created = (DateTime)row["Created"],
+                    LastUsed = row["LastUsed"] == DBNull.Value ? (DateTime?)null : (DateTime)row["LastUsed"],
+                    Revoked = (bool)row["Revoked"]
+                });
+            }
+
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Revokes an app link by ID. Only the owner of the link may revoke it.
+        /// </summary>
+        /// <param name="id">The ID of the UserAppKeys row to revoke.</param>
+        [HttpDelete]
+        [Authorize]
+        [Route("AppLinks/{id}")]
+        public async Task<IActionResult> RevokeAppLink(long id)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+                return Unauthorized();
+
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+
+            // Fetch the row to confirm ownership and get the raw API key for cache purge
+            string selectSql = "SELECT `APIKey`, `UserId` FROM UserAppKeys WHERE `Id` = @id";
+            DataTable data = await db.ExecuteCMDAsync(selectSql, new Dictionary<string, object> { { "id", id } });
+
+            if (data.Rows.Count == 0)
+                return NotFound();
+
+            if (data.Rows[0]["UserId"].ToString() != user.Id)
+                return Forbid();
+
+            string apiKey = data.Rows[0]["APIKey"].ToString()!;
+
+            db.ExecuteNonQuery(
+                "UPDATE UserAppKeys SET `Revoked` = 1 WHERE `Id` = @id",
+                new Dictionary<string, object> { { "id", id } }
+            );
+
+            // Purge from cache so the revoked key is not accepted until the cache expires
+            ApiKey.PurgeApiKeyCache(apiKey);
+
+            return Ok();
         }
     }
 }
