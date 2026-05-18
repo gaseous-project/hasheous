@@ -867,6 +867,14 @@ namespace Classes
                     }
                 }
 
+                public string LibraryTemporaryBundlesDirectory
+                {
+                    get
+                    {
+                        return Path.Combine(Path.GetTempPath(), "Bundles");
+                    }
+                }
+
                 /// <summary>
                 /// Gets the directory path for IGDB metadata within the library metadata directory.
                 /// </summary>

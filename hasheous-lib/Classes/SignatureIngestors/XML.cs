@@ -2,6 +2,7 @@
 using System.Data;
 using System.IO;
 using System.Net;
+using System.Security.Cryptography.Xml;
 using Classes;
 using gaseous_signature_parser.models.RomSignatureObject;
 using Microsoft.CodeAnalysis;
@@ -54,20 +55,25 @@ namespace XML
 
             DateTime now = DateTime.UtcNow;
 
+            bool hasMigratedOldSignatureGameNamesToSortingName = Config.ReadSetting<bool>("HasMigratedOldSignatureGameNamesToSortingName_" + XMLType.ToString(), false);
+
             // process dat files
             for (UInt16 i = 0; i < PathContents.Length; ++i)
             {
                 Logging.Log(Logging.LogType.Information, "Signature Ingest", "(" + (i + 1) + " / " + PathContents.Length + ") Processing " + XMLType.ToString() + " DAT file: " + PathContents[i]);
                 Logging.SendReport(Config.LogName, (i + 1), PathContents.Length, "Processing " + XMLType.ToString() + " DAT file: " + Path.GetFileName(PathContents[i]));
 
-                await ProcessDatFile(PathContents[i], XMLDBSearchPath, DBPathContents, XMLType, db, now);
+                await ProcessDatFile(PathContents[i], XMLDBSearchPath, DBPathContents, XMLType, db, now, hasMigratedOldSignatureGameNamesToSortingName);
             }
+
+            // mark migrations as completed
+            Config.SetSetting<bool>("HasMigratedOldSignatureGameNamesToSortingName_" + XMLType.ToString(), true);
 
             // prune old sources
             await PruneOldSources(XMLType, db, now);
         }
 
-        private async Task ProcessDatFile(string XMLFile, string? XMLDBSearchPath, string[]? DBPathContents, gaseous_signature_parser.parser.SignatureParser XMLType, Database db, DateTime now)
+        private async Task ProcessDatFile(string XMLFile, string? XMLDBSearchPath, string[]? DBPathContents, gaseous_signature_parser.parser.SignatureParser XMLType, Database db, DateTime now, bool hasMigratedOldSignatureGameNamesToSortingName)
         {
             string sql = "";
             Dictionary<string, object> dbDict = new Dictionary<string, object>();
@@ -153,6 +159,180 @@ namespace XML
 
                         sourceId = Convert.ToInt32(sigDB.Rows[0]["Id"]);
                     }
+
+                    #region "Migrate old signature game names to sortingname"
+                    if (hasMigratedOldSignatureGameNamesToSortingName == false)
+                    {
+                        List<GameMigration> gameMigrations = new List<GameMigration>();
+                        foreach (var game in Object.Games)
+                        {
+                            GameMigration migration = new GameMigration
+                            {
+                                Game = game,
+                                AlternateNames = new List<string>()
+                            };
+
+                            migration.AlternateNames.Add(game.SortingName);
+
+                            // get all games in Object.Games with the same name as this game but a different sorting name - these are likely alternate names for the same game that should be migrated to the sortingname field
+                            foreach (var alternateGame in Object.Games)
+                            {
+                                if (alternateGame.Name == game.Name && alternateGame.SortingName != game.SortingName)
+                                {
+                                    if (migration.AlternateNames.Contains(alternateGame.SortingName))
+                                    {
+                                        continue;
+                                    }
+                                    migration.AlternateNames.Add(alternateGame.SortingName);
+                                }
+                            }
+
+                            if (migration.AlternateNames.Count > 0)
+                            {
+                                gameMigrations.Add(migration);
+                            }
+                        }
+
+                        // start processing game migrations - for each game, we want to update the name of the game to be the sortingname, and then duplicate the record for each alternate name
+                        List<string> completedMigrations = new List<string>();
+                        foreach (var gameMigration in gameMigrations)
+                        {
+                            if (completedMigrations.Contains(gameMigration.Game.Name + gameMigration.Game.Year + gameMigration.Game.Publisher) || completedMigrations.Contains(gameMigration.Game.SortingName + gameMigration.Game.Year + gameMigration.Game.Publisher))
+                            {
+                                continue;
+                            }
+                            bool skipMigration = false;
+                            foreach (var alternateName in gameMigration.AlternateNames)
+                            {
+                                if (completedMigrations.Contains(alternateName + gameMigration.Game.Year + gameMigration.Game.Publisher))
+                                {
+                                    skipMigration = true;
+                                }
+                            }
+                            if (skipMigration)
+                            {
+                                continue;
+                            }
+
+                            // get publisher id
+                            int publisherId = 0;
+                            if (gameMigration.Game.Publisher != null)
+                            {
+                                sql = "SELECT * FROM Signatures_Publishers WHERE `Publisher`=@publisher";
+                                sigDB = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>
+                            {
+                                { "publisher", gameMigration.Game.Publisher }
+                            });
+                                if (sigDB.Rows.Count > 0)
+                                {
+                                    publisherId = (int)sigDB.Rows[0][0];
+                                }
+                            }
+
+                            // get platform id
+                            int platformId = 0;
+                            if (gameMigration.Game.System != null)
+                            {
+                                sql = "SELECT `Id` FROM Signatures_Platforms WHERE `Platform`=@platform";
+                                sigDB = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>
+                            {
+                                { "platform", gameMigration.Game.System }
+                            });
+                                if (sigDB.Rows.Count > 0)
+                                {
+                                    platformId = (int)sigDB.Rows[0][0];
+                                }
+                            }
+
+                            // get the game record for this game
+                            sql = "SELECT * FROM Signatures_Games WHERE `Name`=@name AND `Year`=@year AND `PublisherId`=@publisherid AND `SystemId`=@systemid";
+                            sigDB = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>
+                        {
+                            { "name", gameMigration.Game.Name },
+                            { "year", Common.ReturnValueIfNull(gameMigration.Game.Year, "") },
+                            { "publisherid", publisherId },
+                            { "systemid", platformId }
+                        });
+
+                            if (sigDB.Rows.Count > 0)
+                            {
+                                long gameId = (long)sigDB.Rows[0]["Id"];
+
+                                // update the name of the game to be the sortingname
+                                sql = "UPDATE Signatures_Games SET `Name`=@name WHERE `Id`=@gameid;";
+                                await db.ExecuteCMDAsync(sql, new Dictionary<string, object>
+                            {
+                                { "name", gameMigration.Game.SortingName },
+                                { "gameid", gameId }
+                            });
+                                completedMigrations.Add(gameMigration.Game.Name + gameMigration.Game.Year + gameMigration.Game.Publisher);
+
+                                // get dataobject id's this game is linked to
+                                sql = "SELECT * FROM DataObject_SignatureMap WHERE SignatureId=@gameid;";
+                                DataTable dataObjectMap = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>
+                            {
+                                { "gameid", gameId }
+                            });
+
+                                // duplicate the record for each alternate name
+                                foreach (var alternateName in gameMigration.AlternateNames)
+                                {
+                                    if (alternateName == gameMigration.Game.SortingName)
+                                    {
+                                        continue;
+                                    }
+
+                                    sql = "SELECT * FROM Signatures_Games WHERE `Name`=@name AND `Year`=@year AND `PublisherId`=@publisherid AND `SystemId`=@systemid";
+                                    var checkSigDB = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>
+                                {
+                                    { "name", alternateName },
+                                    { "year", Common.ReturnValueIfNull(gameMigration.Game.Year, "") },
+                                    { "publisherid", publisherId },
+                                    { "systemid", platformId }
+                                });
+                                    if (checkSigDB.Rows.Count > 0)
+                                    {
+                                        continue;
+                                    }
+
+                                    sql = "INSERT INTO Signatures_Games " +
+                                        "(`Name`, `Description`, `Year`, `PublisherId`, `Demo`, `SystemId`, `SystemVariant`, `Video`, `Copyright`, `Category`, `MetadataSource`, `SourceId`, `created_at`, `updated_at`) VALUES " +
+                                        "(@name, @description, @year, @publisherid, @demo, @systemid, @systemvariant, @video, @copyright, @category, @sigsource, @sourceid, @updatedat, @updatedat); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
+                                    var updateDb = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>
+                                {
+                                    { "name", alternateName },
+                                    { "description", Common.ReturnValueIfNull(gameMigration.Game.Description, "") },
+                                    { "year", Common.ReturnValueIfNull(gameMigration.Game.Year, "") },
+                                    { "publisherid", publisherId },
+                                    { "demo", (int)gameMigration.Game.Demo },
+                                    { "systemid", platformId },
+                                    { "systemvariant", Common.ReturnValueIfNull(gameMigration.Game.SystemVariant, "") },
+                                    { "video", Common.ReturnValueIfNull(gameMigration.Game.Video, "") },
+                                    { "copyright", Common.ReturnValueIfNull(gameMigration.Game.Copyright, "") },
+                                    { "category", Common.ReturnValueIfNull(gameMigration.Game.Category, "") },
+                                    { "sigsource", Common.ReturnValueIfNull(sigDB.Rows[0]["MetadataSource"], "") },
+                                    { "sourceid", Common.ReturnValueIfNull(sourceId, "") },
+                                    { "updatedat", now }
+                                });
+                                    completedMigrations.Add(alternateName + gameMigration.Game.Year + gameMigration.Game.Publisher);
+
+                                    // link the new game record to the same dataobjects as the original game record
+                                    long newGameId = Convert.ToInt64(updateDb.Rows[0][0]);
+                                    foreach (DataRow row in dataObjectMap.Rows)
+                                    {
+                                        sql = "INSERT INTO DataObject_SignatureMap (DataObjectId, DataObjectTypeId, SignatureId) VALUES (@dataobjectid, @dataobjecttypeid, @signatureid);";
+                                        await db.ExecuteCMDAsync(sql, new Dictionary<string, object>
+                                    {
+                                        { "dataobjectid", row["DataObjectId"] },
+                                        { "dataobjecttypeid", row["DataObjectTypeId"] },
+                                        { "signatureid", newGameId }
+                                    });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    #endregion "Migrate old signature game names to sortingname"
 
                     for (int x = 0; x < Object.Games.Count; ++x)
                     {
@@ -241,11 +421,11 @@ namespace XML
             if (flipNameAndDescription.Contains(XMLType.ToString()))
             {
                 dbDict.Add("name", Common.ReturnValueIfNull(gameObject.Description, ""));
-                dbDict.Add("description", Common.ReturnValueIfNull(gameObject.Name, ""));
+                dbDict.Add("description", Common.ReturnValueIfNull(gameObject.SortingName, ""));
             }
             else
             {
-                dbDict.Add("name", Common.ReturnValueIfNull(gameObject.Name, ""));
+                dbDict.Add("name", Common.ReturnValueIfNull(gameObject.SortingName, ""));
                 dbDict.Add("description", Common.ReturnValueIfNull(gameObject.Description, ""));
             }
             dbDict.Add("year", Common.ReturnValueIfNull(gameObject.Year, ""));
@@ -543,6 +723,12 @@ namespace XML
                     }
                 }
             }
+        }
+
+        private class GameMigration
+        {
+            public gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game Game { get; set; }
+            public List<string> AlternateNames { get; set; } = new List<string>();
         }
     }
 }

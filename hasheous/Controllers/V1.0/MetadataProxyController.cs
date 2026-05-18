@@ -1358,7 +1358,7 @@ namespace hasheous_server.Controllers.v1_0
             if (buildNewBundle)
             {
                 // create a temporary working directory
-                string tempWorkingDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+                string tempWorkingDir = Path.Combine(Config.LibraryConfiguration.LibraryTemporaryBundlesDirectory, Guid.NewGuid().ToString());
                 Directory.CreateDirectory(tempWorkingDir);
 
                 // get the root game metadata based on GameID
