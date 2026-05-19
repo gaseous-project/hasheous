@@ -12,6 +12,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
 - Architecture & data flow
   - MariaDB/MySQL is the source of truth. On startup, schema is created/migrated via embedded scripts (see `hasheous-lib/Classes/Database.cs::InitDB`, scripts named `hasheous-####.sql`).
   - Signature data is ingested from DAT/XML (TOSEC/No-Intro/etc.) by `Classes/SignatureIngestors/XML.cs` into `Signatures_*` tables.
+  - Signature ingestion now stores game names from `SortingName` and includes a one-time per-parser migration flag (`HasMigratedToSortingName_<ParserType>`) to migrate legacy name records while preserving alternate-name mappings.
   - Public API (versioned) handles lookups like `POST /api/v1/Lookup/ByHash` via `Classes/HashLookup` + `Classes/Database`.
   - Redis (Valkey) provides caching if enabled (`Classes/RedisConnection`), otherwise an in-memory cache is used.
   - Separation: the orchestration server exists to separate background tasks from the frontend web server. The frontend web server only services user requests; the orchestrator schedules and runs internal/background work (`QueueProcessor.QueueItems` in `service-orchestrator/Program.cs`). Note the orchestrator has no public endpoints, and should only be called by trusted web servers using the inter-host API key.
@@ -24,6 +25,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
 
 - Configuration
   - File: `~/.hasheous-server/config.json` (auto-updated on startup by `Config.UpdateConfig()`). Env vars (used by Docker): `dbhost`, `dbuser`, `dbpass`, `igdbclientid`, `igdbclientsecret`, `redisenabled`, `redishost`, `redisport`, `reportingserverurl`, etc.
+  - Temporary metadata bundle workspace is configured via `Config.LibraryConfiguration.LibraryTemporaryBundlesDirectory` (defaults to `Path.Combine(Path.GetTempPath(), "Bundles")`).
   - Development mode disables client API key requirement (`Config.RequireClientAPIKey = false`) and enables developer exception page.
   - GiantBomb: set `gbapikey` env var (or update config.json) to enable GiantBomb metadata ingestion & proxy; optional `BaseURL` override (defaults to `https://www.giantbomb.com/`).
   - SteamGridDB: set `sgdbapikey` env var (or update config.json -> `SteamGridDBConfiguration.APIKey`) to enable SteamGridDB metadata matching.
@@ -94,6 +96,11 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 
 - Use the lookup timeout pattern
   - See `LookupController.LookupPost`: `Task.WhenAny(..., Task.Delay(TimeSpan.FromSeconds(10)))` and set `Retry-After = 90` on 503 responses.
+  - Interactive hash lookup metadata searches use a short `Task.Delay(TimeSpan.FromSeconds(2))` guard to keep UI-driven requests responsive.
+
+## Signature lookup behavior
+- `SignatureManagement.GetRawSignatures(...)` excludes zero-size ROM signature rows by default (`Signatures_Roms.Size > 0`) before hash-condition matching.
+- Keep the non-zero-size filter when extending hash lookup SQL unless a feature explicitly requires zero-byte signatures.
 
 - Correlation & logging
   - Middleware sets `CallContext` values (CorrelationId, CallingProcess, CallingUser); orchestrator also returns `x-correlation-id` header.
@@ -177,6 +184,7 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 ## Dump files (MetadataMap.zip)
 - Producer: `hasheous-lib/Classes/ProcessQueue/Tasks/Dumps.cs` (queued as `QueueItemType.MetadataMapDump` in `service-orchestrator/Program.cs`, default every 10080 minutes = 7 days).
 - Output: a zip at `Config.LibraryConfiguration.LibraryMetadataMapDumpsDirectory/MetadataMap.zip`.
+- Temporary working directories used while composing bundles are created under `Config.LibraryConfiguration.LibraryTemporaryBundlesDirectory/<guid>`.
 - Inside the zip: `Content/<PlatformName>/<GameName> (<Id>).json` per game.
   - PlatformName comes from the game’s `Attributes` where `attributeName == Platform`; falls back to `Unknown Platform` if missing.
   - File names are sanitized and include the DataObject Id.
