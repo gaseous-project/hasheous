@@ -395,7 +395,7 @@ namespace Classes
                         // Run with 5 second timeout for interactive sessions
                         await Task.WhenAny(
                             dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true),
-                            Task.Delay(TimeSpan.FromSeconds(5))
+                            Task.Delay(TimeSpan.FromSeconds(2))
                         );
                     }
                     else
