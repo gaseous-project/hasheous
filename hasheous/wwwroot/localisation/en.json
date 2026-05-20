@@ -342,5 +342,16 @@
     "servicetaskstatus": "Distributed Task Status",
     "possibleduplicates": "Possible Duplicates",
     "mergeduplicates": "Merge Duplicates",
-    "searchaliases": "Search Aliases"
+    "searchaliases": "Search Aliases",
+    "linkedapps": "Linked Applications",
+    "linkedappsdescription": "These are the applications that have been authorised to access your account. You can revoke access at any time.",
+    "revokeapplink": "Revoke",
+    "revoked": "Revoked",
+    "linkapp_error_heading": "Application Not Recognised",
+    "linkapp_error_body": "This application could not be identified. Please contact the application developer.",
+    "linkapp_login_heading": "Sign In to Continue",
+    "linkapp_login_body": "Please sign in to your Hasheous account to authorise this application.",
+    "linkapp_confirm_body": "Allow {0} to access your Hasheous account?",
+    "linkapp_authorise": "Authorise",
+    "linkapp_success": "Authorisation complete. You may close this window."
 }
