@@ -583,6 +583,9 @@ function renderContent() {
                     }
 
                     let sigLabelText = dataObject.signatureDataObjects[i].Name;
+                    if (dataObject.signatureDataObjects[i].Country != null && dataObject.signatureDataObjects[i].Country != '') {
+                        sigLabelText += ' - ' + dataObject.signatureDataObjects[i].Country;
+                    }
                     if (dataObject.signatureDataObjects[i].Year != null && dataObject.signatureDataObjects[i].Year != '') {
                         sigLabelText += ' (' + dataObject.signatureDataObjects[i].Year + ')';
                     }

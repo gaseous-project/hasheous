@@ -798,6 +798,7 @@ namespace hasheous_server.Classes
                             DataObject_SignatureMap.`SignatureId`,
                             Signatures_Games.`Name`,
                             Signatures_Games.`Year`,
+                            Signatures_Games.`Country`,
                             Signatures_Platforms.`Platform`,
                             Signatures_Games.`SourceId` AS `SourceId`,
                             Signatures_Games.`MetadataSource` AS `MetadataSource`
