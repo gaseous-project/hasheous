@@ -397,6 +397,9 @@ async function loadData() {
 
                 case "game":
                     let sigLabelText = signatureSources[Number(dataObject.signatureDataObjects[i].MetadataSource)] + ' - ' + dataObject.signatureDataObjects[i].Name;
+                    if (dataObject.signatureDataObjects[i].Country != null && dataObject.signatureDataObjects[i].Country != '') {
+                        sigLabelText += ' - ' + dataObject.signatureDataObjects[i].Country;
+                    }
                     if (dataObject.signatureDataObjects[i].Year != null && dataObject.signatureDataObjects[i].Year != '') {
                         sigLabelText += ' (' + dataObject.signatureDataObjects[i].Year + ')';
                     }
@@ -466,6 +469,20 @@ async function loadData() {
 
                     switch (pageType) {
                         case "game":
+                            let country = "";
+                            if (data[i].country) {
+                                // loop all keys and join into a comma separated list
+                                let countryList = [];
+                                for (const key in data[i].country) {
+                                    if (data[i].country[key] == true) {
+                                        countryList.push(key);
+                                    }
+                                }
+                                if (countryList.length > 0) {
+                                    country = " - " + countryList.join(", ");
+                                }
+                            }
+
                             let year = "";
                             if (data[i].year) {
                                 if (data[i].year != "") {
@@ -480,7 +497,7 @@ async function loadData() {
                                 }
                             }
 
-                            sigName = data[i][sigSearchName] + year + system;
+                            sigName = data[i][sigSearchName] + country + year + system;
                             break;
 
                         default:
@@ -568,6 +585,20 @@ function signatureSelectionFormatter(state) {
     let valueLabel = document.createElement('span');
     switch (pageType) {
         case "game":
+            let country = "";
+            if (data.countries) {
+                // loop all keys and join into a comma separated list
+                let countryList = [];
+                for (const key in data.countries) {
+                    if (data.countries[key].length > 0) {
+                        countryList.push(key);
+                    }
+                }
+                if (countryList.length > 0) {
+                    country = " - " + countryList.join(", ");
+                }
+            }
+
             let year = "";
             if (data.year) {
                 if (data.year != "") {
@@ -582,9 +613,9 @@ function signatureSelectionFormatter(state) {
                 }
             }
 
-            sigName = data.name + year + system;
+            sigName = data.name + country + year + system;
 
-            valueLabel.innerHTML = data.name + year;
+            valueLabel.innerHTML = data.name + country + year;
             valueLabel.classList.add('signatureMetadataName');
             labelBox.appendChild(valueLabel);
 
@@ -750,6 +781,20 @@ function GetSuggestedSignatures() {
                                 if (useSig == true) {
                                     sigItem.setAttribute('data-id', success[i].id);
 
+                                    let country = "";
+                                    if (success[i].countries) {
+                                        // loop all keys and join into a comma separated list
+                                        let countryList = [];
+                                        for (const key in success[i].countries) {
+                                            if (success[i].countries[key].length > 0) {
+                                                countryList.push(key);
+                                            }
+                                        }
+                                        if (countryList.length > 0) {
+                                            country = " - " + countryList.join(", ");
+                                        }
+                                    }
+
                                     let year = "";
                                     if (success[i].year) {
                                         if (success[i].year != "") {
@@ -764,7 +809,7 @@ function GetSuggestedSignatures() {
                                         }
                                     }
 
-                                    sigItem.innerHTML = success[i].name + year + system;
+                                    sigItem.innerHTML = success[i].name + country + year + system;
                                 }
 
                                 break;
