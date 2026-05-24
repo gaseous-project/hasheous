@@ -2009,7 +2009,8 @@ namespace hasheous_server.Classes
                 MetadataSources.RetroAchievements,
                 MetadataSources.GiantBomb,
                 MetadataSources.ScreenScraper,
-                MetadataSources.SteamGridDb
+                MetadataSources.SteamGridDb,
+                MetadataSources.LaunchBox
             ];
 
             // set now time
@@ -2194,7 +2195,16 @@ namespace hasheous_server.Classes
                         platformMetadata = itemPlatform.Metadata.Find(x => x.Source == metadataSource);
                         if (!String.IsNullOrEmpty(platformMetadata?.ImmutableId))
                         {
-                            searchOptions.Add("platformId", long.Parse(platformMetadata.ImmutableId ?? "0"));
+                            // check if platformMetadata.ImmutableId is a long - if so, add it to search options as platformId; if not, add it as platformIdString
+                            if (long.TryParse(platformMetadata.ImmutableId, out long platformId))
+                            {
+                                searchOptions.Add("platformId", platformId);
+                                searchOptions.Add("platformIdString", platformMetadata.ImmutableId);
+                            }
+                            else
+                            {
+                                searchOptions.Add("platformIdString", platformMetadata.ImmutableId);
+                            }
                         }
                         else
                         {

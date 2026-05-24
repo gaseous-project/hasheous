@@ -264,6 +264,25 @@ namespace hasheous_server.Models
                             Template = "https://www.screenscraper.fr/gameinfos.php?gameid={0}"
                         }
                     }
+                },
+                {
+                    Communications.MetadataSources.LaunchBox,
+
+                    new List<LinkTemplateItem>
+                    {
+                        new LinkTemplateItem
+                        {
+                            Source = Communications.MetadataSources.LaunchBox,
+                            ObjectType = DataObjects.DataObjectType.Platform,
+                            Template = "https://gamesdb.launchbox-app.com/platforms/games/{0}"
+                        },
+                        new LinkTemplateItem
+                        {
+                            Source = Communications.MetadataSources.LaunchBox,
+                            ObjectType = DataObjects.DataObjectType.Game,
+                            Template = "https://gamesdb.launchbox-app.com/games/dbid/{0}"
+                        }
+                    }
                 }
             };
 
