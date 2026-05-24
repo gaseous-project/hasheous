@@ -931,6 +931,17 @@ namespace Classes
                 }
 
                 /// <summary>
+                /// Gets the directory path for LaunchBox metadata within the library metadata directory.
+                /// </summary>
+                public string LibraryMetadataDirectory_LaunchBox
+                {
+                    get
+                    {
+                        return Path.Combine(LibraryMetadataDirectory, "LaunchBox");
+                    }
+                }
+
+                /// <summary>
                 /// Gets the directory path for Redump metadata within the library metadata directory.
                 /// </summary>
                 public string LibraryMetadataDirectory_Redump

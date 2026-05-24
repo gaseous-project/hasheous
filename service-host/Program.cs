@@ -164,6 +164,10 @@ switch (taskType)
         Task = new FetchScreenScraperMetadata();
         break;
 
+    case QueueItemType.FetchLaunchBoxMetadata:
+        Task = new FetchLaunchBoxMetadata();
+        break;
+
     case QueueItemType.HourlyMaintenance:
         Task = new HourlyMaintenance();
         break;

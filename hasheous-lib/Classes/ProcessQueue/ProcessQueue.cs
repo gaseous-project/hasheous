@@ -124,6 +124,10 @@ namespace Classes.ProcessQueue
                         Task = new FetchScreenScraperMetadata();
                         break;
 
+                    case QueueItemType.FetchLaunchBoxMetadata:
+                        Task = new FetchLaunchBoxMetadata();
+                        break;
+
                     case QueueItemType.HourlyMaintenance_Frontend:
                         Task = new HourlyMaintenance_Frontend();
                         break;

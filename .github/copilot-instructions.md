@@ -161,6 +161,42 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
   - MAME Mess: `MAME MESS/`
   - Redump: `Redump/`
 
+## LaunchBox metadata
+- Background task: `QueueItemType.FetchLaunchBoxMetadata` (implemented under `hasheous-lib/Classes/ProcessQueue/Tasks/FetchLaunchBoxMetadata.cs`).
+- Downloader/importer entrypoint: `hasheous-lib/Classes/Metadata/LaunchBox/MetadataDownload.cs` (`DownloadManager`).
+- Import helper: `hasheous-lib/Classes/Metadata/LaunchBox/XmlModelImporter.cs`.
+  - Supports streaming XML import via `ImportXmlMultipleModelsAsync(...)` to avoid loading large files fully into memory.
+  - Generates SQL tables from model scalar properties.
+  - Supports identity handling (`Id` auto-increment when configured as identity and not included in inserts).
+- Model locations: `hasheous-lib/Classes/Metadata/LaunchBox/Models/*.cs`.
+
+### LaunchBox ForeignKey conventions
+- Attribute: `hasheous-lib/Classes/Metadata/ForeignKeyAttribute.cs`.
+- Untyped FK usage (lookup table auto-created):
+  - `[ForeignKey("Company")]`
+  - Creates/uses a simple `{Id BIGINT AUTO_INCREMENT, Name VARCHAR(255) UNIQUE}` table.
+- Typed FK usage (references an existing imported table):
+  - Use the explicit constructor with lookup/id columns:
+    - `[ForeignKey("Game", typeof(GameModel), "Name", "Id")]`
+  - For typed FKs, lookup/id columns are required and validated against the referenced model type.
+- FK-tagged source properties are expected to be `string` values (lookup keys from XML).
+- FK-tagged destination columns are persisted as `BIGINT` IDs.
+- Blank/whitespace FK values are normalized to `NULL` during insert.
+
+### LaunchBox model-defined indexes
+- Index definitions are declared on models via static `GetIndexes()` returning `IEnumerable<ModelIndexDefinition>`.
+  - Definition type: `hasheous-lib/Classes/Metadata/ModelIndexDefinition.cs`.
+  - Helpers support both single and composite indexes:
+    - `ModelIndexDefinition.Single(...)`
+    - `ModelIndexDefinition.Composite(...)`
+- Indexes are created by `XmlModelImporter.EnsureIndexesAsync(...)` after table creation.
+- Guardrails:
+  - Index names and columns are sanitized.
+  - Referenced columns must exist on the model/table.
+  - Existing indexes are detected via `information_schema.statistics` and skipped.
+- MySQL key length safety:
+  - For `string` columns (stored as `LONGTEXT`), index creation uses prefix length `(191)` automatically (for example ``Name(191)``) to avoid `Specified key was too long` errors on MariaDB/MySQL.
+
 ## ScreenScraper metadata
 - Background task: `QueueItemType.FetchScreenScraperMetadata`.
 - Local cache source: `~/.hasheous-server/Data/Metadata/ScreenScraper/games` (resolved from `Config.LibraryConfiguration.LibraryMetadataDirectory_Screenscraper`).
