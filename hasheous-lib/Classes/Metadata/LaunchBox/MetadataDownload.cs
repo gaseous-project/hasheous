@@ -55,68 +55,68 @@ namespace LaunchBox
                 Directory.CreateDirectory(LocalFilePath);
             }
 
-            // if (IsLocalCopyOlderThanMaxAge(DownloadedZipFilePath) == true)
-            // {
-            //     Logging.Log(Logging.LogType.Information, "LaunchBox", "Downloading metadata database from LaunchBox");
+            if (IsLocalCopyOlderThanMaxAge(DownloadedZipFilePath) == true)
+            {
+                Logging.Log(Logging.LogType.Information, "LaunchBox", "Downloading metadata database from LaunchBox");
 
-            //     // download the file
-            //     if (File.Exists(DownloadedZipFilePath))
-            //     {
-            //         File.Delete(DownloadedZipFilePath);
-            //     }
+                // download the file
+                if (File.Exists(DownloadedZipFilePath))
+                {
+                    File.Delete(DownloadedZipFilePath);
+                }
 
-            //     var result = await DownloadFile(DumpsUrl, DownloadedZipFilePath);
+                var result = await DownloadFile(DumpsUrl, DownloadedZipFilePath);
 
-            //     // extract the file
-            //     if (result == true)
-            //     {
-            //         if (Directory.Exists(LocalFilePath))
-            //         {
-            //             Directory.Delete(LocalFilePath, true);
-            //         }
-            //         ZipFile.ExtractToDirectory(DownloadedZipFilePath, LocalFilePath);
+                // extract the file
+                if (result == true)
+                {
+                    if (Directory.Exists(LocalFilePath))
+                    {
+                        Directory.Delete(LocalFilePath, true);
+                    }
+                    ZipFile.ExtractToDirectory(DownloadedZipFilePath, LocalFilePath);
 
-            // start the import process
-            // drop the launchbox database if it exists
-            Database db = Config.database;
-            string dropDatabaseQuery = "DROP DATABASE IF EXISTS launchbox;";
-            await db.ExecuteCMDAsync(dropDatabaseQuery);
-            // create the launchbox database
-            string createDatabaseQuery = "CREATE DATABASE launchbox;";
-            await db.ExecuteCMDAsync(createDatabaseQuery);
+                    // start the import process
+                    // drop the launchbox database if it exists
+                    Database db = Config.database;
+                    string dropDatabaseQuery = "DROP DATABASE IF EXISTS launchbox;";
+                    await db.ExecuteCMDAsync(dropDatabaseQuery);
+                    // create the launchbox database
+                    string createDatabaseQuery = "CREATE DATABASE launchbox;";
+                    await db.ExecuteCMDAsync(createDatabaseQuery);
 
-            // Platforms.xml — Platform + PlatformAlternateName
-            await ImportXmlFileAsync(db, "Platforms.xml",
-                For<PlatformModel>("Platform", "Platform"),
-                For<PlatformAlternateNameModel>("PlatformAlternateName", "PlatformAlternateName"));
+                    // Platforms.xml — Platform + PlatformAlternateName
+                    await ImportXmlFileAsync(db, "Platforms.xml",
+                        For<PlatformModel>("Platform", "Platform"),
+                        For<PlatformAlternateNameModel>("PlatformAlternateName", "PlatformAlternateName"));
 
-            // Metadata.xml — streamed in a single pass (large file)
-            await ImportXmlFileAsync(db, "Metadata.xml",
-                For<EmulatorModel>("Emulator", "Emulator"),
-                For<EmulatorPlatformModel>("EmulatorPlatform", "EmulatorPlatform"),
-                For<GameModel>("Game", "Game"),
-                For<GameAlternateNameModel>("GameAlternateName", "GameAlternateName"),
-                For<GameImageModel>("GameImage", "GameImage"));
+                    // Metadata.xml — streamed in a single pass (large file)
+                    await ImportXmlFileAsync(db, "Metadata.xml",
+                        For<EmulatorModel>("Emulator", "Emulator"),
+                        For<EmulatorPlatformModel>("EmulatorPlatform", "EmulatorPlatform"),
+                        For<GameModel>("Game", "Game"),
+                        For<GameAlternateNameModel>("GameAlternateName", "GameAlternateName"),
+                        For<GameImageModel>("GameImage", "GameImage"));
 
-            // // Files.xml — File
-            // await ImportXmlFileAsync(db, "Files.xml",
-            //     For<FileModel>("File", "File"));
+                    // // Files.xml — File
+                    // await ImportXmlFileAsync(db, "Files.xml",
+                    //     For<FileModel>("File", "File"));
 
-            // // Mame.xml — ControllerSupport + MameFile + MameListItem
-            // await ImportXmlFileAsync(db, "Mame.xml",
-            //     For<ControllerSupportModel>("ControllerSupport", "ControllerSupport"),
-            //     For<MameFileModel>("MameFile", "MameFile"),
-            //     For<MameListItemModel>("MameListItem", "MameListItem"));
-            //     }
-            // }
-            // else
-            // {
-            //     // calculate the age of the file
-            //     var lastWriteTime = File.GetLastWriteTime(DownloadedZipFilePath);
-            //     var age = DateTime.Now - lastWriteTime;
+                    // // Mame.xml — ControllerSupport + MameFile + MameListItem
+                    // await ImportXmlFileAsync(db, "Mame.xml",
+                    //     For<ControllerSupportModel>("ControllerSupport", "ControllerSupport"),
+                    //     For<MameFileModel>("MameFile", "MameFile"),
+                    //     For<MameListItemModel>("MameListItem", "MameListItem"));
+                }
+            }
+            else
+            {
+                // calculate the age of the file
+                var lastWriteTime = File.GetLastWriteTime(DownloadedZipFilePath);
+                var age = DateTime.Now - lastWriteTime;
 
-            //     Logging.Log(Logging.LogType.Information, "LaunchBox", "Metadata database from LaunchBox is up to date. Next update in " + (MaxAgeInDays - age.Days) + " days");
-            // }
+                Logging.Log(Logging.LogType.Information, "LaunchBox", "Metadata database from LaunchBox is up to date. Next update in " + (MaxAgeInDays - age.Days) + " days");
+            }
 
             return LocalFilePath;
         }
