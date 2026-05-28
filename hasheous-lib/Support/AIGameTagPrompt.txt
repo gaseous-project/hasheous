@@ -2,8 +2,6 @@ You are an expert whose responsibility is to help with automatic tagging for a g
 
 Generate detailed tags for the game <DATA_OBJECT_NAME> for <DATA_OBJECT_PLATFORM>.
 
-If present; use the Wikipedia source as context for the other provided sources.
-
 The tags should accurately represent the game. Only generate tags in the following categories: Genre, Gameplay, Features, Theme, Perspective, and Art Style.
 
 Each tag should be no more than three words long. Ensure each tag is specific and commonly used within the gaming community, but avoid overly broad or generic terms. If you are unable to generate tags relevant to the category, leave it empty.

@@ -812,6 +812,21 @@ namespace hasheous_server.Classes.Tasks.Clients
                                                 parameters["sources"] += "Wikipedia; ";
                                             }
                                             break;
+                                        case Metadata.Communications.MetadataSources.LaunchBox:
+                                            sql = "SELECT `Overview` FROM `launchbox`.`Game` WHERE `DatabaseID` = @id LIMIT 1;";
+                                            dt = Config.database.ExecuteCMD(sql, new Dictionary<string, object>
+                                            {
+                                                { "@id", metadataItem.ImmutableId }
+                                            });
+                                            if (dt.Rows.Count > 0)
+                                            {
+                                                if (dt.Rows[0]["Overview"] != DBNull.Value && dt.Rows[0]["Overview"].ToString() != "")
+                                                {
+                                                    parameters.Add("Source_LaunchBox", dt.Rows[0]["Overview"].ToString() ?? "");
+                                                    parameters["sources"] += "LaunchBox; ";
+                                                }
+                                            }
+                                            break;
                                     }
                                 }
                             }
@@ -909,6 +924,29 @@ namespace hasheous_server.Classes.Tasks.Clients
                                             {
                                                 parameters.Add("Source_Wikipedia", wikiContent ?? "");
                                                 parameters["sources"] += "Wikipedia; ";
+                                            }
+                                            break;
+                                        case Metadata.Communications.MetadataSources.LaunchBox:
+                                            // get the platform slug from the immutable id - the immutable id is in the format "<id>-<slug>"
+                                            if (metadataItem.ImmutableId == null || metadataItem.ImmutableId == "")
+                                            {
+                                                break;
+                                            }
+                                            string[] parts = metadataItem.ImmutableId.Split("-");
+                                            // remove the first item which is the id, and rejoin the rest (replacing the dashes with spaces) to get the slug
+                                            string slug = string.Join(" ", parts.Skip(1));
+                                            sql = "SELECT `Notes` FROM `launchbox`.`Platform` WHERE `Name` = @slug LIMIT 1;";
+                                            dt = Config.database.ExecuteCMD(sql, new Dictionary<string, object>
+                                            {
+                                                { "@slug", slug }
+                                            });
+                                            if (dt.Rows.Count > 0)
+                                            {
+                                                if (dt.Rows[0]["Notes"] != DBNull.Value && dt.Rows[0]["Notes"].ToString() != "")
+                                                {
+                                                    parameters.Add("Source_LaunchBox", dt.Rows[0]["Notes"].ToString() ?? "");
+                                                    parameters["sources"] += "LaunchBox; ";
+                                                }
                                             }
                                             break;
                                     }

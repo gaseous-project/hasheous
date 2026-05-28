@@ -659,6 +659,50 @@ namespace hasheous_server.Controllers.v1_0
 
         [MapToApiVersion("1.0")]
         [HttpGet]
+        [Authorize(Roles = "Admin,Moderator")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [Route("{ObjectType}/{Id}/Tasks/")]
+        public async Task<IActionResult> GetTasks(Classes.DataObjects.DataObjectType ObjectType, long Id)
+        {
+            var response = Classes.Tasks.Clients.TaskManagement.GetAllTasks(Id);
+
+            if (response != null)
+            {
+                return Ok(response);
+            }
+            else
+            {
+                return NotFound();
+            }
+        }
+
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [Authorize(Roles = "Admin,Moderator")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [Route("{ObjectType}/{Id}/Tasks/{TaskId}")]
+        public async Task<IActionResult> GetTask(Classes.DataObjects.DataObjectType ObjectType, long Id, long TaskId, bool resetTask = false)
+        {
+            var response = Classes.Tasks.Clients.TaskManagement.GetTask(TaskId);
+
+            if (response != null)
+            {
+                if (resetTask)
+                {
+                    await response.Reset();
+                    response = Classes.Tasks.Clients.TaskManagement.GetTask(TaskId);
+                }
+
+                return Ok(response);
+            }
+            else
+            {
+                return NotFound();
+            }
+        }
+
+        [MapToApiVersion("1.0")]
+        [HttpGet]
         [Authorize]
         [ProducesResponseType(typeof(List<ClientApiKeyItem>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
