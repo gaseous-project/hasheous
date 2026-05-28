@@ -34,6 +34,9 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
 - API versioning & routing
   - Controllers use `[ApiController]`, `[ApiVersion("1.0")]`, `[Route("api/v{version:apiVersion}/[controller]/")]`.
   - Prefer using cache profiles: `"5Minute"` or `"7Days"` configured in `hasheous/Program.cs` (see `LookupController` usage).
+  - Data object admin task endpoints are exposed on `DataObjectsController` for moderators/admins:
+    - `GET /api/v1/DataObjects/{ObjectType}/{Id}/Tasks` returns all task records for the object.
+    - `GET /api/v1/DataObjects/{ObjectType}/{Id}/Tasks/{TaskId}?resetTask=true` returns a single task and optionally resets it.
   - Swagger is enabled with custom schema IDs and API key security definitions.
 
 - Auth & security
@@ -70,6 +73,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Healthcheck: `hasheous-lib/Controllers/HealthcheckController.cs` → `[AllowAnonymous]`, versioned route, `Ok()`.
   - Lookup: `hasheous/Controllers/V1.0/LookupController.cs` shows async handlers, request models, cache usage, and the timeout pattern.
   - Account management: `hasheous/Controllers/V1.0/AccountController.cs` shows authenticated endpoints with `[Authorize]`, user context access via `_userManager.GetUserAsync(User)`, and role management patterns.
+  - Data object task access/reset: `hasheous/Controllers/V1.0/DataObjectController.cs` shows admin/moderator task endpoints and optional task reset flow.
   - Email verification: Account controller demonstrates automatic role assignment (`UpdateVerifiedEmailRole()`) and secure user-specific operations.
 
 - Gotchas
@@ -169,6 +173,10 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
   - Generates SQL tables from model scalar properties.
   - Supports identity handling (`Id` auto-increment when configured as identity and not included in inserts).
 - Model locations: `hasheous-lib/Classes/Metadata/LaunchBox/Models/*.cs`.
+- AI description enrichment:
+  - Game description/tag jobs can now pull LaunchBox `Game.Overview` when metadata source is `LaunchBox`.
+  - Platform description/tag jobs can now pull LaunchBox `Platform.Notes` by parsing slug text from immutable ids (`<id>-<slug>`).
+  - Source payload key is `Source_LaunchBox`; include this when extending AI task source aggregation logic in `hasheous-lib/Classes/TaskManagement.cs`.
 
 ### LaunchBox ForeignKey conventions
 - Attribute: `hasheous-lib/Classes/Metadata/ForeignKeyAttribute.cs`.
@@ -282,6 +290,12 @@ Additional example (rating boards):
   - Localization: move all user-visible text to `wwwroot/localisation/en.json` and use `data-lang` attributes or `lang.getLang()` calls.
   - CSS: use CSS variables (`--warning-color`, `--valid-color`, `--invalid-color`) and semantic class names instead of inline styles.
   - Frontend API: use `postData()` function for authenticated requests instead of direct `fetch()` - handles CSRF tokens and authentication cookies automatically.
+  - Data object details admin UI now includes a dedicated tasks panel (`#dataObjectTasksSection`) in `wwwroot/pages/dataobjectdetail.html` rendered by `loadTasksSection()` in `wwwroot/pages/dataobjectdetail.js`; keep role-gating aligned with backend authorization (Admin/Moderator).
+
+## AI prompt templates
+- Prompt templates for AI descriptions/tags live in `hasheous-lib/Support/AIGameDescriptionPrompt.txt`, `hasheous-lib/Support/AIGameTagPrompt.txt`, `hasheous-lib/Support/AIPlatformDescriptionPrompt.txt`, and `hasheous-lib/Support/AIPlatformTagPrompt.txt`.
+- Current prompt guidance no longer gives Wikipedia priority context instructions.
+- Description prompts now explicitly require plain description output with no added title headings.
 
 ## async guidance
 - Prefer Task-returning actions: `public async Task<IActionResult> Action(...)`.
