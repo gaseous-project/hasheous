@@ -16,16 +16,16 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="craftersmine.SteamGridDB.Net" Version="1.1.7" />
-    <PackageReference Include="gaseous-signature-parser" Version="2.6.1" />
+    <PackageReference Include="gaseous-signature-parser" Version="2.7.0" />
     <PackageReference Include="gaseous.IGDB" Version="1.0.5" />
-    <PackageReference Include="hasheous-client" Version="1.4.9" />
+    <PackageReference Include="hasheous-client" Version="1.4.10" />
     <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="8.0.27" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.MicrosoftAccount" Version="8.0.27" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="8.0.27" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Versioning" Version="5.1.0" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Versioning.ApiExplorer" Version="5.1.0" />
-    <PackageReference Include="StackExchange.Redis" Version="2.13.1" />
+    <PackageReference Include="StackExchange.Redis" Version="2.13.17" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="[9.0.6]" />
     <PackageReference Include="MySqlConnector" Version="2.5.0" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="8.0.27" />

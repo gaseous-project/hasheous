@@ -533,6 +533,7 @@ let signatureSources = {
     8: "FBNeo",
     9: "PureDOSDAT",
     11: "MAMERedump",
+    12: "TotalDOSCollection",
     98: "ScreenScraper"
 }
 

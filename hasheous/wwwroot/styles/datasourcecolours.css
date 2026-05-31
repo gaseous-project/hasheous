@@ -11,6 +11,7 @@
     --signature-source-color-mameredump: #8b4513;
     --signature-source-color-puredosdat: #00ff00;
     --signature-source-color-screenscraper: #0000ff;
+    --signature-source-color-totaldoscollection: #ff69b4;
 }
 
 .color-none {
@@ -59,4 +60,8 @@
 
 .color-screenscraper {
     background-color: var(--signature-source-color-screenscraper);
+}
+
+.color-totaldoscollection {
+    background-color: var(--signature-source-color-totaldoscollection);
 }
