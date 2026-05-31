@@ -34,6 +34,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
 - API versioning & routing
   - Controllers use `[ApiController]`, `[ApiVersion("1.0")]`, `[Route("api/v{version:apiVersion}/[controller]/")]`.
   - Prefer using cache profiles: `"5Minute"` or `"7Days"` configured in `hasheous/Program.cs` (see `LookupController` usage).
+  - Deprecated hash-lookup route note: `HashLookupController` and `POST /api/v1/HashLookup/Lookup` are no longer active. Use `LookupController` endpoints (for example `POST /api/v1/Lookup/ByHash`) for all hash lookup behavior.
   - Data object admin task endpoints are exposed on `DataObjectsController` for moderators/admins:
     - `GET /api/v1/DataObjects/{ObjectType}/{Id}/Tasks` returns all task records for the object.
     - `GET /api/v1/DataObjects/{ObjectType}/{Id}/Tasks/{TaskId}?resetTask=true` returns a single task and optionally resets it.
