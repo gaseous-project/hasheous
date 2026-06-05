@@ -504,7 +504,7 @@ namespace Classes
 
 					transaction.Commit();
 				}
-				catch (Exception ex)
+				catch
 				{
 					transaction.Rollback();
 					throw;
@@ -550,7 +550,7 @@ namespace Classes
 
 					await transaction.CommitAsync();
 				}
-				catch (Exception ex)
+				catch
 				{
 					await transaction.RollbackAsync();
 					throw;

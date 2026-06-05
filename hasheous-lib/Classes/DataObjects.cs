@@ -925,7 +925,7 @@ namespace hasheous_server.Classes
                                         break;
                                 }
                             }
-                            catch (Exception ex)
+                            catch
                             {
                                 objectId = null;
                             }

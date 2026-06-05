@@ -50,7 +50,7 @@ namespace hasheous_server.Controllers.v1_0
 
                 return Ok(DataObjectDefinition);
             }
-            catch (Exception ex)
+            catch
             {
                 return NotFound();
             }

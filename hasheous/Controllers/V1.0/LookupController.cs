@@ -220,7 +220,7 @@ namespace hasheous_server.Controllers.v1_0
                     return Ok(hashLookup);
                 }
             }
-            catch (HashLookup.HashNotFoundException hnfEx)
+            catch (HashLookup.HashNotFoundException)
             {
                 return NotFound("The provided hash was not found in the signature database.");
             }

@@ -1,5 +1,5 @@
 using Authentication;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using static Authentication.ApiKey;
 using static Authentication.ClientApiKey;
@@ -9,7 +9,7 @@ public class AuthorizationOperationFilter : IOperationFilter
 {
     public void Apply(OpenApiOperation operation, OperationFilterContext context)
     {
-        List<string> securityRequirements = new List<string>();
+        var securityRequirements = new List<OpenApiSecurityRequirement>();
 
         // get API key attribute
         var apiKeyAttribute = context.MethodInfo.DeclaringType.GetCustomAttributes(true)
@@ -18,27 +18,7 @@ public class AuthorizationOperationFilter : IOperationFilter
 
         if (apiKeyAttribute != null && apiKeyAttribute.Count() > 0)
         {
-            securityRequirements.Add("API Key");
-
-
-            // add security requirement
-            operation.Security = new List<OpenApiSecurityRequirement>
-            {
-                new OpenApiSecurityRequirement
-                {
-                    {
-                        new OpenApiSecurityScheme
-                        {
-                            Reference = new OpenApiReference
-                            {
-                                Type = ReferenceType.SecurityScheme,
-                                Id = "API Key"
-                            }
-                        },
-                        securityRequirements
-                    }
-                }
-            };
+            securityRequirements.Add(CreateSecurityRequirement("API Key"));
         }
 
         // get Client API key attribute
@@ -48,26 +28,7 @@ public class AuthorizationOperationFilter : IOperationFilter
 
         if (clientApiKeyAttribute != null && clientApiKeyAttribute.Count() > 0)
         {
-            securityRequirements.Add("Client API Key");
-
-            // add security requirement
-            operation.Security = new List<OpenApiSecurityRequirement>
-            {
-                new OpenApiSecurityRequirement
-                {
-                    {
-                        new OpenApiSecurityScheme
-                        {
-                            Reference = new OpenApiReference
-                            {
-                                Type = ReferenceType.SecurityScheme,
-                                Id = "Client API Key"
-                            }
-                        },
-                        securityRequirements
-                    }
-                }
-            };
+            securityRequirements.Add(CreateSecurityRequirement("Client API Key"));
         }
 
         // get Inter host API key attribute
@@ -77,31 +38,26 @@ public class AuthorizationOperationFilter : IOperationFilter
 
         if (interhostApiKeyAttribute != null && interhostApiKeyAttribute.Count() > 0)
         {
-            securityRequirements.Add("Inter Host API Key");
-
-            // add security requirement
-            operation.Security = new List<OpenApiSecurityRequirement>
-            {
-                new OpenApiSecurityRequirement
-                {
-                    {
-                        new OpenApiSecurityScheme
-                        {
-                            Reference = new OpenApiReference
-                            {
-                                Type = ReferenceType.SecurityScheme,
-                                Id = "Inter Host API Key"
-                            }
-                        },
-                        securityRequirements
-                    }
-                }
-            };
+            securityRequirements.Add(CreateSecurityRequirement("Inter Host API Key"));
         }
 
         if (securityRequirements.Count == 0)
         {
-            operation.Security.Clear();
+            operation.Security?.Clear();
+            return;
         }
+
+        operation.Security = securityRequirements;
+    }
+
+    private static OpenApiSecurityRequirement CreateSecurityRequirement(string schemeName)
+    {
+        return new OpenApiSecurityRequirement
+        {
+            {
+                new OpenApiSecuritySchemeReference(schemeName, null!, null),
+                []
+            }
+        };
     }
 }
