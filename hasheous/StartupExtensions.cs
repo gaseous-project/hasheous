@@ -163,6 +163,7 @@ public static class StartupExtensions
                 Scheme = "TaskWorkerApiKeyScheme"
             });
             options.OperationFilter<AuthorizationOperationFilter>();
+            options.OperationFilter<LookupRequestBodyOperationFilter>();
             options.DocumentFilter<IGDBMetadataDocumentFilter>();
             options.SwaggerDoc("v1", new OpenApiInfo
             {
