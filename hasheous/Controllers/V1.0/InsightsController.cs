@@ -1,15 +1,13 @@
+using Authentication;
 using Classes;
+using Classes.Insights;
 using hasheous_server.Classes;
 using hasheous_server.Models;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Net.Http.Headers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
-using Authentication;
-using Classes.Insights;
+using Microsoft.Net.Http.Headers;
 
 namespace hasheous_server.Controllers.v1_0
 {

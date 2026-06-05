@@ -49,7 +49,7 @@ namespace hasheous_server.Controllers.v1_0
             {
                 return NotFound(knfEx.Message);
             }
-            catch (Exception ex)
+            catch
             {
                 // Log the exception (not shown here for brevity)
                 return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while processing your request.");

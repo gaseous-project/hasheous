@@ -7,11 +7,11 @@
   <PropertyGroup Condition=" '$(RunConfiguration)' == 'http' " />
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <WarningLevel>4</WarningLevel>
-    <DocumentationFile>bin\Debug\net8.0\hasheous.xml</DocumentationFile>
+    <DocumentationFile>bin\Debug\net10.0\hasheous.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <WarningLevel>4</WarningLevel>
-    <DocumentationFile>bin\Release\net8.0\hasheous.xml</DocumentationFile>
+    <DocumentationFile>bin\Release\net10.0\hasheous.xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../hasheous-lib/hasheous-lib.csproj" />

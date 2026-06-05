@@ -589,7 +589,7 @@ namespace hasheous_server.Controllers.v1_0
 
                     return PhysicalFile(imagePath, "image/jpeg");
                 }
-                catch (Exception ex)
+                catch
                 {
                     return NotFound();
                 }
@@ -674,7 +674,7 @@ namespace hasheous_server.Controllers.v1_0
 
                     return PhysicalFile(imageFile, "image/jpeg");
                 }
-                catch (Exception ex)
+                catch
                 {
                     return NotFound();
                 }
@@ -1285,7 +1285,7 @@ namespace hasheous_server.Controllers.v1_0
 
                     return PhysicalFile(imageFile, "image/jpeg");
                 }
-                catch (Exception ex)
+                catch
                 {
                     return NotFound();
                 }

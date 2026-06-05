@@ -57,7 +57,7 @@ namespace hasheous_server.Controllers.v1_0
             {
                 return Ok(await submissions.AddVote(_userManager.GetUserId(HttpContext.User), model));
             }
-            catch (HashLookup.HashNotFoundException hnfEx)
+            catch (HashLookup.HashNotFoundException)
             {
                 return NotFound("The provided hash was not found in the signature database.");
             }
@@ -91,7 +91,7 @@ namespace hasheous_server.Controllers.v1_0
             {
                 return Ok(await submissions.AddArchiveObservation(_userManager.GetUserId(HttpContext.User), model));
             }
-            catch (HashLookup.HashNotFoundException hnfEx)
+            catch (HashLookup.HashNotFoundException)
             {
                 return NotFound("The provided content hash was not found in the signature database.");
             }

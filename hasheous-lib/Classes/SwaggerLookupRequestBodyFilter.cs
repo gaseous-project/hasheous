@@ -1,6 +1,6 @@
+using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Mvc.Controllers;
-using Microsoft.OpenApi.Any;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 public class LookupRequestBodyOperationFilter : IOperationFilter
@@ -27,47 +27,29 @@ public class LookupRequestBodyOperationFilter : IOperationFilter
                 {
                     Schema = new OpenApiSchema
                     {
-                        OneOf = new List<OpenApiSchema>
+                        OneOf = new List<IOpenApiSchema>
                         {
                             new OpenApiSchema
                             {
-                                Type = "object",
+                                Type = JsonSchemaType.Object,
                                 AdditionalProperties = new OpenApiSchema
                                 {
-                                    Type = "string",
-                                    Nullable = true
+                                    Type = JsonSchemaType.String | JsonSchemaType.Null
                                 },
-                                Example = new OpenApiObject
-                                {
-                                    ["crc"] = new OpenApiString("12ec7f82"),
-                                    ["md5"] = new OpenApiString("5d7550788a4d1b47ad81fbbbf5c615a9"),
-                                    ["sha1"] = new OpenApiString("274ed5c2ea2ddc855f67d4c4e61c9d9b7eb68403"),
-                                    ["sha256"] = new OpenApiString("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-                                }
+                                Example = JsonNode.Parse("{\"crc\":\"12ec7f82\",\"md5\":\"5d7550788a4d1b47ad81fbbbf5c615a9\",\"sha1\":\"274ed5c2ea2ddc855f67d4c4e61c9d9b7eb68403\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}")
                             },
                             new OpenApiSchema
                             {
-                                Type = "array",
+                                Type = JsonSchemaType.Array,
                                 Items = new OpenApiSchema
                                 {
-                                    Type = "object",
+                                    Type = JsonSchemaType.Object,
                                     AdditionalProperties = new OpenApiSchema
                                     {
-                                        Type = "string",
-                                        Nullable = true
+                                        Type = JsonSchemaType.String | JsonSchemaType.Null
                                     }
                                 },
-                                Example = new OpenApiArray
-                                {
-                                    new OpenApiObject
-                                    {
-                                        ["crc"] = new OpenApiString("12ec7f82")
-                                    },
-                                    new OpenApiObject
-                                    {
-                                        ["md5"] = new OpenApiString("5d7550788a4d1b47ad81fbbbf5c615a9")
-                                    }
-                                }
+                                Example = JsonNode.Parse("[{\"crc\":\"12ec7f82\"},{\"md5\":\"5d7550788a4d1b47ad81fbbbf5c615a9\"}]")
                             }
                         }
                     }

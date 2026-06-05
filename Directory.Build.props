@@ -1,6 +1,7 @@
 <Project>
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
+    <NoWarn>$(NoWarn);1572;1573;1587;1591</NoWarn>
   </PropertyGroup>
   <Import Project="build\Version.props" />
 </Project>
