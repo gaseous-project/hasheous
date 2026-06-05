@@ -3,8 +3,8 @@
 Use this to get productive fast. Follow the existing patterns in this repo over generic .NET advice.
 
 - Repo layout
-  - `hasheous/` ASP.NET Core 8 web API + static UI; public endpoints and Swagger.
-  - `service-orchestrator/` ASP.NET Core API hosting background orchestration and scheduled jobs.
+  - `hasheous/` .NET 10 web API + static UI; public endpoints and Swagger.
+  - `service-orchestrator/` .NET 10 API hosting background orchestration and scheduled jobs.
   - `hasheous-lib/` Shared library: data access, config, auth, background tasks, models, migrations (embedded SQL).
   - `hasheous-cli/` CLI utilities.
   - NOTE (resource namespace): Embedded resources (SQL migrations, support data lists) now resolve under the assembly root namespace `hasheous_lib` (e.g. `hasheous_lib.Schema.hasheous-1004.sql`, `hasheous_lib.Support.Country.txt`). Use that prefix when adding new embedded resources; prior references using `hasheous.*` were refactored.
@@ -32,6 +32,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - SteamGridDB: set `sgdbapikey` env var (or update config.json -> `SteamGridDBConfiguration.APIKey`) to enable SteamGridDB metadata matching.
 
 - API versioning & routing
+  - Framework now uses `Asp.Versioning.Mvc` (via `Asp.Versioning.Mvc.ApiExplorer` 10.x). Project-level `global using Asp.Versioning;` makes attributes like `[ApiVersion("1.0")]` and `[MapToApiVersion("1.0")]` available without per-file imports.
   - Controllers use `[ApiController]`, `[ApiVersion("1.0")]`, `[Route("api/v{version:apiVersion}/[controller]/")]`.
   - Prefer using cache profiles: `"5Minute"` or `"7Days"` configured in `hasheous/Program.cs` (see `LookupController` usage).
   - Deprecated hash-lookup route note: `HashLookupController` and `POST /api/v1/HashLookup/Lookup` are no longer active. Use `LookupController` endpoints (for example `POST /api/v1/Lookup/ByHash`) for all hash lookup behavior.
@@ -79,13 +80,15 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
 
 - Gotchas
   - Large uploads are allowed (Kestrel/FormOptions set to max); ensure proxies forward `X-Forwarded-*` (already configured).
-  - Keep XML docs for Swagger (`IncludeXmlComments` expects generated XML files from the projects).
+  - Keep XML docs for Swagger (`IncludeXmlComments` expects generated XML files from the projects); build output paths are `bin/Debug/net10.0/` (not net8.0).
+  - Swagger filter custom implementations: framework now uses Swashbuckle 10.x, which brings `Microsoft.OpenApi` 2.x. Schema types are `JsonSchemaType` flags (e.g., `JsonSchemaType.String | JsonSchemaType.Null` for nullable strings), examples use `JsonNode` instead of `OpenApiObject`/`OpenApiString`, and tag/security references use `OpenApiTagReference`/`OpenApiSecuritySchemeReference` instead of embedding objects directly. See `hasheous-lib/Classes/SwaggerLookupRequestBodyFilter.cs` and `SwaggerIDocumentFilter.cs` for reference implementations.
 
 If something is unclear or missing (e.g., additional services, tests, or new auth flows), ask and this guide can be refined.
 
 ## Quick how‑tos
 - Add a new API endpoint
   - Create a controller under `hasheous/Controllers/V1.0` with `[ApiController]`, `[ApiVersion("1.0")]`, `[Route("api/v{version:apiVersion}/[controller]/")]`.
+  - API version attributes (`[ApiVersion]`, `[MapToApiVersion]`) are available globally via project-level `global using Asp.Versioning;` — no per-file using directive needed.
   - Reuse cache profiles via `[ResponseCache(CacheProfileName = "5Minute")]` or `"7Days"`.
   - Protect with `[Authentication.ApiKey.ApiKeyAttribute]` or `[Authentication.ClientApiKey.ClientApiKeyAttribute]` when needed.
   - For authenticated endpoints, use `[Authorize]` and access user context via `_userManager.GetUserAsync(User)`.
@@ -161,7 +164,7 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 
 ## Maintenance
 - A PR guard (`.github/workflows/copilot-instructions-guard.yml`) fails when architecture/config files change without updating this file; it prints hints via `.github/scripts/copilot-instructions-help.sh`.
-  - Update this file when: resource namespace conventions change (e.g., `hasheous_lib.*` migration), new cross-cutting utilities like `ComputeObjectPropertyHash` are added, or queue coordination semantics are modified.
+  - Update this file when: resource namespace conventions change (e.g., `hasheous_lib.*` migration), new cross-cutting utilities like `ComputeObjectPropertyHash` are added, queue coordination semantics are modified, or major framework/dependency updates occur (e.g., .NET version bumps, Swagger/OpenAPI package upgrades).
 
 ## API key usage examples
 - User API key (header `X-API-Key`):
@@ -287,6 +290,10 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 Additional example (rating boards):
 `curl -H "X-Client-API-Key: <CLIENT_KEY>" "https://localhost:7157/api/v1/MetadataProxy/GiantBomb/rating_boards?limit=10"`
 
+## Contributing with AI (.NET 10 specifics)
+- When updating Swagger operation filters or custom documentation: use `JsonSchemaType` flags for schema types (e.g., `JsonSchemaType.String`), `JsonNode.Parse("...")` for examples, and dedicated reference types (`OpenApiSecuritySchemeReference(name, hostDoc, externalResource)`, `OpenApiTagReference(name, hostDoc, externalResource)`) instead of embedding full objects.
+- Ensure new Swagger helpers use `using Microsoft.OpenApi;` (not `Microsoft.OpenApi.Models` or `Microsoft.OpenApi.Any`, which no longer exist in v2.x).
+
 ## Contributing with AI
 - Keep PRs small and single-purpose. Describe intent, touched areas, and any migration/caching impact.
 - Follow structure:
@@ -310,6 +317,12 @@ Additional example (rating boards):
 - Prompt templates for AI descriptions/tags live in `hasheous-lib/Support/AIGameDescriptionPrompt.txt`, `hasheous-lib/Support/AIGameTagPrompt.txt`, `hasheous-lib/Support/AIPlatformDescriptionPrompt.txt`, and `hasheous-lib/Support/AIPlatformTagPrompt.txt`.
 - Current prompt guidance no longer gives Wikipedia priority context instructions.
 - Description prompts now explicitly require plain description output with no added title headings.
+
+## .NET 10 and dependencies
+- Framework: .NET 10.0. Target framework set in `Directory.Build.props` and applied to all projects.
+- API versioning: `Asp.Versioning.Mvc` + `Asp.Versioning.Mvc.ApiExplorer` 10.x (replacing old `Microsoft.AspNetCore.Mvc.Versioning` packages).
+- Swagger: Swashbuckle 10.2.1 brings `Microsoft.OpenApi` 2.7.5. Schema types are `JsonSchemaType` enums, examples are `JsonNode`, references are dedicated types (`OpenApiTagReference`, `OpenApiSecuritySchemeReference`). See Swagger filter implementations for patterns.
+- Build warnings: XML documentation warnings (`CS1572`, `CS1573`, `CS1587`, `CS1591`) are suppressed project-wide in `Directory.Build.props` to reduce noise; focus remains on nullable (`CS8600+`) and logic warnings.
 
 ## async guidance
 - Prefer Task-returning actions: `public async Task<IActionResult> Action(...)`.
