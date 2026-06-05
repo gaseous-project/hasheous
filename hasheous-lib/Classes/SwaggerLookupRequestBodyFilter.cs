@@ -17,44 +17,46 @@ public class LookupRequestBodyOperationFilter : IOperationFilter
             return;
         }
 
-        operation.RequestBody = new OpenApiRequestBody
+        var requestBody = new OpenApiRequestBody
         {
             Required = true,
-            Description = "Raw JSON body containing either one hash object or an array of hash objects. Each object may contain crc, md5, sha1, and/or sha256 fields.",
-            Content =
+            Description = "Raw JSON body containing either one hash object or an array of hash objects. Each object may contain crc, md5, sha1, and/or sha256 fields."
+        };
+
+        var content = new Dictionary<string, OpenApiMediaType>();
+        content["application/json"] = new OpenApiMediaType
+        {
+            Schema = new OpenApiSchema
             {
-                ["application/json"] = new OpenApiMediaType
+                OneOf = new List<IOpenApiSchema>
                 {
-                    Schema = new OpenApiSchema
+                    new OpenApiSchema
                     {
-                        OneOf = new List<IOpenApiSchema>
+                        Type = JsonSchemaType.Object,
+                        AdditionalProperties = new OpenApiSchema
                         {
-                            new OpenApiSchema
+                            Type = JsonSchemaType.String | JsonSchemaType.Null
+                        },
+                        Example = JsonNode.Parse("{\"crc\":\"12ec7f82\",\"md5\":\"5d7550788a4d1b47ad81fbbbf5c615a9\",\"sha1\":\"274ed5c2ea2ddc855f67d4c4e61c9d9b7eb68403\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}")
+                    },
+                    new OpenApiSchema
+                    {
+                        Type = JsonSchemaType.Array,
+                        Items = new OpenApiSchema
+                        {
+                            Type = JsonSchemaType.Object,
+                            AdditionalProperties = new OpenApiSchema
                             {
-                                Type = JsonSchemaType.Object,
-                                AdditionalProperties = new OpenApiSchema
-                                {
-                                    Type = JsonSchemaType.String | JsonSchemaType.Null
-                                },
-                                Example = JsonNode.Parse("{\"crc\":\"12ec7f82\",\"md5\":\"5d7550788a4d1b47ad81fbbbf5c615a9\",\"sha1\":\"274ed5c2ea2ddc855f67d4c4e61c9d9b7eb68403\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}")
-                            },
-                            new OpenApiSchema
-                            {
-                                Type = JsonSchemaType.Array,
-                                Items = new OpenApiSchema
-                                {
-                                    Type = JsonSchemaType.Object,
-                                    AdditionalProperties = new OpenApiSchema
-                                    {
-                                        Type = JsonSchemaType.String | JsonSchemaType.Null
-                                    }
-                                },
-                                Example = JsonNode.Parse("[{\"crc\":\"12ec7f82\"},{\"md5\":\"5d7550788a4d1b47ad81fbbbf5c615a9\"}]")
+                                Type = JsonSchemaType.String | JsonSchemaType.Null
                             }
-                        }
+                        },
+                        Example = JsonNode.Parse("[{\"crc\":\"12ec7f82\"},{\"md5\":\"5d7550788a4d1b47ad81fbbbf5c615a9\"}]")
                     }
                 }
             }
         };
+        requestBody.Content = content;
+
+        operation.RequestBody = requestBody;
     }
 }

@@ -7,6 +7,11 @@ public class IGDBMetadataDocumentFilter : IDocumentFilter
 {
     public void Apply(OpenApiDocument openApiDocument, DocumentFilterContext context)
     {
+        if (openApiDocument == null)
+        {
+            return;
+        }
+
         // loop all classes in IGDB.Models namespace and add them to the document
         var igdbAssembly = typeof(IGDB.Models.Game).Assembly;
         var hasheousAssembly = typeof(HasheousClient.Models.Metadata.IGDB.Game).Assembly;
@@ -35,6 +40,7 @@ public class IGDBMetadataDocumentFilter : IDocumentFilter
                     Summary = $"Get {type.Name}metadata from IGDB.",
                     OperationId = $"Get{type.Name}Metadata"
                 };
+                var responses = new OpenApiResponses();
 
                 // check if the type has a description
                 if (!string.IsNullOrEmpty(endpointDataItem?.Endpoint))
@@ -173,45 +179,49 @@ public class IGDBMetadataDocumentFilter : IDocumentFilter
                 {
                     Description = "Success"
                 };
-
-                // add response type
-                response200.Content.Add("application/json", new OpenApiMediaType
+                var response200Content = new Dictionary<string, OpenApiMediaType>
                 {
-                    Schema = new OpenApiSchema
+                    ["application/json"] = new OpenApiMediaType
                     {
-                        Type = JsonSchemaType.Object,
-                        AdditionalPropertiesAllowed = true,
-                        Properties = properties,
-                        Description = $"Returns the {type.Name} object from IGDB."
+                        Schema = new OpenApiSchema
+                        {
+                            Type = JsonSchemaType.Object,
+                            AdditionalPropertiesAllowed = true,
+                            Properties = properties,
+                            Description = $"Returns the {type.Name} object from IGDB."
+                        }
                     }
-                });
+                };
+                response200.Content = response200Content;
 
                 // adding response to operation
-                operation.Responses.Add("200", response200);
+                responses.Add("200", response200);
 
                 // create 400 response
                 var response400 = new OpenApiResponse
                 {
                     Description = "Error: Invalid search parameters"
                 };
-
-                // add response type
-                response400.Content.Add("application/json", new OpenApiMediaType
+                var response400Content = new Dictionary<string, OpenApiMediaType>
                 {
-                    Schema = new OpenApiSchema
+                    ["application/json"] = new OpenApiMediaType
                     {
-                        Description = $"Invalid search parameters for {type.Name}.",
-                        Type = JsonSchemaType.Object,
-                        Properties = new Dictionary<string, IOpenApiSchema>
+                        Schema = new OpenApiSchema
                         {
-                            { "error", new OpenApiSchema { Type = JsonSchemaType.String, Description = "Error message" } },
-                            { "code", new OpenApiSchema { Type = JsonSchemaType.Integer, Description = "Error code" } }
+                            Description = $"Invalid search parameters for {type.Name}.",
+                            Type = JsonSchemaType.Object,
+                            Properties = new Dictionary<string, IOpenApiSchema>
+                            {
+                                { "error", new OpenApiSchema { Type = JsonSchemaType.String, Description = "Error message" } },
+                                { "code", new OpenApiSchema { Type = JsonSchemaType.Integer, Description = "Error code" } }
+                            }
                         }
                     }
-                });
+                };
+                response400.Content = response400Content;
 
                 // adding response to operation
-                operation.Responses.Add("400", response400);
+                responses.Add("400", response400);
 
                 // create 404 response
                 var response404 = new OpenApiResponse
@@ -220,7 +230,7 @@ public class IGDBMetadataDocumentFilter : IDocumentFilter
                 };
 
                 // adding response to operation
-                operation.Responses.Add("404", response404);
+                responses.Add("404", response404);
 
                 // create 500 response
                 var response500 = new OpenApiResponse
@@ -229,7 +239,8 @@ public class IGDBMetadataDocumentFilter : IDocumentFilter
                 };
 
                 // adding response to operation
-                operation.Responses.Add("500", response500);
+                responses.Add("500", response500);
+                operation.Responses = responses;
 
                 // enable this code if your endpoint requires authorization.
                 operation.Security = new List<OpenApiSecurityRequirement>
@@ -248,7 +259,8 @@ public class IGDBMetadataDocumentFilter : IDocumentFilter
                 // add operation to the path
                 pathItem.AddOperation(HttpMethod.Get, operation);
                 // finally add the path to document
-                openApiDocument?.Paths.Add($"/api/v1/MetadataProxy/IGDB/{type.Name}", pathItem);
+                openApiDocument.Paths ??= new OpenApiPaths();
+                openApiDocument.Paths.Add($"/api/v1/MetadataProxy/IGDB/{type.Name}", pathItem);
             }
         }
     }
