@@ -35,12 +35,15 @@ namespace hasheous_server.Classes
             else
             {
                 // if DataObjectId is not provided, look it up based on the hashes
-                HashLookup hashLookup = new HashLookup(db, new Models.HashLookupModel
+                HashLookup hashLookup = new HashLookup(db, new List<Models.HashLookupModel>
                 {
-                    MD5 = model.MD5,
-                    SHA1 = model.SHA1,
-                    SHA256 = model.SHA256,
-                    CRC = model.CRC
+                    new Models.HashLookupModel
+                    {
+                        MD5 = model.MD5,
+                        SHA1 = model.SHA1,
+                        SHA256 = model.SHA256,
+                        CRC = model.CRC
+                    }
                 });
                 await hashLookup.PerformLookup();
 
@@ -401,12 +404,15 @@ namespace hasheous_server.Classes
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
 
             // check if the content hash already exists
-            HashLookup hashLookup = new HashLookup(db, new Models.HashLookupModel
+            HashLookup hashLookup = new HashLookup(db, new List<Models.HashLookupModel>
             {
-                MD5 = model.Content.MD5,
-                SHA1 = model.Content.SHA1,
-                SHA256 = model.Content.SHA256,
-                CRC = model.Content.CRC
+                new Models.HashLookupModel
+                {
+                    MD5 = model.Content.MD5,
+                    SHA1 = model.Content.SHA1,
+                    SHA256 = model.Content.SHA256,
+                    CRC = model.Content.CRC
+                }
             });
             await hashLookup.PerformLookup();
 
