@@ -105,11 +105,24 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
   - See `LookupController.LookupPost`: `Task.WhenAny(..., Task.Delay(TimeSpan.FromSeconds(10)))` and set `Retry-After = 90` on 503 responses.
   - Interactive hash lookup metadata searches use a short `Task.Delay(TimeSpan.FromSeconds(2))` guard to keep UI-driven requests responsive.
 
+- Raw-body POST endpoints and Swagger documentation
+  - `LookupPost` (`POST /api/v1/Lookup/ByHash`) accepts a raw JSON body instead of a bound model parameter. The action reads `Request.Body` directly via `StreamReader` and calls `JsonDocument.Parse(...)` manually.
+  - This avoids ASP.NET Core model binding requiring a named form/query field; the body can be a JSON object `{"crc":"..."}` or a JSON array `[{"crc":"..."},{"md5":"..."}]`. A quoted JSON string containing an object/array is also accepted.
+  - Because there is no bindable parameter, Swagger cannot infer the request body automatically. Use an `IOperationFilter` to inject the `OpenApiRequestBody` manually for such actions. The filter `LookupRequestBodyOperationFilter` in `hasheous-lib/Classes/SwaggerLookupRequestBodyFilter.cs` is the reference implementation; register it with `options.OperationFilter<LookupRequestBodyOperationFilter>()` in `StartupExtensions.cs`.
+  - When adding other raw-body endpoints, follow this same pattern: read body manually in the action and add a dedicated `IOperationFilter` for Swagger documentation.
+
 ## Signature lookup behavior
 - `SignatureManagement.GetRawSignatures(...)` excludes zero-size ROM signature rows by default (`Signatures_Roms.Size > 0`) before hash-condition matching.
 - Keep the non-zero-size filter when extending hash lookup SQL unless a feature explicitly requires zero-byte signatures.
 - `SignatureManagement.BuildGameItem(...)` currently populates both singular and plural dictionary properties for compatibility: `Country` and `Countries`, `Language` and `Languages`.
 - Data object signature listing for games includes `Signatures_Games.Country`; frontend game signature labels/suggestions append country text in `wwwroot/pages/dataobjectdetail.js` and `wwwroot/pages/dataobjectedit.js`.
+
+### Multi-hash lookup (new behavior)
+- `GetRawSignatures(...)` accepts a list of `HashLookupModel` where each element specifies one or more hash fields (CRC/MD5/SHA1/SHA256). Each valid hash field generates a typed token subquery using `UNION ALL`; the outer JOIN then uses `HAVING COUNT(DISTINCT HashToken) = N` to require that **all** tokens are matched by the same `GameId`.
+- This means different hashes in different array elements can be on different ROM rows, as long as they belong to the same game.
+- The outer WHERE clause still retains the full `OR` list of hash conditions so only matching ROM rows are returned (same columns/object mapping as before).
+- `tokenCount` tracks how many valid hash tokens were built; `modelCount` is a separate counter used for parameter naming to avoid `dbDict` key collisions across models.
+- Do not deduplicate tokens by value when extending — each new hash field should add its own uniquely-named parameter (`@sha256{modelCount}`, `@crc{modelCount}`, etc.).
 
 - Correlation & logging
   - Middleware sets `CallContext` values (CorrelationId, CallingProcess, CallingUser); orchestrator also returns `x-correlation-id` header.
