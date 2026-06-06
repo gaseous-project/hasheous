@@ -54,6 +54,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Prefer async methods: `ExecuteCMDAsync`/`ExecuteCMDDictAsync`; use `await` in controllers/handlers. Avoid blocking sync calls unless there’s no async alternative.
   - Add new migration scripts in `hasheous-lib/Schema` as `hasheous-####.sql` with the next number.
   - Recent migration note: `hasheous-1034.sql` updates `Signatures_Games.Country`/`Language` to `VARCHAR(100)` and adds country-aware composite indexes for ingestion and game matching.
+  - Recent migration note: `hasheous-1035.sql` updates `Signatures_Sources.Url` to nullable `VARCHAR(255)` (from text) so source links are bounded and easier to render safely in the UI.
   - Embedded migration & support file manifest names now start with `hasheous_lib.Schema.` or `hasheous_lib.Support.`. After adding a file, ensure Build Action = EmbeddedResource and verify with `Assembly.GetExecutingAssembly().GetManifestResourceNames()` if debugging mismatches.
 
 - Caching
@@ -311,6 +312,9 @@ Additional example (rating boards):
   - Localization: move all user-visible text to `wwwroot/localisation/en.json` and use `data-lang` attributes or `lang.getLang()` calls.
   - CSS: use CSS variables (`--warning-color`, `--valid-color`, `--invalid-color`) and semantic class names instead of inline styles.
   - Frontend API: use `postData()` function for authenticated requests instead of direct `fetch()` - handles CSRF tokens and authentication cookies automatically.
+  - Sources page behavior: `wwwroot/pages/sources.js` should only render the homepage block when `<source>homepage` has a non-empty localization value; this supports sources such as `generic` that intentionally have no homepage URL.
+  - Source color mapping: add/update source badge colors in `wwwroot/styles/datasourcecolours.css` via `--signature-source-color-<source>` and matching `.color-<source>` rules (for example, `generic`).
+  - Long URL readability: keep wrapping enabled for source/homepage and table link cells (`.source-homepage`, `.tablecell[media-selector="cell_link"]`) so long links do not overflow cards or grids.
   - Data object details admin UI now includes a dedicated tasks panel (`#dataObjectTasksSection`) in `wwwroot/pages/dataobjectdetail.html` rendered by `loadTasksSection()` in `wwwroot/pages/dataobjectdetail.js`; keep role-gating aligned with backend authorization (Admin/Moderator).
 
 ## AI prompt templates
