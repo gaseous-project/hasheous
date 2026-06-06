@@ -815,6 +815,7 @@ pre {
     border-radius: var(--element-border-radius);
     background-color: var(--element-background-color-translucent);
     position: relative;
+    overflow: hidden;
 }
 
 .heading-text {
@@ -835,6 +836,19 @@ pre {
     display: block;
     left: 0px;
     right: 0px;
+}
+
+.source-homepage {
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    word-break: break-all;
+}
+
+.tablecell[media-selector="cell_link"] {
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    word-break: break-all;
+    max-width: 150px;
 }
 
 .dataObjectInsight {

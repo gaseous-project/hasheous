@@ -24,14 +24,16 @@ function loadSourceCounts() {
             description.innerHTML = lang.getLang(key + 'desc');
             sourceBox.appendChild(description);
 
-            let homepage = document.createElement('div');
-            homepage.classList.add('source-homepage');
-            homepage.innerHTML = lang.getLang('homepage') + '<br /><a href="' + lang.getLang(key + 'homepage') + '" target="_blank" rel="noopener noreferrer">' + lang.getLang(key + 'homepage') + '<img src="/images/link.svg" class="linkicon"></a>';
-            sourceBox.appendChild(homepage);
+            if (lang.getLang(key + 'homepage')) {
+                let homepage = document.createElement('div');
+                homepage.classList.add('source-homepage');
+                homepage.innerHTML = lang.getLang('homepage') + '<br /><a href="' + lang.getLang(key + 'homepage') + '" target="_blank" rel="noopener noreferrer">' + lang.getLang(key + 'homepage') + '<img src="/images/link.svg" class="linkicon"></a>';
+                sourceBox.appendChild(homepage);
+            }
 
             let count = document.createElement('div');
             count.classList.add('source-count');
-            count.innerHTML = lang.getLang('romcount') + ': ' + success[key];
+            count.innerHTML = lang.getLang('romcount') + ' ' + success[key];
             sourceBox.appendChild(count);
 
             sourcesTarget.appendChild(sourceBox);
