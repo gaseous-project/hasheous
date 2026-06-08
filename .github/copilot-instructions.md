@@ -12,6 +12,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
 - Architecture & data flow
   - MariaDB/MySQL is the source of truth. On startup, schema is created/migrated via embedded scripts (see `hasheous-lib/Classes/Database.cs::InitDB`, scripts named `hasheous-####.sql`).
   - Signature data is ingested from DAT/XML (TOSEC/No-Intro/etc.) by `Classes/SignatureIngestors/XML.cs` into `Signatures_*` tables.
+  - Signature game import in `Classes/SignatureIngestors/XML.cs` now runs with a bounded worker pool (`MaxConcurrentImportWorkers`, currently 10) that repeatedly processes the next game via `ImportDatRecordInternal(...)` until all parsed games are consumed.
   - Signature ingestion now stores game names from `SortingName` and includes a one-time per-parser migration flag (`HasMigratedToSortingName_<ParserType>`) to migrate legacy name records while preserving alternate-name mappings.
   - Signature game records now also persist country/language variants on `Signatures_Games` (`Country`, `Language`), and migration logic updates legacy null-country rows plus links variant rows back to existing `DataObject_SignatureMap` entries.
   - Public API (versioned) handles lookups like `POST /api/v1/Lookup/ByHash` via `Classes/HashLookup` + `Classes/Database`.
