@@ -39,6 +39,12 @@ namespace Classes.ProcessQueue
                         Directory.CreateDirectory(SignaturePath);
                     }
 
+                    if (parserType == gaseous_signature_parser.parser.SignatureParser.TotalDOSCollection)
+                    {
+                        TotalDOSCollection.MetadataManagement metadataManagement = new TotalDOSCollection.MetadataManagement();
+                        metadataManagement.VerifyDATFile();
+                    }
+
                     await tIngest.Import(SignaturePath, parserType);
                 }
             }
