@@ -3,6 +3,7 @@ using System.Data;
 using System.IO;
 using System.Net;
 using System.Security.Cryptography.Xml;
+using System.Threading;
 using Classes;
 using gaseous_signature_parser.models.RomSignatureObject;
 using hasheous_server.Classes.Metadata.IGDB;
@@ -26,6 +27,8 @@ namespace XML
             public Dictionary<string, int> PlatformIds { get; } = new(StringComparer.OrdinalIgnoreCase);
             public Dictionary<string, int> PublisherIds { get; } = new(StringComparer.OrdinalIgnoreCase);
         }
+
+        private const int MaxConcurrentImportWorkers = 10;
 
         /// <summary>
         /// Imports signature data from XML/DAT files into the database.
@@ -325,11 +328,35 @@ namespace XML
                     }
                     #endregion "Migrate old signature game names to sortingname"
 
-                    for (int x = 0; x < Object.Games.Count; ++x)
+                    if (processGames)
                     {
-                        if (processGames)
+                        int nextGameIndex = -1;
+                        int workerCount = Math.Min(MaxConcurrentImportWorkers, Object.Games.Count);
+
+                        if (workerCount > 0)
                         {
-                            await ImportDatRecordInternal(Object.Games[x], now, sourceId, XMLType, lookupCache);
+                            List<Task> workers = new List<Task>(workerCount);
+
+                            async Task ImportWorkerAsync()
+                            {
+                                while (true)
+                                {
+                                    int gameIndex = Interlocked.Increment(ref nextGameIndex);
+                                    if (gameIndex >= Object.Games.Count)
+                                    {
+                                        break;
+                                    }
+
+                                    await ImportDatRecordInternal(Object.Games[gameIndex], now, sourceId, XMLType, lookupCache);
+                                }
+                            }
+
+                            for (int workerIndex = 0; workerIndex < workerCount; workerIndex++)
+                            {
+                                workers.Add(ImportWorkerAsync());
+                            }
+
+                            await Task.WhenAll(workers);
                         }
                     }
                 }
