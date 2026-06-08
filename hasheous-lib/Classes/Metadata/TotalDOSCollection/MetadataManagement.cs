@@ -25,6 +25,13 @@ namespace TotalDOSCollection
             if (fileSizeInBytes <= fileSizeLimitInBytes)
                 return;
 
+            // remove any existing part files from previous runs to avoid confusion
+            string outputDir = System.IO.Path.GetDirectoryName(datFilePath)!;
+            foreach (var partFile in System.IO.Directory.GetFiles(outputDir, "tdc_daily_*.dat"))
+            {
+                System.IO.File.Delete(partFile);
+            }
+
             // Extract the header from the DAT file — prepended to every part file.
             var header = ExtractHeaderData(datFilePath, HeaderTag);
             string headerString = HeaderTag + " (\n" +
@@ -32,7 +39,6 @@ namespace TotalDOSCollection
                 "\n)";
             int headerByteCount = Encoding.UTF8.GetByteCount(headerString + Environment.NewLine);
 
-            string outputDir = System.IO.Path.GetDirectoryName(datFilePath)!;
             int partNumber = 1;
             StreamWriter? currentWriter = null;
             long currentPartSize = 0;
