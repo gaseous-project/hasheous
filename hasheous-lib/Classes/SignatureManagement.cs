@@ -198,7 +198,7 @@ HAVING
             }
         }
 
-        public object[] SearchSignatures(SignatureSearchModel model)
+        public async Task<object[]> SearchSignatures(SignatureSearchModel model)
         {
             // check for errors in search model
             if (model.Ids == null && model.Name == null)
@@ -320,7 +320,7 @@ HAVING
             {
                 case SignatureSearchModel.SignatureSearchTypes.Game:
                     List<Signatures_Games_2.GameItem> games = new List<Signatures_Games_2.GameItem>();
-                    DataTable gamesData = db.ExecuteCMD(sql, dbDict);
+                    DataTable gamesData = await db.ExecuteCMDAsync(sql, dbDict);
                     foreach (DataRow row in gamesData.Rows)
                     {
                         games.Add(BuildGameItem(row));
@@ -329,7 +329,7 @@ HAVING
 
                 case SignatureSearchModel.SignatureSearchTypes.Rom:
                     List<Signatures_Games_2.RomItem> roms = new List<Signatures_Games_2.RomItem>();
-                    DataTable romsData = db.ExecuteCMD(sql, dbDict);
+                    DataTable romsData = await db.ExecuteCMDAsync(sql, dbDict);
                     foreach (DataRow row in romsData.Rows)
                     {
                         roms.Add(BuildRomItem(row));
@@ -337,7 +337,7 @@ HAVING
                     return roms.ToArray();
 
                 default:
-                    return db.ExecuteCMDDict(sql, dbDict).ToArray();
+                    return (await db.ExecuteCMDDictAsync(sql, dbDict)).ToArray();
             }
         }
 

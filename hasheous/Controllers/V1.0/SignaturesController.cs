@@ -37,7 +37,7 @@ namespace hasheous_server.Controllers.v1_0
         {
             SignatureManagement signature = new SignatureManagement();
 
-            object[] objects = signature.SearchSignatures(model);
+            object[] objects = await signature.SearchSignatures(model);
 
             return Ok(objects);
         }
