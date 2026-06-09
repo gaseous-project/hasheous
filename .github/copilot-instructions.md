@@ -334,3 +334,10 @@ Additional example (rating boards):
 - Await DB calls (`ExecuteCMDAsync`/`ExecuteCMDDictAsync`) and long-running operations.
 - Use `Task.WhenAny` for bounded latency where appropriate (see `LookupController`).
 - Avoid `.Result`/`.Wait()` to prevent thread-pool starvation and deadlocks.
+
+### Async refactor notes (current)
+- `Classes.Database` internal execution path is async end-to-end (`_ExecuteCMD`, `_ExecuteCMDDict`, and `MySQLServerConnector.ExecCMD`) and uses `ExecuteReaderAsync()` for MySQL reads.
+- Keep the synchronous wrappers (`ExecuteCMD` / `ExecuteCMDDict`) as compatibility shims only; prefer async callers and avoid introducing new sync call sites.
+- `DataObjectPermission.GetObjectPermission(...)` and `DataObjectPermission.GetObjectPermissionList(...)` now return `Task<...>` and must be awaited by controller/service callers.
+- `SignatureManagement.SearchSignatures(...)` now returns `Task<object[]>`; API endpoints should `await` it before returning results.
+- For incremental async cleanup, update method signatures and call chains together in one change so no mixed sync/async regressions are introduced.
