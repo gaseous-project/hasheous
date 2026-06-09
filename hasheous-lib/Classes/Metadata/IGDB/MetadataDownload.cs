@@ -316,7 +316,7 @@ namespace InternetGameDatabase
                 db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
                 string tableName = "`igdb`.`" + dump.endpoint.Replace("-", "_") + "`";
                 sql = $"SELECT * FROM information_schema.tables WHERE table_schema = 'igdb' AND table_name = '{dump.endpoint.Replace("-", "_")}' LIMIT 1;";
-                if (db.ExecuteCMD(sql).Rows.Count == 0)
+                if ((await db.ExecuteCMDAsync(sql)).Rows.Count == 0)
                 {
                     // table does not exist, we need to create it
                     Logging.Log(Logging.LogType.Information, "IGDB Dumps", $"Table {tableName} does not exist in the database, creating it...");

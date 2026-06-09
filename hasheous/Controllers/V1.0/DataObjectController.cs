@@ -131,10 +131,10 @@ namespace hasheous_server.Controllers.v1_0
                     }
 
                     DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
-                    DataObject.Permissions = dataObjectPermission.GetObjectPermission(user, ObjectType, DataObject.Id);
+                    DataObject.Permissions = await dataObjectPermission.GetObjectPermission(user, ObjectType, DataObject.Id);
                     if (DataObject.Permissions.Contains(DataObjectPermission.PermissionType.Update))
                     {
-                        DataObject.UserPermissions = dataObjectPermission.GetObjectPermissionList(DataObject.Id);
+                        DataObject.UserPermissions = await dataObjectPermission.GetObjectPermissionList(DataObject.Id);
                     }
                 }
                 else

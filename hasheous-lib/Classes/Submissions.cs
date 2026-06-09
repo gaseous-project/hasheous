@@ -218,7 +218,7 @@ namespace hasheous_server.Classes
                         // check for an existing vote - users only get one vote per game
                         // if a user submits an existing vote, it will be updated
                         string sql = "SELECT * FROM MatchUserVotes WHERE UserId = @userId AND DataObjectId = @dataObjectId AND MetadataSourceId = @metadataSourceId";
-                        DataTable data = db.ExecuteCMD(sql, new Dictionary<string, object>{
+                        DataTable data = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>{
                             { "userId", UserId },
                             { "dataObjectId", dataObjectId },
                             { "metadataSourceId", metadataMatch.Source }
@@ -270,7 +270,7 @@ namespace hasheous_server.Classes
 
             // select all dataobjects that have votes
             string sql = "SELECT DISTINCT DataObjectId FROM MatchUserVotes;";
-            DataTable dataObjectsWithVotes = db.ExecuteCMD(sql);
+            DataTable dataObjectsWithVotes = await db.ExecuteCMDAsync(sql);
 
             DataObjects dataObjects = new DataObjects();
 
@@ -303,7 +303,7 @@ namespace hasheous_server.Classes
                 {
                     // calculate votes
                     sql = "SELECT DataObjectId, MetadataSourceId, MetadataGameId, COUNT(*) AS `Votes` FROM MatchUserVotes WHERE DataObjectId = @dataObjectId AND MetadataSourceId = @metadataSourceId GROUP BY MetadataSourceId, MetadataGameId ORDER BY DataObjectId, MetadataSourceId, `Votes` DESC;";
-                    DataTable data = db.ExecuteCMD(sql, new Dictionary<string, object>{
+                    DataTable data = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>{
                         { "dataObjectId", dataObject.Id },
                         { "metadataSourceId", metadataSource }
                     });
@@ -424,7 +424,7 @@ namespace hasheous_server.Classes
 
             // check if the archive hash already exists in the database against this user
             string sql = "SELECT * FROM UserArchiveObservations WHERE UserId = @userId AND ArchiveMD5 = @md5 AND ArchiveSHA1 = @sha1 AND ArchiveSHA256 = @sha256;";
-            DataTable data = db.ExecuteCMD(sql, new Dictionary<string, object>
+            DataTable data = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>
             {
                 { "userId", UserId },
                 { "md5", model.Archive.MD5 },

@@ -547,7 +547,7 @@ namespace Classes
                 WHERE
                     SignatureId = @sigid AND DataObjectTypeId = @typeid
             ;";
-            DataTable data = db.ExecuteCMD(sql, new Dictionary<string, object>{
+            DataTable data = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>{
                 { "sigid", sigId },
                 { "typeid",  objectType }
             });

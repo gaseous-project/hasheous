@@ -94,7 +94,7 @@ namespace hasheous_server.Classes
                         { "@DataObject_ID", ObjectId },
                         { "@UserId", user.Id }
                     };
-                    DataTable dt = db.ExecuteCMD(sql, parameters);
+                    DataTable dt = await db.ExecuteCMDAsync(sql, parameters);
 
                     if (dt.Rows.Count > 0)
                     {
@@ -142,7 +142,7 @@ namespace hasheous_server.Classes
         /// <remarks>
         /// This method is used to get the permission for the object. It is only relevent for the app object type.
         /// </remarks>
-        public List<PermissionType> GetObjectPermission(Authentication.ApplicationUser user, Classes.DataObjects.DataObjectType ObjectType, long ObjectId)
+        public async Task<List<PermissionType>> GetObjectPermission(Authentication.ApplicationUser user, Classes.DataObjects.DataObjectType ObjectType, long ObjectId)
         {
             if (user == null)
             {
@@ -165,7 +165,7 @@ namespace hasheous_server.Classes
                 { "@DataObject_ID", ObjectId },
                 { "@UserId", user.Id }
             };
-            DataTable dt = db.ExecuteCMD(sql, parameters);
+            DataTable dt = await db.ExecuteCMDAsync(sql, parameters);
 
             List<PermissionType> permissions = new List<PermissionType>();
 
@@ -200,7 +200,7 @@ namespace hasheous_server.Classes
         /// <remarks>
         /// This method is used to get the permission for the object. It is only relevent for the app object type.
         /// </remarks>
-        public Dictionary<string, List<PermissionType>> GetObjectPermissionList(long ObjectId)
+        public async Task<Dictionary<string, List<PermissionType>>> GetObjectPermissionList(long ObjectId)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "SELECT DataObject_ACL.*, Users.Email FROM DataObject_ACL JOIN Users ON DataObject_ACL.UserId = Users.Id WHERE DataObject_ID = @DataObject_ID;";
@@ -208,7 +208,7 @@ namespace hasheous_server.Classes
             {
                 { "@DataObject_ID", ObjectId }
             };
-            DataTable dt = db.ExecuteCMD(sql, parameters);
+            DataTable dt = await db.ExecuteCMDAsync(sql, parameters);
 
             Dictionary<string, List<PermissionType>> permissionsList = new Dictionary<string, List<PermissionType>>();
             foreach (DataRow row in dt.Rows)
