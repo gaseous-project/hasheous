@@ -44,6 +44,8 @@ namespace XML
                 SearchPath = Path.Combine(SearchPath, "DAT");
             }
 
+            List<string> supportedFileTypes = new List<string> { ".xml", ".dat" };
+
             // process provided files
             if (!Directory.Exists(SearchPath))
             {
@@ -73,6 +75,12 @@ namespace XML
             {
                 Logging.Log(Logging.LogType.Information, "Signature Ingest", "(" + (i + 1) + " / " + PathContents.Length + ") Processing " + XMLType.ToString() + " DAT file: " + PathContents[i]);
                 Logging.SendReport(Config.LogName, (i + 1), PathContents.Length, "Processing " + XMLType.ToString() + " DAT file: " + Path.GetFileName(PathContents[i]));
+
+                if (!supportedFileTypes.Contains(Path.GetExtension(PathContents[i]), StringComparer.OrdinalIgnoreCase))
+                {
+                    Logging.Log(Logging.LogType.Information, "Signature Ingest", "Skipping unsupported file type: " + PathContents[i]);
+                    continue;
+                }
 
                 await ProcessDatFile(PathContents[i], XMLDBSearchPath, DBPathContents, XMLType, now, hasMigratedOldSignatureGameNamesToSortingName);
             }
