@@ -28,7 +28,7 @@ namespace XML
             public Dictionary<string, int> PublisherIds { get; } = new(StringComparer.OrdinalIgnoreCase);
         }
 
-        private const int MaxConcurrentImportWorkers = 10;
+        private const int MaxConcurrentImportWorkers = 4;
 
         /// <summary>
         /// Imports signature data from XML/DAT files into the database.
