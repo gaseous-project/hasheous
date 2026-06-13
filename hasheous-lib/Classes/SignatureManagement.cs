@@ -58,19 +58,18 @@ namespace Classes
 
             Dictionary<string, object> dbDict = new Dictionary<string, object>();
             List<string> whereClauses = new List<string>();
-            List<string> tokenSelectClauses = new List<string>();
+            List<string> modelGameMatchClauses = new List<string>();
             int modelCount = 0;
-            int tokenCount = 0;
             foreach (var model in models)
             {
+                List<string> modelWhereClauses = new List<string>();
                 if (model.SHA256 != null)
                 {
                     if (model.SHA256.Length == 64)
                     {
                         whereClauses.Add("Signatures_Roms.SHA256 = @sha256" + modelCount);
-                        tokenSelectClauses.Add("SELECT Signatures_Roms.GameId, 'token" + tokenCount + "' AS HashToken FROM Signatures_Roms WHERE Signatures_Roms.Size > 0 AND Signatures_Roms.SHA256 = @sha256" + modelCount);
+                        modelWhereClauses.Add("sr_model" + modelCount + ".SHA256 = @sha256" + modelCount);
                         dbDict.Add("sha256" + modelCount, model.SHA256);
-                        tokenCount++;
                     }
                 }
                 if (model.SHA1 != null)
@@ -78,9 +77,8 @@ namespace Classes
                     if (model.SHA1.Length == 40)
                     {
                         whereClauses.Add("Signatures_Roms.SHA1 = @sha1" + modelCount);
-                        tokenSelectClauses.Add("SELECT Signatures_Roms.GameId, 'token" + tokenCount + "' AS HashToken FROM Signatures_Roms WHERE Signatures_Roms.Size > 0 AND Signatures_Roms.SHA1 = @sha1" + modelCount);
+                        modelWhereClauses.Add("sr_model" + modelCount + ".SHA1 = @sha1" + modelCount);
                         dbDict.Add("sha1" + modelCount, model.SHA1);
-                        tokenCount++;
                     }
                 }
                 if (model.MD5 != null)
@@ -88,9 +86,8 @@ namespace Classes
                     if (model.MD5.Length == 32)
                     {
                         whereClauses.Add("Signatures_Roms.MD5 = @md5" + modelCount);
-                        tokenSelectClauses.Add("SELECT Signatures_Roms.GameId, 'token" + tokenCount + "' AS HashToken FROM Signatures_Roms WHERE Signatures_Roms.Size > 0 AND Signatures_Roms.MD5 = @md5" + modelCount);
+                        modelWhereClauses.Add("sr_model" + modelCount + ".MD5 = @md5" + modelCount);
                         dbDict.Add("md5" + modelCount, model.MD5);
-                        tokenCount++;
                     }
                 }
                 if (model.CRC != null)
@@ -98,21 +95,24 @@ namespace Classes
                     if (model.CRC.Length == 8)
                     {
                         whereClauses.Add("Signatures_Roms.CRC = @crc" + modelCount);
-                        tokenSelectClauses.Add("SELECT Signatures_Roms.GameId, 'token" + tokenCount + "' AS HashToken FROM Signatures_Roms WHERE Signatures_Roms.Size > 0 AND Signatures_Roms.CRC = @crc" + modelCount);
+                        modelWhereClauses.Add("sr_model" + modelCount + ".CRC = @crc" + modelCount);
                         dbDict.Add("crc" + modelCount, model.CRC);
-                        tokenCount++;
                     }
+                }
+
+                if (modelWhereClauses.Count > 0)
+                {
+                    modelGameMatchClauses.Add("EXISTS (SELECT 1 FROM Signatures_Roms sr_model" + modelCount + " WHERE sr_model" + modelCount + ".GameId = view_Signatures_Games.Id AND sr_model" + modelCount + ".Size > 0 AND (" + string.Join(" OR ", modelWhereClauses) + "))");
                 }
                 modelCount++;
             }
 
-            if (whereClauses.Count > 0 && tokenSelectClauses.Count > 0)
+            if (whereClauses.Count > 0 && modelGameMatchClauses.Count > 0)
             {
                 // lookup the provided hashes
                 Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-                dbDict.Add("requiredHashTokenCount", tokenSelectClauses.Count);
 
-                string sql = "SELECT view_Signatures_Games.*, Signatures_Roms.Id AS romid, Signatures_Roms.Name AS romname, Signatures_Roms.Size, Signatures_Roms.CRC, Signatures_Roms.MD5, Signatures_Roms.SHA1, Signatures_Roms.SHA256, Signatures_Roms.Status, Signatures_Roms.DevelopmentStatus, Signatures_Roms.Attributes, Signatures_Roms.RomType, Signatures_Roms.RomTypeMedia, Signatures_Roms.MediaLabel, Signatures_Roms.MetadataSource, Signatures_Roms.Countries, Signatures_Roms.Languages FROM Signatures_Roms INNER JOIN view_Signatures_Games ON Signatures_Roms.GameId = view_Signatures_Games.Id INNER JOIN (SELECT TokenMatches.GameId FROM (" + string.Join(" UNION ALL ", tokenSelectClauses) + ") AS TokenMatches GROUP BY TokenMatches.GameId HAVING COUNT(DISTINCT TokenMatches.HashToken) = @requiredHashTokenCount) AS QualifiedGames ON QualifiedGames.GameId = Signatures_Roms.GameId WHERE Signatures_Roms.Size > 0 AND (" + string.Join(" OR ", whereClauses) + ")";
+                string sql = "SELECT view_Signatures_Games.*, Signatures_Roms.Id AS romid, Signatures_Roms.Name AS romname, Signatures_Roms.Size, Signatures_Roms.CRC, Signatures_Roms.MD5, Signatures_Roms.SHA1, Signatures_Roms.SHA256, Signatures_Roms.Status, Signatures_Roms.DevelopmentStatus, Signatures_Roms.Attributes, Signatures_Roms.RomType, Signatures_Roms.RomTypeMedia, Signatures_Roms.MediaLabel, Signatures_Roms.MetadataSource, Signatures_Roms.Countries, Signatures_Roms.Languages FROM Signatures_Roms INNER JOIN view_Signatures_Games ON Signatures_Roms.GameId = view_Signatures_Games.Id WHERE Signatures_Roms.Size > 0 AND (" + string.Join(" OR ", whereClauses) + ") AND " + string.Join(" AND ", modelGameMatchClauses);
 
                 DataTable sigDb = await db.ExecuteCMDAsync(sql, dbDict);
 
