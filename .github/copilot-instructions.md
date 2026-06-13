@@ -123,11 +123,11 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 - Data object signature listing for games includes `Signatures_Games.Country`; frontend game signature labels/suggestions append country text in `wwwroot/pages/dataobjectdetail.js` and `wwwroot/pages/dataobjectedit.js`.
 
 ### Multi-hash lookup (new behavior)
-- `GetRawSignatures(...)` accepts a list of `HashLookupModel` where each element specifies one or more hash fields (CRC/MD5/SHA1/SHA256). Each valid hash field generates a typed token subquery using `UNION ALL`; the outer JOIN then uses `HAVING COUNT(DISTINCT HashToken) = N` to require that **all** tokens are matched by the same `GameId`.
-- This means different hashes in different array elements can be on different ROM rows, as long as they belong to the same game.
-- The outer WHERE clause still retains the full `OR` list of hash conditions so only matching ROM rows are returned (same columns/object mapping as before).
-- `tokenCount` tracks how many valid hash tokens were built; `modelCount` is a separate counter used for parameter naming to avoid `dbDict` key collisions across models.
-- Do not deduplicate tokens by value when extending — each new hash field should add its own uniquely-named parameter (`@sha256{modelCount}`, `@crc{modelCount}`, etc.).
+- `GetRawSignatures(...)` accepts an array (`List<HashLookupModel>`) where each element can include one or more hash fields (CRC/MD5/SHA1/SHA256).
+- Within each `HashLookupModel`, hash fields are evaluated as an `OR` group (any valid hash in that element can satisfy the element).
+- Across the array, each element is enforced as an `AND` requirement against the same game id using per-model `EXISTS` clauses bound to `view_Signatures_Games.Id`.
+- Practical effect: different array elements can match different ROM rows, but all elements must resolve under one `GameId` to be returned.
+- `modelCount` is used for uniquely-named SQL parameters and subquery aliases (for example `@sha256{modelCount}`, `sr_model{modelCount}`) to avoid collisions across models.
 
 - Correlation & logging
   - Middleware sets `CallContext` values (CorrelationId, CallingProcess, CallingUser); orchestrator also returns `x-correlation-id` header.
