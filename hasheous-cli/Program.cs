@@ -54,6 +54,7 @@ if (cmdArgs.Length == 1)
     Console.WriteLine("Commands:");
     Console.WriteLine("  user [command] [options] - Manage users");
     Console.WriteLine("  role [command] [options] - Manage roles");
+    Console.WriteLine("  mcp - Start MCP stdio server");
     // Console.WriteLine("  backup [command] [options] - Manage backups");
     // Console.WriteLine("  restore [command] [options] - Restore backups");
     Console.WriteLine("  help - Display this help message");
@@ -69,9 +70,16 @@ if (cmdArgs[1] == "help")
     Console.WriteLine("Commands:");
     Console.WriteLine("  user [command] [options] - Manage users");
     Console.WriteLine("  role [command] [options] - Manage roles");
+    Console.WriteLine("  mcp - Start MCP stdio server");
     // Console.WriteLine("  backup [command] [options] - Manage backups");
     // Console.WriteLine("  restore [command] [options] - Restore backups");
     Console.WriteLine("  help - Display this help message");
+    return;
+}
+
+if (cmdArgs[1] == "mcp")
+{
+    await hasheous_cli.Mcp.McpServer.RunAsync(db);
     return;
 }
 
