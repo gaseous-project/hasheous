@@ -12,6 +12,7 @@ Hasheous is hosted at https://hasheous.org/
 * Proxies the following metadata sources:
   * IGDB
 * Provides an API for developers to submit fixes to data matching
+* Includes a hosted MCP endpoint in the Hasheous API for AI-assisted database queries
 * Is completely free to use
 
 ## Discord Server
@@ -74,6 +75,26 @@ Dockerfile and docker-compose-build.yml files have been provided to make deploym
 3. Open the docker-compose--build.yml file and edit the igdbclientid and igdbclientsecret to the values retrieved from your IGDB account
 4. Run the command ```docker-compose --file docker-compose-build.yml up -d```
 5. Connect to the host on port 7157
+
+## MCP Server
+Full MCP documentation: [`README-MCP.MD`](./README-MCP.MD)
+
+Hasheous includes a hosted MCP JSON-RPC endpoint at:
+
+`POST /api/v1/Mcp`
+
+When client API keys are enforced, include `X-Client-API-Key`.
+
+Hasheous CLI still supports local stdio MCP mode:
+
+```bash
+dotnet run --project hasheous-cli -- mcp
+```
+
+Currently exposed MCP tools:
+- `hasheous_search_games` (search by game name + optional platform, includes ROM/hash data)
+- `hasheous_get_game_details` (full details for a specific game id)
+- `hasheous_lookup_hashes` (find matching games by CRC/MD5/SHA1/SHA256)
 
 # Adding Content
 Currently supported DAT's:
