@@ -2,8 +2,8 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Classes;
 using Classes.Mcp;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using static Authentication.ClientApiKey;
 
 namespace hasheous_server.Controllers.v1_0
 {
@@ -14,7 +14,7 @@ namespace hasheous_server.Controllers.v1_0
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]/")]
     [ApiVersion("1.0")]
-    [ClientApiKey()]
+    [AllowAnonymous]
     [IgnoreAntiforgeryToken]
     public class McpController : ControllerBase
     {

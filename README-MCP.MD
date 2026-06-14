@@ -7,7 +7,13 @@ This document describes the Model Context Protocol (MCP) support in Hasheous.
 - **URL:** `POST /api/v1/Mcp`
 - **Protocol:** JSON-RPC 2.0 request/response payloads
 - **API versioning route:** `api/v{version}/Mcp` (current: `v1`)
-- **Authentication:** `X-Client-API-Key` header when `RequireClientAPIKey` is enabled
+- **Authentication:** none; the endpoint is intentionally public for free database lookups
+
+## Discovery manifest
+
+- **URL:** `GET /.well-known/mcp.json`
+- **Purpose:** publishes a machine-readable MCP manifest so MCP-aware clients can discover the Hasheous server more easily
+- **Authentication:** none
 
 ## Supported JSON-RPC methods
 
@@ -99,6 +105,21 @@ Tool-level validation errors return a successful JSON-RPC envelope with:
 - `result.structuredContent.error`
 
 Protocol-level errors return JSON-RPC `error` objects.
+
+## Discovery manifest shape
+
+The discovery manifest advertises:
+
+- server name/description/version
+- MCP protocol version
+- hosted endpoint URL
+- manifest URL
+- docs URL
+- transport type
+- auth mode
+- supported HTTP methods
+- tool names/descriptions
+- OpenAPI document URL
 
 ## CLI stdio MCP mode
 

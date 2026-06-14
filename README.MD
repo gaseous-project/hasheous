@@ -83,7 +83,11 @@ Hasheous includes a hosted MCP JSON-RPC endpoint at:
 
 `POST /api/v1/Mcp`
 
-When client API keys are enforced, include `X-Client-API-Key`.
+This endpoint is public and does not require authentication.
+
+Discovery manifest:
+
+`GET /.well-known/mcp.json`
 
 Hasheous CLI still supports local stdio MCP mode:
 

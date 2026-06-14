@@ -6,6 +6,8 @@ namespace Classes.Mcp;
 
 public static class McpRequestProcessor
 {
+    public sealed record McpToolDescriptor(string Name, string Description);
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -16,6 +18,13 @@ public static class McpRequestProcessor
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = true
+    };
+
+    public static readonly IReadOnlyList<McpToolDescriptor> ToolDescriptors = new List<McpToolDescriptor>
+    {
+        new("hasheous_search_games", "Search signature games by name and optional platform. Returns game records and optional ROM/hash data."),
+        new("hasheous_get_game_details", "Get detailed game and ROM/hash information for a specific signature game id."),
+        new("hasheous_lookup_hashes", "Find matching games by one or more hashes (crc, md5, sha1, sha256).")
     };
 
     public static async Task<JsonObject?> ProcessRequestAsync(Database db, JsonObject request)
@@ -470,10 +479,11 @@ LIMIT {Math.Max(100, gameIds.Count * maxPerGame)}";
 
     private static JsonObject BuildSearchGamesTool()
     {
+        McpToolDescriptor descriptor = ToolDescriptors[0];
         return new JsonObject
         {
-            ["name"] = "hasheous_search_games",
-            ["description"] = "Search signature games by name and optional platform. Returns game records and optional ROM/hash data.",
+            ["name"] = descriptor.Name,
+            ["description"] = descriptor.Description,
             ["inputSchema"] = new JsonObject
             {
                 ["type"] = "object",
@@ -507,10 +517,11 @@ LIMIT {Math.Max(100, gameIds.Count * maxPerGame)}";
 
     private static JsonObject BuildGetGameDetailsTool()
     {
+        McpToolDescriptor descriptor = ToolDescriptors[1];
         return new JsonObject
         {
-            ["name"] = "hasheous_get_game_details",
-            ["description"] = "Get detailed game and ROM/hash information for a specific signature game id.",
+            ["name"] = descriptor.Name,
+            ["description"] = descriptor.Description,
             ["inputSchema"] = new JsonObject
             {
                 ["type"] = "object",
@@ -529,10 +540,11 @@ LIMIT {Math.Max(100, gameIds.Count * maxPerGame)}";
 
     private static JsonObject BuildLookupHashesTool()
     {
+        McpToolDescriptor descriptor = ToolDescriptors[2];
         return new JsonObject
         {
-            ["name"] = "hasheous_lookup_hashes",
-            ["description"] = "Find matching games by one or more hashes (crc, md5, sha1, sha256).",
+            ["name"] = descriptor.Name,
+            ["description"] = descriptor.Description,
             ["inputSchema"] = new JsonObject
             {
                 ["type"] = "object",
