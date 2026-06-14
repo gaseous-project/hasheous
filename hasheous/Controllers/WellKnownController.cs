@@ -1,5 +1,4 @@
 using System.Reflection;
-using System.Text.Json.Nodes;
 using Classes.Mcp;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -23,31 +22,27 @@ namespace hasheous_server.Controllers
             string openApiUrl = $"{baseUrl}/swagger/v1/swagger.json";
             string? version = Assembly.GetExecutingAssembly().GetName().Version?.ToString();
 
-            JsonArray tools = new JsonArray();
-            foreach (McpRequestProcessor.McpToolDescriptor tool in McpRequestProcessor.ToolDescriptors)
+            var tools = McpRequestProcessor.ToolDescriptors.Select(tool => new
             {
-                tools.Add(new JsonObject
-                {
-                    ["name"] = tool.Name,
-                    ["description"] = tool.Description
-                });
-            }
+                name = tool.Name,
+                description = tool.Description
+            }).ToArray();
 
-            JsonObject manifest = new JsonObject
+            var manifest = new
             {
-                ["name"] = "Hasheous",
-                ["description"] = "Lookup video game signature, ROM hash, and game metadata from the Hasheous database over MCP.",
-                ["version"] = version,
-                ["protocol"] = "MCP",
-                ["protocolVersion"] = "2024-11-05",
-                ["endpoint"] = endpointUrl,
-                ["manifest_url"] = manifestUrl,
-                ["docs"] = documentationUrl,
-                ["transports"] = new JsonArray("streamable-http"),
-                ["auth"] = "none",
-                ["methods"] = new JsonArray("POST"),
-                ["tools"] = tools,
-                ["openapi_spec"] = openApiUrl
+                name = "Hasheous",
+                description = "Lookup video game signature, ROM hash, and game metadata from the Hasheous database over MCP.",
+                version,
+                protocol = "MCP",
+                protocolVersion = "2024-11-05",
+                endpoint = endpointUrl,
+                manifest_url = manifestUrl,
+                docs = documentationUrl,
+                transports = new[] { "streamable-http" },
+                auth = "none",
+                methods = new[] { "POST" },
+                tools,
+                openapi_spec = openApiUrl
             };
 
             Response.Headers["X-Content-Type-Options"] = "nosniff";
