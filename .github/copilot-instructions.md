@@ -16,6 +16,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Signature ingestion now stores game names from `SortingName` and includes a one-time per-parser migration flag (`HasMigratedToSortingName_<ParserType>`) to migrate legacy name records while preserving alternate-name mappings.
   - Signature game records now also persist country/language variants on `Signatures_Games` (`Country`, `Language`), and migration logic updates legacy null-country rows plus links variant rows back to existing `DataObject_SignatureMap` entries.
   - Public API (versioned) handles lookups like `POST /api/v1/Lookup/ByHash` via `Classes/HashLookup` + `Classes/Database`.
+  - MCP is hosted on the public `hasheous` web API at `POST /api/v1/Mcp` (controller: `hasheous/Controllers/V1.0/McpController.cs`; shared processor: `hasheous-lib/Classes/Mcp/McpRequestProcessor.cs`).
   - Redis (Valkey) provides caching if enabled (`Classes/RedisConnection`), otherwise an in-memory cache is used.
   - Separation: the orchestration server exists to separate background tasks from the frontend web server. The frontend web server only services user requests; the orchestrator schedules and runs internal/background work (`QueueProcessor.QueueItems` in `service-orchestrator/Program.cs`). Note the orchestrator has no public endpoints, and should only be called by trusted web servers using the inter-host API key.
 
@@ -41,13 +42,14 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
     - `GET /api/v1/DataObjects/{ObjectType}/{Id}/Tasks` returns all task records for the object.
     - `GET /api/v1/DataObjects/{ObjectType}/{Id}/Tasks/{TaskId}?resetTask=true` returns a single task and optionally resets it.
   - Swagger is enabled with custom schema IDs and API key security definitions.
+  - MCP endpoint route: `POST /api/v1/Mcp` (JSON-RPC over HTTP). Keep MCP internet-facing endpoints in `hasheous` (not `service-orchestrator`).
 
 - Auth & security
   - Identity cookies configured; roles/policies: Admin, Moderator, Member, "Verified Email". Roles are seeded on startup.
   - Role hierarchy: Admin > Moderator > Member. "Verified Email" is a status role (not hierarchical) automatically assigned/removed based on email confirmation status.
   - API keys:
   - User key header `X-API-Key` via `[Authentication.ApiKey.ApiKeyAttribute]` (`ApiKeyAuthorizationFilter` wired in `hasheous/Program.cs`) — identifies individual users and their actions.
-  - Client key header `X-Client-API-Key` via `[Authentication.ClientApiKey.ClientApiKeyAttribute]` — identifies client apps (e.g., Gaseous, Romm); typically required when `Config.RequireClientAPIKey` is true. Required to access the metadata proxy endpoints.
+  - Client key header `X-Client-API-Key` via `[Authentication.ClientApiKey.ClientApiKeyAttribute]` — identifies client apps (e.g., Gaseous, Romm); typically required when `Config.RequireClientAPIKey` is true. Required to access the metadata proxy and MCP endpoints.
   - Inter-host API key for orchestrator calls (see `InterHostApiKey*` and registration in `service-orchestrator/Program.cs`) — security mechanism allowing multiple web server frontends (load-balanced) to securely call the orchestrator.
 
 - Data access & migrations
@@ -96,6 +98,12 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
   - For authenticated endpoints, use `[Authorize]` and access user context via `_userManager.GetUserAsync(User)`.
   - Use `new Classes.Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString)` and `ExecuteCMD/ExecuteCMDDict` for DB work.
   - If caching, build keys with `hasheous.Classes.RedisConnection.GenerateKey(prefix, keyObj)`.
+
+- Add or update MCP tools
+  - Keep transport-specific protocol handling thin (`McpController` for HTTP, `hasheous-cli` for stdio).
+  - Implement tool behavior in shared processor code: `hasheous-lib/Classes/Mcp/McpRequestProcessor.cs`.
+  - For hosted MCP, keep endpoint auth with `[ClientApiKey()]` and route under `api/v{version:apiVersion}/Mcp`.
+  - Update `README-MCP.MD` and `README.MD` MCP link when adding/changing methods/tools.
 
 - Add a background job
   - Edit `service-orchestrator/Program.cs` and add a `QueueProcessor.QueueItem(QueueItemType.YourItem, <minutes>, false)` to `QueueProcessor.QueueItems`.
@@ -166,7 +174,7 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 
 ## Maintenance
 - A PR guard (`.github/workflows/copilot-instructions-guard.yml`) fails when architecture/config files change without updating this file; it prints hints via `.github/scripts/copilot-instructions-help.sh`.
-  - Update this file when: resource namespace conventions change (e.g., `hasheous_lib.*` migration), new cross-cutting utilities like `ComputeObjectPropertyHash` are added, queue coordination semantics are modified, or major framework/dependency updates occur (e.g., .NET version bumps, Swagger/OpenAPI package upgrades).
+  - Update this file when: resource namespace conventions change (e.g., `hasheous_lib.*` migration), new cross-cutting utilities like `ComputeObjectPropertyHash` are added, queue coordination semantics are modified, MCP routing/tooling/auth changes, or major framework/dependency updates occur (e.g., .NET version bumps, Swagger/OpenAPI package upgrades).
 
 ## API key usage examples
 - User API key (header `X-API-Key`):
