@@ -125,11 +125,13 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 - Raw-body POST endpoints and Swagger documentation
   - `LookupPost` (`POST /api/v1/Lookup/ByHash`) accepts a raw JSON body instead of a bound model parameter. The action reads `Request.Body` directly via `StreamReader` and calls `JsonDocument.Parse(...)` manually.
   - This avoids ASP.NET Core model binding requiring a named form/query field; the body can be a JSON object `{"crc":"..."}` or a JSON array `[{"crc":"..."},{"md5":"..."}]`. A quoted JSON string containing an object/array is also accepted.
+  - `LookupController` validates request payloads manually and rejects explicit zero-byte hashes with `400 Bad Request` before the database lookup runs.
   - Because there is no bindable parameter, Swagger cannot infer the request body automatically. Use an `IOperationFilter` to inject the `OpenApiRequestBody` manually for such actions. The filter `LookupRequestBodyOperationFilter` in `hasheous-lib/Classes/SwaggerLookupRequestBodyFilter.cs` is the reference implementation; register it with `options.OperationFilter<LookupRequestBodyOperationFilter>()` in `StartupExtensions.cs`.
   - When adding other raw-body endpoints, follow this same pattern: read body manually in the action and add a dedicated `IOperationFilter` for Swagger documentation.
 
 ## Signature lookup behavior
 - `SignatureManagement.GetRawSignatures(...)` excludes zero-size ROM signature rows by default (`Signatures_Roms.Size > 0`) before hash-condition matching.
+- `LookupController` now rejects explicit zero-byte hashes early for both raw-body `POST /api/v1/Lookup/ByHash` and direct `GET /api/v1/Lookup/ByHash/{hash}` routes, returning `400 Bad Request` rather than querying the signature database.
 - Keep the non-zero-size filter when extending hash lookup SQL unless a feature explicitly requires zero-byte signatures.
 - `SignatureManagement.BuildGameItem(...)` currently populates both singular and plural dictionary properties for compatibility: `Country` and `Countries`, `Language` and `Languages`.
 - Data object signature listing for games includes `Signatures_Games.Country`; frontend game signature labels/suggestions append country text in `wwwroot/pages/dataobjectdetail.js` and `wwwroot/pages/dataobjectedit.js`.
