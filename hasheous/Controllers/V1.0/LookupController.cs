@@ -18,6 +18,11 @@ namespace hasheous_server.Controllers.v1_0
     [Insight(Insights.InsightSourceType.HashLookup)]
     public class LookupController : ControllerBase
     {
+        private static string zeroByteMD5 = "d41d8cd98f00b204e9800998ecf8427e";
+        private static string zeroByteSHA1 = "da39a3ee5e6b4b0d3255bfef95601890afd80709";
+        private static string zeroByteSHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+        private static string zeroByteCRC = "00000000";
+
         /// <summary>
         /// Look up the signature coresponding to the provided MD5 and SHA1 hash - and if available, any mapped metadata ids
         /// </summary>
@@ -146,6 +151,12 @@ namespace hasheous_server.Controllers.v1_0
                     return BadRequest("Invalid model payload. Provide at least one hash field (MD5, SHA1, SHA256, CRC).");
                 }
 
+                // fail on obvious zero byte hashes to avoid unnecessary lookups
+                if (modelList.Count == 1 && modelList.Any(x => x.MD5 == zeroByteMD5 || x.SHA1 == zeroByteSHA1 || x.SHA256 == zeroByteSHA256 || x.CRC == zeroByteCRC))
+                {
+                    return BadRequest("Invalid model payload. Zero-byte hashes are not allowed.");
+                }
+
                 HashLookup hashLookup = new HashLookup(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), modelList, returnAllSources, returnFields, returnSourcesList);
                 var lookupTask = hashLookup.PerformLookup(true);
                 if (await Task.WhenAny(lookupTask, Task.Delay(TimeSpan.FromSeconds(10))) == lookupTask)
@@ -197,6 +208,12 @@ namespace hasheous_server.Controllers.v1_0
         [Route("ByHash/crc/{crc}")]
         public async Task<IActionResult> LookupGet(string? md5, string? sha1, string? sha256, string? crc)
         {
+            // fail on obvious zero byte hashes to avoid unnecessary lookups
+            if (md5 == zeroByteMD5 || sha1 == zeroByteSHA1 || sha256 == zeroByteSHA256 || crc == zeroByteCRC)
+            {
+                return BadRequest("Invalid hash provided. Zero-byte hashes are not allowed.");
+            }
+
             try
             {
                 HashLookup hashLookup = new HashLookup(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), new List<hasheous_server.Models.HashLookupModel>
