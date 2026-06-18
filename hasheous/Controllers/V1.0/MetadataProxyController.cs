@@ -488,6 +488,36 @@ namespace hasheous_server.Controllers.v1_0
 
         private static HttpClient client = new HttpClient();
 
+        private async Task<IActionResult?> TryServeFromLocalOrS3Async(string localFilePath, string s3Key, string fallbackContentType)
+        {
+            StorageFallbackResolver resolver = new StorageFallbackResolver();
+            string bucketName = Config.S3StorageConfiguration.DefaultBucket;
+
+            ResolvedContentStream? resolved = await resolver.ResolveReadStreamAsync(localFilePath, bucketName, s3Key);
+            if (resolved == null)
+            {
+                return null;
+            }
+
+            HttpContext.Response.RegisterForDispose(resolved);
+
+            string contentType = string.IsNullOrWhiteSpace(resolved.ContentType) ? fallbackContentType : resolved.ContentType;
+            return File(resolved.Stream, contentType);
+        }
+
+        private void ScheduleLocalCacheUploadToS3(string localFilePath, string s3Key)
+        {
+            if (!Config.S3StorageConfiguration.Enabled)
+            {
+                return;
+            }
+
+            StorageFallbackResolver resolver = new StorageFallbackResolver();
+            string bucketName = Config.S3StorageConfiguration.DefaultBucket;
+
+            HttpContext.Response.OnCompleted(() => resolver.UploadLocalFileToS3Async(localFilePath, bucketName, s3Key, overwrite: false));
+        }
+
         /// <summary>
         /// Get image from IGDB
         /// </summary>
@@ -513,6 +543,7 @@ namespace hasheous_server.Controllers.v1_0
 
             string imageDirectory = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB, "Images");
             string imagePath = Path.Combine(imageDirectory, ImageId + ".jpg");
+            string s3Key = $"IGDB/Images/{ImageId}.jpg";
 
             // create directory if it doesn't exist
             if (!System.IO.Directory.Exists(imageDirectory))
@@ -520,79 +551,70 @@ namespace hasheous_server.Controllers.v1_0
                 System.IO.Directory.CreateDirectory(imageDirectory);
             }
 
-            // check if image exists
-            if (System.IO.File.Exists(imagePath))
+            IActionResult? cachedResult = await TryServeFromLocalOrS3Async(imagePath, s3Key, "image/jpeg");
+            if (cachedResult != null)
             {
-                // check the file is non-zero length
-                FileInfo fileInfo = new FileInfo(imagePath);
-                if (fileInfo.Length == 0)
-                {
-                    System.IO.File.Delete(imagePath);
-                    return NotFound();
-                }
-
-                return PhysicalFile(imagePath, "image/jpeg");
+                return cachedResult;
             }
-            else
+
+            // get image from IGDB
+            string url = String.Format("https://images.igdb.com/igdb/image/upload/t_{0}/{1}.jpg", "original", ImageId);
+
+            // download image from url
+            try
             {
-                // get image from IGDB
-                string url = String.Format("https://images.igdb.com/igdb/image/upload/t_{0}/{1}.jpg", "original", ImageId);
-
-                // download image from url
-                try
+                using (HttpResponseMessage response = client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).Result)
                 {
-                    using (HttpResponseMessage response = client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).Result)
+                    response.EnsureSuccessStatusCode();
+
+                    using (Stream contentStream = await response.Content.ReadAsStreamAsync(), fileStream = new FileStream(imagePath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true))
                     {
-                        response.EnsureSuccessStatusCode();
+                        var totalRead = 0L;
+                        var totalReads = 0L;
+                        var buffer = new byte[8192];
+                        var isMoreToRead = true;
 
-                        using (Stream contentStream = await response.Content.ReadAsStreamAsync(), fileStream = new FileStream(imagePath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true))
+                        do
                         {
-                            var totalRead = 0L;
-                            var totalReads = 0L;
-                            var buffer = new byte[8192];
-                            var isMoreToRead = true;
-
-                            do
+                            var read = await contentStream.ReadAsync(buffer, 0, buffer.Length);
+                            if (read == 0)
                             {
-                                var read = await contentStream.ReadAsync(buffer, 0, buffer.Length);
-                                if (read == 0)
-                                {
-                                    isMoreToRead = false;
-                                }
-                                else
-                                {
-                                    await fileStream.WriteAsync(buffer, 0, read);
+                                isMoreToRead = false;
+                            }
+                            else
+                            {
+                                await fileStream.WriteAsync(buffer, 0, read);
 
-                                    totalRead += read;
-                                    totalReads += 1;
+                                totalRead += read;
+                                totalReads += 1;
 
-                                    if (totalReads % 2000 == 0)
-                                    {
-                                        Console.WriteLine(string.Format("total bytes downloaded so far: {0:n0}", totalRead));
-                                    }
+                                if (totalReads % 2000 == 0)
+                                {
+                                    Console.WriteLine(string.Format("total bytes downloaded so far: {0:n0}", totalRead));
                                 }
                             }
-                            while (isMoreToRead);
                         }
+                        while (isMoreToRead);
                     }
-
-                    if (System.IO.File.Exists(imagePath))
-                    {
-                        // check the file is non-zero length
-                        FileInfo fileInfo = new FileInfo(imagePath);
-                        if (fileInfo.Length == 0)
-                        {
-                            System.IO.File.Delete(imagePath);
-                            return NotFound();
-                        }
-                    }
-
-                    return PhysicalFile(imagePath, "image/jpeg");
                 }
-                catch
+
+                if (System.IO.File.Exists(imagePath))
                 {
-                    return NotFound();
+                    // check the file is non-zero length
+                    FileInfo fileInfo = new FileInfo(imagePath);
+                    if (fileInfo.Length == 0)
+                    {
+                        System.IO.File.Delete(imagePath);
+                        return NotFound();
+                    }
                 }
+
+                ScheduleLocalCacheUploadToS3(imagePath, s3Key);
+                return PhysicalFile(imagePath, "image/jpeg");
+            }
+            catch
+            {
+                return NotFound();
             }
         }
 
@@ -628,6 +650,7 @@ namespace hasheous_server.Controllers.v1_0
             }
             string imageFile = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_TheGamesDb, "Images", ImageSize.ToString(), FileName);
             string imagePath = Path.GetDirectoryName(imageFile);
+            string s3Key = $"TheGamesDB/Images/{ImageSize}/{FileName}";
 
             // create directory if it doesn't exist
             if (!Directory.Exists(imagePath))
@@ -635,9 +658,26 @@ namespace hasheous_server.Controllers.v1_0
                 Directory.CreateDirectory(imagePath);
             }
 
-            // check if image exists
-            if (System.IO.File.Exists(imageFile))
+            IActionResult? cachedResult = await TryServeFromLocalOrS3Async(imageFile, s3Key, "image/jpeg");
+            if (cachedResult != null)
             {
+                return cachedResult;
+            }
+
+            // download image from url
+            try
+            {
+                Uri theGamesDBUri = new Uri("https://cdn.thegamesdb.net/images/" + ImageSize.ToString() + "/" + FileName);
+
+                DownloadManager downloadManager = new DownloadManager();
+                var result = downloadManager.DownloadFile(theGamesDBUri.ToString(), imageFile);
+
+                // wait until result is completed
+                while (result.IsCompleted == false)
+                {
+                    Thread.Sleep(1000);
+                }
+
                 // check the file is non-zero length
                 FileInfo fileInfo = new FileInfo(imageFile);
                 if (fileInfo.Length == 0)
@@ -646,38 +686,12 @@ namespace hasheous_server.Controllers.v1_0
                     return NotFound();
                 }
 
+                ScheduleLocalCacheUploadToS3(imageFile, s3Key);
                 return PhysicalFile(imageFile, "image/jpeg");
             }
-            else
+            catch
             {
-                // download image from url
-                try
-                {
-                    Uri theGamesDBUri = new Uri("https://cdn.thegamesdb.net/images/" + ImageSize.ToString() + "/" + FileName);
-
-                    DownloadManager downloadManager = new DownloadManager();
-                    var result = downloadManager.DownloadFile(theGamesDBUri.ToString(), imageFile);
-
-                    // wait until result is completed
-                    while (result.IsCompleted == false)
-                    {
-                        Thread.Sleep(1000);
-                    }
-
-                    // check the file is non-zero length
-                    FileInfo fileInfo = new FileInfo(imageFile);
-                    if (fileInfo.Length == 0)
-                    {
-                        System.IO.File.Delete(imageFile);
-                        return NotFound();
-                    }
-
-                    return PhysicalFile(imageFile, "image/jpeg");
-                }
-                catch
-                {
-                    return NotFound();
-                }
+                return NotFound();
             }
         }
 
@@ -1226,7 +1240,7 @@ namespace hasheous_server.Controllers.v1_0
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [Route("GiantBomb/a/uploads/{*GiantBombImagePath}")]
         [ResponseCache(CacheProfileName = "7Days")]
-        public IActionResult GetGiantBombImage(string GiantBombImagePath)
+        public async Task<IActionResult> GetGiantBombImage(string GiantBombImagePath)
         {
             GiantBombImagePath = System.Uri.UnescapeDataString(GiantBombImagePath);
             if (GiantBombImagePath.Contains("..") || GiantBombImagePath.Contains("\\"))
@@ -1239,6 +1253,7 @@ namespace hasheous_server.Controllers.v1_0
             }
             string imageFile = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_GiantBomb, "Images", GiantBombImagePath);
             string imagePath = Path.GetDirectoryName(imageFile);
+            string s3Key = $"GiantBomb/Images/{GiantBombImagePath}";
 
             // create directory if it doesn't exist
             if (!Directory.Exists(imagePath))
@@ -1246,9 +1261,26 @@ namespace hasheous_server.Controllers.v1_0
                 Directory.CreateDirectory(imagePath);
             }
 
-            // check if image exists
-            if (System.IO.File.Exists(imageFile))
+            IActionResult? cachedResult = await TryServeFromLocalOrS3Async(imageFile, s3Key, "image/jpeg");
+            if (cachedResult != null)
             {
+                return cachedResult;
+            }
+
+            // download image from url
+            try
+            {
+                Uri giantBombUri = new Uri("https://www.giantbomb.com/a/uploads/" + GiantBombImagePath);
+
+                DownloadManager downloadManager = new DownloadManager();
+                var result = downloadManager.DownloadFile(giantBombUri.ToString(), imageFile);
+
+                // wait until result is completed
+                while (result.IsCompleted == false)
+                {
+                    Thread.Sleep(1000);
+                }
+
                 // check the file is non-zero length
                 FileInfo fileInfo = new FileInfo(imageFile);
                 if (fileInfo.Length == 0)
@@ -1257,38 +1289,12 @@ namespace hasheous_server.Controllers.v1_0
                     return NotFound();
                 }
 
+                ScheduleLocalCacheUploadToS3(imageFile, s3Key);
                 return PhysicalFile(imageFile, "image/jpeg");
             }
-            else
+            catch
             {
-                // download image from url
-                try
-                {
-                    Uri giantBombUri = new Uri("https://www.giantbomb.com/a/uploads/" + GiantBombImagePath);
-
-                    DownloadManager downloadManager = new DownloadManager();
-                    var result = downloadManager.DownloadFile(giantBombUri.ToString(), imageFile);
-
-                    // wait until result is completed
-                    while (result.IsCompleted == false)
-                    {
-                        Thread.Sleep(1000);
-                    }
-
-                    // check the file is non-zero length
-                    FileInfo fileInfo = new FileInfo(imageFile);
-                    if (fileInfo.Length == 0)
-                    {
-                        System.IO.File.Delete(imageFile);
-                        return NotFound();
-                    }
-
-                    return PhysicalFile(imageFile, "image/jpeg");
-                }
-                catch
-                {
-                    return NotFound();
-                }
+                return NotFound();
             }
         }
         #endregion GiantBomb
@@ -1342,6 +1348,7 @@ namespace hasheous_server.Controllers.v1_0
             string fileName = $"{MetadataSourceName}_{GameID}.bundle";
             FileInfo? fileInfo;
             string bundleFilePath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataBundlesDirectory, fileName);
+            string s3Key = $"Bundles/{fileName}";
             bool buildNewBundle = true;
             if (System.IO.File.Exists(bundleFilePath))
             {
@@ -1349,8 +1356,23 @@ namespace hasheous_server.Controllers.v1_0
                 fileInfo = new FileInfo(bundleFilePath);
                 if ((DateTime.Now - fileInfo.LastWriteTime).TotalDays <= Config.MetadataConfiguration.MetadataBundle_MaxAgeInDays)
                 {
-                    // return the existing bundle
-                    buildNewBundle = false;
+                    IActionResult? cachedResult = await TryServeFromLocalOrS3Async(bundleFilePath, s3Key, "application/octet-stream");
+                    if (cachedResult != null)
+                    {
+                        return cachedResult;
+                    }
+
+                    // Rebuild if the existing bundle cannot be served.
+                    buildNewBundle = true;
+                }
+            }
+
+            if (buildNewBundle == true && !System.IO.File.Exists(bundleFilePath))
+            {
+                IActionResult? cachedResult = await TryServeFromLocalOrS3Async(bundleFilePath, s3Key, "application/octet-stream");
+                if (cachedResult != null)
+                {
+                    return cachedResult;
                 }
             }
 
@@ -1440,10 +1462,9 @@ namespace hasheous_server.Controllers.v1_0
                                             if (item.Key == "image_id")
                                             {
                                                 string imageID = item.Value.ToString() ?? "";
-                                                PhysicalFileResult? imageFileData = (PhysicalFileResult?)await GetImage(imageID);
-                                                if (imageFileData != null)
+                                                if (await GetImage(imageID) is FileResult imageFileData)
                                                 {
-                                                    await _AddFileToBundle(tempWorkingDir, imageProperty, imageFileData);
+                                                    await _AddFileToBundle(tempWorkingDir, imageProperty, imageFileData, imageID + ".jpg");
                                                 }
                                             }
                                         }
@@ -1457,10 +1478,9 @@ namespace hasheous_server.Controllers.v1_0
                                             if (imageObj != null && imageObj.ContainsKey("image_id"))
                                             {
                                                 string imageID = imageObj["image_id"].ToString() ?? "";
-                                                PhysicalFileResult? imageFileData = (PhysicalFileResult?)await GetImage(imageID);
-                                                if (imageFileData != null)
+                                                if (await GetImage(imageID) is FileResult imageFileData)
                                                 {
-                                                    await _AddFileToBundle(tempWorkingDir, imageProperty, imageFileData);
+                                                    await _AddFileToBundle(tempWorkingDir, imageProperty, imageFileData, imageID + ".jpg");
                                                 }
                                             }
                                         }
@@ -1507,10 +1527,9 @@ namespace hasheous_server.Controllers.v1_0
                                 foreach (var image in imageObj)
                                 {
                                     string imagePath = image.filename ?? "";
-                                    PhysicalFileResult? imageFileData = (PhysicalFileResult?)await GetTheGamesDBImage(MetadataQuery.imageSize.original, imagePath);
-                                    if (imageFileData != null)
+                                    if (await GetTheGamesDBImage(MetadataQuery.imageSize.original, imagePath) is FileResult imageFileData)
                                     {
-                                        await _AddFileToBundle(tempWorkingDir, image.type, imageFileData);
+                                        await _AddFileToBundle(tempWorkingDir, image.type, imageFileData, Path.GetFileName(imagePath));
                                     }
                                 }
                             }
@@ -1526,6 +1545,8 @@ namespace hasheous_server.Controllers.v1_0
                 }
 
                 ZipFile.CreateFromDirectory(tempWorkingDir, bundleFilePath, CompressionLevel.Fastest, false);
+
+                ScheduleLocalCacheUploadToS3(bundleFilePath, s3Key);
 
                 // clean up the temporary working directory
                 Directory.Delete(tempWorkingDir, true);
@@ -1548,7 +1569,7 @@ namespace hasheous_server.Controllers.v1_0
             await System.IO.File.WriteAllTextAsync(metadataFilePath, metadata);
         }
 
-        private async Task _AddFileToBundle(string tempBundleDir, string relativePathInBundle, PhysicalFileResult fileData)
+        private async Task _AddFileToBundle(string tempBundleDir, string relativePathInBundle, FileResult fileData, string fileNameHint)
         {
             // create the directory if it doesn't exist
             string fileDir = Path.Combine(tempBundleDir, relativePathInBundle);
@@ -1558,29 +1579,62 @@ namespace hasheous_server.Controllers.v1_0
                 Directory.CreateDirectory(fileDir);
             }
 
-            // PhysicalFileResult provides a physical path via FileName; copy from disk
-            string? sourcePath = fileData.FileName;
-            // Only use the basename for the bundle, not the full source path
-            string destFileName = Path.GetFileName(sourcePath ?? string.Empty);
-            string filePathInBundle = Path.Combine(fileDir, destFileName);
-            if (string.IsNullOrWhiteSpace(sourcePath) || !System.IO.File.Exists(sourcePath))
+            string destFileName = Path.GetFileName(fileNameHint);
+            if (string.IsNullOrWhiteSpace(destFileName))
             {
-                throw new FileNotFoundException("Source file for bundle not found.", sourcePath ?? "<null>");
+                destFileName = Guid.NewGuid().ToString("N");
             }
 
-            // Avoid copying a file onto itself
-            if (string.Equals(Path.GetFullPath(sourcePath), Path.GetFullPath(filePathInBundle), StringComparison.OrdinalIgnoreCase))
+            string filePathInBundle = Path.Combine(fileDir, destFileName);
+
+            if (fileData is PhysicalFileResult physicalFile)
             {
+                string? sourcePath = physicalFile.FileName;
+                if (string.IsNullOrWhiteSpace(sourcePath) || !System.IO.File.Exists(sourcePath))
+                {
+                    throw new FileNotFoundException("Source file for bundle not found.", sourcePath ?? "<null>");
+                }
+
+                // Avoid copying a file onto itself
+                if (string.Equals(Path.GetFullPath(sourcePath), Path.GetFullPath(filePathInBundle), StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                // copy the file data to the bundle
+                // Use explicit streams with read sharing to minimize "file in use" issues
+                using (var sourceStream = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                using (var destStream = new FileStream(filePathInBundle, FileMode.Create, FileAccess.Write, FileShare.None))
+                {
+                    await sourceStream.CopyToAsync(destStream);
+                }
+
                 return;
             }
 
-            // copy the file data to the bundle
-            // Use explicit streams with read sharing to minimize "file in use" issues
-            using (var sourceStream = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read))
-            using (var destStream = new FileStream(filePathInBundle, FileMode.Create, FileAccess.Write, FileShare.None))
+            if (fileData is FileStreamResult streamResult)
             {
-                await sourceStream.CopyToAsync(destStream);
+                Stream sourceStream = streamResult.FileStream;
+                if (sourceStream.CanSeek)
+                {
+                    sourceStream.Position = 0;
+                }
+
+                await using (var destStream = new FileStream(filePathInBundle, FileMode.Create, FileAccess.Write, FileShare.None))
+                {
+                    await sourceStream.CopyToAsync(destStream);
+                }
+
+                return;
             }
+
+            if (fileData is FileContentResult contentResult)
+            {
+                await System.IO.File.WriteAllBytesAsync(filePathInBundle, contentResult.FileContents);
+                return;
+            }
+
+            throw new InvalidOperationException($"Unsupported file result type for bundle input: {fileData.GetType().Name}");
         }
 
         #endregion MetadataBundles

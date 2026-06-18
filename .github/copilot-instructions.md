@@ -19,6 +19,9 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - MCP is hosted on the public `hasheous` web API at `POST /api/v1/Mcp` (controller: `hasheous/Controllers/V1.0/McpController.cs`; shared processor: `hasheous-lib/Classes/Mcp/McpRequestProcessor.cs`).
   - MCP discovery is published at `GET /.well-known/mcp.json` (controller: `hasheous/Controllers/WellKnownController.cs`) and should point clients to the hosted MCP endpoint.
   - Redis (Valkey) provides caching if enabled (`Classes/RedisConnection`), otherwise an in-memory cache is used.
+  - Metadata file caching now supports optional S3-compatible object storage fallback (including MinIO) via shared helpers in `hasheous-lib/Classes/S3StorageTools.cs` and `hasheous-lib/Classes/StorageFallbackResolver.cs`.
+  - Metadata proxy image and bundle routes use local-disk first, then S3 fallback, and fail open: if S3 is unavailable they fall back to existing provider fetch/build behavior without surfacing S3 errors to clients.
+  - S3 uploads for newly downloaded/built files are scheduled on response completion (`HttpContext.Response.OnCompleted`) so client download latency is not blocked by object-store upload time.
   - Separation: the orchestration server exists to separate background tasks from the frontend web server. The frontend web server only services user requests; the orchestrator schedules and runs internal/background work (`QueueProcessor.QueueItems` in `service-orchestrator/Program.cs`). Note the orchestrator has no public endpoints, and should only be called by trusted web servers using the inter-host API key.
 
 - Run & debug (local)
@@ -29,8 +32,12 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
 
 - Configuration
   - File: `~/.hasheous-server/config.json` (auto-updated on startup by `Config.UpdateConfig()`). Env vars (used by Docker): `dbhost`, `dbuser`, `dbpass`, `igdbclientid`, `igdbclientsecret`, `redisenabled`, `redishost`, `redisport`, `reportingserverurl`, etc.
+  - S3 config (`Config.S3StorageConfiguration`): `Enabled`, `Region`, `ServiceUrl`, `AccessKey`, `SecretKey`, `SessionToken`, `ForcePathStyle`, `DefaultBucket`.
+  - S3 env vars: `s3enabled`, `s3region`, `s3serviceurl`, `s3accesskey`, `s3secretkey`, `s3sessiontoken`, `s3forcepathstyle`.
+  - For MinIO and similar S3-compatible endpoints, use host-only `ServiceUrl` (for example `https://s3.mrgtech.net`) and typically set `ForcePathStyle = true`.
+  - S3 fallback is effectively disabled when either `Enabled` is false or bucket/key inputs are missing.
   - Temporary metadata bundle workspace is configured via `Config.LibraryConfiguration.LibraryTemporaryBundlesDirectory` (defaults to `Path.Combine(Path.GetTempPath(), "Bundles")`).
-  - Development mode disables client API key requirement (`Config.RequireClientAPIKey = false`) and enables developer exception page.
+  - Development mode disables client API key requirement by setting `Config.RequireClientAPIKey = false` in `hasheous/StartupExtensions.cs` (`ConfigureDevelopmentModeAsync`) and enables developer exception page.
   - GiantBomb: set `gbapikey` env var (or update config.json) to enable GiantBomb metadata ingestion & proxy; optional `BaseURL` override (defaults to `https://www.giantbomb.com/`).
   - SteamGridDB: set `sgdbapikey` env var (or update config.json -> `SteamGridDBConfiguration.APIKey`) to enable SteamGridDB metadata matching.
 
@@ -45,6 +52,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Swagger is enabled with custom schema IDs and API key security definitions.
   - MCP endpoint route: `POST /api/v1/Mcp` (JSON-RPC over HTTP). Keep MCP internet-facing endpoints in `hasheous` (not `service-orchestrator`).
   - Discovery route: `GET /.well-known/mcp.json` for client/server discovery metadata.
+  - Metadata proxy file routes (`IGDB/Image`, `TheGamesDB/Images`, `GiantBomb/a/uploads`, and `Bundles/{MetadataSourceName}/{GameID}.bundle`) may return either physical-file or stream-backed file results depending on cache source; do not assume `PhysicalFileResult` only when consuming these actions internally.
   - MCP lookups are intentionally public: the hosted MCP controller uses `[AllowAnonymous]` rather than API key auth.
 
 - Auth & security
