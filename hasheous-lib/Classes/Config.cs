@@ -158,6 +158,17 @@ namespace Classes
         }
 
         /// <summary>
+        /// Gets the S3 storage configuration settings.
+        /// </summary>
+        public static ConfigFile.S3Storage S3StorageConfiguration
+        {
+            get
+            {
+                return _config.S3StorageConfiguration;
+            }
+        }
+
+        /// <summary>
         /// Gets the social authentication configuration settings.
         /// </summary>
         public static ConfigFile.SocialAuth SocialAuthConfiguration
@@ -598,6 +609,11 @@ namespace Classes
             /// Gets or sets the SteamGridDB configuration settings.
             /// </summary>
             public SteamGridDB SteamGridDBConfiguration = new SteamGridDB();
+
+            /// <summary>
+            /// Gets or sets the S3 storage configuration settings.
+            /// </summary>
+            public S3Storage S3StorageConfiguration = new S3Storage();
 
             /// <summary>
             /// Gets or sets the social authentication configuration settings.
@@ -1456,6 +1472,164 @@ namespace Classes
                 /// Gets or sets the API key used for authenticating requests to the SteamGridDB service.
                 /// </summary>
                 public string APIKey = _DefaultAPIKey;
+            }
+
+            /// <summary>
+            /// Represents the S3 storage configuration settings.
+            /// </summary>
+            public class S3Storage
+            {
+                private static bool _Enabled
+                {
+                    get
+                    {
+                        string? envVar = Environment.GetEnvironmentVariable("s3enabled");
+                        if (!String.IsNullOrEmpty(envVar))
+                        {
+                            return bool.Parse(envVar);
+                        }
+                        else
+                        {
+                            return false;
+                        }
+                    }
+                }
+
+                private static string _Region
+                {
+                    get
+                    {
+                        string? envVar = Environment.GetEnvironmentVariable("s3region");
+                        if (!String.IsNullOrEmpty(envVar))
+                        {
+                            return envVar;
+                        }
+                        else
+                        {
+                            return "us-east-1";
+                        }
+                    }
+                }
+
+                private static string _ServiceUrl
+                {
+                    get
+                    {
+                        string? envVar = Environment.GetEnvironmentVariable("s3serviceurl");
+                        if (!String.IsNullOrEmpty(envVar))
+                        {
+                            return envVar;
+                        }
+                        else
+                        {
+                            return "";
+                        }
+                    }
+                }
+
+                private static string _AccessKey
+                {
+                    get
+                    {
+                        string? envVar = Environment.GetEnvironmentVariable("s3accesskey");
+                        if (!String.IsNullOrEmpty(envVar))
+                        {
+                            return envVar;
+                        }
+                        else
+                        {
+                            return "";
+                        }
+                    }
+                }
+
+                private static string _SecretKey
+                {
+                    get
+                    {
+                        string? envVar = Environment.GetEnvironmentVariable("s3secretkey");
+                        if (!String.IsNullOrEmpty(envVar))
+                        {
+                            return envVar;
+                        }
+                        else
+                        {
+                            return "";
+                        }
+                    }
+                }
+
+                private static string _SessionToken
+                {
+                    get
+                    {
+                        string? envVar = Environment.GetEnvironmentVariable("s3sessiontoken");
+                        if (!String.IsNullOrEmpty(envVar))
+                        {
+                            return envVar;
+                        }
+                        else
+                        {
+                            return "";
+                        }
+                    }
+                }
+
+                private static bool _ForcePathStyle
+                {
+                    get
+                    {
+                        string? envVar = Environment.GetEnvironmentVariable("s3forcepathstyle");
+                        if (!String.IsNullOrEmpty(envVar))
+                        {
+                            return bool.Parse(envVar);
+                        }
+                        else
+                        {
+                            return false;
+                        }
+                    }
+                }
+
+                /// <summary>
+                /// Gets or sets a value indicating whether S3 storage support is enabled.
+                /// </summary>
+                public bool Enabled = _Enabled;
+
+                /// <summary>
+                /// Gets or sets the AWS region used when connecting to S3.
+                /// </summary>
+                public string Region = _Region;
+
+                /// <summary>
+                /// Gets or sets an optional S3-compatible service URL.
+                /// </summary>
+                public string ServiceUrl = _ServiceUrl;
+
+                /// <summary>
+                /// Gets or sets the S3 access key.
+                /// </summary>
+                public string AccessKey = _AccessKey;
+
+                /// <summary>
+                /// Gets or sets the S3 secret key.
+                /// </summary>
+                public string SecretKey = _SecretKey;
+
+                /// <summary>
+                /// Gets or sets an optional S3 session token.
+                /// </summary>
+                public string SessionToken = _SessionToken;
+
+                /// <summary>
+                /// Gets or sets a value indicating whether path-style addressing should be used.
+                /// </summary>
+                public bool ForcePathStyle = _ForcePathStyle;
+
+                /// <summary>
+                /// Gets or sets the default bucket used by callers that do not provide one.
+                /// </summary>
+                public string DefaultBucket = "";
             }
 
             /// <summary>
