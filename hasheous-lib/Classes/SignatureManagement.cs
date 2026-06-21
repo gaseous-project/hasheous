@@ -102,7 +102,7 @@ namespace Classes
 
                 if (modelWhereClauses.Count > 0)
                 {
-                    modelGameMatchClauses.Add("EXISTS (SELECT 1 FROM Signatures_Roms sr_model" + modelCount + " WHERE sr_model" + modelCount + ".GameId = view_Signatures_Games.Id AND sr_model" + modelCount + ".Size > 0 AND (" + string.Join(" OR ", modelWhereClauses) + "))");
+                    modelGameMatchClauses.Add("EXISTS (SELECT 1 FROM Signatures_Roms sr_model" + modelCount + " WHERE sr_model" + modelCount + ".GameId = view_Signatures_Games.Id AND (" + string.Join(" OR ", modelWhereClauses) + "))");
                 }
                 modelCount++;
             }
