@@ -30,6 +30,9 @@ namespace XML
 
         private const int MaxConcurrentImportWorkers = 4;
 
+        private static List<int> gameCountries = new List<int>();
+        private static List<int> gameLanguages = new List<int>();
+
         /// <summary>
         /// Imports signature data from XML/DAT files into the database.
         /// </summary>
@@ -37,6 +40,8 @@ namespace XML
         /// <param name="XMLType">The type of signature parser to use (e.g., NoIntro, TOSEC, MAME).</param>
         public async Task Import(string SearchPath, gaseous_signature_parser.parser.SignatureParser XMLType)
         {
+            Logging.Log(Logging.LogType.Information, "Signature Ingest", "Starting import of " + XMLType.ToString() + " signature files from: " + SearchPath);
+
             string? XMLDBSearchPath = null;
             if (XMLType == gaseous_signature_parser.parser.SignatureParser.NoIntro)
             {
@@ -355,12 +360,15 @@ namespace XML
                                         break;
                                     }
 
+                                    Logging.Log(Logging.LogType.Information, "Signature Ingest", $"Importing game {gameIndex + 1} of {Object.Games.Count} from {XMLType.ToString()} DAT file: {Path.GetFileName(XMLFile)}");
+                                    Logging.SendReport(Config.LogName, gameIndex + 1, Object.Games.Count, "Processing " + XMLType.ToString() + " DAT file: " + Path.GetFileName(XMLFile));
                                     await ImportDatRecordInternal(Object.Games[gameIndex], now, sourceId, XMLType, lookupCache);
                                 }
                             }
 
                             for (int workerIndex = 0; workerIndex < workerCount; workerIndex++)
                             {
+
                                 workers.Add(ImportWorkerAsync());
                             }
 
@@ -470,7 +478,6 @@ namespace XML
             dbDict.Add("category", Common.ReturnValueIfNull(gameObject.Category, ""));
             dbDict.Add("updatedat", now);
 
-            List<int> gameCountries = new List<int>();
             if (
                 gameObject.Country != null &&
                 gameObject.Country.Count > 0
@@ -487,7 +494,6 @@ namespace XML
                 }
             }
 
-            List<int> gameLanguages = new List<int>();
             if (
                 gameObject.Language != null &&
                 gameObject.Language.Count > 0

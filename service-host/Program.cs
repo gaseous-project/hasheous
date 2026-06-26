@@ -68,9 +68,9 @@ if (!Enum.TryParse(serviceName, out QueueItemType taskType) || taskType == Queue
 // If no reporting server URL is provided, abort
 if (string.IsNullOrEmpty(reportingServerUrl))
 {
-    Console.WriteLine("Error: No reporting server URL provided.");
-    Help.DisplayHelp();
-    return;
+    Console.WriteLine("Error: No reporting server URL provided. Reporting to console only.");
+    // Help.DisplayHelp();
+    // return;
 }
 
 // If a correlation ID is provided, set it in the CallContext
