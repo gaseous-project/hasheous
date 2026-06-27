@@ -8,7 +8,8 @@ namespace Redump
     {
         private static readonly HttpClient client = new HttpClient();
 
-        public string PlatformsUrl { get; } = "http://redump.org/downloads/";
+        public static string BaseUrl = "https://redump.info";
+        public static string PlatformsUrl = $"{BaseUrl}/downloads/";
 
         public async Task Download()
         {
@@ -30,10 +31,10 @@ namespace Redump
                 var content = await response.Content.ReadAsStringAsync();
 
                 // Parse the content to find platform links
-                // get the table inside the div with id "main"
+                // get the table inside the first div with class "downloads-table-scaler"
                 var doc = new HtmlAgilityPack.HtmlDocument();
                 doc.LoadHtml(content);
-                var mainDiv = doc.DocumentNode.SelectSingleNode("//div[@id='main']");
+                var mainDiv = doc.DocumentNode.SelectSingleNode("//div[@class='downloads-table-scaler']");
                 var table = mainDiv.SelectSingleNode(".//table");
                 var rows = table.SelectNodes(".//tr");
                 int currentRow = 0;
@@ -45,34 +46,38 @@ namespace Redump
                     string platformLink = "";
 
                     var cols = row.SelectNodes(".//td");
-                    if (cols.Count < 2) continue;
+                    if (cols.Count < 1) continue;
 
                     // the first column has the platform name
                     platformName = cols[0].InnerText.Trim();
-                    // the second column has the link to the cuesheets - ok if it is empty
-                    var col2linkNode = cols[1].SelectSingleNode(".//a");
-                    if (col2linkNode != null)
+                    // the second column has the links as separate <a> tags
+                    var col2links = cols[1].SelectNodes(".//a");
+                    foreach (var link in col2links)
                     {
-                        cueSheetLink = col2linkNode.GetAttributeValue("href", "").Trim();
-                        if (!cueSheetLink.StartsWith("http"))
+                        switch (link.InnerText.ToLower().Trim())
                         {
-                            cueSheetLink = "http://redump.org" + cueSheetLink;
+                            case "dat + serial/version":
+                                platformLink = link.GetAttributeValue("href", "").Trim();
+                                if (!platformLink.StartsWith("http"))
+                                {
+                                    platformLink = BaseUrl + platformLink;
+                                }
+                                break;
+
+                            case "cuesheets":
+                                cueSheetLink = link.GetAttributeValue("href", "").Trim();
+                                if (!cueSheetLink.StartsWith("http"))
+                                {
+                                    cueSheetLink = BaseUrl + cueSheetLink;
+                                }
+                                break;
                         }
                     }
-                    // the third column has the link to the datfile - value is required
-                    var col3linkNode = cols[2].SelectSingleNode(".//a");
-                    if (col3linkNode == null)
+
+                    if (string.IsNullOrEmpty(platformLink))
                     {
                         Logging.Log(Logging.LogType.Warning, "Redump", $"No datfile link found for platform {platformName}, skipping.");
                         continue;
-                    }
-                    else
-                    {
-                        platformLink = col3linkNode.GetAttributeValue("href", "").Trim();
-                        if (!platformLink.StartsWith("http"))
-                        {
-                            platformLink = "http://redump.org" + platformLink + "serial,version";
-                        }
                     }
 
                     // Download the datfile

@@ -45,9 +45,7 @@
             "program": "${workspaceFolder}/service-host/bin/Debug/net10.0/service-host.dll",
             "args": [
                 "--service",
-                "SignatureIngestor",
-                "--reportingserver",
-                "https://localhost:7023"
+                "SignatureIngestor"
             ],
             "cwd": "${workspaceFolder}/service-host",
             "stopAtEntry": false
