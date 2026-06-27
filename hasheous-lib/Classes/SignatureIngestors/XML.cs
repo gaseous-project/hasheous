@@ -2,8 +2,11 @@
 using System.Data;
 using System.IO;
 using System.Net;
+using System.Security.Cryptography.Xml;
+using System.Threading;
 using Classes;
 using gaseous_signature_parser.models.RomSignatureObject;
+using hasheous_server.Classes.Metadata.IGDB;
 using Microsoft.CodeAnalysis;
 using MySqlConnector;
 
@@ -15,6 +18,21 @@ namespace XML
     /// </summary>
     public class XMLIngestor
     {
+        private sealed class ImportLookupCache
+        {
+            public Dictionary<string, int> CountryIdsByCode { get; } = new(StringComparer.OrdinalIgnoreCase);
+            public Dictionary<string, int> CountryIdsByValue { get; } = new(StringComparer.OrdinalIgnoreCase);
+            public Dictionary<string, int> LanguageIdsByCode { get; } = new(StringComparer.OrdinalIgnoreCase);
+            public Dictionary<string, int> LanguageIdsByValue { get; } = new(StringComparer.OrdinalIgnoreCase);
+            public Dictionary<string, int> PlatformIds { get; } = new(StringComparer.OrdinalIgnoreCase);
+            public Dictionary<string, int> PublisherIds { get; } = new(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private const int MaxConcurrentImportWorkers = 4;
+
+        private static List<int> gameCountries = new List<int>();
+        private static List<int> gameLanguages = new List<int>();
+
         /// <summary>
         /// Imports signature data from XML/DAT files into the database.
         /// </summary>
@@ -22,8 +40,7 @@ namespace XML
         /// <param name="XMLType">The type of signature parser to use (e.g., NoIntro, TOSEC, MAME).</param>
         public async Task Import(string SearchPath, gaseous_signature_parser.parser.SignatureParser XMLType)
         {
-            // connect to database
-            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            Logging.Log(Logging.LogType.Information, "Signature Ingest", "Starting import of " + XMLType.ToString() + " signature files from: " + SearchPath);
 
             string? XMLDBSearchPath = null;
             if (XMLType == gaseous_signature_parser.parser.SignatureParser.NoIntro)
@@ -31,6 +48,8 @@ namespace XML
                 XMLDBSearchPath = Path.Combine(SearchPath, "DB");
                 SearchPath = Path.Combine(SearchPath, "DAT");
             }
+
+            List<string> supportedFileTypes = new List<string> { ".xml", ".dat" };
 
             // process provided files
             if (!Directory.Exists(SearchPath))
@@ -54,24 +73,36 @@ namespace XML
 
             DateTime now = DateTime.UtcNow;
 
+            bool hasMigratedOldSignatureGameNamesToSortingName = Config.ReadSetting<bool>("HasMigratedToSortingName_" + XMLType.ToString(), false);
+
             // process dat files
             for (UInt16 i = 0; i < PathContents.Length; ++i)
             {
                 Logging.Log(Logging.LogType.Information, "Signature Ingest", "(" + (i + 1) + " / " + PathContents.Length + ") Processing " + XMLType.ToString() + " DAT file: " + PathContents[i]);
-                Logging.SendReport(Config.LogName, (i + 1), PathContents.Length, "Processing " + XMLType.ToString() + " DAT file: " + Path.GetFileName(PathContents[i]));
+                Logging.SendReport(Config.LogName, (i + 1), PathContents.Length, "Processing " + XMLType.ToString() + " DAT file: " + Path.GetFileName(PathContents[i]), true);
 
-                await ProcessDatFile(PathContents[i], XMLDBSearchPath, DBPathContents, XMLType, db, now);
+                if (!supportedFileTypes.Contains(Path.GetExtension(PathContents[i]), StringComparer.OrdinalIgnoreCase))
+                {
+                    Logging.Log(Logging.LogType.Information, "Signature Ingest", "Skipping unsupported file type: " + PathContents[i]);
+                    continue;
+                }
+
+                await ProcessDatFile(PathContents[i], XMLDBSearchPath, DBPathContents, XMLType, now, hasMigratedOldSignatureGameNamesToSortingName);
             }
 
+            // mark migrations as completed
+            Config.SetSetting<bool>("HasMigratedToSortingName_" + XMLType.ToString(), true);
+
             // prune old sources
-            await PruneOldSources(XMLType, db, now);
+            await PruneOldSources(XMLType, now);
         }
 
-        private async Task ProcessDatFile(string XMLFile, string? XMLDBSearchPath, string[]? DBPathContents, gaseous_signature_parser.parser.SignatureParser XMLType, Database db, DateTime now)
+        private async Task ProcessDatFile(string XMLFile, string? XMLDBSearchPath, string[]? DBPathContents, gaseous_signature_parser.parser.SignatureParser XMLType, DateTime now, bool hasMigratedOldSignatureGameNamesToSortingName)
         {
             string sql = "";
             Dictionary<string, object> dbDict = new Dictionary<string, object>();
             System.Data.DataTable sigDB;
+            ImportLookupCache lookupCache = await LoadImportLookupCacheAsync();
 
             string? DBFile = null;
             if (XMLDBSearchPath != null)
@@ -109,7 +140,7 @@ namespace XML
                 {
                     int sourceId = 0;
 
-                    sql = "SELECT * FROM Signatures_Sources WHERE `SourceMD5`=@sourcemd5";
+                    sql = "SELECT `Id` FROM Signatures_Sources WHERE `SourceMD5`=@sourcemd5 LIMIT 1";
                     dbDict = new Dictionary<string, object>
                     {
                         { "name", Common.ReturnValueIfNull(Object.Name, "") },
@@ -133,13 +164,13 @@ namespace XML
                     dbDict.Add("sourcemd5", Object.SourceMd5);
                     dbDict.Add("sourcesha1", Object.SourceSHA1);
 
-                    sigDB = await db.ExecuteCMDAsync(sql, dbDict);
+                    sigDB = await Config.database.ExecuteCMDAsync(sql, dbDict);
                     if (sigDB.Rows.Count == 0)
                     {
                         // entry not present, insert it
                         sql = "INSERT INTO Signatures_Sources (`Name`, `Description`, `Category`, `Version`, `Author`, `Email`, `Homepage`, `Url`, `SourceType`, `processed_at`, `SourceMD5`, `SourceSHA1`) VALUES (@name, @description, @category, @version, @author, @email, @homepage, @uri, @sourcetype, @processedat, @sourcemd5, @sourcesha1); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
 
-                        sigDB = await db.ExecuteCMDAsync(sql, dbDict);
+                        sigDB = await Config.database.ExecuteCMDAsync(sql, dbDict);
 
                         sourceId = Convert.ToInt32(sigDB.Rows[0][0]);
 
@@ -149,16 +180,206 @@ namespace XML
                     {
                         // entry present, update processed date
                         sql = "UPDATE Signatures_Sources SET processed_at=@processedat WHERE `SourceMD5`=@sourcemd5;";
-                        await db.ExecuteCMDAsync(sql, dbDict);
+                        await Config.database.ExecuteCMDAsync(sql, dbDict);
 
                         sourceId = Convert.ToInt32(sigDB.Rows[0]["Id"]);
                     }
 
-                    for (int x = 0; x < Object.Games.Count; ++x)
+                    #region "Migrate old signature game names to sortingname"
+                    if (hasMigratedOldSignatureGameNamesToSortingName == false)
                     {
-                        if (processGames)
+                        // load platforms into a dictionary for quick lookup to avoid multiple database calls in the loop below
+                        Dictionary<string, long> platforms = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+                        sql = "SELECT `Id`, `Platform` FROM Signatures_Platforms;";
+                        sigDB = await Config.database.ExecuteCMDAsync(sql);
+                        foreach (DataRow row in sigDB.Rows)
                         {
-                            await ImportDatRecord(Object.Games[x], now, sourceId, XMLType);
+                            string platformName = Convert.ToString(Common.ReturnValueIfNull(row["Platform"], "")) ?? "";
+                            if (!string.IsNullOrEmpty(platformName) && !platforms.ContainsKey(platformName))
+                            {
+                                platforms.Add(platformName, Convert.ToInt64(row["Id"]));
+                            }
+                        }
+
+                        Dictionary<string, long> publishers = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+                        sql = "SELECT `Id`, `Publisher` FROM Signatures_Publishers;";
+                        sigDB = await Config.database.ExecuteCMDAsync(sql);
+                        foreach (DataRow row in sigDB.Rows)
+                        {
+                            string publisherName = Convert.ToString(Common.ReturnValueIfNull(row["Publisher"], "")) ?? "";
+                            if (!string.IsNullOrEmpty(publisherName) && !publishers.ContainsKey(publisherName))
+                            {
+                                publishers.Add(publisherName, Convert.ToInt64(row["Id"]));
+                            }
+                        }
+
+                        // Prevent reprocessing the same legacy base record multiple times in a single migration run.
+                        HashSet<long> migratedBaseGameIds = new HashSet<long>();
+
+                        foreach (var game in Object.Games)
+                        {
+                            string gameSystem = Convert.ToString(Common.ReturnValueIfNull(game.System, "")) ?? "";
+                            string gamePublisher = Convert.ToString(Common.ReturnValueIfNull(game.Publisher, "")) ?? "";
+
+                            long platformId = platforms.ContainsKey(gameSystem) ? platforms[gameSystem] : 0;
+                            long publisherId = publishers.ContainsKey(gamePublisher) ? publishers[gamePublisher] : 0;
+
+                            // find the item using the old record structure (name, year, publisher, platform, and null country) and update it's country and language information if needed
+                            sql = "SELECT `Id` FROM Signatures_Games WHERE `Name`=@name AND `Year`=@year AND `PublisherId`=@publisherid AND `SystemId`=@systemid AND Country IS NULL LIMIT 1;";
+                            dbDict = new Dictionary<string, object>
+                            {
+                                { "name", Common.ReturnValueIfNull(game.Name, "") },
+                                { "year", Common.ReturnValueIfNull(game.Year, "") },
+                                { "publisherid", publisherId },
+                                { "systemid", platformId }
+                            };
+
+                            sigDB = await Config.database.ExecuteCMDAsync(sql, dbDict);
+                            if (sigDB.Rows.Count > 0)
+                            {
+                                // record found, update the country and language fields if needed
+                                long gameId = Convert.ToInt32(sigDB.Rows[0]["Id"]);
+                                if (!migratedBaseGameIds.Add(gameId))
+                                {
+                                    continue;
+                                }
+
+                                string updateSql = "UPDATE Signatures_Games SET `Country`=@country, `Language`=@language WHERE `Id`=@gameid;";
+                                await Config.database.ExecuteCMDAsync(updateSql, new Dictionary<string, object>
+                                {
+                                    {
+                                        "country", string.Join(", ",(game.Country?.Keys ?? Enumerable.Empty<string>()).OrderByDescending(k => k.Length))
+                                    },
+                                    {
+                                        "language", string.Join(", ",(game.Language?.Keys ?? Enumerable.Empty<string>()).OrderByDescending(k => k.Length))
+                                    },
+                                    { "gameid", gameId }
+                                });
+
+                                // get all DataObjects linked to this game
+                                string doLinks = "SELECT * FROM DataObject_SignatureMap WHERE SignatureId = @gameid;";
+                                DataTable doLinksTable = await Config.database.ExecuteCMDAsync(doLinks, new Dictionary<string, object>
+                                {
+                                    { "gameid", gameId }
+                                });
+                                // proceed only if there are linked DataObjects
+                                if (doLinksTable.Rows.Count > 0)
+                                {
+                                    // find all variants of this game (same year, publisher, platform, but different sortingname) and insert new records for each country variant if they don't already exist, linking them to the same DataObject
+                                    var gameVariants = Object.Games.Where(g =>
+                                        g.Name == game.Name &&
+                                        g.Year == game.Year &&
+                                        g.Publisher == game.Publisher &&
+                                        g.System == game.System &&
+                                        g.SortingName != game.SortingName
+                                    ).GroupBy(g => new
+                                    {
+                                        Name = Common.ReturnValueIfNull(g.Name, ""),
+                                        Year = Common.ReturnValueIfNull(g.Year, ""),
+                                        Country = string.Join(", ", (g.Country?.Keys ?? Enumerable.Empty<string>()).OrderByDescending(k => k.Length)),
+                                        Language = string.Join(", ", (g.Language?.Keys ?? Enumerable.Empty<string>()).OrderByDescending(k => k.Length))
+                                    })
+                                    .Select(g => g.First());
+
+                                    foreach (var gameVariant in gameVariants)
+                                    {
+                                        string gameVariantCountry = string.Join(", ", (gameVariant.Country?.Keys ?? Enumerable.Empty<string>()).OrderByDescending(k => k.Length));
+                                        string gameVariantLanguage = string.Join(", ", (gameVariant.Language?.Keys ?? Enumerable.Empty<string>()).OrderByDescending(k => k.Length));
+
+                                        Dictionary<string, object> variantDict = new Dictionary<string, object>
+                                        {
+                                            { "name", Common.ReturnValueIfNull(gameVariant.Name, "") },
+                                            { "description", Common.ReturnValueIfNull(gameVariant.Description, "") },
+                                            { "year", Common.ReturnValueIfNull(gameVariant.Year, "") },
+                                            { "publisherid", publisherId },
+                                            { "demo", (int)gameVariant.Demo },
+                                            { "systemid", platformId },
+                                            { "systemvariant", Common.ReturnValueIfNull(gameVariant.SystemVariant, "") },
+                                            { "video", Common.ReturnValueIfNull(gameVariant.Video, "") },
+                                            { "country", gameVariantCountry },
+                                            { "language", gameVariantLanguage },
+                                            { "copyright", Common.ReturnValueIfNull(gameVariant.Copyright, "") },
+                                            { "category", Common.ReturnValueIfNull(gameVariant.Category, "") },
+                                            { "sigsource", XMLType },
+                                            { "sourceid", sourceId },
+                                            { "createdat", now },
+                                            { "updatedat", now }
+                                        };
+
+                                        string existingGameVariantSQL = "SELECT `Id` FROM Signatures_Games WHERE `Name`=@name AND `Year`=@year AND `PublisherId`=@publisherid AND `SystemId`=@systemid AND `Country`=@country LIMIT 1;";
+                                        DataTable existingGameVariantTable = await Config.database.ExecuteCMDAsync(existingGameVariantSQL, variantDict);
+
+                                        long newGameVariantId;
+                                        if (existingGameVariantTable.Rows.Count > 0)
+                                        {
+                                            newGameVariantId = Convert.ToInt64(existingGameVariantTable.Rows[0]["Id"]);
+                                        }
+                                        else
+                                        {
+                                            string newGameVariantSQL = "INSERT INTO Signatures_Games (`Name`, `Description`, `Year`, `PublisherId`, `Demo`, `SystemId`, `SystemVariant`, `Video`, `Country`, `Language`, `Copyright`, `Category`, `MetadataSource`, `SourceId`, `created_at`, `updated_at`) VALUES (@name, @description, @year, @publisherid, @demo, @systemid, @systemvariant, @video, @country, @language, @copyright, @category, @sigsource, @sourceid, @createdat, @updatedat); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
+                                            DataTable newGameVariantTable = await Config.database.ExecuteCMDAsync(newGameVariantSQL, variantDict);
+                                            newGameVariantId = Convert.ToInt64(newGameVariantTable.Rows[0][0]);
+                                        }
+
+                                        foreach (DataRow row in doLinksTable.Rows)
+                                        {
+                                            long linkedDataObjectId = Convert.ToInt64(row["DataObjectId"]);
+                                            int linkedDataObjectType = Convert.ToInt32(row["DataObjectTypeId"]);
+
+                                            string newLinkSQL = "INSERT IGNORE INTO DataObject_SignatureMap (`DataObjectId`, `DataObjectTypeId`, `SignatureId`) VALUES (@dataobjectid, @dataobjecttypeid, @signatureid);";
+                                            await Config.database.ExecuteCMDAsync(newLinkSQL, new Dictionary<string, object>
+                                            {
+                                                { "dataobjectid", linkedDataObjectId },
+                                                { "dataobjecttypeid", linkedDataObjectType },
+                                                { "signatureid", newGameVariantId }
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    #endregion "Migrate old signature game names to sortingname"
+
+                    if (processGames)
+                    {
+                        int nextGameIndex = -1;
+                        int workerCount = Math.Min(MaxConcurrentImportWorkers, Object.Games.Count);
+                        int lastReportedGameIndex = -1;
+
+                        if (workerCount > 0)
+                        {
+                            List<Task> workers = new List<Task>(workerCount);
+
+                            async Task ImportWorkerAsync()
+                            {
+                                while (true)
+                                {
+                                    int gameIndex = Interlocked.Increment(ref nextGameIndex);
+                                    if (gameIndex >= Object.Games.Count)
+                                    {
+                                        break;
+                                    }
+
+                                    if ((lastReportedGameIndex + 10) < gameIndex)
+                                    {
+                                        Logging.Log(Logging.LogType.Information, "Signature Ingest", $"Importing game {gameIndex + 1} of {Object.Games.Count} from {XMLType.ToString()} DAT file: {Path.GetFileName(XMLFile)}", LogToDiskOnly: true);
+                                        Logging.SendReport(Config.LogName + XMLType.ToString(), gameIndex + 1, Object.Games.Count, "Processing game: " + Common.ReturnValueIfNull(Object.Games[gameIndex].Name, ""), true);
+
+                                        lastReportedGameIndex = gameIndex;
+                                    }
+
+                                    await ImportDatRecordInternal(Object.Games[gameIndex], now, sourceId, XMLType, lookupCache);
+                                }
+                            }
+
+                            for (int workerIndex = 0; workerIndex < workerCount; workerIndex++)
+                            {
+
+                                workers.Add(ImportWorkerAsync());
+                            }
+
+                            await Task.WhenAll(workers);
                         }
                     }
                 }
@@ -169,12 +390,12 @@ namespace XML
             }
         }
 
-        private async Task PruneOldSources(gaseous_signature_parser.parser.SignatureParser XMLType, Database db, DateTime now)
+        private async Task PruneOldSources(gaseous_signature_parser.parser.SignatureParser XMLType, DateTime now)
         {
             // get the most recent source entries for this XML type - anything with a processed_at value of now should be kept - everything else should be removed
             // this is the "safe" sources list - these should be kept - anything not in this list should be removed
             string sql = "SELECT * FROM Signatures_Sources WHERE `SourceType`=@sourcetype AND processed_at = @processedat;";
-            DataTable dt = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>
+            DataTable dt = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object>
             {
                 { "sourcetype", XMLType.ToString() },
                 { "processedat", now }
@@ -197,7 +418,7 @@ namespace XML
             do
             {
                 sql = "DELETE FROM Signatures_Roms WHERE MetadataSource=@sourcetype AND (SourceId NOT IN (" + string.Join(",", safeSourceIds) + ") OR SourceId IS NULL) LIMIT 1000; SELECT ROW_COUNT() AS Count;";
-                DataTable deletedCountTable = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>
+                DataTable deletedCountTable = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object>
                 {
                     { "sourcetype", XMLType }
                 });
@@ -224,7 +445,11 @@ namespace XML
         /// <returns></returns>
         public async Task ImportDatRecord(RomSignatureObject.Game gameObject, DateTime now, int sourceId, gaseous_signature_parser.parser.SignatureParser XMLType)
         {
-            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            await ImportDatRecordInternal(gameObject, now, sourceId, XMLType, await LoadImportLookupCacheAsync());
+        }
+
+        private async Task ImportDatRecordInternal(RomSignatureObject.Game gameObject, DateTime now, int sourceId, gaseous_signature_parser.parser.SignatureParser XMLType, ImportLookupCache lookupCache)
+        {
 
             // store in database
             string[] flipNameAndDescription = {
@@ -255,10 +480,11 @@ namespace XML
             dbDict.Add("platform", Common.ReturnValueIfNull(gameObject.System, ""));
             dbDict.Add("systemvariant", Common.ReturnValueIfNull(gameObject.SystemVariant, ""));
             dbDict.Add("video", Common.ReturnValueIfNull(gameObject.Video, ""));
+            dbDict.Add("country", string.Join(", ", (gameObject.Country?.Keys ?? Enumerable.Empty<string>()).OrderByDescending(k => k.Length)));
+            dbDict.Add("language", string.Join(", ", (gameObject.Language?.Keys ?? Enumerable.Empty<string>()).OrderByDescending(k => k.Length)));
             dbDict.Add("category", Common.ReturnValueIfNull(gameObject.Category, ""));
             dbDict.Add("updatedat", now);
 
-            List<int> gameCountries = new List<int>();
             if (
                 gameObject.Country != null &&
                 gameObject.Country.Count > 0
@@ -266,24 +492,7 @@ namespace XML
             {
                 foreach (KeyValuePair<string, string> country in gameObject.Country)
                 {
-                    int countryId = -1;
-                    countryId = Common.GetLookupByCode(Common.LookupTypes.Country, (string)Common.ReturnValueIfNull(country.Key.Trim(), ""));
-                    if (countryId == -1)
-                    {
-                        countryId = Common.GetLookupByValue(Common.LookupTypes.Country, (string)Common.ReturnValueIfNull(country.Key.Trim(), ""));
-
-                        if (countryId == -1)
-                        {
-                            Logging.Log(Logging.LogType.Warning, "Signature Ingest", "Unable to locate country id for " + country.Key.Trim());
-                            sql = "INSERT INTO Country (`Code`, `Value`) VALUES (@code, @name); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
-                            Dictionary<string, object> countryDict = new Dictionary<string, object>{
-                                            { "code", country.Key.Trim() },
-                                            { "name", country.Value.Trim() }
-                                        };
-                            countryId = Convert.ToInt32((await db.ExecuteCMDAsync(sql, countryDict)).Rows[0][0]);
-                            Common.InvalidateLookupCache(Common.LookupTypes.Country);
-                        }
-                    }
+                    int countryId = await ResolveLookupIdAsync("Country", country.Key, country.Value, lookupCache.CountryIdsByCode, lookupCache.CountryIdsByValue);
 
                     if (countryId > 0)
                     {
@@ -292,7 +501,6 @@ namespace XML
                 }
             }
 
-            List<int> gameLanguages = new List<int>();
             if (
                 gameObject.Language != null &&
                 gameObject.Language.Count > 0
@@ -300,24 +508,7 @@ namespace XML
             {
                 foreach (KeyValuePair<string, string> language in gameObject.Language)
                 {
-                    int languageId = -1;
-                    languageId = Common.GetLookupByCode(Common.LookupTypes.Language, (string)Common.ReturnValueIfNull(language.Key.Trim(), ""));
-                    if (languageId == -1)
-                    {
-                        languageId = Common.GetLookupByValue(Common.LookupTypes.Language, (string)Common.ReturnValueIfNull(language.Key.Trim(), ""));
-
-                        if (languageId == -1)
-                        {
-                            Logging.Log(Logging.LogType.Warning, "Signature Ingest", "Unable to locate language id for " + language.Key.Trim());
-                            sql = "INSERT INTO Language (`Code`, `Value`) VALUES (@code, @name); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
-                            Dictionary<string, object> langDict = new Dictionary<string, object>{
-                                                        { "code", language.Key.Trim() },
-                                                        { "name", language.Value.Trim() }
-                                                    };
-                            languageId = Convert.ToInt32((await db.ExecuteCMDAsync(sql, langDict)).Rows[0][0]);
-                            Common.InvalidateLookupCache(Common.LookupTypes.Language);
-                        }
-                    }
+                    int languageId = await ResolveLookupIdAsync("Language", language.Key, language.Value, lookupCache.LanguageIdsByCode, lookupCache.LanguageIdsByValue);
 
                     if (languageId > 0)
                     {
@@ -332,21 +523,12 @@ namespace XML
             int gameSystem = 0;
             if (gameObject.System != null)
             {
-                sql = "SELECT `Id` FROM Signatures_Platforms WHERE `Platform`=@platform";
-
-                sigDB = await db.ExecuteCMDAsync(sql, dbDict);
-                if (sigDB.Rows.Count == 0)
-                {
-                    // entry not present, insert it
-                    sql = "INSERT INTO Signatures_Platforms (`Platform`) VALUES (@platform); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
-                    sigDB = await db.ExecuteCMDAsync(sql, dbDict);
-
-                    gameSystem = Convert.ToInt32(sigDB.Rows[0][0]);
-                }
-                else
-                {
-                    gameSystem = (int)sigDB.Rows[0][0];
-                }
+                gameSystem = await GetOrCreateEntityIdAsync(
+                    lookupCache.PlatformIds,
+                    Convert.ToString(Common.ReturnValueIfNull(gameObject.System, "")) ?? "",
+                    "Signatures_Platforms",
+                    "Platform",
+                    "platform");
             }
             dbDict.Add("systemid", gameSystem);
 
@@ -354,28 +536,20 @@ namespace XML
             int gamePublisher = 0;
             if (gameObject.Publisher != null)
             {
-                sql = "SELECT * FROM Signatures_Publishers WHERE `Publisher`=@publisher";
-
-                sigDB = await db.ExecuteCMDAsync(sql, dbDict);
-                if (sigDB.Rows.Count == 0)
-                {
-                    // entry not present, insert it
-                    sql = "INSERT INTO Signatures_Publishers (`Publisher`) VALUES (@publisher); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
-                    sigDB = await db.ExecuteCMDAsync(sql, dbDict);
-                    gamePublisher = Convert.ToInt32(sigDB.Rows[0][0]);
-                }
-                else
-                {
-                    gamePublisher = (int)sigDB.Rows[0][0];
-                }
+                gamePublisher = await GetOrCreateEntityIdAsync(
+                    lookupCache.PublisherIds,
+                    Convert.ToString(Common.ReturnValueIfNull(gameObject.Publisher, "")) ?? "",
+                    "Signatures_Publishers",
+                    "Publisher",
+                    "publisher");
             }
             dbDict.Add("publisherid", gamePublisher);
 
             // store game
             long gameId = 0;
-            sql = "SELECT * FROM Signatures_Games WHERE `Name`=@name AND `Year`=@year AND `PublisherId`=@publisherid AND `SystemId`=@systemid";
+            sql = "SELECT `Id` FROM Signatures_Games WHERE `Name`=@name AND `Year`=@year AND `PublisherId`=@publisherid AND `SystemId`=@systemid AND `Country`=@country LIMIT 1";
 
-            sigDB = await db.ExecuteCMDAsync(sql, dbDict);
+            sigDB = await Config.database.ExecuteCMDAsync(sql, dbDict);
 
             dbDict.Add("sigsource", XMLType);
             dbDict.Add("sourceid", sourceId);
@@ -384,21 +558,19 @@ namespace XML
             {
                 // entry not present, insert it
                 sql = "INSERT INTO Signatures_Games " +
-                    "(`Name`, `Description`, `Year`, `PublisherId`, `Demo`, `SystemId`, `SystemVariant`, `Video`, `Copyright`, `Category`, `MetadataSource`, `SourceId`, `created_at`, `updated_at`) VALUES " +
-                    "(@name, @description, @year, @publisherid, @demo, @systemid, @systemvariant, @video, @copyright, @category, @sigsource, @sourceid, @updatedat, @updatedat); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
-                sigDB = await db.ExecuteCMDAsync(sql, dbDict);
+                    "(`Name`, `Description`, `Year`, `PublisherId`, `Demo`, `SystemId`, `SystemVariant`, `Video`, `Country`, `Language`, `Copyright`, `Category`, `MetadataSource`, `SourceId`, `created_at`, `updated_at`) VALUES " +
+                    "(@name, @description, @year, @publisherid, @demo, @systemid, @systemvariant, @video, @country, @language, @copyright, @category, @sigsource, @sourceid, @updatedat, @updatedat); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
+                sigDB = await Config.database.ExecuteCMDAsync(sql, dbDict);
 
                 gameId = Convert.ToInt32(sigDB.Rows[0][0]);
             }
             else
             {
                 gameId = (long)sigDB.Rows[0]["Id"];
-                long gameSourceId = (long)sigDB.Rows[0]["SourceId"];
-                int gameMetadataSourceId = (int)sigDB.Rows[0]["MetadataSource"];
 
                 string gameSourceSql = "UPDATE Signatures_Games SET `Category`=@category, `MetadataSource`=@sigsource, `SourceId`=@sourceid, `updated_at`=@updatedat WHERE `Id`=@gameid;";
                 dbDict.Add("gameid", gameId);
-                await db.ExecuteCMDAsync(gameSourceSql, dbDict);
+                await Config.database.ExecuteCMDAsync(gameSourceSql, dbDict);
             }
 
             // insert countries
@@ -411,10 +583,10 @@ namespace XML
                                                 { "gameid", gameId },
                                                 { "Countryid", gameCountry }
                                             };
-                    if ((await db.ExecuteCMDAsync(sql, countryDict)).Rows.Count == 0)
+                    if ((await Config.database.ExecuteCMDAsync(sql, countryDict)).Rows.Count == 0)
                     {
                         sql = "INSERT INTO Signatures_Games_Countries (GameId, CountryId) VALUES (@gameid, @Countryid)";
-                        await db.ExecuteCMDAsync(sql, countryDict);
+                        await Config.database.ExecuteCMDAsync(sql, countryDict);
                     }
                 }
                 catch
@@ -433,10 +605,10 @@ namespace XML
                                                 { "gameid", gameId },
                                                 { "languageid", gameLanguage }
                                             };
-                    if ((await db.ExecuteCMDAsync(sql, langDict)).Rows.Count == 0)
+                    if ((await Config.database.ExecuteCMDAsync(sql, langDict)).Rows.Count == 0)
                     {
                         sql = "INSERT INTO Signatures_Games_Languages (GameId, LanguageId) VALUES (@gameid, @languageid)";
-                        await db.ExecuteCMDAsync(sql, langDict);
+                        await Config.database.ExecuteCMDAsync(sql, langDict);
                     }
                 }
                 catch
@@ -451,16 +623,16 @@ namespace XML
                 if (romObject.Md5 != null || romObject.Sha1 != null || romObject.Sha256 != null || romObject.Crc != null)
                 {
                     long romId = 0;
-                    sql = "SELECT * FROM Signatures_Roms WHERE `GameId`=@gameid AND ((`MD5`=@md5 AND `SHA1`=@sha1 AND `SHA256`=@sha256 AND `CRC`=@crc AND `IngestorVersion`=3) OR (`MD5`=@md5 AND `SHA1`=@sha1 AND `IngestorVersion`<=2));";
+                    sql = "SELECT `Id`, `IngestorVersion` FROM Signatures_Roms WHERE `GameId`=@gameid AND ((`MD5`=@md5 AND `SHA1`=@sha1 AND `SHA256`=@sha256 AND `CRC`=@crc AND `IngestorVersion`=3) OR (`MD5`=@md5 AND `SHA1`=@sha1 AND `IngestorVersion`<=2)) LIMIT 1;";
                     dbDict = new Dictionary<string, object>
                                 {
                                     { "gameid", gameId },
                                     { "name", Common.ReturnValueIfNull(romObject.Name, "") },
                                     { "size", Common.ReturnValueIfNull(romObject.Size, 0) },
-                                    { "crc", Common.ReturnValueIfNull(romObject.Crc, "").ToString().ToLower() },
-                                    { "md5", Common.ReturnValueIfNull(romObject.Md5, "").ToString().ToLower() },
-                                    { "sha1", Common.ReturnValueIfNull(romObject.Sha1, "").ToString().ToLower() },
-                                    { "sha256", Common.ReturnValueIfNull(romObject.Sha256, "").ToString().ToLower() },
+                                    { "crc", (Convert.ToString(Common.ReturnValueIfNull(romObject.Crc, "")) ?? "").ToLowerInvariant() },
+                                    { "md5", (Convert.ToString(Common.ReturnValueIfNull(romObject.Md5, "")) ?? "").ToLowerInvariant() },
+                                    { "sha1", (Convert.ToString(Common.ReturnValueIfNull(romObject.Sha1, "")) ?? "").ToLowerInvariant() },
+                                    { "sha256", (Convert.ToString(Common.ReturnValueIfNull(romObject.Sha256, "")) ?? "").ToLowerInvariant() },
                                     { "developmentstatus", Common.ReturnValueIfNull(romObject.DevelopmentStatus, "") }
                                 };
 
@@ -502,12 +674,12 @@ namespace XML
                     }
                     dbDict.Add("languages", Newtonsoft.Json.JsonConvert.SerializeObject(languages));
 
-                    sigDB = await db.ExecuteCMDAsync(sql, dbDict);
+                    sigDB = await Config.database.ExecuteCMDAsync(sql, dbDict);
                     if (sigDB.Rows.Count == 0)
                     {
                         // entry not present, insert it
                         sql = "INSERT INTO Signatures_Roms (`GameId`, `Name`, `Size`, `CRC`, `MD5`, `SHA1`, `SHA256`, `Status`, `DevelopmentStatus`, `Attributes`, `RomType`, `RomTypeMedia`, `MediaLabel`, `MetadataSource`, `SourceId`, `IngestorVersion`, `Countries`, `Languages`, `created_at`, `updated_at`) VALUES (@gameid, @name, @size, @crc, @md5, @sha1, @sha256, @status, @developmentstatus, @attributes, @romtype, @romtypemedia, @medialabel, @metadatasource, @sourceid, @ingestorversion, @countries, @languages, @updatedat, @updatedat); SELECT CAST(LAST_INSERT_ID() AS SIGNED);";
-                        sigDB = await db.ExecuteCMDAsync(sql, dbDict);
+                        sigDB = await Config.database.ExecuteCMDAsync(sql, dbDict);
 
                         romId = Convert.ToInt32(sigDB.Rows[0][0]);
                         dbDict.Add("romid", romId);
@@ -520,29 +692,128 @@ namespace XML
                         // check if column IngesterVersion < 3, if so, we need to update the crc and sha256 values before proceeding
                         if (sigDB.Rows[0]["IngestorVersion"] == DBNull.Value || Convert.ToInt32(sigDB.Rows[0]["IngestorVersion"]) < 3)
                         {
-                            dbDict["crc"] = Common.ReturnValueIfNull(romObject.Crc, "").ToString().ToLower();
-                            dbDict["sha256"] = Common.ReturnValueIfNull(romObject.Sha256, "").ToString().ToLower();
+                            dbDict["crc"] = (Convert.ToString(Common.ReturnValueIfNull(romObject.Crc, "")) ?? "").ToLowerInvariant();
+                            dbDict["sha256"] = (Convert.ToString(Common.ReturnValueIfNull(romObject.Sha256, "")) ?? "").ToLowerInvariant();
 
                             sql = "UPDATE Signatures_Roms SET `CRC`=@crc, `SHA256`=@sha256, `IngestorVersion`=3 WHERE `Id`=@romid;";
-                            await db.ExecuteCMDAsync(sql, dbDict);
+                            await Config.database.ExecuteCMDAsync(sql, dbDict);
                         }
 
                         // update the rom entry
                         sql = "UPDATE Signatures_Roms SET `GameId`=@gameid, `Name`=@name, `Size`=@size, `Status`=@status, `DevelopmentStatus`=@developmentstatus, `Attributes`=@attributes, `RomType`=@romtype, `RomTypeMedia`=@romtypemedia, `MediaLabel`=@medialabel, `MetadataSource`=@metadatasource, `SourceId`=@sourceid, `Countries`=@countries, `Languages`=@languages, `updated_at`=@updatedat WHERE `Id`=@romid;";
-                        await db.ExecuteCMDAsync(sql, dbDict);
+                        await Config.database.ExecuteCMDAsync(sql, dbDict);
                     }
 
                     // map the rom to the source
-                    sql = "SELECT * FROM Signatures_RomToSource WHERE SourceId=@sourceid AND RomId=@romid;";
+                    sql = "SELECT 1 FROM Signatures_RomToSource WHERE SourceId=@sourceid AND RomId=@romid LIMIT 1;";
 
-                    sigDB = await db.ExecuteCMDAsync(sql, dbDict);
+                    sigDB = await Config.database.ExecuteCMDAsync(sql, dbDict);
                     if (sigDB.Rows.Count == 0)
                     {
                         sql = "INSERT INTO Signatures_RomToSource (`SourceId`, `RomId`) VALUES (@sourceid, @romid);";
-                        await db.ExecuteCMDAsync(sql, dbDict);
+                        await Config.database.ExecuteCMDAsync(sql, dbDict);
                     }
                 }
             }
+        }
+
+        private static async Task<ImportLookupCache> LoadImportLookupCacheAsync()
+        {
+            ImportLookupCache cache = new ImportLookupCache();
+
+            DataTable countries = await Config.database.ExecuteCMDAsync("SELECT `Id`, `Code`, `Value` FROM Country;");
+            foreach (DataRow row in countries.Rows)
+            {
+                int id = Convert.ToInt32(row["Id"]);
+                string code = Convert.ToString(Common.ReturnValueIfNull(row["Code"], "")) ?? "";
+                string value = Convert.ToString(Common.ReturnValueIfNull(row["Value"], "")) ?? "";
+
+                if (!string.IsNullOrWhiteSpace(code) && !cache.CountryIdsByCode.ContainsKey(code))
+                    cache.CountryIdsByCode[code] = id;
+                if (!string.IsNullOrWhiteSpace(value) && !cache.CountryIdsByValue.ContainsKey(value))
+                    cache.CountryIdsByValue[value] = id;
+            }
+
+            DataTable languages = await Config.database.ExecuteCMDAsync("SELECT `Id`, `Code`, `Value` FROM Language;");
+            foreach (DataRow row in languages.Rows)
+            {
+                int id = Convert.ToInt32(row["Id"]);
+                string code = Convert.ToString(Common.ReturnValueIfNull(row["Code"], "")) ?? "";
+                string value = Convert.ToString(Common.ReturnValueIfNull(row["Value"], "")) ?? "";
+
+                if (!string.IsNullOrWhiteSpace(code) && !cache.LanguageIdsByCode.ContainsKey(code))
+                    cache.LanguageIdsByCode[code] = id;
+                if (!string.IsNullOrWhiteSpace(value) && !cache.LanguageIdsByValue.ContainsKey(value))
+                    cache.LanguageIdsByValue[value] = id;
+            }
+
+            DataTable platforms = await Config.database.ExecuteCMDAsync("SELECT `Id`, `Platform` FROM Signatures_Platforms;");
+            foreach (DataRow row in platforms.Rows)
+            {
+                string platform = Convert.ToString(Common.ReturnValueIfNull(row["Platform"], "")) ?? "";
+                if (!string.IsNullOrWhiteSpace(platform) && !cache.PlatformIds.ContainsKey(platform))
+                    cache.PlatformIds[platform] = Convert.ToInt32(row["Id"]);
+            }
+
+            DataTable publishers = await Config.database.ExecuteCMDAsync("SELECT `Id`, `Publisher` FROM Signatures_Publishers;");
+            foreach (DataRow row in publishers.Rows)
+            {
+                string publisher = Convert.ToString(Common.ReturnValueIfNull(row["Publisher"], "")) ?? "";
+                if (!string.IsNullOrWhiteSpace(publisher) && !cache.PublisherIds.ContainsKey(publisher))
+                    cache.PublisherIds[publisher] = Convert.ToInt32(row["Id"]);
+            }
+
+            return cache;
+        }
+
+        private static async Task<int> ResolveLookupIdAsync(string tableName, string? code, string? value, Dictionary<string, int> idsByCode, Dictionary<string, int> idsByValue)
+        {
+            string normalizedCode = (code ?? string.Empty).Trim();
+            string normalizedValue = (value ?? string.Empty).Trim();
+
+            if (!string.IsNullOrWhiteSpace(normalizedCode) && idsByCode.TryGetValue(normalizedCode, out int cachedByCode))
+                return cachedByCode;
+
+            if (!string.IsNullOrWhiteSpace(normalizedValue) && idsByValue.TryGetValue(normalizedValue, out int cachedByValue))
+                return cachedByValue;
+
+            Logging.Log(Logging.LogType.Warning, "Signature Ingest", $"Unable to locate {tableName.ToLowerInvariant()} id for {normalizedCode}");
+
+            DataTable inserted = await Config.database.ExecuteCMDAsync(
+                $"INSERT INTO {tableName} (`Code`, `Value`) VALUES (@code, @name); SELECT CAST(LAST_INSERT_ID() AS SIGNED);",
+                new Dictionary<string, object>
+                {
+                    { "code", normalizedCode },
+                    { "name", normalizedValue }
+                });
+
+            int newId = Convert.ToInt32(inserted.Rows[0][0]);
+            if (!string.IsNullOrWhiteSpace(normalizedCode))
+                idsByCode[normalizedCode] = newId;
+            if (!string.IsNullOrWhiteSpace(normalizedValue))
+                idsByValue[normalizedValue] = newId;
+
+            return newId;
+        }
+
+        private static async Task<int> GetOrCreateEntityIdAsync(Dictionary<string, int> cache, string key, string tableName, string columnName, string parameterName)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+                return 0;
+
+            if (cache.TryGetValue(key, out int existingId))
+                return existingId;
+
+            DataTable inserted = await Config.database.ExecuteCMDAsync(
+                $"INSERT INTO {tableName} (`{columnName}`) VALUES (@{parameterName}); SELECT CAST(LAST_INSERT_ID() AS SIGNED);",
+                new Dictionary<string, object>
+                {
+                    { parameterName, key }
+                });
+
+            int newId = Convert.ToInt32(inserted.Rows[0][0]);
+            cache[key] = newId;
+            return newId;
         }
     }
 }

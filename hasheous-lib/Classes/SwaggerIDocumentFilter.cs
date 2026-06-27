@@ -1,13 +1,17 @@
 using System.Text.Json;
 using hasheous_server.Classes.Metadata.IGDB;
-using Microsoft.OpenApi.Any;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 public class IGDBMetadataDocumentFilter : IDocumentFilter
 {
     public void Apply(OpenApiDocument openApiDocument, DocumentFilterContext context)
     {
+        if (openApiDocument == null)
+        {
+            return;
+        }
+
         // loop all classes in IGDB.Models namespace and add them to the document
         var igdbAssembly = typeof(IGDB.Models.Game).Assembly;
         var hasheousAssembly = typeof(HasheousClient.Models.Metadata.IGDB.Game).Assembly;
@@ -36,6 +40,7 @@ public class IGDBMetadataDocumentFilter : IDocumentFilter
                     Summary = $"Get {type.Name}metadata from IGDB.",
                     OperationId = $"Get{type.Name}Metadata"
                 };
+                var responses = new OpenApiResponses();
 
                 // check if the type has a description
                 if (!string.IsNullOrEmpty(endpointDataItem?.Endpoint))
@@ -43,11 +48,10 @@ public class IGDBMetadataDocumentFilter : IDocumentFilter
                     operation.Description = $"Get {type.Name}metadata from IGDB. See [IGDB API documentation](https://api-docs.igdb.com/#{endpointDataItem.Endpoint}) for more details.";
                 }
 
-                // assign tag
-                operation.Tags.Add(new OpenApiTag { Name = "MetadataProxy" });
+                EnsureMetadataProxyTag(openApiDocument, operation);
 
                 // set parameters
-                operation.Parameters = new List<OpenApiParameter>
+                operation.Parameters = new List<IOpenApiParameter>
                     {
                         new OpenApiParameter
                         {
@@ -57,7 +61,8 @@ public class IGDBMetadataDocumentFilter : IDocumentFilter
                             Required = false,
                             Schema = new OpenApiSchema
                             {
-                                Type = "integer($int64)"
+                                Type = JsonSchemaType.Integer,
+                                Format = "int64"
                             }
                         }
                     };
@@ -71,7 +76,7 @@ public class IGDBMetadataDocumentFilter : IDocumentFilter
                         Required = false,
                         Schema = new OpenApiSchema
                         {
-                            Type = "string"
+                            Type = JsonSchemaType.String
                         }
                     });
                 }
@@ -80,9 +85,9 @@ public class IGDBMetadataDocumentFilter : IDocumentFilter
                 bool hasExpandColumns = false;
 
                 // create response properties
-                var properties = new Dictionary<string, OpenApiSchema>
+                IDictionary<string, IOpenApiSchema> properties = new Dictionary<string, IOpenApiSchema>
                 {
-                    { type.Name, new OpenApiSchema() { Type = type.Name } }
+                    { type.Name, new OpenApiSchema { Type = JsonSchemaType.Object, Description = $"An instance of {type.Name}." } }
                 };
 
                 // create new object of type, and serialize it to get the properties
@@ -101,20 +106,16 @@ public class IGDBMetadataDocumentFilter : IDocumentFilter
                         // and description
                         string propertyType = property.PropertyType.Name;
 
-                        properties[property.Name] = new OpenApiSchema
-                        {
-                            Type = propertyType,
-                            Description = propertyType,
-                            AdditionalPropertiesAllowed = true
-                        };
+                        properties[property.Name] = CreateSchemaForClrType(property.PropertyType, propertyType);
 
                         // if the property is a collection, set the type to array
                         if (property.PropertyType.IsGenericType && (property.PropertyType.GetGenericTypeDefinition() == typeof(List<>) || property.PropertyType.GetGenericTypeDefinition() == typeof(IList<>) || property.PropertyType.GetGenericTypeDefinition() == typeof(IEnumerable<>) || property.PropertyType.GetGenericTypeDefinition() == typeof(Array)))
                         {
-                            properties[property.Name].Type = "array";
-                            properties[property.Name].Items = new OpenApiSchema
+                            properties[property.Name] = new OpenApiSchema
                             {
-                                Type = property.PropertyType.GetGenericArguments()[0].Name
+                                Type = JsonSchemaType.Array,
+                                Items = CreateSchemaForClrType(property.PropertyType.GetGenericArguments()[0], property.PropertyType.GetGenericArguments()[0].Name),
+                                Description = propertyType
                             };
 
                             // get the JsonPropertyName attribute if it exists
@@ -135,8 +136,12 @@ public class IGDBMetadataDocumentFilter : IDocumentFilter
                         // if the property is a dictionary, set the type to object
                         if (property.PropertyType.IsGenericType && property.PropertyType.GetGenericTypeDefinition() == typeof(Dictionary<,>))
                         {
-                            properties[property.Name].Type = "object";
-                            properties[property.Name].AdditionalPropertiesAllowed = true;
+                            properties[property.Name] = new OpenApiSchema
+                            {
+                                Type = JsonSchemaType.Object,
+                                Description = propertyType,
+                                AdditionalPropertiesAllowed = true
+                            };
                         }
                     }
                 }
@@ -145,7 +150,7 @@ public class IGDBMetadataDocumentFilter : IDocumentFilter
                     // if instance is null, we can still add the type as a property
                     properties[type.Name] = new OpenApiSchema
                     {
-                        Type = type.Name,
+                        Type = JsonSchemaType.Object,
                         Description = $"An instance of {type.Name}."
                     };
                 }
@@ -164,7 +169,7 @@ public class IGDBMetadataDocumentFilter : IDocumentFilter
                         Required = false,
                         Schema = new OpenApiSchema
                         {
-                            Type = "string"
+                            Type = JsonSchemaType.String
                         }
                     });
                 }
@@ -174,45 +179,49 @@ public class IGDBMetadataDocumentFilter : IDocumentFilter
                 {
                     Description = "Success"
                 };
-
-                // add response type
-                response200.Content.Add("application/json", new OpenApiMediaType
+                var response200Content = new Dictionary<string, OpenApiMediaType>
                 {
-                    Schema = new OpenApiSchema
+                    ["application/json"] = new OpenApiMediaType
                     {
-                        Type = type.FullName,
-                        AdditionalPropertiesAllowed = true,
-                        Properties = properties,
-                        Description = $"Returns the {type.Name} object from IGDB."
+                        Schema = new OpenApiSchema
+                        {
+                            Type = JsonSchemaType.Object,
+                            AdditionalPropertiesAllowed = true,
+                            Properties = properties,
+                            Description = $"Returns the {type.Name} object from IGDB."
+                        }
                     }
-                });
+                };
+                response200.Content = response200Content;
 
                 // adding response to operation
-                operation.Responses.Add("200", response200);
+                responses.Add("200", response200);
 
                 // create 400 response
                 var response400 = new OpenApiResponse
                 {
                     Description = "Error: Invalid search parameters"
                 };
-
-                // add response type
-                response400.Content.Add("application/json", new OpenApiMediaType
+                var response400Content = new Dictionary<string, OpenApiMediaType>
                 {
-                    Schema = new OpenApiSchema
+                    ["application/json"] = new OpenApiMediaType
                     {
-                        Description = $"Invalid search parameters for {type.Name}.",
-                        Type = "object",
-                        Properties = new Dictionary<string, OpenApiSchema>
+                        Schema = new OpenApiSchema
                         {
-                            { "error", new OpenApiSchema { Type = "string", Description = "Error message" } },
-                            { "code", new OpenApiSchema { Type = "integer", Description = "Error code" } }
+                            Description = $"Invalid search parameters for {type.Name}.",
+                            Type = JsonSchemaType.Object,
+                            Properties = new Dictionary<string, IOpenApiSchema>
+                            {
+                                { "error", new OpenApiSchema { Type = JsonSchemaType.String, Description = "Error message" } },
+                                { "code", new OpenApiSchema { Type = JsonSchemaType.Integer, Description = "Error code" } }
+                            }
                         }
                     }
-                });
+                };
+                response400.Content = response400Content;
 
                 // adding response to operation
-                operation.Responses.Add("400", response400);
+                responses.Add("400", response400);
 
                 // create 404 response
                 var response404 = new OpenApiResponse
@@ -221,7 +230,7 @@ public class IGDBMetadataDocumentFilter : IDocumentFilter
                 };
 
                 // adding response to operation
-                operation.Responses.Add("404", response404);
+                responses.Add("404", response404);
 
                 // create 500 response
                 var response500 = new OpenApiResponse
@@ -230,37 +239,105 @@ public class IGDBMetadataDocumentFilter : IDocumentFilter
                 };
 
                 // adding response to operation
-                operation.Responses.Add("500", response500);
+                responses.Add("500", response500);
+                operation.Responses = responses;
 
                 // enable this code if your endpoint requires authorization.
-                List<string> securityRequirements = ["API Key"];
-
-                // add security requirement
                 operation.Security = new List<OpenApiSecurityRequirement>
+                {
+                    new OpenApiSecurityRequirement
                     {
-                        new OpenApiSecurityRequirement
                         {
-                            {
-                                new OpenApiSecurityScheme
-                                {
-                                    Reference = new OpenApiReference
-                                    {
-                                        Type = ReferenceType.SecurityScheme,
-                                        Id = "Client API Key"
-                                    }
-                                },
-                                securityRequirements
-                            }
+                            new OpenApiSecuritySchemeReference("Client API Key", null!, null),
+                            []
                         }
-                    };
+                    }
+                };
 
                 // create path item
                 var pathItem = new OpenApiPathItem();
                 // add operation to the path
-                pathItem.AddOperation(OperationType.Get, operation);
+                pathItem.AddOperation(HttpMethod.Get, operation);
                 // finally add the path to document
-                openApiDocument?.Paths.Add($"/api/v1/MetadataProxy/IGDB/{type.Name}", pathItem);
+                openApiDocument.Paths ??= new OpenApiPaths();
+                openApiDocument.Paths.Add($"/api/v1/MetadataProxy/IGDB/{type.Name}", pathItem);
             }
         }
+    }
+
+    private static void EnsureMetadataProxyTag(OpenApiDocument openApiDocument, OpenApiOperation operation)
+    {
+        openApiDocument.Tags ??= new HashSet<OpenApiTag>();
+
+        if (!openApiDocument.Tags.Any(tag => tag.Name == "MetadataProxy"))
+        {
+            openApiDocument.Tags.Add(new OpenApiTag { Name = "MetadataProxy" });
+        }
+
+        operation.Tags ??= new HashSet<OpenApiTagReference>();
+        operation.Tags.Add(new OpenApiTagReference("MetadataProxy", openApiDocument, null));
+    }
+
+    private static OpenApiSchema CreateSchemaForClrType(Type clrType, string? description = null)
+    {
+        var isNullable = !clrType.IsValueType || Nullable.GetUnderlyingType(clrType) != null;
+        var effectiveType = Nullable.GetUnderlyingType(clrType) ?? clrType;
+
+        JsonSchemaType schemaType;
+        string? format = null;
+
+        if (effectiveType == typeof(string) || effectiveType == typeof(Guid) || effectiveType == typeof(DateTime) || effectiveType == typeof(DateTimeOffset) || effectiveType.IsEnum)
+        {
+            schemaType = JsonSchemaType.String;
+            if (effectiveType == typeof(Guid))
+            {
+                format = "uuid";
+            }
+            else if (effectiveType == typeof(DateTime) || effectiveType == typeof(DateTimeOffset))
+            {
+                format = "date-time";
+            }
+        }
+        else if (effectiveType == typeof(bool))
+        {
+            schemaType = JsonSchemaType.Boolean;
+        }
+        else if (effectiveType == typeof(byte) || effectiveType == typeof(short) || effectiveType == typeof(int) || effectiveType == typeof(long))
+        {
+            schemaType = JsonSchemaType.Integer;
+            if (effectiveType == typeof(long))
+            {
+                format = "int64";
+            }
+            else if (effectiveType == typeof(int))
+            {
+                format = "int32";
+            }
+        }
+        else if (effectiveType == typeof(float) || effectiveType == typeof(double) || effectiveType == typeof(decimal))
+        {
+            schemaType = JsonSchemaType.Number;
+        }
+        else if (typeof(System.Collections.IEnumerable).IsAssignableFrom(effectiveType) && effectiveType != typeof(string))
+        {
+            schemaType = JsonSchemaType.Array;
+        }
+        else
+        {
+            schemaType = JsonSchemaType.Object;
+        }
+
+        if (isNullable)
+        {
+            schemaType |= JsonSchemaType.Null;
+        }
+
+        return new OpenApiSchema
+        {
+            Type = schemaType,
+            Format = format,
+            Description = description,
+            AdditionalPropertiesAllowed = schemaType.HasFlag(JsonSchemaType.Object)
+        };
     }
 }

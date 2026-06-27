@@ -650,6 +650,159 @@ namespace Classes
 		static readonly ConcurrentDictionary<Type, System.Reflection.PropertyInfo[]> _hashPropsCache =
 			new ConcurrentDictionary<Type, System.Reflection.PropertyInfo[]>();
 
+		public static bool IsStrongNameMatch(string candidate, string? resultName)
+		{
+			return GetStrongNameMatchScore(candidate, resultName) >= 8;
+		}
+
+		public static int GetStrongNameMatchScore(string candidate, string? resultName)
+		{
+			if (string.IsNullOrWhiteSpace(candidate) || string.IsNullOrWhiteSpace(resultName))
+			{
+				return int.MinValue;
+			}
+
+			if (string.Equals(candidate, resultName, StringComparison.OrdinalIgnoreCase))
+			{
+				return 100;
+			}
+
+			HashSet<string> candidateTokens = TokenizeWithNumericVariants(candidate);
+			HashSet<string> resultTokens = TokenizeWithNumericVariants(resultName);
+
+			// Pull in parenthetical aliases, e.g. "Commodore 65 (C64)" should expose "C64" and "64".
+			foreach (Match aliasMatch in Regex.Matches(resultName, @"\(([^)]{1,40})\)"))
+			{
+				foreach (string token in TokenizeWithNumericVariants(aliasMatch.Groups[1].Value))
+				{
+					resultTokens.Add(token);
+				}
+			}
+
+			int score = 0;
+			HashSet<string> matchedResultTokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+			// Every candidate token must be represented in the result with exact or near-exact matching.
+			foreach (string candidateToken in candidateTokens)
+			{
+				int bestTokenScore = int.MinValue;
+				string? bestResultToken = null;
+
+				foreach (string resultToken in resultTokens)
+				{
+					int tokenScore = TokenMatchScore(candidateToken, resultToken);
+					if (tokenScore > bestTokenScore)
+					{
+						bestTokenScore = tokenScore;
+						bestResultToken = resultToken;
+					}
+				}
+
+				if (bestTokenScore <= 0 || bestResultToken == null)
+				{
+					return int.MinValue;
+				}
+
+				score += bestTokenScore;
+				matchedResultTokens.Add(bestResultToken);
+			}
+
+			int unmatchedResultTokenPenalty = resultTokens
+				.Where(token => !matchedResultTokens.Contains(token))
+				.Count(token => token.Length >= 3);
+
+			score -= unmatchedResultTokenPenalty * 3;
+
+			string normalizedCandidate = Regex.Replace(candidate.ToLowerInvariant(), @"[^a-z0-9]+", " ").Trim();
+			string normalizedResult = Regex.Replace(resultName.ToLowerInvariant(), @"[^a-z0-9]+", " ").Trim();
+			score -= Math.Abs(normalizedResult.Length - normalizedCandidate.Length) / 2;
+
+			return score;
+		}
+
+		private static HashSet<string> TokenizeWithNumericVariants(string input)
+		{
+			HashSet<string> tokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+			foreach (string rawPart in Regex.Split(input, @"[^A-Za-z0-9]+"))
+			{
+				if (string.IsNullOrWhiteSpace(rawPart))
+				{
+					continue;
+				}
+
+				string token = rawPart.Trim().ToLowerInvariant();
+				tokens.Add(token);
+
+				// Add a numeric variant for shorthand tokens like "c64" -> "64".
+				string numericOnly = new string(token.Where(char.IsDigit).ToArray());
+				if (!string.IsNullOrEmpty(numericOnly))
+				{
+					tokens.Add(numericOnly);
+				}
+			}
+
+			return tokens;
+		}
+
+		private static bool TokensEquivalent(string a, string b)
+		{
+			return TokenMatchScore(a, b) > 0;
+		}
+
+		private static int TokenMatchScore(string a, string b)
+		{
+			if (string.Equals(a, b, StringComparison.OrdinalIgnoreCase))
+			{
+				return 10;
+			}
+
+			int maxLength = Math.Max(a.Length, b.Length);
+			int distance = LevenshteinDistance(a, b);
+
+			// Keep typo tolerance conservative to avoid incorrect automatic matches.
+			if (maxLength >= 8 && distance <= 2)
+			{
+				return 6;
+			}
+
+			if (maxLength >= 4 && distance <= 1)
+			{
+				return 7;
+			}
+
+			return 0;
+		}
+
+		private static int LevenshteinDistance(string left, string right)
+		{
+			int[,] d = new int[left.Length + 1, right.Length + 1];
+
+			for (int i = 0; i <= left.Length; i++)
+			{
+				d[i, 0] = i;
+			}
+
+			for (int j = 0; j <= right.Length; j++)
+			{
+				d[0, j] = j;
+			}
+
+			for (int i = 1; i <= left.Length; i++)
+			{
+				for (int j = 1; j <= right.Length; j++)
+				{
+					int cost = left[i - 1] == right[j - 1] ? 0 : 1;
+					d[i, j] = Math.Min(
+						Math.Min(d[i - 1, j] + 1, d[i, j - 1] + 1),
+						d[i - 1, j - 1] + cost
+					);
+				}
+			}
+
+			return d[left.Length, right.Length];
+		}
+
 		/// <summary>
 		/// Provides a way to set contextual data that flows with the call and 
 		/// async context of a test or invocation.

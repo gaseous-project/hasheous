@@ -6,6 +6,7 @@ let editMode = false;
 let showEditControls = false;
 let showMergeControls = false;
 let showRescanButton = false;
+let showTasksSection = false;
 let showMetadataSubmitButton = false;
 let loadDuplicates = false;
 
@@ -16,6 +17,7 @@ if (userProfile != null && userProfile.Roles != null) {
             if (userProfile.Roles.includes('Moderator') || userProfile.Roles.includes('Admin')) {
                 showEditControls = true;
                 showMergeControls = true;
+                showTasksSection = true;
                 loadDuplicates = true;
             }
 
@@ -26,6 +28,7 @@ if (userProfile != null && userProfile.Roles != null) {
 
         case "platform":
             if (userProfile.Roles.includes('Moderator') || userProfile.Roles.includes('Admin')) {
+                showTasksSection = true;
                 loadDuplicates = true;
             }
         case "app":
@@ -48,6 +51,12 @@ if (showMergeControls) {
     document.getElementById('dataObjectMergeButtons').style.display = '';
 } else {
     document.getElementById('dataObjectMergeButtons').style.display = 'none';
+}
+
+if (showTasksSection) {
+    document.getElementById('dataObjectTasksSection').style.display = '';
+} else {
+    document.getElementById('dataObjectTasksSection').style.display = 'none';
 }
 
 if (showRescanButton) {
@@ -583,6 +592,9 @@ function renderContent() {
                     }
 
                     let sigLabelText = dataObject.signatureDataObjects[i].Name;
+                    if (dataObject.signatureDataObjects[i].Country != null && dataObject.signatureDataObjects[i].Country != '') {
+                        sigLabelText += ' - ' + dataObject.signatureDataObjects[i].Country;
+                    }
                     if (dataObject.signatureDataObjects[i].Year != null && dataObject.signatureDataObjects[i].Year != '') {
                         sigLabelText += ' (' + dataObject.signatureDataObjects[i].Year + ')';
                     }
@@ -637,6 +649,10 @@ function renderContent() {
             false
         );
         document.getElementById('dataObjectMetadataMap').appendChild(newMetadataMapTable);
+    }
+
+    if (showTasksSection) {
+        loadTasksSection();
     }
 
     if (loadDuplicates) {
@@ -1046,3 +1062,63 @@ let platforms = fetch('/api/v1/DataObjects/platform?getchildrelations=false', {
     .catch((error) => {
         console.error('Error fetching platforms:', error);
     });
+
+function loadTasksSection() {
+    // load the tasks endpoint
+    fetch('/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int') + '/Tasks', {
+        method: 'GET'
+    }).then(async function (response) {
+        if (!response.ok) {
+            throw new Error('Failed to fetch data object tasks');
+        }
+        return response.json();
+    }).then(function (success) {
+        if (success.length > 0) {
+            let tasksLang = [];
+            success.forEach(task => {
+                let newTask = {
+                    id: task.id,
+                    taskName: `servicetasktype${task.taskName.toLowerCase()}`,
+                    realTaskName: task.taskName,
+                    status: `servicetaskstatus${task.status.toLowerCase()}`,
+                    realStatus: task.status
+                }
+                tasksLang.push(newTask);
+            });
+
+            let tasksTable = new generateTable(
+                tasksLang,
+                ['id', 'taskName:lang', 'status:lang'],
+                'id',
+                true,
+                (id, taskObject) => {
+                    let taskStatus = String(taskObject[0].realStatus).toLowerCase();
+                    if (taskStatus != 'pending') {
+                        // reset the task
+                        fetch('/api/v1/DataObjects/' + pageType + '/' + getQueryString('id', 'int') + '/Tasks/' + id + '?resetTask=true', {
+                            method: 'GET'
+                        }).then(async function (response) {
+                            if (!response.ok) {
+                                throw new Error('Failed to reset task');
+                            }
+                            return response.json();
+                        }).then(function (success) {
+                            loadTasksSection();
+                        }).catch(function (error) {
+                            console.warn(error);
+                        });
+                    }
+                },
+                success.length
+            );
+
+            let tasksTableElement = document.getElementById('dataObjectTasks');
+            tasksTableElement.innerHTML = '';
+            tasksTableElement.appendChild(tasksTable);
+        }
+    },
+        function (error) {
+            console.warn(error);
+        }
+    );
+}

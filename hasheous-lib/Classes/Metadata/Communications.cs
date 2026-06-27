@@ -211,7 +211,12 @@ namespace hasheous_server.Classes.Metadata
             /// <summary>
             /// ScreenScraper - queries ScreenScraper service for metadata
             /// </summary>
-            ScreenScraper
+            ScreenScraper,
+
+            /// <summary>
+            /// LaunchBox - queries LaunchBox Metadata.xml file for metadata
+            /// </summary>
+            LaunchBox
         }
 
         /// <summary>

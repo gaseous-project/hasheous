@@ -37,11 +37,11 @@
 				"GitHub.vscode-pull-request-github",
 				"AndersEAndersen.html-class-suggestions",
 				"george-alisson.html-preview-vscode",
-				"ms-dotnettools.vscodeintellicode-csharp",
 				"Zignd.html-css-class-completion",
 				"ms-azuretools.vscode-docker",
 				"Gruntfuggly.todo-tree",
-				"eamodio.gitlens"
+				"eamodio.gitlens",
+				"ms-vscode.vscode-chat-customizations-evaluations"
 			]
 		}
 	}

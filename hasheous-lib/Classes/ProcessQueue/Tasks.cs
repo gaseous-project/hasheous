@@ -128,6 +128,11 @@ namespace Classes.ProcessQueue
         /// <summary>
         /// Fetches ScreenScraper metadata - uses already cached metadata files
         /// </summary>
-        FetchScreenScraperMetadata
+        FetchScreenScraperMetadata,
+
+        /// <summary>
+        /// Fetches LaunchBox metadata - uses already cached metadata files
+        /// </summary>
+        FetchLaunchBoxMetadata
     }
 }

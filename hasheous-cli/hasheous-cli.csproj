@@ -9,16 +9,16 @@
 
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <WarningLevel>4</WarningLevel>
-    <DocumentationFile>bin\Debug\net8.0\hasheous-cli.xml</DocumentationFile>
+    <DocumentationFile>bin\Debug\net10.0\hasheous-cli.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <WarningLevel>4</WarningLevel>
-    <DocumentationFile>bin\Release\net8.0\hasheous-cli.xml</DocumentationFile>
+    <DocumentationFile>bin\Release\net10.0\hasheous-cli.xml</DocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-    <PackageReference Include="MySqlConnector" Version="2.5.0" />
+    <PackageReference Include="MySqlConnector" Version="2.6.1" />
   </ItemGroup>
 
   <ItemGroup>

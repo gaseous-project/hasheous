@@ -8,29 +8,32 @@
 
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <WarningLevel>4</WarningLevel>
-    <DocumentationFile>bin\Debug\net8.0\hasheous-lib.xml</DocumentationFile>
+    <DocumentationFile>bin\Debug\net10.0\hasheous-lib.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <WarningLevel>4</WarningLevel>
-    <DocumentationFile>bin\Release\net8.0\hasheous-lib.xml</DocumentationFile>
+    <DocumentationFile>bin\Release\net10.0\hasheous-lib.xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="gaseous-signature-parser" Version="2.5.3" />
+    <PackageReference Include="AWSSDK.S3" Version="4.0.25.3" />
+    <PackageReference Include="craftersmine.SteamGridDB.Net" Version="1.1.7" />
+    <PackageReference Include="gaseous-signature-parser" Version="2.7.0" />
     <PackageReference Include="gaseous.IGDB" Version="1.0.5" />
-    <PackageReference Include="hasheous-client" Version="1.4.8" />
+    <PackageReference Include="hasheous-client" Version="1.5.0" />
     <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="8.0.25" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.MicrosoftAccount" Version="8.0.25" />
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="8.0.25" />
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.Versioning" Version="5.1.0" />
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.Versioning.ApiExplorer" Version="5.1.0" />
-    <PackageReference Include="StackExchange.Redis" Version="2.12.14" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="[9.0.6]" />
-    <PackageReference Include="MySqlConnector" Version="2.5.0" />
-    <PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="8.0.25" />
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.25" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.5" />
-    <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="9.0.0" />
+    <PackageReference Include="Asp.Versioning.Mvc" Version="10.0.0" />
+    <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" Version="10.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="10.0.9" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.MicrosoftAccount" Version="10.0.9" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="10.0.9" />
+    <PackageReference Include="StackExchange.Redis" Version="3.0.7" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
+    <PackageReference Include="MySqlConnector" Version="2.6.1" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="10.0.9" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
+    <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="10.0.2" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
   <ItemGroup>
@@ -40,7 +43,8 @@
     <None Remove="Schema\hasheous-*.sql" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Build" Version="17.11.48" />
+    <PackageReference Include="Microsoft.Build" Version="18.7.1" />
+    <PackageReference Include="NuGet.Packaging" Version="7.6.0" />
     <EmbeddedResource Include="Support\*.txt" />
     <EmbeddedResource Include="Schema\hasheous-*.sql" />
   </ItemGroup>

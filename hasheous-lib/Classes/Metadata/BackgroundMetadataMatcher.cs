@@ -57,7 +57,7 @@ namespace BackgroundMetadataMatcher
             Voted = 5
         }
 
-        public Task GetGamesWithoutArtwork()
+        public async Task GetGamesWithoutArtwork()
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = @"
@@ -82,20 +82,18 @@ namespace BackgroundMetadataMatcher
                     (`Attr`.`AttributeValue` IS NULL OR `Attr`.`AttributeValue` = "");
             ";
 
-            DataTable data = db.ExecuteCMD(sql, new Dictionary<string, object>());
+            DataTable data = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>());
             foreach (DataRow row in data.Rows)
             {
                 Logging.Log(Logging.LogType.Information, "Background Metadata Matcher", "Getting artwork for game " + (string)row["Name"]);
                 _ = GetGameArtwork((long)row["Id"]);
             }
-
-            return Task.CompletedTask;
         }
 
         public async Task GetGameArtwork(long DataObjectId, bool force = false)
         {
             DataObjects dataObjects = new DataObjects();
-            DataObjectItem dataObjectItem = await dataObjects.GetDataObject(DataObjects.DataObjectType.Game, DataObjectId);
+            DataObjectItem? dataObjectItem = await dataObjects.GetDataObject(DataObjects.DataObjectType.Game, DataObjectId);
 
             if (dataObjectItem != null)
             {

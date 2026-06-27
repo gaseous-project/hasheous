@@ -50,7 +50,7 @@ namespace hasheous_server.Controllers.v1_0
 
                 return Ok(DataObjectDefinition);
             }
-            catch (Exception ex)
+            catch
             {
                 return NotFound();
             }
@@ -131,10 +131,10 @@ namespace hasheous_server.Controllers.v1_0
                     }
 
                     DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
-                    DataObject.Permissions = dataObjectPermission.GetObjectPermission(user, ObjectType, DataObject.Id);
+                    DataObject.Permissions = await dataObjectPermission.GetObjectPermission(user, ObjectType, DataObject.Id);
                     if (DataObject.Permissions.Contains(DataObjectPermission.PermissionType.Update))
                     {
-                        DataObject.UserPermissions = dataObjectPermission.GetObjectPermissionList(DataObject.Id);
+                        DataObject.UserPermissions = await dataObjectPermission.GetObjectPermissionList(DataObject.Id);
                     }
                 }
                 else
@@ -655,6 +655,50 @@ namespace hasheous_server.Controllers.v1_0
             objectsList = await DataObjects.GetDuplicateDataObjects(ObjectType, Id, pageNumber, pageSize);
 
             return Ok(objectsList);
+        }
+
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [Authorize(Roles = "Admin,Moderator")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [Route("{ObjectType}/{Id}/Tasks/")]
+        public async Task<IActionResult> GetTasks(Classes.DataObjects.DataObjectType ObjectType, long Id)
+        {
+            var response = Classes.Tasks.Clients.TaskManagement.GetAllTasks(Id);
+
+            if (response != null)
+            {
+                return Ok(response);
+            }
+            else
+            {
+                return NotFound();
+            }
+        }
+
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [Authorize(Roles = "Admin,Moderator")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [Route("{ObjectType}/{Id}/Tasks/{TaskId}")]
+        public async Task<IActionResult> GetTask(Classes.DataObjects.DataObjectType ObjectType, long Id, long TaskId, bool resetTask = false)
+        {
+            var response = Classes.Tasks.Clients.TaskManagement.GetTask(TaskId);
+
+            if (response != null)
+            {
+                if (resetTask)
+                {
+                    await response.Reset();
+                    response = Classes.Tasks.Clients.TaskManagement.GetTask(TaskId);
+                }
+
+                return Ok(response);
+            }
+            else
+            {
+                return NotFound();
+            }
         }
 
         [MapToApiVersion("1.0")]

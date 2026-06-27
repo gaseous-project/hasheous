@@ -147,33 +147,33 @@ namespace Classes
 		public DataTable ExecuteCMD(string Command)
 		{
 			Dictionary<string, object> dbDict = new Dictionary<string, object>();
-			return _ExecuteCMD(Command, dbDict, 30, "");
+			return _ExecuteCMD(Command, dbDict, 30, "").Result;
 		}
 
 		public DataTable ExecuteCMD(string Command, Dictionary<string, object> Parameters)
 		{
-			return _ExecuteCMD(Command, Parameters, 30, "");
+			return _ExecuteCMD(Command, Parameters, 30, "").Result;
 		}
 
 		public DataTable ExecuteCMD(string Command, Dictionary<string, object> Parameters, int Timeout = 30, string ConnectionString = "")
 		{
-			return _ExecuteCMD(Command, Parameters, Timeout, ConnectionString);
+			return _ExecuteCMD(Command, Parameters, Timeout, ConnectionString).Result;
 		}
 
 		public List<Dictionary<string, object>> ExecuteCMDDict(string Command)
 		{
 			Dictionary<string, object> dbDict = new Dictionary<string, object>();
-			return _ExecuteCMDDict(Command, dbDict, 30, "");
+			return _ExecuteCMDDict(Command, dbDict, 30, "").Result;
 		}
 
 		public List<Dictionary<string, object>> ExecuteCMDDict(string Command, Dictionary<string, object> Parameters)
 		{
-			return _ExecuteCMDDict(Command, Parameters, 30, "");
+			return _ExecuteCMDDict(Command, Parameters, 30, "").Result;
 		}
 
 		public List<Dictionary<string, object>> ExecuteCMDDict(string Command, Dictionary<string, object> Parameters, int Timeout = 30, string ConnectionString = "")
 		{
-			return _ExecuteCMDDict(Command, Parameters, Timeout, ConnectionString);
+			return _ExecuteCMDDict(Command, Parameters, Timeout, ConnectionString).Result;
 		}
 		#endregion Synchronous Database Access
 
@@ -181,39 +181,39 @@ namespace Classes
 		public async Task<DataTable> ExecuteCMDAsync(string Command)
 		{
 			Dictionary<string, object> dbDict = new Dictionary<string, object>();
-			return _ExecuteCMD(Command, dbDict, 30, "");
+			return await _ExecuteCMD(Command, dbDict, 30, "");
 		}
 
 		public async Task<DataTable> ExecuteCMDAsync(string Command, Dictionary<string, object> Parameters)
 		{
-			return _ExecuteCMD(Command, Parameters, 30, "");
+			return await _ExecuteCMD(Command, Parameters, 30, "");
 		}
 
 		public async Task<DataTable> ExecuteCMDAsync(string Command, Dictionary<string, object> Parameters, int Timeout = 30, string ConnectionString = "")
 		{
-			return _ExecuteCMD(Command, Parameters, Timeout, ConnectionString);
+			return await _ExecuteCMD(Command, Parameters, Timeout, ConnectionString);
 		}
 
 		public async Task<List<Dictionary<string, object>>> ExecuteCMDDictAsync(string Command)
 		{
 			Dictionary<string, object> dbDict = new Dictionary<string, object>();
-			return _ExecuteCMDDict(Command, dbDict, 30, "");
+			return await _ExecuteCMDDict(Command, dbDict, 30, "");
 		}
 
 		public async Task<List<Dictionary<string, object>>> ExecuteCMDDictAsync(string Command, Dictionary<string, object> Parameters)
 		{
-			return _ExecuteCMDDict(Command, Parameters, 30, "");
+			return await _ExecuteCMDDict(Command, Parameters, 30, "");
 		}
 
 		public async Task<List<Dictionary<string, object>>> ExecuteCMDDictAsync(string Command, Dictionary<string, object> Parameters, int Timeout = 30, string ConnectionString = "")
 		{
-			return _ExecuteCMDDict(Command, Parameters, Timeout, ConnectionString);
+			return await _ExecuteCMDDict(Command, Parameters, Timeout, ConnectionString);
 		}
 		#endregion Asynchronous Database Access
 
-		private List<Dictionary<string, object>> _ExecuteCMDDict(string Command, Dictionary<string, object> Parameters, int Timeout = 30, string ConnectionString = "")
+		private async Task<List<Dictionary<string, object>>> _ExecuteCMDDict(string Command, Dictionary<string, object> Parameters, int Timeout = 30, string ConnectionString = "")
 		{
-			DataTable dataTable = _ExecuteCMD(Command, Parameters, Timeout, ConnectionString);
+			DataTable dataTable = await _ExecuteCMD(Command, Parameters, Timeout, ConnectionString);
 
 			// convert datatable to dictionary
 			List<Dictionary<string, object?>> rows = new List<Dictionary<string, object?>>();
@@ -239,14 +239,14 @@ namespace Classes
 			return rows;
 		}
 
-		private DataTable _ExecuteCMD(string Command, Dictionary<string, object> Parameters, int Timeout = 30, string ConnectionString = "")
+		private async Task<DataTable> _ExecuteCMD(string Command, Dictionary<string, object> Parameters, int Timeout = 30, string ConnectionString = "")
 		{
 			if (ConnectionString == "") { ConnectionString = _ConnectionString; }
 			switch (_ConnectorType)
 			{
 				case databaseType.MySql:
 					MySQLServerConnector conn = new MySQLServerConnector(ConnectionString);
-					return (DataTable)conn.ExecCMD(Command, Parameters, Timeout);
+					return await conn.ExecCMD(Command, Parameters, Timeout);
 				default:
 					return new DataTable();
 			}
@@ -387,7 +387,7 @@ namespace Classes
 				DBConn = ConnectionString;
 			}
 
-			public DataTable ExecCMD(string SQL, Dictionary<string, object> Parameters, int Timeout)
+			public async Task<DataTable> ExecCMD(string SQL, Dictionary<string, object> Parameters, int Timeout)
 			{
 				DataTable RetTable = new DataTable();
 
@@ -415,7 +415,7 @@ namespace Classes
 						string dictValues = string.Join(";", Parameters.Select(x => string.Join("=", x.Key, x.Value)));
 						Logging.Log(Logging.LogType.Debug, "Database", "Parameters: " + dictValues, null, true);
 					}
-					RetTable.Load(cmd.ExecuteReader());
+					RetTable.Load(await cmd.ExecuteReaderAsync());
 				}
 				catch (Exception ex)
 				{
@@ -504,7 +504,7 @@ namespace Classes
 
 					transaction.Commit();
 				}
-				catch (Exception ex)
+				catch
 				{
 					transaction.Rollback();
 					throw;
@@ -550,7 +550,7 @@ namespace Classes
 
 					await transaction.CommitAsync();
 				}
-				catch (Exception ex)
+				catch
 				{
 					await transaction.RollbackAsync();
 					throw;

@@ -76,7 +76,8 @@ function LoadBackgroundTasks() {
                             "FetchTheGamesDbMetadata",
                             "FetchVIMMMetadata",
                             "FetchGiantBombMetadata",
-                            "FetchRetroAchievementsMetadata"
+                            "FetchRetroAchievementsMetadata",
+                            "FetchLaunchBoxMetadata"
                         ],
                         "maintenance": [
                             "HourlyMaintenance_Frontend",

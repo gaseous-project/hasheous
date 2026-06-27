@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Mail;
 using System.Reflection;
 using System.Text.Json.Serialization;
+using Asp.Versioning;
 using Authentication;
 using Classes;
 using hasheous_server.Controllers.v1_0;
@@ -9,9 +10,8 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Versioning;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using static Authentication.InterHostApiKey;
 using static Classes.Common;
 
@@ -86,11 +86,12 @@ builder.Services.AddApiVersioning(config =>
     config.DefaultApiVersion = new ApiVersion(1, 0);
     config.AssumeDefaultVersionWhenUnspecified = true;
     config.ReportApiVersions = true;
-    config.ApiVersionReader = ApiVersionReader.Combine(new UrlSegmentApiVersionReader(),
-                                                    new HeaderApiVersionReader("x-api-version"),
-                                                    new MediaTypeApiVersionReader("x-api-version"));
-});
-builder.Services.AddVersionedApiExplorer(setup =>
+    config.ApiVersionReader = ApiVersionReader.Combine(
+        new UrlSegmentApiVersionReader(),
+        new HeaderApiVersionReader("x-api-version"),
+        new MediaTypeApiVersionReader("x-api-version"));
+})
+.AddApiExplorer(setup =>
 {
     setup.GroupNameFormat = "'v'VVV";
     setup.SubstituteApiVersionInUrl = true;
@@ -255,6 +256,8 @@ Classes.ProcessQueue.QueueProcessor.QueueItems = new List<Classes.ProcessQueue.Q
     new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchFBNEOMetadata, 10080, false),
     // fetch ScreenScraper metadata
     new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchScreenScraperMetadata, 1440, false),
+    // fetch LaunchBox metadata
+    new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchLaunchBoxMetadata, 1440, false),
 
     // dump all data objects
     new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.MetadataMapDump, 10080, false)

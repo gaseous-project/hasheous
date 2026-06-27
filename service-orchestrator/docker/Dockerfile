@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0 AS build-env
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS build-env
 ARG TARGETARCH
 ARG BUILDPLATFORM
 WORKDIR /App
@@ -23,7 +23,7 @@ RUN dotnet restore "service-host/service-host.csproj" -a $TARGETARCH
 RUN dotnet publish "service-host/service-host.csproj" --use-current-runtime --self-contained true -c Release -o out -a $TARGETARCH
 
 # Build runtime image
-FROM mcr.microsoft.com/dotnet/aspnet:8.0
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
 ENV INDOCKER=1
 WORKDIR /App
 

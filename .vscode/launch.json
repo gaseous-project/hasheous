@@ -6,7 +6,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/hasheous/bin/Debug/net8.0/hasheous.dll",
+            "program": "${workspaceFolder}/hasheous/bin/Debug/net10.0/hasheous.dll",
             "args": [],
             "cwd": "${workspaceFolder}/hasheous",
             "enableStepFiltering": false,
@@ -24,7 +24,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/service-orchestrator/bin/Debug/net8.0/service-orchestrator.dll",
+            "program": "${workspaceFolder}/service-orchestrator/bin/Debug/net10.0/service-orchestrator.dll",
             "args": [],
             "cwd": "${workspaceFolder}/service-orchestrator",
             "enableStepFiltering": false,
@@ -42,12 +42,10 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/service-host/bin/Debug/net8.0/service-host.dll",
+            "program": "${workspaceFolder}/service-host/bin/Debug/net10.0/service-host.dll",
             "args": [
                 "--service",
-                "FetchScreenScraperMetadata",
-                "--reportingserver",
-                "https://localhost:7023"
+                "SignatureIngestor"
             ],
             "cwd": "${workspaceFolder}/service-host",
             "stopAtEntry": false

@@ -35,12 +35,15 @@ namespace hasheous_server.Classes
             else
             {
                 // if DataObjectId is not provided, look it up based on the hashes
-                HashLookup hashLookup = new HashLookup(db, new Models.HashLookupModel
+                HashLookup hashLookup = new HashLookup(db, new List<Models.HashLookupModel>
                 {
-                    MD5 = model.MD5,
-                    SHA1 = model.SHA1,
-                    SHA256 = model.SHA256,
-                    CRC = model.CRC
+                    new Models.HashLookupModel
+                    {
+                        MD5 = model.MD5,
+                        SHA1 = model.SHA1,
+                        SHA256 = model.SHA256,
+                        CRC = model.CRC
+                    }
                 });
                 await hashLookup.PerformLookup();
 
@@ -215,7 +218,7 @@ namespace hasheous_server.Classes
                         // check for an existing vote - users only get one vote per game
                         // if a user submits an existing vote, it will be updated
                         string sql = "SELECT * FROM MatchUserVotes WHERE UserId = @userId AND DataObjectId = @dataObjectId AND MetadataSourceId = @metadataSourceId";
-                        DataTable data = db.ExecuteCMD(sql, new Dictionary<string, object>{
+                        DataTable data = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>{
                             { "userId", UserId },
                             { "dataObjectId", dataObjectId },
                             { "metadataSourceId", metadataMatch.Source }
@@ -267,7 +270,7 @@ namespace hasheous_server.Classes
 
             // select all dataobjects that have votes
             string sql = "SELECT DISTINCT DataObjectId FROM MatchUserVotes;";
-            DataTable dataObjectsWithVotes = db.ExecuteCMD(sql);
+            DataTable dataObjectsWithVotes = await db.ExecuteCMDAsync(sql);
 
             DataObjects dataObjects = new DataObjects();
 
@@ -300,7 +303,7 @@ namespace hasheous_server.Classes
                 {
                     // calculate votes
                     sql = "SELECT DataObjectId, MetadataSourceId, MetadataGameId, COUNT(*) AS `Votes` FROM MatchUserVotes WHERE DataObjectId = @dataObjectId AND MetadataSourceId = @metadataSourceId GROUP BY MetadataSourceId, MetadataGameId ORDER BY DataObjectId, MetadataSourceId, `Votes` DESC;";
-                    DataTable data = db.ExecuteCMD(sql, new Dictionary<string, object>{
+                    DataTable data = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>{
                         { "dataObjectId", dataObject.Id },
                         { "metadataSourceId", metadataSource }
                     });
@@ -401,12 +404,15 @@ namespace hasheous_server.Classes
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
 
             // check if the content hash already exists
-            HashLookup hashLookup = new HashLookup(db, new Models.HashLookupModel
+            HashLookup hashLookup = new HashLookup(db, new List<Models.HashLookupModel>
             {
-                MD5 = model.Content.MD5,
-                SHA1 = model.Content.SHA1,
-                SHA256 = model.Content.SHA256,
-                CRC = model.Content.CRC
+                new Models.HashLookupModel
+                {
+                    MD5 = model.Content.MD5,
+                    SHA1 = model.Content.SHA1,
+                    SHA256 = model.Content.SHA256,
+                    CRC = model.Content.CRC
+                }
             });
             await hashLookup.PerformLookup();
 
@@ -418,7 +424,7 @@ namespace hasheous_server.Classes
 
             // check if the archive hash already exists in the database against this user
             string sql = "SELECT * FROM UserArchiveObservations WHERE UserId = @userId AND ArchiveMD5 = @md5 AND ArchiveSHA1 = @sha1 AND ArchiveSHA256 = @sha256;";
-            DataTable data = db.ExecuteCMD(sql, new Dictionary<string, object>
+            DataTable data = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>
             {
                 { "userId", UserId },
                 { "md5", model.Archive.MD5 },

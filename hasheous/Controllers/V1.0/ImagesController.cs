@@ -42,7 +42,7 @@ namespace hasheous_server.Controllers.v1_0
                     FileName = image.Id + image.extension,
                     Inline = true
                 };
-                Response.Headers.Add("Content-Disposition", cd.ToString());
+                Response.Headers.Append(HeaderNames.ContentDisposition, cd.ToString());
 
                 return File(image.content, image.mimeType);
             }

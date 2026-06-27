@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Mail;
 using System.Reflection;
 using System.Text.Json.Serialization;
+using Asp.Versioning;
 using Authentication;
 using Classes;
 using Classes.ProcessQueue;
@@ -16,11 +17,10 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
-using Microsoft.AspNetCore.Mvc.Versioning;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using StackExchange.Redis;
 using static Classes.Common;
 
@@ -97,9 +97,12 @@ public static class StartupExtensions
             config.DefaultApiVersion = new ApiVersion(1, 0);
             config.AssumeDefaultVersionWhenUnspecified = true;
             config.ReportApiVersions = true;
-            config.ApiVersionReader = ApiVersionReader.Combine(new UrlSegmentApiVersionReader(), new HeaderApiVersionReader("x-api-version"), new MediaTypeApiVersionReader("x-api-version"));
-        });
-        services.AddVersionedApiExplorer(setup =>
+            config.ApiVersionReader = ApiVersionReader.Combine(
+                new UrlSegmentApiVersionReader(),
+                new HeaderApiVersionReader("x-api-version"),
+                new MediaTypeApiVersionReader("x-api-version"));
+        })
+        .AddApiExplorer(setup =>
         {
             setup.GroupNameFormat = "'v'VVV";
             setup.SubstituteApiVersionInUrl = true;
@@ -163,6 +166,7 @@ public static class StartupExtensions
                 Scheme = "TaskWorkerApiKeyScheme"
             });
             options.OperationFilter<AuthorizationOperationFilter>();
+            options.OperationFilter<LookupRequestBodyOperationFilter>();
             options.DocumentFilter<IGDBMetadataDocumentFilter>();
             options.SwaggerDoc("v1", new OpenApiInfo
             {

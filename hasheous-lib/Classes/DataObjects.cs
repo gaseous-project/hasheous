@@ -359,7 +359,7 @@ namespace hasheous_server.Classes
                 }
             }
 
-            DataTable data = db.ExecuteCMD(sql, dbDict);
+            DataTable data = await db.ExecuteCMDAsync(sql, dbDict);
 
             List<Models.DataObjectItem> DataObjects = new List<Models.DataObjectItem>();
 
@@ -466,7 +466,7 @@ namespace hasheous_server.Classes
                     break;
             }
 
-            DataTable data = db.ExecuteCMD(sql, dbDict);
+            DataTable data = await db.ExecuteCMDAsync(sql, dbDict);
 
             List<Models.DataObjectItem> DataObjects = new List<Models.DataObjectItem>();
 
@@ -515,7 +515,7 @@ namespace hasheous_server.Classes
                 { "id", id }
             };
 
-            DataTable data = db.ExecuteCMD(sql, dbDict);
+            DataTable data = await db.ExecuteCMDAsync(sql, dbDict);
 
             if (data.Rows.Count > 0)
             {
@@ -538,7 +538,7 @@ namespace hasheous_server.Classes
                 { "objecttype", objectType }
             };
 
-            DataTable data = db.ExecuteCMD(sql, dbDict);
+            DataTable data = await db.ExecuteCMDAsync(sql, dbDict);
 
             if (data.Rows.Count > 0)
             {
@@ -602,7 +602,7 @@ namespace hasheous_server.Classes
                 sql += " WHERE " + nameClause;
             }
 
-            DataTable data = db.ExecuteCMD(sql, dbDict);
+            DataTable data = await db.ExecuteCMDAsync(sql, dbDict);
 
             if (data.Rows.Count > 0)
             {
@@ -798,6 +798,7 @@ namespace hasheous_server.Classes
                             DataObject_SignatureMap.`SignatureId`,
                             Signatures_Games.`Name`,
                             Signatures_Games.`Year`,
+                            Signatures_Games.`Country`,
                             Signatures_Platforms.`Platform`,
                             Signatures_Games.`SourceId` AS `SourceId`,
                             Signatures_Games.`MetadataSource` AS `MetadataSource`
@@ -924,7 +925,7 @@ namespace hasheous_server.Classes
                                         break;
                                 }
                             }
-                            catch (Exception ex)
+                            catch
                             {
                                 objectId = null;
                             }
@@ -1159,7 +1160,7 @@ namespace hasheous_server.Classes
                 { "updateddate", DateTime.UtcNow }
             };
 
-            DataTable data = db.ExecuteCMD(sql, dbDict);
+            DataTable data = await db.ExecuteCMDAsync(sql, dbDict);
 
             // configure the new object
             switch (objectType)
@@ -1797,7 +1798,7 @@ namespace hasheous_server.Classes
                     dbDict = new Dictionary<string, object>{
                         { "email", acl.Key }
                     };
-                    DataTable user = db.ExecuteCMD(sql, dbDict);
+                    DataTable user = await db.ExecuteCMDAsync(sql, dbDict);
                     if (user.Rows.Count > 0)
                     {
                         sql = "INSERT INTO DataObject_ACL (`DataObject_ID`, `UserId`, `Read`, `Write`, `Delete`) VALUES (@id, @userid, @read, @write, @delete);";
@@ -2007,7 +2008,9 @@ namespace hasheous_server.Classes
                 MetadataSources.TheGamesDb,
                 MetadataSources.RetroAchievements,
                 MetadataSources.GiantBomb,
-                MetadataSources.ScreenScraper
+                MetadataSources.ScreenScraper,
+                MetadataSources.SteamGridDb,
+                MetadataSources.LaunchBox
             ];
 
             // set now time
@@ -2192,7 +2195,16 @@ namespace hasheous_server.Classes
                         platformMetadata = itemPlatform.Metadata.Find(x => x.Source == metadataSource);
                         if (!String.IsNullOrEmpty(platformMetadata?.ImmutableId))
                         {
-                            searchOptions.Add("platformId", long.Parse(platformMetadata.ImmutableId ?? "0"));
+                            // check if platformMetadata.ImmutableId is a long - if so, add it to search options as platformId; if not, add it as platformIdString
+                            if (long.TryParse(platformMetadata.ImmutableId, out long platformId))
+                            {
+                                searchOptions.Add("platformId", platformId);
+                                searchOptions.Add("platformIdString", platformMetadata.ImmutableId);
+                            }
+                            else
+                            {
+                                searchOptions.Add("platformIdString", platformMetadata.ImmutableId);
+                            }
                         }
                         else
                         {
@@ -2791,7 +2803,7 @@ namespace hasheous_server.Classes
 
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "INSERT INTO DataObject_Attributes (DataObjectId, AttributeType, AttributeName, AttributeValue, AttributeRelation, AttributeRelationType) VALUES (@id, @attributetype, @attributename, @attributevalue, @attributerelation, @attributerelationtype); SELECT LAST_INSERT_ID();";
-            DataTable data = db.ExecuteCMD(sql, new Dictionary<string, object>{
+            DataTable data = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>{
                 { "id", DataObjectId },
                 { "attributetype", attribute.attributeType },
                 { "attributename", attribute.attributeName },
@@ -2801,7 +2813,7 @@ namespace hasheous_server.Classes
             });
 
             sql = "SELECT * FROM DataObject_Attributes WHERE AttributeId=@id";
-            DataTable returnValue = db.ExecuteCMD(sql, new Dictionary<string, object>{
+            DataTable returnValue = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>{
                 { "id", data.Rows[0][0] }
             });
             AttributeItem attributeItem = await BuildAttributeItem(returnValue.Rows[0], true);
@@ -2989,7 +3001,7 @@ namespace hasheous_server.Classes
                             Signatures_<TableName>.<FieldName> LIKE CONCAT('%', @searchstring, '%');";
             sql = sql.Replace("<TableName>", tableName).Replace("<FieldName>", fieldName);
 
-            List<Dictionary<string, object>> results = db.ExecuteCMDDict(sql, dbDict);
+            List<Dictionary<string, object>> results = await db.ExecuteCMDDictAsync(sql, dbDict);
 
             return results;
         }

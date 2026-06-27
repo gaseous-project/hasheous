@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Classes;
 using Classes.Insights;
 using hasheous_server.Classes;
@@ -17,12 +18,14 @@ namespace hasheous_server.Controllers.v1_0
     [Insight(Insights.InsightSourceType.HashLookup)]
     public class LookupController : ControllerBase
     {
+        private static string zeroByteMD5 = "d41d8cd98f00b204e9800998ecf8427e";
+        private static string zeroByteSHA1 = "da39a3ee5e6b4b0d3255bfef95601890afd80709";
+        private static string zeroByteSHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+        private static string zeroByteCRC = "00000000";
+
         /// <summary>
         /// Look up the signature coresponding to the provided MD5 and SHA1 hash - and if available, any mapped metadata ids
         /// </summary>
-        /// <param name="model" required="true">
-        /// A JSON element with MD5 or SHA1 key value pairs representing the hashes of the ROM being queried.
-        /// </param>
         /// <param name="returnAllSources" required="false" default="false" example="true">
         /// If true, all sources will be returned. If false, only the first source will be returned.
         /// </param>
@@ -51,9 +54,11 @@ namespace hasheous_server.Controllers.v1_0
         [HttpPost]
         [ProducesResponseType(typeof(HashLookup), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [ResponseCache(CacheProfileName = "5Minute")]
         [Route("ByHash")]
-        public async Task<IActionResult> LookupPost(HashLookupModel model, bool? returnAllSources = false, string? returnFields = "All", string? returnSources = null)
+        public async Task<IActionResult> LookupPost(bool? returnAllSources = false, string? returnFields = "All", string? returnSources = null)
         {
             try
             {
@@ -76,7 +81,83 @@ namespace hasheous_server.Controllers.v1_0
                     }
                 }
 
-                HashLookup hashLookup = new HashLookup(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), model, returnAllSources, returnFields, returnSourcesList);
+                // [{"crc": "12ec7f82"}, {"crc": "836a0187"}]
+
+                List<hasheous_server.Models.HashLookupModel> modelList = new List<hasheous_server.Models.HashLookupModel>();
+                var jsonOptions = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                };
+
+                using var reader = new StreamReader(Request.Body);
+                string rawRequestBody = await reader.ReadToEndAsync();
+                if (string.IsNullOrWhiteSpace(rawRequestBody))
+                {
+                    return BadRequest("Invalid model payload. Provide a JSON object or array containing hash fields.");
+                }
+
+                JsonElement normalizedModel;
+                try
+                {
+                    using JsonDocument parsedBody = JsonDocument.Parse(rawRequestBody);
+                    normalizedModel = parsedBody.RootElement.Clone();
+                }
+                catch (JsonException)
+                {
+                    return BadRequest("Invalid model payload. Body must be valid JSON.");
+                }
+
+                // Some clients send JSON text as a quoted string (for example, "[{...}]").
+                // Parse the inner JSON so both raw and string-encoded JSON are accepted.
+                if (normalizedModel.ValueKind == JsonValueKind.String)
+                {
+                    string? rawModelString = normalizedModel.GetString();
+                    if (string.IsNullOrWhiteSpace(rawModelString))
+                    {
+                        return BadRequest("Invalid model payload. Provide a JSON object or array containing hash fields.");
+                    }
+
+                    try
+                    {
+                        using JsonDocument parsedStringModel = JsonDocument.Parse(rawModelString);
+                        normalizedModel = parsedStringModel.RootElement.Clone();
+                    }
+                    catch (JsonException)
+                    {
+                        return BadRequest("Invalid model payload. String body must contain valid JSON object or array text.");
+                    }
+                }
+
+                // accept raw JSON object or array in request body and deserialize manually
+                if (normalizedModel.ValueKind == JsonValueKind.Array)
+                {
+                    modelList = JsonSerializer.Deserialize<List<hasheous_server.Models.HashLookupModel>>(normalizedModel.GetRawText(), jsonOptions) ?? new List<hasheous_server.Models.HashLookupModel>();
+                }
+                else if (normalizedModel.ValueKind == JsonValueKind.Object)
+                {
+                    var deserializedModel = JsonSerializer.Deserialize<hasheous_server.Models.HashLookupModel>(normalizedModel.GetRawText(), jsonOptions);
+                    if (deserializedModel != null)
+                    {
+                        modelList.Add(deserializedModel);
+                    }
+                }
+                else
+                {
+                    return BadRequest("Invalid model payload. Provide a JSON object or array containing hash fields.");
+                }
+
+                if (modelList.Count == 0 || modelList.All(x => string.IsNullOrWhiteSpace(x.MD5) && string.IsNullOrWhiteSpace(x.SHA1) && string.IsNullOrWhiteSpace(x.SHA256) && string.IsNullOrWhiteSpace(x.CRC)))
+                {
+                    return BadRequest("Invalid model payload. Provide at least one hash field (MD5, SHA1, SHA256, CRC).");
+                }
+
+                // fail on obvious zero byte hashes to avoid unnecessary lookups
+                if (modelList.Count == 1 && modelList.Any(x => x.MD5 == zeroByteMD5 || x.SHA1 == zeroByteSHA1 || x.SHA256 == zeroByteSHA256 || x.CRC == zeroByteCRC))
+                {
+                    return BadRequest("Invalid model payload. Zero-byte hashes are not allowed.");
+                }
+
+                HashLookup hashLookup = new HashLookup(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), modelList, returnAllSources, returnFields, returnSourcesList);
                 var lookupTask = hashLookup.PerformLookup(true);
                 if (await Task.WhenAny(lookupTask, Task.Delay(TimeSpan.FromSeconds(10))) == lookupTask)
                 {
@@ -101,11 +182,11 @@ namespace hasheous_server.Controllers.v1_0
             }
             catch (HashLookup.HashNotFoundException hnfEx)
             {
-                return NotFound("The provided hash was not found in the signature database.");
+                return NotFound(hnfEx.Message);
             }
             catch (Exception ex)
             {
-                Logging.Log(Logging.LogType.Warning, "Hash Lookup", "An error occurred while looking up a hash: " + model.MD5 + " " + model.SHA1 + ": " + ex.Message, ex);
+                Logging.Log(Logging.LogType.Warning, "Hash Lookup", "An error occurred while looking up a hash: " + ex.Message, ex);
                 return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while looking up the hash. Please try again later.");
             }
         }
@@ -127,14 +208,23 @@ namespace hasheous_server.Controllers.v1_0
         [Route("ByHash/crc/{crc}")]
         public async Task<IActionResult> LookupGet(string? md5, string? sha1, string? sha256, string? crc)
         {
+            // fail on obvious zero byte hashes to avoid unnecessary lookups
+            if (md5 == zeroByteMD5 || sha1 == zeroByteSHA1 || sha256 == zeroByteSHA256 || crc == zeroByteCRC)
+            {
+                return BadRequest("Invalid hash provided. Zero-byte hashes are not allowed.");
+            }
+
             try
             {
-                HashLookup hashLookup = new HashLookup(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), new HashLookupModel
+                HashLookup hashLookup = new HashLookup(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), new List<hasheous_server.Models.HashLookupModel>
                 {
-                    MD5 = md5,
-                    SHA1 = sha1,
-                    SHA256 = sha256,
-                    CRC = crc
+                    new hasheous_server.Models.HashLookupModel
+                    {
+                        MD5 = md5,
+                        SHA1 = sha1,
+                        SHA256 = sha256,
+                        CRC = crc
+                    }
                 });
                 await hashLookup.PerformLookup();
 
@@ -147,7 +237,7 @@ namespace hasheous_server.Controllers.v1_0
                     return Ok(hashLookup);
                 }
             }
-            catch (HashLookup.HashNotFoundException hnfEx)
+            catch (HashLookup.HashNotFoundException)
             {
                 return NotFound("The provided hash was not found in the signature database.");
             }

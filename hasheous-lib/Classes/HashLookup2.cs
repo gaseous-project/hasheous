@@ -39,7 +39,7 @@ namespace Classes
 
         [Newtonsoft.Json.JsonIgnore]
         [System.Text.Json.Serialization.JsonIgnore]
-        public hasheous_server.Models.HashLookupModel model { get; set; }
+        public List<hasheous_server.Models.HashLookupModel> model { get; set; }
 
         [Newtonsoft.Json.JsonIgnore]
         [System.Text.Json.Serialization.JsonIgnore]
@@ -95,7 +95,7 @@ namespace Classes
         /// <param name="forceSearch">If true, will force a search even if a cached result is available. Default is true.</param>
         /// <exception cref="HashNotFoundException">Thrown if the provided hash is not found in any signature database.</exception>
         /// <returns>A Task representing the asynchronous operation.</returns>
-        public HashLookup(Database db, hasheous_server.Models.HashLookupModel model, bool? returnAllSources = false, string? returnFields = "All", List<gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType>? returnSources = null, bool? forceSearch = true)
+        public HashLookup(Database db, List<hasheous_server.Models.HashLookupModel> model, bool? returnAllSources = false, string? returnFields = "All", List<gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType>? returnSources = null, bool? forceSearch = true)
         {
             this.db = db;
             this.model = model;
@@ -135,20 +135,39 @@ namespace Classes
             // get the raw signature
             List<Signatures_Games_2> rawSignatures = await signature.GetRawSignatures(model);
 
+            // organise rawSignatures into a dictionary keyed by game id, with the value being a list of signatures for that game
+            Dictionary<string, List<Signatures_Games_2>> signaturesByGameId = new Dictionary<string, List<Signatures_Games_2>>();
+            foreach (Signatures_Games_2 sig in rawSignatures)
+            {
+                if (sig.Game != null)
+                {
+                    if (!signaturesByGameId.ContainsKey(sig.Game.Id))
+                    {
+                        signaturesByGameId.Add(sig.Game.Id, new List<Signatures_Games_2>());
+                    }
+                    signaturesByGameId[sig.Game.Id].Add(sig);
+                }
+            }
+
+            if (signaturesByGameId.Count > 30)
+            {
+                throw new HashNotFoundException("The provided hash returned too many results to process. Please provide a more specific hash or check the input for errors.");
+            }
+
             // narrow down the options
             Signatures_Games_2 discoveredSignature = new Signatures_Games_2();
-            if (rawSignatures.Count == 0)
+            if (signaturesByGameId.Keys.Count == 0)
             {
                 throw new HashNotFoundException("The provided hash was not found in any signature database.");
             }
             else
             {
-                if (rawSignatures.Count == 1)
+                if (signaturesByGameId.Keys.Count == 1)
                 {
                     // only 1 signature found!
-                    discoveredSignature = rawSignatures.ElementAt(0);
+                    discoveredSignature = signaturesByGameId.Values.First().First();
                 }
-                else if (rawSignatures.Count > 1)
+                else if (signaturesByGameId.Keys.Count > 1)
                 {
                     // more than one signature found - find one with highest score
                     foreach (Signatures_Games_2 Sig in rawSignatures)
@@ -395,7 +414,7 @@ namespace Classes
                         // Run with 5 second timeout for interactive sessions
                         await Task.WhenAny(
                             dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true),
-                            Task.Delay(TimeSpan.FromSeconds(5))
+                            Task.Delay(TimeSpan.FromSeconds(2))
                         );
                     }
                     else
@@ -528,7 +547,7 @@ namespace Classes
                 WHERE
                     SignatureId = @sigid AND DataObjectTypeId = @typeid
             ;";
-            DataTable data = db.ExecuteCMD(sql, new Dictionary<string, object>{
+            DataTable data = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>{
                 { "sigid", sigId },
                 { "typeid",  objectType }
             });
