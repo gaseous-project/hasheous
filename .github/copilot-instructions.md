@@ -12,7 +12,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
 - Architecture & data flow
   - MariaDB/MySQL is the source of truth. On startup, schema is created/migrated via embedded scripts (see `hasheous-lib/Classes/Database.cs::InitDB`, scripts named `hasheous-####.sql`).
   - Signature data is ingested from DAT/XML (TOSEC/No-Intro/etc.) by `Classes/SignatureIngestors/XML.cs` into `Signatures_*` tables.
-  - Signature game import in `Classes/SignatureIngestors/XML.cs` now runs with a bounded worker pool (`MaxConcurrentImportWorkers`, currently 10) that repeatedly processes the next game via `ImportDatRecordInternal(...)` until all parsed games are consumed.
+  - Signature game import in `Classes/SignatureIngestors/XML.cs` now runs with a bounded worker pool (`MaxConcurrentImportWorkers`, currently 4) that repeatedly processes the next game via `ImportDatRecordInternal(...)` until all parsed games are consumed.
   - Signature ingestion now stores game names from `SortingName` and includes a one-time per-parser migration flag (`HasMigratedToSortingName_<ParserType>`) to migrate legacy name records while preserving alternate-name mappings.
   - Signature game records now also persist country/language variants on `Signatures_Games` (`Country`, `Language`), and migration logic updates legacy null-country rows plus links variant rows back to existing `DataObject_SignatureMap` entries.
   - Public API (versioned) handles lookups like `POST /api/v1/Lookup/ByHash` via `Classes/HashLookup` + `Classes/Database`.
@@ -27,6 +27,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
 - Run & debug (local)
   - First run creates `~/.hasheous-server/config.json` (see `hasheous-lib/Classes/Config.cs`). MariaDB 11+ required; Redis optional.
   - App URLs: hasheous http 5220 / https 7157; orchestrator http 5140 / https 7023 (see each `Properties/launchSettings.json`).
+  - `service-host` no longer hard-fails when `--reportingserverurl` is omitted; it logs to console-only mode and continues execution.
   - VS Code tasks: build/publish/watch defined at root; common loop is the “watch” task on `hasheous/hasheous.csproj`.
   - Docker: `docker-compose-build.yml` brings up server, orchestrator, MariaDB, and Valkey. Healthcheck: `GET /api/v1/Healthcheck`.
 
@@ -69,6 +70,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Add new migration scripts in `hasheous-lib/Schema` as `hasheous-####.sql` with the next number.
   - Recent migration note: `hasheous-1034.sql` updates `Signatures_Games.Country`/`Language` to `VARCHAR(100)` and adds country-aware composite indexes for ingestion and game matching.
   - Recent migration note: `hasheous-1035.sql` updates `Signatures_Sources.Url` to nullable `VARCHAR(255)` (from text) so source links are bounded and easier to render safely in the UI.
+  - Recent migration note: `hasheous-1036.sql` adds composite indexes on `Signatures_Roms` for (`GameId`, hashes, `IngestorVersion`) to improve multi-hash lookup performance.
   - Embedded migration & support file manifest names now start with `hasheous_lib.Schema.` or `hasheous_lib.Support.`. After adding a file, ensure Build Action = EmbeddedResource and verify with `Assembly.GetExecutingAssembly().GetManifestResourceNames()` if debugging mismatches.
 
 - Caching
@@ -205,6 +207,12 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
   - MAME Arcade: `MAME Arcade/`
   - MAME Mess: `MAME MESS/`
   - Redump: `Redump/`
+
+## Redump metadata
+- Downloader class: `hasheous-lib/Classes/Metadata/Redump/MetadataDownload.cs`.
+- Redump host migration: use `https://redump.info` as the base host (`BaseUrl`) and `https://redump.info/downloads/` for platform listing.
+- HTML parsing expectation: platform rows are parsed from the first `div.downloads-table-scaler` table; links are selected by anchor label (`DAT + Serial/Version` and `Cuesheets`) instead of fixed table-column positions.
+- URL handling: relative Redump links should be expanded with `BaseUrl`; avoid hardcoded `http://redump.org` URLs or appending legacy query suffixes manually.
 
 ## LaunchBox metadata
 - Background task: `QueueItemType.FetchLaunchBoxMetadata` (implemented under `hasheous-lib/Classes/ProcessQueue/Tasks/FetchLaunchBoxMetadata.cs`).
@@ -348,7 +356,7 @@ Additional example (rating boards):
 ## .NET 10 and dependencies
 - Framework: .NET 10.0. Target framework set in `Directory.Build.props` and applied to all projects.
 - API versioning: `Asp.Versioning.Mvc` + `Asp.Versioning.Mvc.ApiExplorer` 10.x (replacing old `Microsoft.AspNetCore.Mvc.Versioning` packages).
-- Swagger: Swashbuckle 10.2.1 brings `Microsoft.OpenApi` 2.7.5. Schema types are `JsonSchemaType` enums, examples are `JsonNode`, references are dedicated types (`OpenApiTagReference`, `OpenApiSecuritySchemeReference`). See Swagger filter implementations for patterns.
+- Swagger: Swashbuckle 10.2.3 brings `Microsoft.OpenApi` 2.x. Schema types are `JsonSchemaType` enums, examples are `JsonNode`, references are dedicated types (`OpenApiTagReference`, `OpenApiSecuritySchemeReference`). See Swagger filter implementations for patterns.
 - Build warnings: XML documentation warnings (`CS1572`, `CS1573`, `CS1587`, `CS1591`) are suppressed project-wide in `Directory.Build.props` to reduce noise; focus remains on nullable (`CS8600+`) and logic warnings.
 
 ## async guidance
