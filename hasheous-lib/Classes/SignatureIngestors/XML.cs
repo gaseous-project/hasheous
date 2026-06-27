@@ -79,7 +79,7 @@ namespace XML
             for (UInt16 i = 0; i < PathContents.Length; ++i)
             {
                 Logging.Log(Logging.LogType.Information, "Signature Ingest", "(" + (i + 1) + " / " + PathContents.Length + ") Processing " + XMLType.ToString() + " DAT file: " + PathContents[i]);
-                Logging.SendReport(Config.LogName, (i + 1), PathContents.Length, "Processing " + XMLType.ToString() + " DAT file: " + Path.GetFileName(PathContents[i]));
+                Logging.SendReport(Config.LogName, (i + 1), PathContents.Length, "Processing " + XMLType.ToString() + " DAT file: " + Path.GetFileName(PathContents[i]), true);
 
                 if (!supportedFileTypes.Contains(Path.GetExtension(PathContents[i]), StringComparer.OrdinalIgnoreCase))
                 {
@@ -345,6 +345,7 @@ namespace XML
                     {
                         int nextGameIndex = -1;
                         int workerCount = Math.Min(MaxConcurrentImportWorkers, Object.Games.Count);
+                        int lastReportedGameIndex = -1;
 
                         if (workerCount > 0)
                         {
@@ -360,8 +361,14 @@ namespace XML
                                         break;
                                     }
 
-                                    Logging.Log(Logging.LogType.Information, "Signature Ingest", $"Importing game {gameIndex + 1} of {Object.Games.Count} from {XMLType.ToString()} DAT file: {Path.GetFileName(XMLFile)}");
-                                    Logging.SendReport(Config.LogName, gameIndex + 1, Object.Games.Count, "Processing " + XMLType.ToString() + " DAT file: " + Path.GetFileName(XMLFile));
+                                    if ((lastReportedGameIndex + 10) < gameIndex)
+                                    {
+                                        Logging.Log(Logging.LogType.Information, "Signature Ingest", $"Importing game {gameIndex + 1} of {Object.Games.Count} from {XMLType.ToString()} DAT file: {Path.GetFileName(XMLFile)}", LogToDiskOnly: true);
+                                        Logging.SendReport(Config.LogName + XMLType.ToString(), gameIndex + 1, Object.Games.Count, "Processing game: " + Common.ReturnValueIfNull(Object.Games[gameIndex].Name, ""), true);
+
+                                        lastReportedGameIndex = gameIndex;
+                                    }
+
                                     await ImportDatRecordInternal(Object.Games[gameIndex], now, sourceId, XMLType, lookupCache);
                                 }
                             }
