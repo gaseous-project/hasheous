@@ -359,6 +359,31 @@ Additional example (rating boards):
 - Swagger: Swashbuckle 10.2.3 brings `Microsoft.OpenApi` 2.x. Schema types are `JsonSchemaType` enums, examples are `JsonNode`, references are dedicated types (`OpenApiTagReference`, `OpenApiSecuritySchemeReference`). See Swagger filter implementations for patterns.
 - Build warnings: XML documentation warnings (`CS1572`, `CS1573`, `CS1587`, `CS1591`) are suppressed project-wide in `Directory.Build.props` to reduce noise; focus remains on nullable (`CS8600+`) and logic warnings.
 
+## App-linking (OAuth-style client authorisation)
+- Feature: client applications can request a per-user API key by opening a popup using their `X-Client-API-Key`. The user confirms, and the returned key is accepted by all `[ApiKey()]`-protected endpoints.
+- DB table: `UserAppKeys` (`Id`, `UserId` → `Users`, `DataObjectId` → `DataObject` (App type), `APIKey`, `Created`, `LastUsed`, `Revoked`). Added in migration `hasheous-1034.sql`.
+- API validation: `APIKeyMiddleware.GetUserFromApiKey` falls through from `UserAPIKeys` to `UserAppKeys` (non-revoked). Use `ApiKey.PurgeApiKeyCache(rawKey)` after revoking to invalidate Redis caches immediately.
+- Backend endpoints:
+  - `GET /api/v1/AppLink/AppInfo?clientApiKey=xxx` (anonymous) – resolves a client key to its App DataObject and returns `{ dataObjectId, name, logoUrl }`.
+  - `POST /api/v1/AppLink/Authorize` (requires `[Authorize]`) – body `{ clientApiKey }` – upserts a `UserAppKeys` row and returns the raw API key.
+  - `GET /api/v1/Account/AppLinks` (requires `[Authorize]`) – lists the current user's linked apps.
+  - `DELETE /api/v1/Account/AppLinks/{id}` (requires `[Authorize]`) – revokes a specific link.
+- Frontend popup: `hasheous/wwwroot/pages/link-app.html` + `link-app.js`. Open with:
+  ```js
+  const popup = window.open(
+    '/pages/link-app.html?clientApiKey=YOUR_KEY&targetOrigin=' + encodeURIComponent(window.location.origin),
+    'hasheousLink', 'width=480,height=640'
+  );
+  window.addEventListener('message', (e) => {
+    if (e.data?.type === 'hasheous-link') {
+      if (e.data.cancelled) { /* user cancelled */ }
+      else { const apiKey = e.data.hasheousApiKey; /* store and use as X-API-Key */ }
+    }
+  });
+  ```
+- Account page: `account.html`/`account.js` now renders a "Linked Applications" section with Revoke buttons (`DELETE /api/v1/Account/AppLinks/{id}`).
+- Cache prefix affected: `ApiKeys` (same as user API keys – shared namespace; entries are per raw key string).
+
 ## async guidance
 - Prefer Task-returning actions: `public async Task<IActionResult> Action(...)`.
 - Await DB calls (`ExecuteCMDAsync`/`ExecuteCMDDictAsync`) and long-running operations.
