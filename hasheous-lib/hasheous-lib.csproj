@@ -17,7 +17,7 @@
   <ItemGroup>
     <PackageReference Include="AWSSDK.S3" Version="4.0.25.3" />
     <PackageReference Include="craftersmine.SteamGridDB.Net" Version="1.1.7" />
-    <PackageReference Include="gaseous-signature-parser" Version="2.7.0" />
+    <PackageReference Include="gaseous-signature-parser" Version="2.7.1" />
     <PackageReference Include="gaseous.IGDB" Version="1.0.5" />
     <PackageReference Include="hasheous-client" Version="1.5.0" />
     <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
