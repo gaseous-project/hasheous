@@ -1299,6 +1299,115 @@ namespace hasheous_server.Controllers.v1_0
         }
         #endregion GiantBomb
 
+        #region ScreenScraper
+
+
+        /// <summary>
+        /// Get game metadata from ScreenScraper by game ID or checksum (CRC, MD5, SHA1). Returns a response containing game metadata, mirroring the response from the jueInfos.php endpoint of ScreenScraper. If multiple identifiers are provided, the order of precedence is: gameid > md5 > sha1> crc. If no identifiers are provided, a BadRequest response will be returned.
+        /// </summary>
+        /// <param name="gameid" example="12345" required="false">
+        /// The unique identifier of the game in ScreenScraper
+        /// </param>
+        /// <param name="crc" example="12345678" required="false">
+        /// The CRC checksum of the game file
+        /// </param>
+        /// <param name="md5" example="d41d8cd98f00204e9800998ecf8427e" required="false">
+        /// The MD5 checksum of the game file
+        /// </param>
+        /// <param name="sha1" example="da39a3ee5e6b4b0d3255bfef95601890afd80709" required="false">
+        /// The SHA1 checksum of the game file
+        /// </param>
+        /// <param name="output" example="json" required="false">
+        /// The output format of the response: "json" or "xml". Default is "json".
+        /// </param>
+        /// <returns>
+        /// A JSON or XML object containing game metadata from ScreenScraper. Note: the servers and ssuser attributes will be blanked out for security reasons, and the attributes may not be included in the result.
+        /// </returns>
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(typeof(hasheous_server.Classes.MetadataLib.MetadataScreenScraper.GameItem), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [Route("ScreenScraper/jeuInfos.php")]
+        public async Task<IActionResult> GetScreenScraperResponse_Singular(long? gameid, string? crc, string? md5, string? sha1, string? output = "json")
+        {
+            if (gameid == null && string.IsNullOrEmpty(crc) && string.IsNullOrEmpty(md5) && string.IsNullOrEmpty(sha1))
+            {
+                return BadRequest("At least one identifier (gameid, crc, md5, sha1) must be provided.");
+            }
+
+            if (gameid == null)
+            {
+                // search by checksum
+                hasheous_server.Models.HashLookupModel hashLookupModel = new hasheous_server.Models.HashLookupModel();
+                if (!string.IsNullOrEmpty(md5))
+                {
+                    hashLookupModel.MD5 = md5;
+                }
+                if (!string.IsNullOrEmpty(sha1))
+                {
+                    hashLookupModel.SHA1 = sha1;
+                }
+                if (!string.IsNullOrEmpty(crc))
+                {
+                    hashLookupModel.CRC = crc;
+                }
+
+                HashLookup hashLookup = new HashLookup(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), new List<hasheous_server.Models.HashLookupModel> { hashLookupModel }, false, "metadata", null);
+                await hashLookup.PerformLookup(true);
+
+                if (hashLookup != null && hashLookup.Metadata != null && hashLookup.Metadata.Count > 0)
+                {
+                    // find the screenscraper gameid in the metadata attribute
+                    var metadataItem = hashLookup.Metadata.Find(m => m.Source == Communications.MetadataSources.ScreenScraper);
+                    if (metadataItem != null && !string.IsNullOrEmpty(metadataItem.ImmutableId))
+                    {
+                        gameid = long.Parse(metadataItem.ImmutableId);
+                    }
+                    else
+                    {
+                        return NotFound("No game found for the provided checksum(s).");
+                    }
+                }
+                else
+                {
+                    return NotFound("No game found for the provided checksum(s).");
+                }
+            }
+
+            // Now that we have a gameid, fetch the metadata from the cached files
+            string cacheFilePath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_Screenscraper, "games", $"{gameid}.json");
+            if (!System.IO.File.Exists(cacheFilePath))
+            {
+                return NotFound("No metadata found for the provided gameid.");
+            }
+
+            string jsonContent = await System.IO.File.ReadAllTextAsync(cacheFilePath);
+            var gameItem = Newtonsoft.Json.JsonConvert.DeserializeObject<hasheous_server.Classes.MetadataLib.MetadataScreenScraper.ssGame>(jsonContent);
+
+            if (gameItem == null)
+            {
+                return NotFound("Failed to deserialize metadata for the provided gameid.");
+            }
+
+            var response = new hasheous_server.Classes.MetadataLib.MetadataScreenScraper.GameItem
+            {
+                header = new hasheous_server.Classes.MetadataLib.MetadataScreenScraper.ssHeader
+                {
+                    APIversion = "1.0",
+                    dateTime = DateTime.UtcNow,
+                    commandRequested = "jeuInfos.php",
+                    success = true
+                },
+                response = new hasheous_server.Classes.MetadataLib.MetadataScreenScraper.GameItem.GameInfoResponse
+                {
+                    jeu = gameItem
+                }
+            };
+
+            return Ok(response);
+        }
+        #endregion ScreenScraper
+
         #region MetadataBundles
         /// <summary>
         /// Get a metadata bundle by its ID. Bundles contain pre-packaged metadata and images for offline use.
