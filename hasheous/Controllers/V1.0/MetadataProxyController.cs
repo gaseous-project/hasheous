@@ -1389,6 +1389,30 @@ namespace hasheous_server.Controllers.v1_0
                 return NotFound("Failed to deserialize metadata for the provided gameid.");
             }
 
+            // strip all media urls of login details since screenscraper requires credentials in the url, and we don't want to expose that in the response
+            foreach (var media in gameItem.medias)
+            {
+                if (!string.IsNullOrEmpty(media.url))
+                {
+                    string endpointUrl = Classes.MetadataLib.MetadataScreenScraper.ssMedia.Endpoint((long)gameItem.id, long.Parse(gameItem.systeme.id), media.type, media.region);
+
+                    // rewrite the media URL to point to the local cache instead of the original URL
+                    media.originalUrl = endpointUrl; // store the original URL for reference
+
+                    // blank security credentials from the URL: credentials query string attributes are named: devid, devpassword, ssid, sspassword
+                    var uriBuilder = new UriBuilder(endpointUrl);
+                    var query = System.Web.HttpUtility.ParseQueryString(uriBuilder.Query);
+                    query.Remove("devid"); // blank out the value
+                    query.Remove("devpassword"); // blank out the value
+                    query.Remove("ssid"); // blank out the value
+                    query.Remove("sspassword"); // blank out the value
+                    uriBuilder.Query = query.ToString();
+                    media.url = uriBuilder.ToString();
+                    media.url = media.url.Replace("https://api.screenscraper.fr/api2/", "/api/v1/MetadataProxy/ScreenScraper/").Replace("https://api.screenscraper.fr:443/api2/", "/api/v1/MetadataProxy/ScreenScraper/"); // rewrite the URL to point to the local proxy endpoint
+                }
+            }
+
+            // format for response to match the ScreenScraper API structure
             var response = new hasheous_server.Classes.MetadataLib.MetadataScreenScraper.GameItem
             {
                 header = new hasheous_server.Classes.MetadataLib.MetadataScreenScraper.ssHeader
@@ -1404,6 +1428,16 @@ namespace hasheous_server.Controllers.v1_0
                 }
             };
 
+            // If the output format is XML, serialize the response to XML
+            if (output?.ToLower() == "xml")
+            {
+                var xmlSerializer = new System.Xml.Serialization.XmlSerializer(typeof(hasheous_server.Classes.MetadataLib.MetadataScreenScraper.GameItem));
+                using var stringWriter = new StringWriter();
+                xmlSerializer.Serialize(stringWriter, response);
+                return Content(stringWriter.ToString(), "application/xml");
+            }
+
+            // Default to JSON response
             return Ok(response);
         }
         #endregion ScreenScraper

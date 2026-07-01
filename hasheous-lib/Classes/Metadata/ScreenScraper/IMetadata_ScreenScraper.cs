@@ -229,99 +229,118 @@ namespace hasheous_server.Classes.MetadataLib
                                 }
                             }
                         }
-
-                        // query the ScreenScraper API for the ROM hash
-                        var response = await HttpHelper.Get<GameItem>(endpointUrl);
-                        apiCallCount++; // increment API call count after making the call
-
-                        if (response != null && response.response != null && response.response.jeu != null && response.response.jeu.id != null)
-                        {
-                            // capture the user information from the response to update our API usage tracking in case the user information has changed since we last fetched it
-                            if (response.response.ssuser != null)
-                            {
-                                userItem = response.response.ssuser; // update the user information with the latest data from the API response
-                                lastUserInfoFetchTime = DateTime.UtcNow; // update the last fetch time to now since we just got fresh user info from the API
-                                apiFailedCallCount = 0; // reset failed API call count after getting a successful response which indicates we are not currently blocked by rate limits
-                            }
-
-                            // we have a match, return it
-                            DataObjectSearchResults = new hasheous_server.Classes.DataObjects.MatchItem
-                            {
-                                MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic,
-                                MetadataId = response.response.jeu.id.ToString()
-                            };
-
-                            // now cache it
-                            string cacheFilePath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_Screenscraper, "games", response.response.jeu.id.ToString() + ".json");
-                            if (!File.Exists(cacheFilePath))
-                            {
-                                // ensure the directory exists
-                                Directory.CreateDirectory(Path.GetDirectoryName(cacheFilePath) ?? string.Empty);
-
-                                // save the response to the cache file
-                                File.WriteAllText(cacheFilePath, Newtonsoft.Json.JsonConvert.SerializeObject(response.response.jeu));
-
-                                // update mapping table
-                                // delete existing maps
-                                sql = "DELETE FROM Screenscraper_HashToGameMap WHERE GameId = @GameId";
-                                _ = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object> { { "@GameId", response.response.jeu.id } });
-
-                                // add new maps
-                                foreach (var jeuRom in response.response.jeu.roms)
-                                {
-                                    if (!String.IsNullOrEmpty(jeuRom.romcrc))
-                                    {
-                                        sql = "INSERT INTO Screenscraper_HashToGameMap (Hash, HashType, GameId) VALUES (@Hash, @HashType, @GameId)";
-                                        _ = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object> { { "@Hash", jeuRom.romcrc }, { "@HashType", "CRC32" }, { "@GameId", response.response.jeu.id } });
-                                    }
-
-                                    if (!String.IsNullOrEmpty(jeuRom.rommd5))
-                                    {
-                                        sql = "INSERT INTO Screenscraper_HashToGameMap (Hash, HashType, GameId) VALUES (@Hash, @HashType, @GameId)";
-                                        _ = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object> { { "@Hash", jeuRom.rommd5 }, { "@HashType", "MD5" }, { "@GameId", response.response.jeu.id } });
-                                    }
-
-                                    if (!String.IsNullOrEmpty(jeuRom.romsha1))
-                                    {
-                                        sql = "INSERT INTO Screenscraper_HashToGameMap (Hash, HashType, GameId) VALUES (@Hash, @HashType, @GameId)";
-                                        _ = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object> { { "@Hash", jeuRom.romsha1 }, { "@HashType", "SHA1" }, { "@GameId", response.response.jeu.id } });
-                                    }
-                                }
-                            }
-
-                            break; // exit the loop after the first successful match
-                        }
-                    }
-                    catch (HttpRequestException httpEx)
-                    {
-                        switch (httpEx.StatusCode)
-                        {
-                            case HttpStatusCode.NotFound:
-                                // 404 Not Found means we don't have metadata for this ROM hash, so we can cache this result to avoid unnecessary API calls in the future
-                                sql = "INSERT INTO Screenscraper_FailedHashLookups (Hash, HashType, LookupDate) VALUES (@Hash, @HashType, @LookupDate)";
-                                await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object> { { "@Hash", hashUsed }, { "@HashType", parameters["@HashType"] }, { "@LookupDate", DateTime.UtcNow } });
-                                apiFailedCallCount++; // increment failed API call count since this is a failed lookup which counts against the failed call limit
-
-                                Logging.Log(Logging.LogType.Information, "ScreenScraper", $"No metadata found for ROM hash {hashUsed}. Caching this result to avoid future API calls for this hash.");
-                                break;
-                            case HttpStatusCode.Unauthorized:
-                                Logging.Log(Logging.LogType.Critical, "Screenscraper", "Unauthorized access to ScreenScraper API. Please check your API credentials and ensure they are valid.");
-                                break;
-                            default:
-                                // log the error and continue with the next hash
-                                Logging.Log(Logging.LogType.Critical, "ScreenScraper", $"HTTP error querying ScreenScraper API for ROM hash {hashUsed}: {httpEx.Message}");
-                                break;
-                        }
                     }
                     catch (Exception ex)
                     {
                         // log the error and continue with the next hash
-                        Logging.Log(Logging.LogType.Critical, "ScreenScraper", $"Error querying ScreenScraper API for ROM hash {hashUsed}: {ex.Message}");
+                        Logging.Log(Logging.LogType.Critical, "ScreenScraper", $"Error checking local cache for ROM hash {hashUsed}: {ex.Message}");
+                    }
+
+                    DataObjectSearchResults = await DownloadFromApi(endpointUrl, hashUsed, parameters);
+                    if (DataObjectSearchResults != null && DataObjectSearchResults.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic)
+                    {
+                        break; // exit the loop after the first successful match
                     }
                 }
             }
 
             return DataObjectSearchResults;
+        }
+
+        public async Task<hasheous_server.Classes.DataObjects.MatchItem> DownloadFromApi(string endpointUrl, string hashUsed, Dictionary<string, object> parameters)
+        {
+            try
+            {
+                // query the ScreenScraper API for the ROM hash
+                var response = await HttpHelper.Get<GameItem>(endpointUrl);
+                apiCallCount++; // increment API call count after making the call
+
+                if (response != null && response.response != null && response.response.jeu != null && response.response.jeu.id != null)
+                {
+                    // capture the user information from the response to update our API usage tracking in case the user information has changed since we last fetched it
+                    if (response.response.ssuser != null)
+                    {
+                        userItem = response.response.ssuser; // update the user information with the latest data from the API response
+                        lastUserInfoFetchTime = DateTime.UtcNow; // update the last fetch time to now since we just got fresh user info from the API
+                        apiFailedCallCount = 0; // reset failed API call count after getting a successful response which indicates we are not currently blocked by rate limits
+                    }
+
+                    // we have a match, return it
+                    var DataObjectSearchResults = new hasheous_server.Classes.DataObjects.MatchItem
+                    {
+                        MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic,
+                        MetadataId = response.response.jeu.id.ToString()
+                    };
+
+                    // now cache it
+                    string cacheFilePath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_Screenscraper, "games", response.response.jeu.id.ToString() + ".json");
+                    if (!File.Exists(cacheFilePath))
+                    {
+                        // ensure the directory exists
+                        Directory.CreateDirectory(Path.GetDirectoryName(cacheFilePath) ?? string.Empty);
+
+                        // save the response to the cache file
+                        File.WriteAllText(cacheFilePath, Newtonsoft.Json.JsonConvert.SerializeObject(response.response.jeu));
+
+                        // update mapping table
+                        // delete existing maps
+                        string sql = "DELETE FROM Screenscraper_HashToGameMap WHERE GameId = @GameId";
+                        _ = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object> { { "@GameId", response.response.jeu.id } });
+
+                        // add new maps
+                        foreach (var jeuRom in response.response.jeu.roms)
+                        {
+                            if (!String.IsNullOrEmpty(jeuRom.romcrc))
+                            {
+                                sql = "INSERT INTO Screenscraper_HashToGameMap (Hash, HashType, GameId) VALUES (@Hash, @HashType, @GameId)";
+                                _ = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object> { { "@Hash", jeuRom.romcrc }, { "@HashType", "CRC32" }, { "@GameId", response.response.jeu.id } });
+                            }
+
+                            if (!String.IsNullOrEmpty(jeuRom.rommd5))
+                            {
+                                sql = "INSERT INTO Screenscraper_HashToGameMap (Hash, HashType, GameId) VALUES (@Hash, @HashType, @GameId)";
+                                _ = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object> { { "@Hash", jeuRom.rommd5 }, { "@HashType", "MD5" }, { "@GameId", response.response.jeu.id } });
+                            }
+
+                            if (!String.IsNullOrEmpty(jeuRom.romsha1))
+                            {
+                                sql = "INSERT INTO Screenscraper_HashToGameMap (Hash, HashType, GameId) VALUES (@Hash, @HashType, @GameId)";
+                                _ = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object> { { "@Hash", jeuRom.romsha1 }, { "@HashType", "SHA1" }, { "@GameId", response.response.jeu.id } });
+                            }
+                        }
+                    }
+
+                    return DataObjectSearchResults;
+                }
+            }
+            catch (HttpRequestException httpEx)
+            {
+                switch (httpEx.StatusCode)
+                {
+                    case HttpStatusCode.NotFound:
+                        // 404 Not Found means we don't have metadata for this ROM hash, so we can cache this result to avoid unnecessary API calls in the future
+                        string sql = "INSERT INTO Screenscraper_FailedHashLookups (Hash, HashType, LookupDate) VALUES (@Hash, @HashType, @LookupDate)";
+                        await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object> { { "@Hash", hashUsed }, { "@HashType", parameters["@HashType"] }, { "@LookupDate", DateTime.UtcNow } });
+                        apiFailedCallCount++; // increment failed API call count since this is a failed lookup which counts against the failed call limit
+
+                        Logging.Log(Logging.LogType.Information, "ScreenScraper", $"No metadata found for ROM hash {hashUsed}. Caching this result to avoid future API calls for this hash.");
+                        break;
+                    case HttpStatusCode.Unauthorized:
+                        Logging.Log(Logging.LogType.Critical, "Screenscraper", "Unauthorized access to ScreenScraper API. Please check your API credentials and ensure they are valid.");
+                        break;
+                    default:
+                        // log the error and continue with the next hash
+                        Logging.Log(Logging.LogType.Critical, "ScreenScraper", $"HTTP error querying ScreenScraper API for ROM hash {hashUsed}: {httpEx.Message}");
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                // log the error and continue with the next hash
+                Logging.Log(Logging.LogType.Critical, "ScreenScraper", $"Error querying ScreenScraper API for ROM hash {hashUsed}: {ex.Message}");
+            }
+
+            return null;
         }
 
         private async Task<DataObjects.MatchItem> GetPlatformAsync(DataObjectItem item, List<string> SearchCandidates)
@@ -736,6 +755,39 @@ namespace hasheous_server.Classes.MetadataLib
         /// </summary>
         public class ssMedia
         {
+            public static string Endpoint(long jeuid, long systemid, string media, string type)
+            {
+                string endpointName = "";
+                switch (type)
+                {
+                    case "video":
+                    case "video-normalized":
+                        endpointName = "mediaVideoJeu";
+                        break;
+                    case "manuel":
+                        endpointName = "mediaManuelJeu";
+                        break;
+                    case "pictoliste":
+                        endpointName = "mediaGroup";
+                        break;
+                    case "pictomonochrome":
+                    case "pictocouleur":
+                        endpointName = "mediaCompagnie";
+                        break;
+                    default:
+                        endpointName = "mediaJeu";
+                        break;
+                }
+
+                string mediaParam = media;
+                if (!String.IsNullOrEmpty(type))
+                {
+                    mediaParam = $"{media}({type})";
+                }
+
+                return $"https://api.screenscraper.fr/api2/{endpointName}.php?devid={Config.ScreenScraperConfiguration.DevClientId}&devpassword={Config.ScreenScraperConfiguration.DevSecret}&softname=Hasheous&ssid={Config.ScreenScraperConfiguration.ClientId}&sspassword={Config.ScreenScraperConfiguration.Secret}&systemeid={systemid}&jeuid={jeuid}&media={mediaParam}";
+            }
+
             /// <summary>
             /// Type of media, such as "screenshot", "boxart", "banner", etc., indicating the category or purpose of the media item. This property allows for structured access to media information based on its type, enabling the application to organize and present media effectively based on the type of media returned by the ScreenScraper API.
             /// </summary>
@@ -748,6 +800,10 @@ namespace hasheous_server.Classes.MetadataLib
             /// URL where the media can be accessed, providing a direct link to the media file associated with the game. This property allows for structured access to media information based on its URL, enabling the application to retrieve and display media effectively based on the URL provided by the ScreenScraper API.
             /// </summary>
             public string? url { get; set; }
+            /// <summary>
+            /// Original URL of the media file, providing a reference to the source location of the media. This property allows for structured access to media information based on its original URL, enabling the application to track and manage media effectively based on the source location provided by the ScreenScraper API.
+            /// </summary>
+            public string? originalUrl { get; set; }
             /// <summary>
             /// Region associated with the media, such as France, Europe, USA, or Japan. This property is used to identify the specific region for which the media information is relevant, allowing for localized metadata retrieval based on regional differences in game releases or information as returned by the ScreenScraper API.
             /// </summary>
