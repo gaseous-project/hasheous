@@ -179,6 +179,17 @@ namespace Classes
             }
         }
 
+        /// <summary>
+        /// Gets the tiered cache policies for proxy metadata files.
+        /// </summary>
+        public static CachePolicies CachePolicies
+        {
+            get
+            {
+                return _config.Policies ?? new CachePolicies();
+            }
+        }
+
         private static string _logName = System.Reflection.Assembly.GetExecutingAssembly().GetName().Name ?? "Server Log";
         /// <summary>
         /// Gets or sets the name used for the log file directory and file naming.
@@ -629,6 +640,11 @@ namespace Classes
             /// Gets or sets the email SMTP configuration settings.
             /// </summary>
             public EmailSMTP EmailSMTPConfiguration = new EmailSMTP();
+
+            /// <summary>
+            /// Gets or sets the tiered cache policies for proxy metadata files.
+            /// </summary>
+            public CachePolicies Policies = new CachePolicies();
 
             /// <summary>
             /// Represents the database configuration settings, including host, user, password, database name, and connection strings.

@@ -139,8 +139,9 @@ public static class StartupExtensions
     public static IServiceCollection AddHasheousSwagger(this IServiceCollection services)
     {
         services.AddEndpointsApiExplorer();
-        services.AddSwaggerGen(options =>
+        services.AddSwaggerGen(static options =>
         {
+            // apply security definitions for API Key, Client API Key, and Task Worker API Key
             options.AddSecurityDefinition("API Key", new OpenApiSecurityScheme
             {
                 Name = ApiKey.ApiKeyHeaderName,
@@ -165,6 +166,7 @@ public static class StartupExtensions
                 Description = "Task Worker API Key",
                 Scheme = "TaskWorkerApiKeyScheme"
             });
+
             options.OperationFilter<AuthorizationOperationFilter>();
             options.OperationFilter<LookupRequestBodyOperationFilter>();
             options.DocumentFilter<IGDBMetadataDocumentFilter>();
