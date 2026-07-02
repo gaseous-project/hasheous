@@ -64,12 +64,22 @@ namespace Classes
         }
 
         /// <summary>
-        /// Performs hourly maintenance tasks such as aggregating insights into summary tables.
+        /// Performs hourly maintenance tasks such as aggregating insights into summary tables and running cache maintenance.
         /// </summary>
         public async Task RunHourlyMaintenance()
         {
             // aggregate insights into summary tables
             await Classes.Insights.Insights.AggregateHourlySummary();
+
+            // run proxy cache maintenance (tiered LRU + disk-aware eviction)
+            try
+            {
+                var (filesLocal, filesS3, bytesLocal, bytesS3) = await ProxyCacheManager.RunMaintenanceAsync();
+            }
+            catch (Exception ex)
+            {
+                Logging.Log(Logging.LogType.Warning, "Maintenance", $"Proxy cache maintenance failed: {ex.Message}");
+            }
         }
 
         /// <summary>
