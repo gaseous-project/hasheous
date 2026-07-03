@@ -32,6 +32,18 @@ namespace hasheous_server.Controllers.v1_0
     [Insight(Insights.InsightSourceType.MetadataProxy)]
     public class MetadataProxyController : ControllerBase
     {
+        private FileStreamResult FileWithManagedStream(ResolvedContentStream resolvedStream, string contentType, string? fileDownloadName = null)
+        {
+            HttpContext.Response.RegisterForDispose(resolvedStream);
+
+            if (string.IsNullOrWhiteSpace(fileDownloadName))
+            {
+                return File(resolvedStream.Stream, contentType);
+            }
+
+            return File(resolvedStream.Stream, contentType, fileDownloadName);
+        }
+
         #region IGDB
         /// <summary>
         /// Get metadata from IGDB
@@ -521,14 +533,14 @@ namespace hasheous_server.Controllers.v1_0
                 var cachedStream = await ProxyCacheManager.ResolveReadAsync("IGDB", resourcePath, CachePolicyType.Media, "image/jpeg");
                 if (cachedStream != null)
                 {
-                    return File(cachedStream.Stream, "image/jpeg");
+                    return FileWithManagedStream(cachedStream, "image/jpeg");
                 }
 
                 // Download and cache the image
                 var fileStream = await ProxyCacheManager.DownloadAndCacheAsync(url, "IGDB", resourcePath, CachePolicyType.Media, "image/jpeg", HttpContext);
                 if (fileStream != null)
                 {
-                    return File(fileStream.Stream, "image/jpeg");
+                    return FileWithManagedStream(fileStream, "image/jpeg");
                 }
 
                 return NotFound();
@@ -575,14 +587,14 @@ namespace hasheous_server.Controllers.v1_0
                 var cachedStream = await ProxyCacheManager.ResolveReadAsync("TheGamesDB", resourcePath, CachePolicyType.Media, "image/jpeg");
                 if (cachedStream != null)
                 {
-                    return File(cachedStream.Stream, "image/jpeg");
+                    return FileWithManagedStream(cachedStream, "image/jpeg");
                 }
 
                 // Download and cache the image
                 var fileStream = await ProxyCacheManager.DownloadAndCacheAsync(url, "TheGamesDB", resourcePath, CachePolicyType.Media, "image/jpeg", HttpContext);
                 if (fileStream != null)
                 {
-                    return File(fileStream.Stream, "image/jpeg");
+                    return FileWithManagedStream(fileStream, "image/jpeg");
                 }
 
                 return NotFound();
@@ -1155,14 +1167,14 @@ namespace hasheous_server.Controllers.v1_0
                 var cachedStream = await ProxyCacheManager.ResolveReadAsync("GiantBomb", resourcePath, CachePolicyType.Media, "image/jpeg");
                 if (cachedStream != null)
                 {
-                    return File(cachedStream.Stream, "image/jpeg");
+                    return FileWithManagedStream(cachedStream, "image/jpeg");
                 }
 
                 // Download and cache the image
                 var fileStream = await ProxyCacheManager.DownloadAndCacheAsync(url, "GiantBomb", resourcePath, CachePolicyType.Media, "image/jpeg", HttpContext);
                 if (fileStream != null)
                 {
-                    return File(fileStream.Stream, "image/jpeg");
+                    return FileWithManagedStream(fileStream, "image/jpeg");
                 }
 
                 return NotFound();
@@ -1454,14 +1466,14 @@ namespace hasheous_server.Controllers.v1_0
                 var cachedStream = await ProxyCacheManager.ResolveReadAsync("Screenscraper", resourcePath, CachePolicyType.Media, mimeType);
                 if (cachedStream != null)
                 {
-                    return File(cachedStream.Stream, mimeType);
+                    return FileWithManagedStream(cachedStream, mimeType);
                 }
 
                 // Download and cache the image
                 var fileStream = await ProxyCacheManager.DownloadAndCacheAsync(url, "Screenscraper", resourcePath, CachePolicyType.Media, mimeType, HttpContext);
                 if (fileStream != null)
                 {
-                    return File(fileStream.Stream, mimeType);
+                    return FileWithManagedStream(fileStream, mimeType);
                 }
 
                 return NotFound();
@@ -1535,8 +1547,7 @@ namespace hasheous_server.Controllers.v1_0
                     var cachedStream = await ProxyCacheManager.ResolveReadAsync("Bundles", resourcePath, CachePolicyType.Bundles, "application/octet-stream");
                     if (cachedStream != null)
                     {
-                        HttpContext.Response.RegisterForDispose(cachedStream);
-                        return File(cachedStream.Stream, "application/octet-stream", fileName);
+                        return FileWithManagedStream(cachedStream, "application/octet-stream", fileName);
                     }
 
                     // Rebuild if the existing bundle cannot be served.
@@ -1550,8 +1561,7 @@ namespace hasheous_server.Controllers.v1_0
                 var cachedStream = await ProxyCacheManager.ResolveReadAsync("Bundles", resourcePath, CachePolicyType.Bundles, "application/octet-stream");
                 if (cachedStream != null)
                 {
-                    HttpContext.Response.RegisterForDispose(cachedStream);
-                    return File(cachedStream.Stream, "application/octet-stream", fileName);
+                    return FileWithManagedStream(cachedStream, "application/octet-stream", fileName);
                 }
             }
 
