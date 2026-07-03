@@ -1202,9 +1202,6 @@ namespace hasheous_server.Controllers.v1_0
         /// <param name="sha1" example="da39a3ee5e6b4b0d3255bfef95601890afd80709" required="false">
         /// The SHA1 checksum of the game file
         /// </param>
-        /// <param name="output" example="json" required="false">
-        /// The output format of the response: "json" or "xml". Default is "json".
-        /// </param>
         /// <returns>
         /// A JSON or XML object containing game metadata from ScreenScraper. Note: the servers and ssuser attributes will be blanked out for security reasons, and the attributes may not be included in the result.
         /// </returns>
@@ -1213,7 +1210,7 @@ namespace hasheous_server.Controllers.v1_0
         [ProducesResponseType(typeof(hasheous_server.Classes.MetadataLib.MetadataScreenScraper.GameItem), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [Route("ScreenScraper/jeuInfos.php")]
-        public async Task<IActionResult> GetScreenScraperResponse_Singular(long? gameid, string? crc, string? md5, string? sha1, string? output = "json")
+        public async Task<IActionResult> GetScreenScraperResponse_Singular(long? gameid, string? crc, string? md5, string? sha1)
         {
             if (gameid == null && string.IsNullOrEmpty(crc) && string.IsNullOrEmpty(md5) && string.IsNullOrEmpty(sha1))
             {
@@ -1323,16 +1320,6 @@ namespace hasheous_server.Controllers.v1_0
                 }
             };
 
-            // If the output format is XML, serialize the response to XML
-            if (output?.ToLower() == "xml")
-            {
-                var xmlSerializer = new System.Xml.Serialization.XmlSerializer(typeof(hasheous_server.Classes.MetadataLib.MetadataScreenScraper.GameItem));
-                using var stringWriter = new StringWriter();
-                xmlSerializer.Serialize(stringWriter, response);
-                return Content(stringWriter.ToString(), "application/xml");
-            }
-
-            // Default to JSON response
             return Ok(response);
         }
 
@@ -1382,7 +1369,7 @@ namespace hasheous_server.Controllers.v1_0
 
             // get the record
             hasheous_server.Classes.MetadataLib.MetadataScreenScraper.ssGame? gameItem = null;
-            IActionResult gameDataResult = await GetScreenScraperResponse_Singular(jeuid, null, null, null, "json");
+            IActionResult gameDataResult = await GetScreenScraperResponse_Singular(jeuid, null, null, null);
             if (gameDataResult is OkObjectResult ok && ok.Value is hasheous_server.Classes.MetadataLib.MetadataScreenScraper.GameItem payload)
             {
                 gameItem = payload.response?.jeu;
