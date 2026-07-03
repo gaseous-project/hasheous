@@ -1244,9 +1244,9 @@ namespace hasheous_server.Controllers.v1_0
                 {
                     // find the screenscraper gameid in the metadata attribute
                     var metadataItem = hashLookup.Metadata.Find(m => m.Source == Communications.MetadataSources.ScreenScraper);
-                    if (metadataItem != null && !string.IsNullOrEmpty(metadataItem.ImmutableId))
+                    if (metadataItem != null && !string.IsNullOrEmpty(metadataItem.ImmutableId) && long.TryParse(metadataItem.ImmutableId, out long parsedGameId))
                     {
-                        gameid = long.Parse(metadataItem.ImmutableId);
+                        gameid = parsedGameId;
                     }
                     else
                     {
@@ -1282,7 +1282,7 @@ namespace hasheous_server.Controllers.v1_0
             }
 
             // strip all media urls of login details since screenscraper requires credentials in the url, and we don't want to expose that in the response
-            foreach (var media in gameItem.medias)
+            foreach (var media in gameItem.medias ?? Enumerable.Empty<hasheous_server.Classes.MetadataLib.MetadataScreenScraper.ssMedia>())
             {
                 if (!string.IsNullOrEmpty(media.url))
                 {
