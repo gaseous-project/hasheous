@@ -14,6 +14,7 @@ using hasheous_server.Classes.Metadata.IGDB;
 using HasheousClient;
 using IGDB;
 using IGDB.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TheGamesDB.SQL;
 using static Authentication.ClientApiKey;
@@ -31,6 +32,18 @@ namespace hasheous_server.Controllers.v1_0
     [Insight(Insights.InsightSourceType.MetadataProxy)]
     public class MetadataProxyController : ControllerBase
     {
+        private FileStreamResult FileWithManagedStream(ResolvedContentStream resolvedStream, string contentType, string? fileDownloadName = null)
+        {
+            HttpContext.Response.RegisterForDispose(resolvedStream);
+
+            if (string.IsNullOrWhiteSpace(fileDownloadName))
+            {
+                return File(resolvedStream.Stream, contentType);
+            }
+
+            return File(resolvedStream.Stream, contentType, fileDownloadName);
+        }
+
         #region IGDB
         /// <summary>
         /// Get metadata from IGDB
@@ -488,36 +501,6 @@ namespace hasheous_server.Controllers.v1_0
 
         private static HttpClient client = new HttpClient();
 
-        private async Task<IActionResult?> TryServeFromLocalOrS3Async(string localFilePath, string s3Key, string fallbackContentType)
-        {
-            StorageFallbackResolver resolver = new StorageFallbackResolver();
-            string bucketName = Config.S3StorageConfiguration.DefaultBucket;
-
-            ResolvedContentStream? resolved = await resolver.ResolveReadStreamAsync(localFilePath, bucketName, s3Key);
-            if (resolved == null)
-            {
-                return null;
-            }
-
-            HttpContext.Response.RegisterForDispose(resolved);
-
-            string contentType = string.IsNullOrWhiteSpace(resolved.ContentType) ? fallbackContentType : resolved.ContentType;
-            return File(resolved.Stream, contentType);
-        }
-
-        private void ScheduleLocalCacheUploadToS3(string localFilePath, string s3Key)
-        {
-            if (!Config.S3StorageConfiguration.Enabled)
-            {
-                return;
-            }
-
-            StorageFallbackResolver resolver = new StorageFallbackResolver();
-            string bucketName = Config.S3StorageConfiguration.DefaultBucket;
-
-            HttpContext.Response.OnCompleted(() => resolver.UploadLocalFileToS3Async(localFilePath, bucketName, s3Key, overwrite: false));
-        }
-
         /// <summary>
         /// Get image from IGDB
         /// </summary>
@@ -541,76 +524,26 @@ namespace hasheous_server.Controllers.v1_0
                 return BadRequest("Invalid image ID");
             }
 
-            string imageDirectory = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB, "Images");
-            string imagePath = Path.Combine(imageDirectory, ImageId + ".jpg");
-            string s3Key = $"IGDB/Images/{ImageId}.jpg";
-
-            // create directory if it doesn't exist
-            if (!System.IO.Directory.Exists(imageDirectory))
-            {
-                System.IO.Directory.CreateDirectory(imageDirectory);
-            }
-
-            IActionResult? cachedResult = await TryServeFromLocalOrS3Async(imagePath, s3Key, "image/jpeg");
-            if (cachedResult != null)
-            {
-                return cachedResult;
-            }
-
-            // get image from IGDB
+            string resourcePath = $"Images/{ImageId}.jpg";
             string url = String.Format("https://images.igdb.com/igdb/image/upload/t_{0}/{1}.jpg", "original", ImageId);
 
-            // download image from url
             try
             {
-                using (HttpResponseMessage response = client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).Result)
+                // Try to resolve from cache (local or S3 fallback)
+                var cachedStream = await ProxyCacheManager.ResolveReadAsync("IGDB", resourcePath, CachePolicyType.Media, "image/jpeg");
+                if (cachedStream != null)
                 {
-                    response.EnsureSuccessStatusCode();
-
-                    using (Stream contentStream = await response.Content.ReadAsStreamAsync(), fileStream = new FileStream(imagePath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true))
-                    {
-                        var totalRead = 0L;
-                        var totalReads = 0L;
-                        var buffer = new byte[8192];
-                        var isMoreToRead = true;
-
-                        do
-                        {
-                            var read = await contentStream.ReadAsync(buffer, 0, buffer.Length);
-                            if (read == 0)
-                            {
-                                isMoreToRead = false;
-                            }
-                            else
-                            {
-                                await fileStream.WriteAsync(buffer, 0, read);
-
-                                totalRead += read;
-                                totalReads += 1;
-
-                                if (totalReads % 2000 == 0)
-                                {
-                                    Console.WriteLine(string.Format("total bytes downloaded so far: {0:n0}", totalRead));
-                                }
-                            }
-                        }
-                        while (isMoreToRead);
-                    }
+                    return FileWithManagedStream(cachedStream, "image/jpeg");
                 }
 
-                if (System.IO.File.Exists(imagePath))
+                // Download and cache the image
+                var fileStream = await ProxyCacheManager.DownloadAndCacheAsync(url, "IGDB", resourcePath, CachePolicyType.Media, "image/jpeg", HttpContext);
+                if (fileStream != null)
                 {
-                    // check the file is non-zero length
-                    FileInfo fileInfo = new FileInfo(imagePath);
-                    if (fileInfo.Length == 0)
-                    {
-                        System.IO.File.Delete(imagePath);
-                        return NotFound();
-                    }
+                    return FileWithManagedStream(fileStream, "image/jpeg");
                 }
 
-                ScheduleLocalCacheUploadToS3(imagePath, s3Key);
-                return PhysicalFile(imagePath, "image/jpeg");
+                return NotFound();
             }
             catch
             {
@@ -644,50 +577,27 @@ namespace hasheous_server.Controllers.v1_0
             {
                 return BadRequest("Invalid image ID");
             }
-            else if (FileName.Contains("/"))
-            {
-                // forward slashes are allowed in the file name
-            }
-            string imageFile = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_TheGamesDb, "Images", ImageSize.ToString(), FileName);
-            string imagePath = Path.GetDirectoryName(imageFile);
-            string s3Key = $"TheGamesDB/Images/{ImageSize}/{FileName}";
 
-            // create directory if it doesn't exist
-            if (!Directory.Exists(imagePath))
-            {
-                Directory.CreateDirectory(imagePath);
-            }
+            string resourcePath = $"Images/{ImageSize}/{FileName}";
+            string url = $"https://cdn.thegamesdb.net/images/{ImageSize}/{FileName}";
 
-            IActionResult? cachedResult = await TryServeFromLocalOrS3Async(imageFile, s3Key, "image/jpeg");
-            if (cachedResult != null)
-            {
-                return cachedResult;
-            }
-
-            // download image from url
             try
             {
-                Uri theGamesDBUri = new Uri("https://cdn.thegamesdb.net/images/" + ImageSize.ToString() + "/" + FileName);
-
-                DownloadManager downloadManager = new DownloadManager();
-                var result = downloadManager.DownloadFile(theGamesDBUri.ToString(), imageFile);
-
-                // wait until result is completed
-                while (result.IsCompleted == false)
+                // Try to resolve from cache (local or S3 fallback)
+                var cachedStream = await ProxyCacheManager.ResolveReadAsync("TheGamesDB", resourcePath, CachePolicyType.Media, "image/jpeg");
+                if (cachedStream != null)
                 {
-                    Thread.Sleep(1000);
+                    return FileWithManagedStream(cachedStream, "image/jpeg");
                 }
 
-                // check the file is non-zero length
-                FileInfo fileInfo = new FileInfo(imageFile);
-                if (fileInfo.Length == 0)
+                // Download and cache the image
+                var fileStream = await ProxyCacheManager.DownloadAndCacheAsync(url, "TheGamesDB", resourcePath, CachePolicyType.Media, "image/jpeg", HttpContext);
+                if (fileStream != null)
                 {
-                    System.IO.File.Delete(imageFile);
-                    return NotFound();
+                    return FileWithManagedStream(fileStream, "image/jpeg");
                 }
 
-                ScheduleLocalCacheUploadToS3(imageFile, s3Key);
-                return PhysicalFile(imageFile, "image/jpeg");
+                return NotFound();
             }
             catch
             {
@@ -1247,50 +1157,27 @@ namespace hasheous_server.Controllers.v1_0
             {
                 return BadRequest("Invalid image ID");
             }
-            else if (GiantBombImagePath.Contains("/"))
-            {
-                // forward slashes are allowed in the file name
-            }
-            string imageFile = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_GiantBomb, "Images", GiantBombImagePath);
-            string imagePath = Path.GetDirectoryName(imageFile);
-            string s3Key = $"GiantBomb/Images/{GiantBombImagePath}";
 
-            // create directory if it doesn't exist
-            if (!Directory.Exists(imagePath))
-            {
-                Directory.CreateDirectory(imagePath);
-            }
+            string resourcePath = $"Images/{GiantBombImagePath}";
+            string url = $"https://www.giantbomb.com/a/uploads/{GiantBombImagePath}";
 
-            IActionResult? cachedResult = await TryServeFromLocalOrS3Async(imageFile, s3Key, "image/jpeg");
-            if (cachedResult != null)
-            {
-                return cachedResult;
-            }
-
-            // download image from url
             try
             {
-                Uri giantBombUri = new Uri("https://www.giantbomb.com/a/uploads/" + GiantBombImagePath);
-
-                DownloadManager downloadManager = new DownloadManager();
-                var result = downloadManager.DownloadFile(giantBombUri.ToString(), imageFile);
-
-                // wait until result is completed
-                while (result.IsCompleted == false)
+                // Try to resolve from cache (local or S3 fallback)
+                var cachedStream = await ProxyCacheManager.ResolveReadAsync("GiantBomb", resourcePath, CachePolicyType.Media, "image/jpeg");
+                if (cachedStream != null)
                 {
-                    Thread.Sleep(1000);
+                    return FileWithManagedStream(cachedStream, "image/jpeg");
                 }
 
-                // check the file is non-zero length
-                FileInfo fileInfo = new FileInfo(imageFile);
-                if (fileInfo.Length == 0)
+                // Download and cache the image
+                var fileStream = await ProxyCacheManager.DownloadAndCacheAsync(url, "GiantBomb", resourcePath, CachePolicyType.Media, "image/jpeg", HttpContext);
+                if (fileStream != null)
                 {
-                    System.IO.File.Delete(imageFile);
-                    return NotFound();
+                    return FileWithManagedStream(fileStream, "image/jpeg");
                 }
 
-                ScheduleLocalCacheUploadToS3(imageFile, s3Key);
-                return PhysicalFile(imageFile, "image/jpeg");
+                return NotFound();
             }
             catch
             {
@@ -1298,6 +1185,292 @@ namespace hasheous_server.Controllers.v1_0
             }
         }
         #endregion GiantBomb
+
+        #region ScreenScraper
+        /// <summary>
+        /// Get game metadata from ScreenScraper by game ID or checksum (CRC, MD5, SHA1). Returns a response containing game metadata, mirroring the response from the jueInfos.php endpoint of ScreenScraper. If multiple identifiers are provided, the order of precedence is: gameid > md5 > sha1> crc. If no identifiers are provided, a BadRequest response will be returned.
+        /// </summary>
+        /// <param name="gameid" example="12345" required="false">
+        /// The unique identifier of the game in ScreenScraper
+        /// </param>
+        /// <param name="crc" example="12345678" required="false">
+        /// The CRC checksum of the game file
+        /// </param>
+        /// <param name="md5" example="d41d8cd98f00204e9800998ecf8427e" required="false">
+        /// The MD5 checksum of the game file
+        /// </param>
+        /// <param name="sha1" example="da39a3ee5e6b4b0d3255bfef95601890afd80709" required="false">
+        /// The SHA1 checksum of the game file
+        /// </param>
+        /// <returns>
+        /// A JSON or XML object containing game metadata from ScreenScraper. Note: the servers and ssuser attributes will be blanked out for security reasons, and the attributes may not be included in the result.
+        /// </returns>
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(typeof(hasheous_server.Classes.MetadataLib.MetadataScreenScraper.GameItem), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [Route("ScreenScraper/jeuInfos.php")]
+        public async Task<IActionResult> GetScreenScraperResponse_Singular(long? gameid, string? crc, string? md5, string? sha1)
+        {
+            if (gameid == null && string.IsNullOrEmpty(crc) && string.IsNullOrEmpty(md5) && string.IsNullOrEmpty(sha1))
+            {
+                return BadRequest("At least one identifier (gameid, crc, md5, sha1) must be provided.");
+            }
+
+            if (gameid == null)
+            {
+                // search by checksum
+                hasheous_server.Models.HashLookupModel hashLookupModel = new hasheous_server.Models.HashLookupModel();
+                if (!string.IsNullOrEmpty(md5))
+                {
+                    hashLookupModel.MD5 = md5;
+                }
+                if (!string.IsNullOrEmpty(sha1))
+                {
+                    hashLookupModel.SHA1 = sha1;
+                }
+                if (!string.IsNullOrEmpty(crc))
+                {
+                    hashLookupModel.CRC = crc;
+                }
+
+                HashLookup hashLookup = new HashLookup(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), new List<hasheous_server.Models.HashLookupModel> { hashLookupModel }, false, "metadata", null);
+                await hashLookup.PerformLookup(true);
+
+                if (hashLookup != null && hashLookup.Metadata != null && hashLookup.Metadata.Count > 0)
+                {
+                    // find the screenscraper gameid in the metadata attribute
+                    var metadataItem = hashLookup.Metadata.Find(m => m.Source == Communications.MetadataSources.ScreenScraper);
+                    if (metadataItem != null && !string.IsNullOrEmpty(metadataItem.ImmutableId) && long.TryParse(metadataItem.ImmutableId, out long parsedGameId))
+                    {
+                        gameid = parsedGameId;
+                    }
+                    else
+                    {
+                        return NotFound("No game found for the provided checksum(s).");
+                    }
+                }
+                else
+                {
+                    return NotFound("No game found for the provided checksum(s).");
+                }
+            }
+
+            // Now that we have a gameid, fetch the metadata from the cached files
+            string cacheFilePath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_Screenscraper, "games", $"{gameid}.json");
+            if (!System.IO.File.Exists(cacheFilePath))
+            {
+                // if the cache file doesn't exist, try to fetch the metadata from the ScreenScraper API and cache it
+                string endpointUrl = Classes.MetadataLib.MetadataScreenScraper.GameItem.Endpoint((long)gameid);
+                var lookupMatchItem = await Classes.MetadataLib.MetadataScreenScraper.DownloadFromApi(endpointUrl, null, new Dictionary<string, object>());
+
+                if (lookupMatchItem == null)
+                {
+                    return NotFound("No metadata found for the provided gameid.");
+                }
+            }
+
+            string jsonContent = await System.IO.File.ReadAllTextAsync(cacheFilePath);
+            var gameItem = Newtonsoft.Json.JsonConvert.DeserializeObject<hasheous_server.Classes.MetadataLib.MetadataScreenScraper.ssGame>(jsonContent);
+
+            if (gameItem == null)
+            {
+                return NotFound("Failed to deserialize metadata for the provided gameid.");
+            }
+
+            // strip all media urls of login details since screenscraper requires credentials in the url, and we don't want to expose that in the response
+            foreach (var media in gameItem.medias ?? Enumerable.Empty<hasheous_server.Classes.MetadataLib.MetadataScreenScraper.ssMedia>())
+            {
+                if (!string.IsNullOrEmpty(media.url))
+                {
+                    string endpointUrl = Classes.MetadataLib.MetadataScreenScraper.ssMedia.Endpoint((long)gameItem.id, long.Parse(gameItem.systeme.id), media.type, media.region);
+
+                    // rewrite the media URL to point to the local cache instead of the original URL
+#if DEBUG
+                    media.originalUrl = endpointUrl; // store the original URL for reference
+#endif
+
+                    // blank security credentials from the URL: credentials query string attributes are named: devid, devpassword, ssid, sspassword
+                    var uriBuilder = new UriBuilder(endpointUrl);
+                    var query = System.Web.HttpUtility.ParseQueryString(uriBuilder.Query);
+                    query.Remove("devid"); // blank out the value
+                    query.Remove("devpassword"); // blank out the value
+                    query.Remove("ssid"); // blank out the value
+                    query.Remove("sspassword"); // blank out the value
+                    query.Remove("softname"); // blank out the value
+                    uriBuilder.Query = query.ToString();
+                    media.url = uriBuilder.ToString();
+                    media.url = media.url.Replace("https://api.screenscraper.fr/api2/", "/api/v1/MetadataProxy/ScreenScraper/").Replace("https://api.screenscraper.fr:443/api2/", "/api/v1/MetadataProxy/ScreenScraper/"); // rewrite the URL to point to the local proxy endpoint
+                }
+            }
+
+            // format for response to match the ScreenScraper API structure
+            var response = new hasheous_server.Classes.MetadataLib.MetadataScreenScraper.GameItem
+            {
+                header = new hasheous_server.Classes.MetadataLib.MetadataScreenScraper.ssHeader
+                {
+                    APIversion = "1.0",
+                    dateTime = DateTime.UtcNow,
+                    commandRequested = "jeuInfos.php",
+                    success = true
+                },
+                response = new hasheous_server.Classes.MetadataLib.MetadataScreenScraper.GameItem.GameInfoResponse
+                {
+                    jeu = gameItem
+                }
+            };
+
+            return Ok(response);
+        }
+
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [Route("ScreenScraper/systemesListe.php")]
+        public async Task<IActionResult> GetScreenScraperPlatforms()
+        {
+            var screenScraper = new Classes.MetadataLib.MetadataScreenScraper();
+            var platforms = await screenScraper.GetPlatformsAsync();
+            return Ok(platforms);
+        }
+
+        /// <summary>
+        /// Get image from ScreenScraper
+        /// </summary>
+        /// <param name="endpoint" example="Jeu" required="true">
+        /// The endpoint to retrieve the image from (e.g., "Jeu", "JeuMedia")
+        /// </param>
+        /// <param name="systemeid" example="1" required="true">
+        /// The unique identifier of the system in ScreenScraper
+        /// </param>
+        /// <param name="jeuid" example="12345" required="true">
+        /// The unique identifier of the game in ScreenScraper
+        /// </param>
+        /// <param name="media" example="boxart" required="true">
+        /// The type of media to retrieve (e.g., "boxart", "screenshot", "fanart")
+        /// </param>
+        /// <returns>
+        /// The image from ScreenScraper
+        /// </returns>
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [Route("ScreenScraper/media{endpoint}.php")]
+        [ResponseCache(CacheProfileName = "7Days")]
+        public async Task<IActionResult> GetScreenScraperMedia(string endpoint, long systemeid, long jeuid, string media)
+        {
+            // Validate media to prevent path traversal
+            if (media.Contains("..") || media.Contains("/") || media.Contains("\\"))
+            {
+                return BadRequest("Invalid media ID");
+            }
+
+            // get the record
+            hasheous_server.Classes.MetadataLib.MetadataScreenScraper.ssGame? gameItem = null;
+            IActionResult gameDataResult = await GetScreenScraperResponse_Singular(jeuid, null, null, null);
+            if (gameDataResult is OkObjectResult ok && ok.Value is hasheous_server.Classes.MetadataLib.MetadataScreenScraper.GameItem payload)
+            {
+                gameItem = payload.response?.jeu;
+                // use gameItem.medias here
+            }
+            else if (gameDataResult is ObjectResult obj && obj.Value != null)
+            {
+                // fallback if needed
+            }
+            else
+            {
+                return NotFound("Game metadata not found.");
+            }
+
+            // split media name into type and region (if applicable)
+            string mediaType = media;
+            string? mediaRegion = null;
+            if (media.Contains("("))
+            {
+                int regionStartIndex = media.IndexOf("(");
+                int regionEndIndex = media.IndexOf(")");
+                if (regionStartIndex >= 0 && regionEndIndex > regionStartIndex)
+                {
+                    mediaType = media.Substring(0, regionStartIndex);
+                    mediaRegion = media.Substring(regionStartIndex + 1, regionEndIndex - regionStartIndex - 1);
+                }
+            }
+
+            // find the associated media item in the gameItem.medias list
+            var mediaItem = gameItem?.medias?.FirstOrDefault(m => m.type == mediaType && (mediaRegion == null || m.region == mediaRegion));
+            if (mediaItem == null)
+            {
+                return NotFound("Media not found for the specified game and system.");
+            }
+
+            string mimeType = "image/png";
+            string extension = "jpg"; // default extension
+            switch (mediaItem.format?.ToLower())
+            {
+                case "jpg":
+                case "jpeg":
+                    mimeType = "image/jpeg";
+                    extension = "jpg";
+                    break;
+                case "gif":
+                    mimeType = "image/gif";
+                    extension = "gif";
+                    break;
+                case "bmp":
+                    mimeType = "image/bmp";
+                    extension = "bmp";
+                    break;
+                case "tiff":
+                    mimeType = "image/tiff";
+                    extension = "tiff";
+                    break;
+                case "pdf":
+                    mimeType = "application/pdf";
+                    extension = "pdf";
+                    break;
+                case "mp4":
+                    mimeType = "video/mp4";
+                    extension = "mp4";
+                    break;
+                case "svg":
+                    mimeType = "image/svg+xml";
+                    extension = "svg";
+                    break;
+                default:
+                    mimeType = "image/png";
+                    extension = "png";
+                    break;
+            }
+
+            string resourcePath = $"Images/{systemeid}/{jeuid}/{media}.{extension}";
+            string url = Classes.MetadataLib.MetadataScreenScraper.ssMedia.Endpoint(jeuid, systemeid, media, null);
+
+            try
+            {
+                // Try to resolve from cache (local or S3 fallback)
+                var cachedStream = await ProxyCacheManager.ResolveReadAsync("Screenscraper", resourcePath, CachePolicyType.Media, mimeType);
+                if (cachedStream != null)
+                {
+                    return FileWithManagedStream(cachedStream, mimeType);
+                }
+
+                // Download and cache the image
+                var fileStream = await ProxyCacheManager.DownloadAndCacheAsync(url, "Screenscraper", resourcePath, CachePolicyType.Media, mimeType, HttpContext);
+                if (fileStream != null)
+                {
+                    return FileWithManagedStream(fileStream, mimeType);
+                }
+
+                return NotFound();
+            }
+            catch
+            {
+                return NotFound();
+            }
+        }
+        #endregion ScreenScraper
 
         #region MetadataBundles
         /// <summary>
@@ -1348,18 +1521,20 @@ namespace hasheous_server.Controllers.v1_0
             string fileName = $"{MetadataSourceName}_{GameID}.bundle";
             FileInfo? fileInfo;
             string bundleFilePath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataBundlesDirectory, fileName);
-            string s3Key = $"Bundles/{fileName}";
+            string resourcePath = fileName;
             bool buildNewBundle = true;
+
             if (System.IO.File.Exists(bundleFilePath))
             {
                 // check the file age
                 fileInfo = new FileInfo(bundleFilePath);
                 if ((DateTime.Now - fileInfo.LastWriteTime).TotalDays <= Config.MetadataConfiguration.MetadataBundle_MaxAgeInDays)
                 {
-                    IActionResult? cachedResult = await TryServeFromLocalOrS3Async(bundleFilePath, s3Key, "application/octet-stream");
-                    if (cachedResult != null)
+                    // Try to resolve from cache (local or S3 fallback)
+                    var cachedStream = await ProxyCacheManager.ResolveReadAsync("Bundles", resourcePath, CachePolicyType.Bundles, "application/octet-stream");
+                    if (cachedStream != null)
                     {
-                        return cachedResult;
+                        return FileWithManagedStream(cachedStream, "application/octet-stream", fileName);
                     }
 
                     // Rebuild if the existing bundle cannot be served.
@@ -1367,12 +1542,13 @@ namespace hasheous_server.Controllers.v1_0
                 }
             }
 
-            if (buildNewBundle == true && !System.IO.File.Exists(bundleFilePath))
+            if (buildNewBundle && !System.IO.File.Exists(bundleFilePath))
             {
-                IActionResult? cachedResult = await TryServeFromLocalOrS3Async(bundleFilePath, s3Key, "application/octet-stream");
-                if (cachedResult != null)
+                // Try to resolve from cache (local or S3 fallback)
+                var cachedStream = await ProxyCacheManager.ResolveReadAsync("Bundles", resourcePath, CachePolicyType.Bundles, "application/octet-stream");
+                if (cachedStream != null)
                 {
-                    return cachedResult;
+                    return FileWithManagedStream(cachedStream, "application/octet-stream", fileName);
                 }
             }
 
@@ -1546,7 +1722,29 @@ namespace hasheous_server.Controllers.v1_0
 
                 ZipFile.CreateFromDirectory(tempWorkingDir, bundleFilePath, CompressionLevel.Fastest, false);
 
-                ScheduleLocalCacheUploadToS3(bundleFilePath, s3Key);
+                // Schedule S3 upload via response completion (non-blocking)
+                if (Config.S3StorageConfiguration.Enabled)
+                {
+                    try
+                    {
+                        HttpContext.Response.OnCompleted(async () =>
+                        {
+                            try
+                            {
+                                StorageFallbackResolver resolver = new StorageFallbackResolver();
+                                await resolver.UploadLocalFileToS3Async(bundleFilePath, Config.S3StorageConfiguration.DefaultBucket, $"Bundles/{fileName}", overwrite: false);
+                            }
+                            catch (Exception ex)
+                            {
+                                Logging.Log(Logging.LogType.Warning, "MetadataProxyController", $"S3 bundle upload failed for {fileName}: {ex.Message}");
+                            }
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        Logging.Log(Logging.LogType.Warning, "MetadataProxyController", $"Failed to schedule S3 bundle upload: {ex.Message}");
+                    }
+                }
 
                 // clean up the temporary working directory
                 Directory.Delete(tempWorkingDir, true);
