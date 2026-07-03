@@ -21,6 +21,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Redis (Valkey) provides caching if enabled (`Classes/RedisConnection`), otherwise an in-memory cache is used.
   - Metadata file caching now supports optional S3-compatible object storage fallback (including MinIO) via shared helpers in `hasheous-lib/Classes/S3StorageTools.cs` and `hasheous-lib/Classes/StorageFallbackResolver.cs`.
   - Metadata proxy image and bundle routes use local-disk first, then S3 fallback, and fail open: if S3 is unavailable they fall back to existing provider fetch/build behavior without surfacing S3 errors to clients.
+  - When serving cache reads from `ProxyCacheManager` (`ResolvedContentStream`), register the wrapper for response disposal (for example `HttpContext.Response.RegisterForDispose(resolvedStream)`) before returning `File(resolvedStream.Stream, ...)`; disposing only the inner stream can leak S3 response resources/file handles.
   - S3 uploads for newly downloaded/built files are scheduled on response completion (`HttpContext.Response.OnCompleted`) so client download latency is not blocked by object-store upload time.
   - Separation: the orchestration server exists to separate background tasks from the frontend web server. The frontend web server only services user requests; the orchestrator schedules and runs internal/background work (`QueueProcessor.QueueItems` in `service-orchestrator/Program.cs`). Note the orchestrator has no public endpoints, and should only be called by trusted web servers using the inter-host API key.
 
@@ -34,6 +35,10 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
 - Configuration
   - File: `~/.hasheous-server/config.json` (auto-updated on startup by `Config.UpdateConfig()`). Env vars (used by Docker): `dbhost`, `dbuser`, `dbpass`, `igdbclientid`, `igdbclientsecret`, `redisenabled`, `redishost`, `redisport`, `reportingserverurl`, etc.
   - S3 config (`Config.S3StorageConfiguration`): `Enabled`, `Region`, `ServiceUrl`, `AccessKey`, `SecretKey`, `SessionToken`, `ForcePathStyle`, `DefaultBucket`.
+  - Tiered cache policy config (`Config.CachePolicies` / config field `Policies`) controls proxy cache retention by content type and storage tier:
+    - `Media`: local tier defaults to size-only retention; S3 tier defaults to 2-year max age.
+    - `Bundles`: local and S3 tiers default to 90-day max age.
+    - `MinFreeDiskSpaceBytes` on local tiers triggers eviction even when size is under target if disk free space is low.
   - S3 env vars: `s3enabled`, `s3region`, `s3serviceurl`, `s3accesskey`, `s3secretkey`, `s3sessiontoken`, `s3forcepathstyle`.
   - For MinIO and similar S3-compatible endpoints, use host-only `ServiceUrl` (for example `https://s3.mrgtech.net`) and typically set `ForcePathStyle = true`.
   - S3 fallback is effectively disabled when either `Enabled` is false or bucket/key inputs are missing.
@@ -54,6 +59,10 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - MCP endpoint route: `POST /api/v1/Mcp` (JSON-RPC over HTTP). Keep MCP internet-facing endpoints in `hasheous` (not `service-orchestrator`).
   - Discovery route: `GET /.well-known/mcp.json` for client/server discovery metadata.
   - Metadata proxy file routes (`IGDB/Image`, `TheGamesDB/Images`, `GiantBomb/a/uploads`, and `Bundles/{MetadataSourceName}/{GameID}.bundle`) may return either physical-file or stream-backed file results depending on cache source; do not assume `PhysicalFileResult` only when consuming these actions internally.
+  - ScreenScraper proxy routes are exposed under metadata proxy:
+    - `GET /api/v1/MetadataProxy/ScreenScraper/jeuInfos.php` supports `gameid` or hash lookup (`crc`, `md5`, `sha1`) and can return JSON or XML via `output`.
+    - `GET /api/v1/MetadataProxy/ScreenScraper/systemesListe.php` returns cached/platform metadata from ScreenScraper integration.
+    - `GET /api/v1/MetadataProxy/ScreenScraper/media{endpoint}.php` proxies/caches media and rejects traversal-like media IDs.
   - MCP lookups are intentionally public: the hosted MCP controller uses `[AllowAnonymous]` rather than API key auth.
 
 - Auth & security
@@ -80,6 +89,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Add/adjust scheduled tasks in `service-orchestrator/Program.cs` under `QueueProcessor.QueueItems` (e.g., `FetchIGDBMetadata`, timings are minutes).
   - GiantBomb: when `Config.GiantBomb.APIKey` is present a `FetchGiantBombMetadata` job is queued (default 10080 minutes / 7 days) to refresh GiantBomb platform/game/image data.
   - ScreenScraper: `FetchScreenScraperMetadata` is queued every 1440 minutes (24 hours). It reads cached metadata JSON under `Config.LibraryConfiguration.LibraryMetadataDirectory_Screenscraper/games` and imports records through `XML.XMLIngestor.ImportDatRecord(...)`.
+  - Hourly maintenance now runs proxy cache policy maintenance via `ProxyCacheManager.RunMaintenanceAsync()` (tiered LRU/age eviction for local and S3 cache tiers).
   - Queue task refactor: obsolete blocking entries `GetMissingArtwork` and `MetadataMatchSearch` were removed from metadata fetch task `Blocks` lists. Don’t rely on them for future coordination.
   - Data object metadata guard: `DataObjects.DataObjectMetadataSearch(objectType, id?, ForceSearch)` now uses an atomic file lock under `~/.hasheous-server/Data/Metadata/Hasheous/DataObjectFlags` to prevent duplicate concurrent runs for the same `(objectType, id)` key.
   - Guard behavior details: lock acquisition uses create-new semantics (`FileMode.CreateNew`) and keeps the lock handle open for the full search duration; lock-file collisions cause immediate skip/return.
@@ -99,6 +109,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Large uploads are allowed (Kestrel/FormOptions set to max); ensure proxies forward `X-Forwarded-*` (already configured).
   - Keep XML docs for Swagger (`IncludeXmlComments` expects generated XML files from the projects); build output paths are `bin/Debug/net10.0/` (not net8.0).
   - Swagger filter custom implementations: framework now uses Swashbuckle 10.x, which brings `Microsoft.OpenApi` 2.x. Schema types are `JsonSchemaType` flags (e.g., `JsonSchemaType.String | JsonSchemaType.Null` for nullable strings), examples use `JsonNode` instead of `OpenApiObject`/`OpenApiString`, and tag/security references use `OpenApiTagReference`/`OpenApiSecuritySchemeReference` instead of embedding objects directly. See `hasheous-lib/Classes/SwaggerLookupRequestBodyFilter.cs` and `SwaggerIDocumentFilter.cs` for reference implementations.
+  - Swagger auth requirements now account for both direct attributes and service filters (`[ServiceFilter(...AuthorizationFilter)]`) when determining required API key schemes. If you add security filters via service filters, ensure `AuthorizationOperationFilter` continues to recognize them.
 
 If something is unclear or missing (e.g., additional services, tests, or new auth flows), ask and this guide can be refined.
 
@@ -259,6 +270,11 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 - Local cache source: `~/.hasheous-server/Data/Metadata/ScreenScraper/games` (resolved from `Config.LibraryConfiguration.LibraryMetadataDirectory_Screenscraper`).
 - Import path: cached JSON files are parsed with `gaseous_signature_parser` (ScreenScraper parser mode), language/country short codes are normalized via `Common.GetNameByCode(...)`, then records are imported using `XML.XMLIngestor.ImportDatRecord(...)`.
 - Blocking behavior: this task blocks `QueueItemType.SignatureIngestor` while it runs.
+- Metadata proxy parity endpoints now include:
+  - `jeuInfos.php` response shaping (matching ScreenScraper style) with support for `gameid` and hash-based fallback lookup (`crc`/`md5`/`sha1`).
+  - `systemesListe.php` for platform listing.
+  - `media{endpoint}.php` for media passthrough with cache-first behavior via `ProxyCacheManager`.
+- Sensitive ScreenScraper query credentials (`devid`, `devpassword`, `ssid`, `sspassword`, `softname`) are stripped from rewritten media URLs before responses are returned.
 
 ## SteamGridDB metadata
 - Provider class: `hasheous-lib/Classes/Metadata/SteamGridDB/IMetadata_SteamGridDB.cs` (`MetadataSteamGridDB : IMetadata`).

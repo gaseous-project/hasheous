@@ -232,13 +232,10 @@ namespace Classes
         public static async Task<(long FilesLocal, long FilesS3, long BytesLocal, long BytesS3)> RunMaintenanceAsync(
             CancellationToken cancellationToken = default)
         {
-            lock (_maintenanceLock)
+            if (!Monitor.TryEnter(_maintenanceLock, TimeSpan.Zero))
             {
-                if (Monitor.TryEnter(_maintenanceLock, TimeSpan.Zero))
-                {
-                    // Already running
-                    return (0, 0, 0, 0);
-                }
+                // Already running
+                return (0, 0, 0, 0);
             }
 
             try
@@ -384,6 +381,7 @@ namespace Classes
                 "IGDB" => Config.LibraryConfiguration.LibraryMetadataDirectory_IGDB,
                 "TheGamesDB" => Config.LibraryConfiguration.LibraryMetadataDirectory_TheGamesDb,
                 "GiantBomb" => Config.LibraryConfiguration.LibraryMetadataDirectory_GiantBomb,
+                "Screenscraper" => Config.LibraryConfiguration.LibraryMetadataDirectory_Screenscraper,
                 "Bundles" => Config.LibraryConfiguration.LibraryMetadataBundlesDirectory,
                 _ => Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory, sourceKey)
             };
