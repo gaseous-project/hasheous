@@ -1462,6 +1462,8 @@ namespace hasheous_server.Controllers.v1_0
                 {
                     if (fileStream.ContentStream.ContentLength.HasValue && fileStream.ContentStream.ContentLength.Value <= 7)
                     {
+                        await fileStream.ContentStream.DisposeAsync();
+
                         if (System.IO.File.Exists(fileStream.LocalFilePath))
                         {
                             System.IO.File.Delete(fileStream.LocalFilePath);
@@ -1485,7 +1487,7 @@ namespace hasheous_server.Controllers.v1_0
         /// Get a metadata bundle by its ID. Bundles contain pre-packaged metadata and images for offline use.
         /// </summary>
         /// <param name="MetadataSourceName" example="IGDB" required="true">
-        /// The name of the metadata source (e.g., IGDB, TheGamesDB, GiantBomb)
+        /// The name of the metadata source (e.g., IGDB, TheGamesDB, Screenscraper)
         /// </param>
         /// <param name="GameID" example="12345" required="true">
         /// The unique identifier of the game within the specified metadata source
