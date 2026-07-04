@@ -21,6 +21,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Redis (Valkey) provides caching if enabled (`Classes/RedisConnection`), otherwise an in-memory cache is used.
   - Metadata file caching now supports optional S3-compatible object storage fallback (including MinIO) via shared helpers in `hasheous-lib/Classes/S3StorageTools.cs` and `hasheous-lib/Classes/StorageFallbackResolver.cs`.
   - Metadata proxy image and bundle routes use local-disk first, then S3 fallback, and fail open: if S3 is unavailable they fall back to existing provider fetch/build behavior without surfacing S3 errors to clients.
+  - `ProxyCacheManager.DownloadAndCacheAsync(...)` now returns a tuple: `(ResolvedContentStream? ContentStream, string? LocalFilePath)`. Use `ContentStream` for responses and `LocalFilePath` when post-download cleanup is needed.
   - When serving cache reads from `ProxyCacheManager` (`ResolvedContentStream`), register the wrapper for response disposal (for example `HttpContext.Response.RegisterForDispose(resolvedStream)`) before returning `File(resolvedStream.Stream, ...)`; disposing only the inner stream can leak S3 response resources/file handles.
   - S3 uploads for newly downloaded/built files are scheduled on response completion (`HttpContext.Response.OnCompleted`) so client download latency is not blocked by object-store upload time.
   - Separation: the orchestration server exists to separate background tasks from the frontend web server. The frontend web server only services user requests; the orchestrator schedules and runs internal/background work (`QueueProcessor.QueueItems` in `service-orchestrator/Program.cs`). Note the orchestrator has no public endpoints, and should only be called by trusted web servers using the inter-host API key.
@@ -59,6 +60,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - MCP endpoint route: `POST /api/v1/Mcp` (JSON-RPC over HTTP). Keep MCP internet-facing endpoints in `hasheous` (not `service-orchestrator`).
   - Discovery route: `GET /.well-known/mcp.json` for client/server discovery metadata.
   - Metadata proxy file routes (`IGDB/Image`, `TheGamesDB/Images`, `GiantBomb/a/uploads`, and `Bundles/{MetadataSourceName}/{GameID}.bundle`) may return either physical-file or stream-backed file results depending on cache source; do not assume `PhysicalFileResult` only when consuming these actions internally.
+  - Metadata bundle route valid sources are currently `IGDB`, `TheGamesDB`, and `Screenscraper`.
   - ScreenScraper proxy routes are exposed under metadata proxy:
     - `GET /api/v1/MetadataProxy/ScreenScraper/jeuInfos.php` supports `gameid` or hash lookup (`crc`, `md5`, `sha1`) and can return JSON or XML via `output`.
     - `GET /api/v1/MetadataProxy/ScreenScraper/systemesListe.php` returns cached/platform metadata from ScreenScraper integration.
@@ -274,6 +276,8 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
   - `jeuInfos.php` response shaping (matching ScreenScraper style) with support for `gameid` and hash-based fallback lookup (`crc`/`md5`/`sha1`).
   - `systemesListe.php` for platform listing.
   - `media{endpoint}.php` for media passthrough with cache-first behavior via `ProxyCacheManager`.
+- Cache miss sentinel handling: when ScreenScraper media download succeeds but the cached payload is tiny (`ContentLength <= 7`), treat it as a provider "not found" marker, dispose stream, delete the cached local file, and return `404`.
+- Bundle support now includes ScreenScraper via `GET /api/v1/MetadataProxy/Bundles/Screenscraper/{GameID}.bundle`, with game metadata plus media files sourced from ScreenScraper payloads.
 - Sensitive ScreenScraper query credentials (`devid`, `devpassword`, `ssid`, `sspassword`, `softname`) are stripped from rewritten media URLs before responses are returned.
 
 ## SteamGridDB metadata
