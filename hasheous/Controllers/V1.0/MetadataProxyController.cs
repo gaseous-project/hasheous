@@ -538,9 +538,9 @@ namespace hasheous_server.Controllers.v1_0
 
                 // Download and cache the image
                 var fileStream = await ProxyCacheManager.DownloadAndCacheAsync(url, "IGDB", resourcePath, CachePolicyType.Media, "image/jpeg", HttpContext);
-                if (fileStream != null)
+                if (fileStream.ContentStream != null)
                 {
-                    return FileWithManagedStream(fileStream, "image/jpeg");
+                    return FileWithManagedStream(fileStream.ContentStream, "image/jpeg");
                 }
 
                 return NotFound();
@@ -592,9 +592,9 @@ namespace hasheous_server.Controllers.v1_0
 
                 // Download and cache the image
                 var fileStream = await ProxyCacheManager.DownloadAndCacheAsync(url, "TheGamesDB", resourcePath, CachePolicyType.Media, "image/jpeg", HttpContext);
-                if (fileStream != null)
+                if (fileStream.ContentStream != null)
                 {
-                    return FileWithManagedStream(fileStream, "image/jpeg");
+                    return FileWithManagedStream(fileStream.ContentStream, "image/jpeg");
                 }
 
                 return NotFound();
@@ -1172,9 +1172,9 @@ namespace hasheous_server.Controllers.v1_0
 
                 // Download and cache the image
                 var fileStream = await ProxyCacheManager.DownloadAndCacheAsync(url, "GiantBomb", resourcePath, CachePolicyType.Media, "image/jpeg", HttpContext);
-                if (fileStream != null)
+                if (fileStream.ContentStream != null)
                 {
-                    return FileWithManagedStream(fileStream, "image/jpeg");
+                    return FileWithManagedStream(fileStream.ContentStream, "image/jpeg");
                 }
 
                 return NotFound();
@@ -1458,9 +1458,19 @@ namespace hasheous_server.Controllers.v1_0
 
                 // Download and cache the image
                 var fileStream = await ProxyCacheManager.DownloadAndCacheAsync(url, "Screenscraper", resourcePath, CachePolicyType.Media, mimeType, HttpContext);
-                if (fileStream != null)
+                if (fileStream.ContentStream != null)
                 {
-                    return FileWithManagedStream(fileStream, mimeType);
+                    if (fileStream.ContentStream.ContentLength.HasValue && fileStream.ContentStream.ContentLength.Value <= 7)
+                    {
+                        await fileStream.ContentStream.DisposeAsync();
+
+                        if (System.IO.File.Exists(fileStream.LocalFilePath))
+                        {
+                            System.IO.File.Delete(fileStream.LocalFilePath);
+                        }
+                        return NotFound("Media not found for the specified game and system.");
+                    }
+                    return FileWithManagedStream(fileStream.ContentStream, mimeType);
                 }
 
                 return NotFound();
@@ -1477,7 +1487,7 @@ namespace hasheous_server.Controllers.v1_0
         /// Get a metadata bundle by its ID. Bundles contain pre-packaged metadata and images for offline use.
         /// </summary>
         /// <param name="MetadataSourceName" example="IGDB" required="true">
-        /// The name of the metadata source (e.g., IGDB, TheGamesDB, GiantBomb)
+        /// The name of the metadata source (e.g., IGDB, TheGamesDB, Screenscraper)
         /// </param>
         /// <param name="GameID" example="12345" required="true">
         /// The unique identifier of the game within the specified metadata source
@@ -1507,10 +1517,10 @@ namespace hasheous_server.Controllers.v1_0
             }
 
             // validate MetadataSourceName
-            var validSources = new List<string> { "IGDB", "TheGamesDB", "GiantBomb" };
+            var validSources = new List<string> { "IGDB", "TheGamesDB", "Screenscraper" };
             if (!validSources.Contains(MetadataSourceName))
             {
-                return BadRequest("Invalid metadata source");
+                return BadRequest("Invalid metadata source. Valid sources are: " + string.Join(", ", validSources));
             }
 
             // check the disk for a pre-built bundle
@@ -1711,6 +1721,58 @@ namespace hasheous_server.Controllers.v1_0
                             }
                         }
 
+                        break;
+
+                    case "Screenscraper":
+                        var ssGameData = await GetScreenScraperResponse_Singular(long.Parse(GameID), null, null, null);
+                        // extract the response
+                        hasheous_server.Classes.MetadataLib.MetadataScreenScraper.ssGame? ssGameObj = null;
+                        if (ssGameData is OkObjectResult okResult3)
+                        {
+                            var payload = okResult3.Value as hasheous_server.Classes.MetadataLib.MetadataScreenScraper.GameItem;
+                            ssGameObj = payload?.response?.jeu;
+                            // serialize the ssGameObj to json
+                            string ssGameJson = Newtonsoft.Json.JsonConvert.SerializeObject(ssGameObj, Newtonsoft.Json.Formatting.Indented, new Newtonsoft.Json.JsonSerializerSettings
+                            {
+                                NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore,
+                                MaxDepth = 64
+                            });
+                            // drop the game metadata json file
+                            await _AddMetadataToBundle(tempWorkingDir, "Game", ssGameJson);
+
+                            // get all media items and add them to the bundle
+                            if (ssGameObj != null && ssGameObj.medias != null)
+                            {
+                                foreach (var media in ssGameObj.medias)
+                                {
+                                    string mediaType = media.type ?? "";
+                                    string mediaRegion = media.region ?? "";
+                                    string mediaFileName = $"{mediaType}";
+                                    if (!string.IsNullOrEmpty(mediaRegion))
+                                    {
+                                        mediaFileName += $"({mediaRegion})";
+                                    }
+                                    mediaFileName += $".{media.format ?? "jpg"}";
+
+                                    var mediaFileDataResponse = await GetScreenScraperMedia(mediaType, long.Parse(ssGameObj.systeme.id), (long)ssGameObj.id, mediaType);
+
+                                    if (mediaFileDataResponse is NotFoundObjectResult)
+                                    {
+                                        // skip if media not found
+                                        continue;
+                                    }
+
+                                    if (mediaFileDataResponse is FileResult mediaFileData)
+                                    {
+                                        await _AddFileToBundle(tempWorkingDir, media.parent ?? "medias", mediaFileData, mediaFileName);
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            return BadRequest();
+                        }
                         break;
                 }
 
