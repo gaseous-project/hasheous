@@ -131,7 +131,7 @@ namespace Classes
         /// Downloads a file from the given URL, stores it locally in the source-specific cache directory,
         /// and schedules an S3 upload on HTTP response completion (non-blocking for client).
         /// </summary>
-        public static async Task<ResolvedContentStream?> DownloadAndCacheAsync(
+        public static async Task<(ResolvedContentStream? ContentStream, string? LocalFilePath, string? S3Path)> DownloadAndCacheAsync(
             string downloadUrl,
             string sourceKey,
             string resourcePath,
@@ -156,7 +156,7 @@ namespace Classes
 
                 if (!downloadSuccess || !File.Exists(tempPath))
                 {
-                    return null;
+                    return (null, null, null);
                 }
 
                 // Validate file size > 0
@@ -164,7 +164,7 @@ namespace Classes
                 if (tempFileInfo.Length == 0)
                 {
                     File.Delete(tempPath);
-                    return null;
+                    return (null, null, null);
                 }
 
                 // Atomically move to final location
@@ -192,12 +192,12 @@ namespace Classes
                     ScheduleS3Upload(localFilePath, sourceKey, resourcePath, httpContext);
                 }
 
-                return result;
+                return (result, localFilePath, resourcePath);
             }
             catch (Exception ex)
             {
                 Logging.Log(Logging.LogType.Warning, "ProxyCacheManager", $"DownloadAndCacheAsync failed for {downloadUrl}: {ex.Message}");
-                return null;
+                return (null, null, null);
             }
         }
 
