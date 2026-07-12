@@ -2097,6 +2097,13 @@ namespace hasheous_server.Classes
 
         private async Task _DataObjectMetadataSearch_Apply(DataObjectItem item, string logName, Random rand, DataObjectType objectType, long? id, bool ForceSearch, DateTime now, HashSet<MetadataSources> ProcessSources, int processedObjectCount, int objectTotalCount)
         {
+            // check item metadata for any with a matchmethod of inprogress - if so, skip this item as it is already being processed
+            if (item.Metadata != null && item.Metadata.Any(x => x.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.InProgress))
+            {
+                Logging.Log(Logging.LogType.Warning, "Metadata Match", $"{processedObjectCount} / {objectTotalCount} - Skipping {item.ObjectType} {item.Name} as it is already being processed for metadata.");
+                return;
+            }
+
             ConcurrentDictionary<Guid, ConcurrentDictionary<MetadataSources, Task>> metadataLookupTasks = new ConcurrentDictionary<Guid, ConcurrentDictionary<MetadataSources, Task>>();
 
             DataObjectItem? itemPlatform = null;
