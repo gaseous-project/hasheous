@@ -307,7 +307,7 @@ namespace hasheous_server.Controllers.v1_0
             }
             else
             {
-                return Ok(DataObjects.GetAttributes(Id, true));
+                return Ok(await DataObjects.GetAttributes(Id, true));
             }
         }
 
@@ -402,7 +402,7 @@ namespace hasheous_server.Controllers.v1_0
             }
             else
             {
-                return Ok(DataObjects.GetSignatures(ObjectType, Id));
+                return Ok(await DataObjects.GetSignatures(ObjectType, Id));
             }
         }
 
@@ -503,7 +503,7 @@ namespace hasheous_server.Controllers.v1_0
                     );
                 }
 
-                return Ok(DataObjects.GetMetadataMap(ObjectType, Id));
+                return Ok(await DataObjects.GetMetadataMap(ObjectType, Id));
             }
         }
 
@@ -530,7 +530,7 @@ namespace hasheous_server.Controllers.v1_0
             }
             else
             {
-                return Ok(DataObjects.SignatureSearch(Id, ObjectType, SearchString));
+                return Ok(await DataObjects.SignatureSearch(Id, ObjectType, SearchString));
             }
         }
 

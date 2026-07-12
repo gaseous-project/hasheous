@@ -1,3 +1,6 @@
+using System.Data;
+using Classes;
+
 namespace hasheous_server.Classes.MetadataLib
 {
     /// <summary>
@@ -31,16 +34,32 @@ namespace hasheous_server.Classes.MetadataLib
             {
                 case DataObjects.DataObjectType.Game:
                     // currently wikipedia metadata lookup is only available from IGDB game metadata
-                    if (options == null || !options.ContainsKey("igdbGameId"))
+                    long? igdbGameId = null;
+                    string sql = "SELECT `MetadataId` FROM `DataObject_MetadataMap` WHERE `DataObjectId` = @DataObjectId AND `SourceId` = @MetadataSource";
+                    DataTable? dt = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object>
                     {
-                        throw new ArgumentException("IGDB Game ID must be provided in options for Wikipedia game search.");
-                    }
-                    // check that options["igdbGameId"] is a long
-                    if (options["igdbGameId"] == null || options["igdbGameId"].GetType() != typeof(long))
+                        { "@DataObjectId", item.Id },
+                        { "@MetadataSource", hasheous_server.Classes.Metadata.Communications.MetadataSources.IGDB }
+                    });
+                    if (dt != null && dt.Rows.Count > 0)
                     {
-                        throw new ArgumentException("IGDB Game ID must be of type long for Wikipedia game search.");
+                        igdbGameId = Convert.ToInt64(dt.Rows[0]["MetadataId"]);
                     }
-                    long igdbGameId = (long)options["igdbGameId"];
+                    else
+                    {
+                        // if no IGDB metadata is found, check if options contains an IGDB game ID
+                        if (options == null || !options.ContainsKey("igdbGameId"))
+                        {
+                            throw new ArgumentException("IGDB Game ID must be provided in options for Wikipedia game search.");
+                        }
+                        igdbGameId = (long)options["igdbGameId"];
+                    }
+
+                    if (igdbGameId == null)
+                    {
+                        throw new ArgumentException("IGDB Game ID must be provided for Wikipedia game search.");
+                    }
+
                     HasheousClient.Models.Metadata.IGDB.Game? igdbGame = await Metadata.IGDB.Metadata.GetMetadata<HasheousClient.Models.Metadata.IGDB.Game>(igdbGameId);
                     if (igdbGame != null)
                     {
