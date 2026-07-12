@@ -2097,7 +2097,7 @@ namespace hasheous_server.Classes
 
         private async Task _DataObjectMetadataSearch_Apply(DataObjectItem item, string logName, Random rand, DataObjectType objectType, long? id, bool ForceSearch, DateTime now, HashSet<MetadataSources> ProcessSources, int processedObjectCount, int objectTotalCount)
         {
-            ConcurrentDictionary<Guid, Dictionary<MetadataSources, Task>> metadataLookupTasks = new ConcurrentDictionary<Guid, Dictionary<MetadataSources, Task>>();
+            ConcurrentDictionary<Guid, ConcurrentDictionary<MetadataSources, Task>> metadataLookupTasks = new ConcurrentDictionary<Guid, ConcurrentDictionary<MetadataSources, Task>>();
 
             DataObjectItem? itemPlatform = null;
             if (item.ObjectType == DataObjectType.Game)
@@ -2143,17 +2143,7 @@ namespace hasheous_server.Classes
             int defaultNextDay = 1;
 
             Guid jobId = Guid.NewGuid();
-            metadataLookupTasks.TryAdd(jobId, new Dictionary<MetadataSources, Task>());
-
-            var setNextMetadataSearch = async (int period) =>
-            {
-                string sql = "UPDATE DataObject_MetadataMap SET `NextSearch`=@nextsearch WHERE DataObjectId=@id AND SourceId=@source;";
-                await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object>{
-                    { "id", item.Id },
-                    { "source", MetadataSources.None },
-                    { "nextsearch", now.AddDays(period) }
-                });
-            };
+            metadataLookupTasks.TryAdd(jobId, new ConcurrentDictionary<MetadataSources, Task>());
 
             var saveResults = async (MetadataSources metadataSource, BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod? matchMethod, string metadataId, DateTime lastSearch, DateTime nextSearch) =>
             {
@@ -2188,7 +2178,7 @@ namespace hasheous_server.Classes
                 {
                     // set the next search date to 6 months in the future to avoid rechecking too often
                     // we're doing this for unsupported types so that when/if it becomes supported it will be searched in the future
-                    await setNextMetadataSearch(noMatchNextDay);
+                    await saveResults(metadataSource, BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch, "", now, DateTime.Now.AddDays(noMatchNextDay));
 
                     continue;
                 }
@@ -2228,7 +2218,7 @@ namespace hasheous_server.Classes
                         Logging.Log(Logging.LogType.Warning, "Metadata Match", $"{processedObjectCount} / {objectTotalCount} - Skipping metadata source {metadataSource} for game {item.Name} as no platform metadata is mapped.");
 
                         // set the next search date to 6 months in the future to avoid rechecking too often
-                        await setNextMetadataSearch(noMatchNextDay);
+                        await saveResults(metadataSource, BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch, "", now, DateTime.Now.AddDays(noMatchNextDay));
 
                         continue;
                     }
@@ -2243,7 +2233,7 @@ namespace hasheous_server.Classes
                     Logging.Log(Logging.LogType.Warning, "Metadata Match", $"No IMetadata handler found for source: {metadataSource}");
 
                     // set the next search date to 6 months in the future to avoid rechecking too often
-                    await setNextMetadataSearch(noMatchNextDay);
+                    await saveResults(metadataSource, BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch, "", now, DateTime.Now.AddDays(noMatchNextDay));
 
                     continue;
                 }
@@ -2254,7 +2244,7 @@ namespace hasheous_server.Classes
                     Logging.Log(Logging.LogType.Warning, "Metadata Match", $"Metadata provider for source {metadataSource} is not enabled. Skipping.");
 
                     // set the next search date to 6 months in the future to avoid rechecking too often
-                    await setNextMetadataSearch(noMatchNextDay);
+                    await saveResults(metadataSource, BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch, "", now, DateTime.Now.AddDays(noMatchNextDay));
 
                     continue;
                 }
@@ -2382,14 +2372,14 @@ namespace hasheous_server.Classes
                             {
                                 Logging.Log(Logging.LogType.Warning, "Metadata Match", $"{processedObjectCount} / {objectTotalCount} - Rate limit reached, retry after {ex.RetryAfter}", ex);
 
-                                await setNextMetadataSearch(ex.RetryAfter.Subtract(now).Days);
+                                await saveResults(metadataSource, metadata.MatchMethod, metadata.ImmutableId ?? "", now, ex.RetryAfter);
                             }
                             catch (Exception ex)
                             {
                                 Logging.Log(Logging.LogType.Warning, "Metadata Match", $"{processedObjectCount} / {objectTotalCount} - Error processing metadata search", ex);
 
                                 // set the next search date to tomorrow - hopefully it's just a transient issue
-                                await setNextMetadataSearch(defaultNextDay);
+                                await saveResults(metadataSource, metadata.MatchMethod, metadata.ImmutableId ?? "", now, DateTime.Now.AddDays(defaultNextDay));
                             }
                         }
                     }
@@ -2418,17 +2408,6 @@ namespace hasheous_server.Classes
                     {
                         Logging.Log(Logging.LogType.Warning, "Metadata Match", $"{processedObjectCount} / {objectTotalCount} - Error processing game artwork metadata search", ex);
                     }
-                }
-
-                // get artwork
-                try
-                {
-                    BackgroundMetadataMatcher.BackgroundMetadataMatcher metadataMatcher = new BackgroundMetadataMatcher.BackgroundMetadataMatcher();
-                    _ = metadataMatcher.GetGameArtwork((long)item.Id, ForceSearch);
-                }
-                catch (Exception ex)
-                {
-                    Logging.Log(Logging.LogType.Warning, "Metadata Match", $"{processedObjectCount} / {objectTotalCount} - Error processing artwork metadata search", ex);
                 }
 
                 // update date
