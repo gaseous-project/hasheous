@@ -1,4 +1,5 @@
 using System.Data;
+using System.Globalization;
 using Classes;
 
 namespace hasheous_server.Classes.MetadataLib
@@ -43,16 +44,20 @@ namespace hasheous_server.Classes.MetadataLib
                     });
                     if (dt != null && dt.Rows.Count > 0)
                     {
-                        igdbGameId = Convert.ToInt64(dt.Rows[0]["MetadataId"]);
+                        if (TryGetLongFromObject(dt.Rows[0]["MetadataId"], out long parsedMetadataId))
+                        {
+                            igdbGameId = parsedMetadataId;
+                        }
                     }
-                    else
+
+                    // if no valid IGDB metadata id is found in the database, check options for a supplied id
+                    if (igdbGameId == null)
                     {
-                        // if no IGDB metadata is found, check if options contains an IGDB game ID
-                        if (options == null || !options.ContainsKey("igdbGameId"))
+                        if (options == null || !options.TryGetValue("igdbGameId", out object? optionValue) || !TryGetLongFromObject(optionValue, out long parsedOptionId))
                         {
                             throw new ArgumentException("IGDB Game ID must be provided in options for Wikipedia game search.");
                         }
-                        igdbGameId = (long)options["igdbGameId"];
+                        igdbGameId = parsedOptionId;
                     }
 
                     if (igdbGameId == null)
@@ -88,6 +93,52 @@ namespace hasheous_server.Classes.MetadataLib
             }
 
             return DataObjectSearchResults;
+        }
+
+        private static bool TryGetLongFromObject(object? value, out long result)
+        {
+            result = 0;
+
+            if (value == null || value == DBNull.Value)
+            {
+                return false;
+            }
+
+            switch (value)
+            {
+                case long l:
+                    result = l;
+                    return true;
+                case int i:
+                    result = i;
+                    return true;
+                case short s:
+                    result = s;
+                    return true;
+                case byte b:
+                    result = b;
+                    return true;
+                case sbyte sb:
+                    result = sb;
+                    return true;
+                case ushort us:
+                    result = us;
+                    return true;
+                case uint ui:
+                    result = ui;
+                    return true;
+                case ulong ul when ul <= long.MaxValue:
+                    result = (long)ul;
+                    return true;
+                case decimal dec when dec >= long.MinValue && dec <= long.MaxValue && dec == decimal.Truncate(dec):
+                    result = (long)dec;
+                    return true;
+                case string str:
+                    return long.TryParse(str, NumberStyles.Integer, CultureInfo.InvariantCulture, out result);
+            }
+
+            string? stringValue = Convert.ToString(value, CultureInfo.InvariantCulture);
+            return !string.IsNullOrWhiteSpace(stringValue) && long.TryParse(stringValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out result);
         }
     }
 }
