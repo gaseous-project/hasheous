@@ -1,16 +1,16 @@
 using System;
-using System.IO;
-using MySqlConnector;
-using gaseous_signature_parser.models.RomSignatureObject;
 using System.Data;
+using System.IO;
+using System.Threading.Tasks;
 using Classes;
-using IGDB;
-using IGDB.Models;
+using gaseous_signature_parser.models.RomSignatureObject;
+using hasheous_server.Classes;
 using hasheous_server.Classes.Metadata;
 using hasheous_server.Classes.Metadata.IGDB;
 using hasheous_server.Models;
-using hasheous_server.Classes;
-using System.Threading.Tasks;
+using IGDB;
+using IGDB.Models;
+using MySqlConnector;
 
 namespace BackgroundMetadataMatcher
 {
@@ -54,7 +54,12 @@ namespace BackgroundMetadataMatcher
             /// <summary>
             /// Match made by vote
             /// </summary>
-            Voted = 5
+            Voted = 5,
+
+            /// <summary>
+            /// Match is in progress - this is used to prevent multiple matches from being made at the same time
+            /// </summary>
+            InProgress = 6
         }
 
         public async Task GetGamesWithoutArtwork()

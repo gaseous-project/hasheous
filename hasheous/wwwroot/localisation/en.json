@@ -121,6 +121,7 @@
     "automatictoomanymatches": "Too many results to automatically match",
     "manualbyadmin": "Manually matched by Admin",
     "voted": "Matched by community",
+    "inprogress": "Match in progress",
     "description": "Description",
     "attributes": "Attributes",
     "attribute": "Attribute",

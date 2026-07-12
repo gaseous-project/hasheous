@@ -94,6 +94,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Hourly maintenance now runs proxy cache policy maintenance via `ProxyCacheManager.RunMaintenanceAsync()` (tiered LRU/age eviction for local and S3 cache tiers).
   - Queue task refactor: obsolete blocking entries `GetMissingArtwork` and `MetadataMatchSearch` were removed from metadata fetch task `Blocks` lists. Don’t rely on them for future coordination.
   - Data object metadata guard: `DataObjects.DataObjectMetadataSearch(objectType, id?, ForceSearch)` now uses an atomic file lock under `~/.hasheous-server/Data/Metadata/Hasheous/DataObjectFlags` to prevent duplicate concurrent runs for the same `(objectType, id)` key.
+  - Metadata search tasks are launched concurrently per metadata source. The per-run `jobId` must be unique, the bounded return guard is controlled by `maxWaitSeconds` (currently 4), and `finalise()` must wait until every launched task has completed before running.
   - Guard behavior details: lock acquisition uses create-new semantics (`FileMode.CreateNew`) and keeps the lock handle open for the full search duration; lock-file collisions cause immediate skip/return.
   - Stale lock policy: existing lock files are treated as valid for up to 1 hour; older lock files are deleted and lock acquisition is retried. For `id == null`, the lock key uses `all` (for example: `Game_all_MetadataSearchInProgress.flag`).
 
@@ -144,6 +145,7 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 - Use the lookup timeout pattern
   - See `LookupController.LookupPost`: `Task.WhenAny(..., Task.Delay(TimeSpan.FromSeconds(10)))` and set `Retry-After = 90` on 503 responses.
   - Interactive hash lookup metadata searches use a short `Task.Delay(TimeSpan.FromSeconds(2))` guard to keep UI-driven requests responsive.
+  - That guard must not serialize provider work: launch metadata tasks concurrently, return promptly if the guard expires, and let the outstanding tasks finish before finalising the run.
 
 - Raw-body POST endpoints and Swagger documentation
   - `LookupPost` (`POST /api/v1/Lookup/ByHash`) accepts a raw JSON body instead of a bound model parameter. The action reads `Request.Body` directly via `StreamReader` and calls `JsonDocument.Parse(...)` manually.

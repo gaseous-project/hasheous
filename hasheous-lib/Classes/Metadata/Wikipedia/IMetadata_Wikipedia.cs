@@ -1,3 +1,7 @@
+using System.Data;
+using System.Globalization;
+using Classes;
+
 namespace hasheous_server.Classes.MetadataLib
 {
     /// <summary>
@@ -31,16 +35,36 @@ namespace hasheous_server.Classes.MetadataLib
             {
                 case DataObjects.DataObjectType.Game:
                     // currently wikipedia metadata lookup is only available from IGDB game metadata
-                    if (options == null || !options.ContainsKey("igdbGameId"))
+                    long? igdbGameId = null;
+                    string sql = "SELECT `MetadataId` FROM `DataObject_MetadataMap` WHERE `DataObjectId` = @DataObjectId AND `SourceId` = @MetadataSource";
+                    DataTable? dt = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object>
                     {
-                        throw new ArgumentException("IGDB Game ID must be provided in options for Wikipedia game search.");
-                    }
-                    // check that options["igdbGameId"] is a long
-                    if (options["igdbGameId"] == null || options["igdbGameId"].GetType() != typeof(long))
+                        { "@DataObjectId", item.Id },
+                        { "@MetadataSource", hasheous_server.Classes.Metadata.Communications.MetadataSources.IGDB }
+                    });
+                    if (dt != null && dt.Rows.Count > 0)
                     {
-                        throw new ArgumentException("IGDB Game ID must be of type long for Wikipedia game search.");
+                        if (TryGetLongFromObject(dt.Rows[0]["MetadataId"], out long parsedMetadataId))
+                        {
+                            igdbGameId = parsedMetadataId;
+                        }
                     }
-                    long igdbGameId = (long)options["igdbGameId"];
+
+                    // if no valid IGDB metadata id is found in the database, check options for a supplied id
+                    if (igdbGameId == null)
+                    {
+                        if (options == null || !options.TryGetValue("igdbGameId", out object? optionValue) || !TryGetLongFromObject(optionValue, out long parsedOptionId))
+                        {
+                            throw new ArgumentException("IGDB Game ID must be provided in options for Wikipedia game search.");
+                        }
+                        igdbGameId = parsedOptionId;
+                    }
+
+                    if (igdbGameId == null)
+                    {
+                        throw new ArgumentException("IGDB Game ID must be provided for Wikipedia game search.");
+                    }
+
                     HasheousClient.Models.Metadata.IGDB.Game? igdbGame = await Metadata.IGDB.Metadata.GetMetadata<HasheousClient.Models.Metadata.IGDB.Game>(igdbGameId);
                     if (igdbGame != null)
                     {
@@ -69,6 +93,52 @@ namespace hasheous_server.Classes.MetadataLib
             }
 
             return DataObjectSearchResults;
+        }
+
+        private static bool TryGetLongFromObject(object? value, out long result)
+        {
+            result = 0;
+
+            if (value == null || value == DBNull.Value)
+            {
+                return false;
+            }
+
+            switch (value)
+            {
+                case long l:
+                    result = l;
+                    return true;
+                case int i:
+                    result = i;
+                    return true;
+                case short s:
+                    result = s;
+                    return true;
+                case byte b:
+                    result = b;
+                    return true;
+                case sbyte sb:
+                    result = sb;
+                    return true;
+                case ushort us:
+                    result = us;
+                    return true;
+                case uint ui:
+                    result = ui;
+                    return true;
+                case ulong ul when ul <= long.MaxValue:
+                    result = (long)ul;
+                    return true;
+                case decimal dec when dec >= long.MinValue && dec <= long.MaxValue && dec == decimal.Truncate(dec):
+                    result = (long)dec;
+                    return true;
+                case string str:
+                    return long.TryParse(str, NumberStyles.Integer, CultureInfo.InvariantCulture, out result);
+            }
+
+            string? stringValue = Convert.ToString(value, CultureInfo.InvariantCulture);
+            return !string.IsNullOrWhiteSpace(stringValue) && long.TryParse(stringValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out result);
         }
     }
 }

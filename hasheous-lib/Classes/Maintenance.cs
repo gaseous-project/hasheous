@@ -161,7 +161,7 @@ namespace Classes
                 { "objecttype", DataObjectType.Game },
                 { "attributename", AttributeItem.AttributeName.Platform }
             };
-            DataTable gamesWithoutPlatform = await db.ExecuteCMDAsync(sql);
+            DataTable gamesWithoutPlatform = await db.ExecuteCMDAsync(sql, dbDict);
             hasheous_server.Classes.DataObjects dataObjects = new hasheous_server.Classes.DataObjects();
             foreach (DataRow row in gamesWithoutPlatform.Rows)
             {
