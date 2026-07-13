@@ -512,6 +512,7 @@ namespace hasheous_server.Controllers.v1_0
         /// </returns>
         [MapToApiVersion("1.0")]
         [HttpGet]
+        [NoClientApiKeyNeeded()]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [Route("IGDB/Image/{ImageId}.jpg")]
@@ -566,6 +567,7 @@ namespace hasheous_server.Controllers.v1_0
         /// <returns></returns>
         [MapToApiVersion("1.0")]
         [HttpGet]
+        [NoClientApiKeyNeeded()]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [Route("TheGamesDB/Images/{ImageSize}/{*FileName}")]
@@ -772,6 +774,7 @@ namespace hasheous_server.Controllers.v1_0
         /// <response code="400">If the one of the input parameters is bad</response>
         [MapToApiVersion("1.0")]
         [HttpGet]
+        [NoClientApiKeyNeeded()]
         [ProducesResponseType(typeof(HasheousClient.Models.Metadata.TheGamesDb.GamesImages), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [Route("TheGamesDB/Games/Images")]
@@ -919,6 +922,7 @@ namespace hasheous_server.Controllers.v1_0
         /// 
         [MapToApiVersion("1.0")]
         [HttpGet]
+        [NoClientApiKeyNeeded()]
         [ProducesResponseType(typeof(HasheousClient.Models.Metadata.TheGamesDb.PlatformsImages), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [Route("TheGamesDB/Platforms/Images")]
@@ -1080,6 +1084,7 @@ namespace hasheous_server.Controllers.v1_0
 
         [MapToApiVersion("1.0")]
         [HttpGet]
+        [NoClientApiKeyNeeded()]
         [ProducesResponseType(typeof(GiantBomb.Models.GiantBombGenericResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [Route("GiantBomb/images/{guid}")]
@@ -1146,6 +1151,7 @@ namespace hasheous_server.Controllers.v1_0
 
         [MapToApiVersion("1.0")]
         [HttpGet]
+        [NoClientApiKeyNeeded()]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [Route("GiantBomb/a/uploads/{*GiantBombImagePath}")]
@@ -1355,6 +1361,7 @@ namespace hasheous_server.Controllers.v1_0
         /// </returns>
         [MapToApiVersion("1.0")]
         [HttpGet]
+        [NoClientApiKeyNeeded()]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [Route("ScreenScraper/media{endpoint}.php")]
