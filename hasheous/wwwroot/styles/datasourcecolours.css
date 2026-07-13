@@ -12,6 +12,7 @@
     --signature-source-color-puredosdat: #00ff00;
     --signature-source-color-screenscraper: #0000ff;
     --signature-source-color-totaldoscollection: #ff69b4;
+    --signature-source-color-exo: #008a55;
     --signature-source-color-generic: #7f00ff;
 }
 
@@ -65,6 +66,10 @@
 
 .color-totaldoscollection {
     background-color: var(--signature-source-color-totaldoscollection);
+}
+
+.color-exo {
+    background-color: var(--signature-source-color-exo);
 }
 
 .color-generic {

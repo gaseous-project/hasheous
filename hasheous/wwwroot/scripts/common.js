@@ -534,6 +534,7 @@ let signatureSources = {
     9: "PureDOSDAT",
     11: "MAMERedump",
     12: "TotalDOSCollection",
+    13: "eXo",
     98: "ScreenScraper"
 }
 
