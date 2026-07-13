@@ -59,12 +59,12 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Swagger is enabled with custom schema IDs and API key security definitions.
   - MCP endpoint route: `POST /api/v1/Mcp` (JSON-RPC over HTTP). Keep MCP internet-facing endpoints in `hasheous` (not `service-orchestrator`).
   - Discovery route: `GET /.well-known/mcp.json` for client/server discovery metadata.
-  - Metadata proxy file routes (`IGDB/Image`, `TheGamesDB/Images`, `GiantBomb/a/uploads`, and `Bundles/{MetadataSourceName}/{GameID}.bundle`) may return either physical-file or stream-backed file results depending on cache source; do not assume `PhysicalFileResult` only when consuming these actions internally.
+  - Metadata proxy file routes (`IGDB/Image`, `TheGamesDB/Images`, `GiantBomb/a/uploads`, `GiantBomb/images`, `ScreenScraper/media{endpoint}.php`, `TheGamesDB/Games/Images`, and `TheGamesDB/Platforms/Images`) may return either physical-file or stream-backed file results depending on cache source; do not assume `PhysicalFileResult` only when consuming these actions internally. These media endpoints do NOT require the `X-Client-API-Key` header and are marked with `[NoClientApiKeyNeeded()]`.
   - Metadata bundle route valid sources are currently `IGDB`, `TheGamesDB`, and `Screenscraper`.
   - ScreenScraper proxy routes are exposed under metadata proxy:
-    - `GET /api/v1/MetadataProxy/ScreenScraper/jeuInfos.php` supports `gameid` or hash lookup (`crc`, `md5`, `sha1`) and can return JSON or XML via `output`.
-    - `GET /api/v1/MetadataProxy/ScreenScraper/systemesListe.php` returns cached/platform metadata from ScreenScraper integration.
-    - `GET /api/v1/MetadataProxy/ScreenScraper/media{endpoint}.php` proxies/caches media and rejects traversal-like media IDs.
+    - `GET /api/v1/MetadataProxy/ScreenScraper/jeuInfos.php` supports `gameid` or hash lookup (`crc`, `md5`, `sha1`) and can return JSON or XML via `output`. Requires `X-Client-API-Key`.
+    - `GET /api/v1/MetadataProxy/ScreenScraper/systemesListe.php` returns cached/platform metadata from ScreenScraper integration. Requires `X-Client-API-Key`.
+    - `GET /api/v1/MetadataProxy/ScreenScraper/media{endpoint}.php` proxies/caches media and rejects traversal-like media IDs. Does NOT require `X-Client-API-Key`.
   - MCP lookups are intentionally public: the hosted MCP controller uses `[AllowAnonymous]` rather than API key auth.
 
 - Auth & security
@@ -72,7 +72,8 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Role hierarchy: Admin > Moderator > Member. "Verified Email" is a status role (not hierarchical) automatically assigned/removed based on email confirmation status.
   - API keys:
   - User key header `X-API-Key` via `[Authentication.ApiKey.ApiKeyAttribute]` (`ApiKeyAuthorizationFilter` wired in `hasheous/Program.cs`) — identifies individual users and their actions.
-  - Client key header `X-Client-API-Key` via `[Authentication.ClientApiKey.ClientApiKeyAttribute]` — identifies client apps (e.g., Gaseous, Romm); typically required when `Config.RequireClientAPIKey` is true. Required to access the metadata proxy endpoints.
+  - Client key header `X-Client-API-Key` via `[Authentication.ClientApiKey.ClientApiKeyAttribute]` — identifies client apps (e.g., Gaseous, Romm); typically required when `Config.RequireClientAPIKey` is true.
+  - To exempt specific endpoints from client API key requirement, use `[Authentication.ClientApiKey.NoClientApiKeyNeededAttribute]` on the method. This is useful for public media endpoints that should not require authentication.
   - Inter-host API key for orchestrator calls (see `InterHostApiKey*` and registration in `service-orchestrator/Program.cs`) — security mechanism allowing multiple web server frontends (load-balanced) to securely call the orchestrator.
 
 - Data access & migrations
@@ -122,6 +123,7 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
   - API version attributes (`[ApiVersion]`, `[MapToApiVersion]`) are available globally via project-level `global using Asp.Versioning;` — no per-file using directive needed.
   - Reuse cache profiles via `[ResponseCache(CacheProfileName = "5Minute")]` or `"7Days"`.
   - Protect with `[Authentication.ApiKey.ApiKeyAttribute]` or `[Authentication.ClientApiKey.ClientApiKeyAttribute]` when needed.
+  - If an endpoint protected with `[Authentication.ClientApiKey.ClientApiKeyAttribute]` should not require the key (e.g., public media endpoints), add `[Authentication.ClientApiKey.NoClientApiKeyNeededAttribute]` to exempt it.
   - For authenticated endpoints, use `[Authorize]` and access user context via `_userManager.GetUserAsync(User)`.
   - Use `new Classes.Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString)` and `ExecuteCMD/ExecuteCMDDict` for DB work.
   - If caching, build keys with `hasheous.Classes.RedisConnection.GenerateKey(prefix, keyObj)`.
