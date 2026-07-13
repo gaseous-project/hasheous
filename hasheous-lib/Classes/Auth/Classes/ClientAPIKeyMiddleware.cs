@@ -26,6 +26,9 @@ namespace Authentication
             }
         }
 
+        [AttributeUsage(AttributeTargets.Method)]
+        public class NoClientApiKeyNeededAttribute : Attribute { }
+
         public class ClientApiKeyAuthorizationFilter : IAsyncAuthorizationFilter
         {
             private readonly IClientApiKeyValidator _clientApiKeyValidator;
@@ -37,6 +40,15 @@ namespace Authentication
 
             public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
             {
+                // Check if the specific method has our "Skip" marker
+                bool skipAuth = context.ActionDescriptor.EndpointMetadata
+                    .OfType<NoClientApiKeyNeededAttribute>().Any();
+
+                if (skipAuth)
+                {
+                    return; // Reverse it: do nothing and exit
+                }
+
                 string apiKey = context.HttpContext.Request.Headers[APIKeyHeaderName];
 
                 if (apiKey == null || !await _clientApiKeyValidator.IsValidAsync(apiKey, context))
