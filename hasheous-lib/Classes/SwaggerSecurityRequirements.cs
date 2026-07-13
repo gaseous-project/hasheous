@@ -19,7 +19,8 @@ public class AuthorizationOperationFilter : IOperationFilter
             securityRequirements.Add(CreateSecurityRequirement("API Key"));
         }
 
-        if (HasApiKeyAttribute<ClientApiKeyAttribute>(context) || HasServiceFilter<ClientApiKeyAuthorizationFilter>(context))
+        if ((HasApiKeyAttribute<ClientApiKeyAttribute>(context) || HasServiceFilter<ClientApiKeyAuthorizationFilter>(context))
+            && !HasNoClientApiKeyNeededAttribute(context))
         {
             securityRequirements.Add(CreateSecurityRequirement("Client API Key"));
         }
@@ -51,6 +52,12 @@ public class AuthorizationOperationFilter : IOperationFilter
         }
 
         return context.ApiDescription.ActionDescriptor.EndpointMetadata?.OfType<TAttribute>().Any() == true;
+    }
+
+    private static bool HasNoClientApiKeyNeededAttribute(OperationFilterContext context)
+    {
+        return context.ApiDescription.ActionDescriptor.EndpointMetadata
+            ?.OfType<ClientApiKey.NoClientApiKeyNeededAttribute>().Any() == true;
     }
 
     private static bool HasServiceFilter<TFilter>(OperationFilterContext context)
