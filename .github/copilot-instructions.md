@@ -66,6 +66,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
     - `GET /api/v1/MetadataProxy/ScreenScraper/systemesListe.php` returns cached/platform metadata from ScreenScraper integration. Requires `X-Client-API-Key`.
     - `GET /api/v1/MetadataProxy/ScreenScraper/media{endpoint}.php` proxies/caches media and rejects traversal-like media IDs. Does NOT require `X-Client-API-Key`.
   - MCP lookups are intentionally public: the hosted MCP controller uses `[AllowAnonymous]` rather than API key auth.
+  - Hash lookup endpoints (`POST /api/v1/Lookup/ByHash`) enforce request payload limits: `MaxLookupPayloadBytes = 262_144` (256 KB) and `MaxLookupArrayItems = 50`. These are enforced via `[RequestSizeLimit]` and manual JSON array size validation before database queries run.
 
 - Auth & security
   - Identity cookies configured; roles/policies: Admin, Moderator, Member, "Verified Email". Roles are seeded on startup.
@@ -158,6 +159,8 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 
 ## Signature lookup behavior
 - `SignatureManagement.GetRawSignatures(...)` excludes zero-size ROM signature rows by default (`Signatures_Roms.Size > 0`) before hash-condition matching.
+- `SignatureManagement.GetRawSignatures(...)` validates input models (non-null, non-empty array) and throws `ArgumentException` on invalid input. This ensures failed input validation is caught early rather than at the database layer.
+- `SignatureManagement.GetRawSignatures(...)` constructs SQL clauses efficiently using `StringBuilder` to reduce allocations, especially important when building complex multi-model OR/AND logic.
 - `LookupController` now rejects explicit zero-byte hashes early for both raw-body `POST /api/v1/Lookup/ByHash` and direct `GET /api/v1/Lookup/ByHash/{hash}` routes, returning `400 Bad Request` rather than querying the signature database.
 - Keep the non-zero-size filter when extending hash lookup SQL unless a feature explicitly requires zero-byte signatures.
 - `SignatureManagement.BuildGameItem(...)` currently populates both singular and plural dictionary properties for compatibility: `Country` and `Countries`, `Language` and `Languages`.
@@ -394,4 +397,14 @@ Additional example (rating boards):
 - Keep the synchronous wrappers (`ExecuteCMD` / `ExecuteCMDDict`) as compatibility shims only; prefer async callers and avoid introducing new sync call sites.
 - `DataObjectPermission.GetObjectPermission(...)` and `DataObjectPermission.GetObjectPermissionList(...)` now return `Task<...>` and must be awaited by controller/service callers.
 - `SignatureManagement.SearchSignatures(...)` now returns `Task<object[]>`; API endpoints should `await` it before returning results.
+- `SignatureManagement.GetCountriesAndLanguagesForGame(...)` now returns `async Task<List<AttributeItem>>`; callers must `await` it. This reduces duplicate country/language lookups compared to the prior sync implementation that populated both singular and plural dictionary properties separately.
+- `SignatureManagement.GetRomItemByHash(...)` now returns `Task<object>`; all callers must be updated to `await` the result.
+- `SignatureManagement.GetRawSignatures(...)` validates input models (non-null, non-empty) and throws `ArgumentException` on invalid input; uses `StringBuilder` for efficient SQL clause construction to reduce allocations.
+- `HashLookup.PerformLookup(...)` uses `HashSet<ValidFields>` instead of `List<ValidFields>` to avoid allocations and uses a `HashSet<string>` to track unique game ids without storing grouped signature lists, reducing memory overhead during lookups.
 - For incremental async cleanup, update method signatures and call chains together in one change so no mixed sync/async regressions are introduced.
+
+### Hash lookup request validation (current)
+- `POST /api/v1/Lookup/ByHash` now enforces request payload limits: `MaxLookupPayloadBytes = 262_144` (256 KB) via `[RequestSizeLimit]` and `MaxLookupArrayItems = 50` for the number of hash objects in the request body.
+- Zero-byte hashes are rejected with `400 Bad Request` for known hashes: MD5 `d41d8cd98f00b204e9800998ecf8427e`, SHA1 `da39a3ee5e6b4b0d3255bfef95601890afd80709`, SHA256 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`, CRC `00000000`.
+- Request body JSON parsing uses `JsonSerializerOptions` with `PropertyNameCaseInsensitive = true` to normalize input.
+- Validation occurs before any database lookups to fail fast on invalid input.
