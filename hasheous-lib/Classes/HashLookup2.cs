@@ -401,10 +401,10 @@ namespace Classes
                 // force metadata search
                 if (userInteractiveSession)
                 {
-                    // Run with 5 second timeout for interactive sessions
+                    // Run with timeout for interactive sessions
                     await Task.WhenAny(
                         dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true),
-                        Task.Delay(TimeSpan.FromSeconds(2))
+                        Task.Delay(TimeSpan.FromSeconds(4))
                     );
                 }
                 else

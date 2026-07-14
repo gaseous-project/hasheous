@@ -433,6 +433,9 @@ HAVING
                 }
             }
 
+            var countries = await GetLookup(LookupTypes.Country, (long)sigDbRow["Id"]);
+            var languages = await GetLookup(LookupTypes.Language, (long)sigDbRow["Id"]);
+
             Signatures_Games_2.GameItem gameItem = new Signatures_Games_2.GameItem
             {
                 Id = ((long)sigDbRow["Id"]).ToString(),
@@ -446,10 +449,10 @@ HAVING
                 System = (string)Common.ReturnValueIfNull(sigDbRow["Platform"], ""),
                 SystemVariant = (string)Common.ReturnValueIfNull(sigDbRow["SystemVariant"], ""),
                 Video = (string)Common.ReturnValueIfNull(sigDbRow["Video"], ""),
-                Country = new Dictionary<string, string>(await GetLookup(LookupTypes.Country, (long)sigDbRow["Id"])),
-                Countries = new Dictionary<string, string>(await GetLookup(LookupTypes.Country, (long)sigDbRow["Id"])),
-                Language = new Dictionary<string, string>(await GetLookup(LookupTypes.Language, (long)sigDbRow["Id"])),
-                Languages = new Dictionary<string, string>(await GetLookup(LookupTypes.Language, (long)sigDbRow["Id"])),
+                Country = new Dictionary<string, string>(countries),
+                Countries = new Dictionary<string, string>(countries),
+                Language = new Dictionary<string, string>(languages),
+                Languages = new Dictionary<string, string>(languages),
                 Copyright = (string)Common.ReturnValueIfNull(sigDbRow["Copyright"], ""),
                 MetadataSource = (int)sigDbRow["MetadataSource"],
                 Category = (string)Common.ReturnValueIfNull(sigDbRow["Category"], "")
@@ -610,7 +613,7 @@ HAVING
             }
 
             // cache the result
-            await RedisConnection.SetCacheItem(cacheKey, returnDict, TimeSpan.FromDays(5));
+            await RedisConnection.SetCacheItem(cacheKey, returnDict);
 
             return returnDict;
         }

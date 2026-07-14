@@ -60,7 +60,7 @@ namespace hasheous_server.Controllers.v1_0
         {
             SignatureManagement signature = new SignatureManagement();
 
-            object objects = signature.GetRomItemByHash(model);
+            object objects = await signature.GetRomItemByHash(model);
 
             return Ok(objects);
         }
