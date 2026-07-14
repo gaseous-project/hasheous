@@ -680,7 +680,7 @@ namespace hasheous_server.Classes
                         {
                             attributes.Add(await GetRoms(signatureItems));
                             attributes.Add(await GetTagAttribute(id));
-                            attributes.AddRange(GetCountriesAndLanguagesForGame(signatureItems));
+                            attributes.AddRange(await GetCountriesAndLanguagesForGame(signatureItems));
                         }
                         break;
 
@@ -1006,7 +1006,7 @@ namespace hasheous_server.Classes
             return metadataItems;
         }
 
-        public List<AttributeItem> GetCountriesAndLanguagesForGame(List<Dictionary<string, object>> GameSignatures)
+        public async Task<List<AttributeItem>> GetCountriesAndLanguagesForGame(List<Dictionary<string, object>> GameSignatures)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
 
@@ -1022,7 +1022,7 @@ namespace hasheous_server.Classes
                 };
 
                 // get country
-                Dictionary<string, string> gameCountries = signature.GetLookup(Common.LookupTypes.Country, long.Parse(GameSignature["SignatureId"].ToString()));
+                Dictionary<string, string> gameCountries = await signature.GetLookup(Common.LookupTypes.Country, long.Parse(GameSignature["SignatureId"].ToString()));
                 Dictionary<string, KeyValuePair<string, string>> countryCodeCorrections = signature.GetLookupCorrections(Common.LookupTypes.Country);
                 foreach (KeyValuePair<string, string> gameCountry in gameCountries)
                 {
@@ -1041,7 +1041,7 @@ namespace hasheous_server.Classes
                 }
 
                 // get language
-                Dictionary<string, string> gameLanguages = signature.GetLookup(Common.LookupTypes.Language, long.Parse(GameSignature["SignatureId"].ToString()));
+                Dictionary<string, string> gameLanguages = await signature.GetLookup(Common.LookupTypes.Language, long.Parse(GameSignature["SignatureId"].ToString()));
                 foreach (KeyValuePair<string, string> gameLanguage in gameLanguages)
                 {
                     if (!languages.ContainsKey(gameLanguage.Key))
@@ -1134,7 +1134,7 @@ namespace hasheous_server.Classes
 
                 foreach (DataRow row in data.Rows)
                 {
-                    Signatures_Games_2.RomItem rom = signature.BuildRomItem(row);
+                    Signatures_Games_2.RomItem rom = await signature.BuildRomItem(row);
                     roms.Add(rom);
                 }
             }

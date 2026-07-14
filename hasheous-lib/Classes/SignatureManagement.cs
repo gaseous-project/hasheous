@@ -1,4 +1,5 @@
 using System.Data;
+using System.Text;
 using System.Threading.Tasks;
 using hasheous.Classes;
 using hasheous_server.Models;
@@ -33,15 +34,21 @@ namespace Classes
         /// <exception cref="Exception"></exception>
         public async Task<List<Signatures_Games_2>> GetRawSignatures(List<HashLookupModel> models)
         {
+            if (models == null || models.Count == 0)
+            {
+                throw new Exception("Invalid search model");
+            }
+
             // check the archive observations for the provided hashes
-            HashLookupModel? observedHashes = await GetObservedArchiveHashesAsync(models.FirstOrDefault());
+            HashLookupModel firstModel = models[0];
+            HashLookupModel? observedHashes = await GetObservedArchiveHashesAsync(firstModel);
             if (observedHashes != null)
             {
                 // if the archive is observed, return the hashes from the observations
-                models.FirstOrDefault().MD5 = observedHashes.MD5;
-                models.FirstOrDefault().SHA1 = observedHashes.SHA1;
-                models.FirstOrDefault().SHA256 = observedHashes.SHA256;
-                models.FirstOrDefault().CRC = observedHashes.CRC;
+                firstModel.MD5 = observedHashes.MD5;
+                firstModel.SHA1 = observedHashes.SHA1;
+                firstModel.SHA256 = observedHashes.SHA256;
+                firstModel.CRC = observedHashes.CRC;
             }
 
             string cacheKey = RedisConnection.GenerateKey("Signature", models);
@@ -56,19 +63,33 @@ namespace Classes
                 }
             }
 
-            Dictionary<string, object> dbDict = new Dictionary<string, object>();
-            List<string> whereClauses = new List<string>();
-            List<string> modelGameMatchClauses = new List<string>();
+            Dictionary<string, object> dbDict = new Dictionary<string, object>(models.Count * 4);
+            StringBuilder whereClauseBuilder = new StringBuilder(models.Count * 96);
+            StringBuilder modelGameMatchBuilder = new StringBuilder(models.Count * 96);
+            bool hasWhereClause = false;
+            bool hasModelGameMatchClause = false;
             int modelCount = 0;
             foreach (var model in models)
             {
-                List<string> modelWhereClauses = new List<string>();
+                StringBuilder modelWhereClauseBuilder = new StringBuilder(128);
+                bool hasModelWhereClause = false;
                 if (model.SHA256 != null)
                 {
                     if (model.SHA256.Length == 64)
                     {
-                        whereClauses.Add("Signatures_Roms.SHA256 = @sha256" + modelCount);
-                        modelWhereClauses.Add("sr_model" + modelCount + ".SHA256 = @sha256" + modelCount);
+                        if (hasWhereClause)
+                        {
+                            whereClauseBuilder.Append(" OR ");
+                        }
+                        whereClauseBuilder.Append("Signatures_Roms.SHA256 = @sha256").Append(modelCount);
+                        hasWhereClause = true;
+
+                        if (hasModelWhereClause)
+                        {
+                            modelWhereClauseBuilder.Append(" OR ");
+                        }
+                        modelWhereClauseBuilder.Append("sr_model").Append(modelCount).Append(".SHA256 = @sha256").Append(modelCount);
+                        hasModelWhereClause = true;
                         dbDict.Add("sha256" + modelCount, model.SHA256);
                     }
                 }
@@ -76,8 +97,19 @@ namespace Classes
                 {
                     if (model.SHA1.Length == 40)
                     {
-                        whereClauses.Add("Signatures_Roms.SHA1 = @sha1" + modelCount);
-                        modelWhereClauses.Add("sr_model" + modelCount + ".SHA1 = @sha1" + modelCount);
+                        if (hasWhereClause)
+                        {
+                            whereClauseBuilder.Append(" OR ");
+                        }
+                        whereClauseBuilder.Append("Signatures_Roms.SHA1 = @sha1").Append(modelCount);
+                        hasWhereClause = true;
+
+                        if (hasModelWhereClause)
+                        {
+                            modelWhereClauseBuilder.Append(" OR ");
+                        }
+                        modelWhereClauseBuilder.Append("sr_model").Append(modelCount).Append(".SHA1 = @sha1").Append(modelCount);
+                        hasModelWhereClause = true;
                         dbDict.Add("sha1" + modelCount, model.SHA1);
                     }
                 }
@@ -85,8 +117,19 @@ namespace Classes
                 {
                     if (model.MD5.Length == 32)
                     {
-                        whereClauses.Add("Signatures_Roms.MD5 = @md5" + modelCount);
-                        modelWhereClauses.Add("sr_model" + modelCount + ".MD5 = @md5" + modelCount);
+                        if (hasWhereClause)
+                        {
+                            whereClauseBuilder.Append(" OR ");
+                        }
+                        whereClauseBuilder.Append("Signatures_Roms.MD5 = @md5").Append(modelCount);
+                        hasWhereClause = true;
+
+                        if (hasModelWhereClause)
+                        {
+                            modelWhereClauseBuilder.Append(" OR ");
+                        }
+                        modelWhereClauseBuilder.Append("sr_model").Append(modelCount).Append(".MD5 = @md5").Append(modelCount);
+                        hasModelWhereClause = true;
                         dbDict.Add("md5" + modelCount, model.MD5);
                     }
                 }
@@ -94,35 +137,69 @@ namespace Classes
                 {
                     if (model.CRC.Length == 8)
                     {
-                        whereClauses.Add("Signatures_Roms.CRC = @crc" + modelCount);
-                        modelWhereClauses.Add("sr_model" + modelCount + ".CRC = @crc" + modelCount);
+                        if (hasWhereClause)
+                        {
+                            whereClauseBuilder.Append(" OR ");
+                        }
+                        whereClauseBuilder.Append("Signatures_Roms.CRC = @crc").Append(modelCount);
+                        hasWhereClause = true;
+
+                        if (hasModelWhereClause)
+                        {
+                            modelWhereClauseBuilder.Append(" OR ");
+                        }
+                        modelWhereClauseBuilder.Append("sr_model").Append(modelCount).Append(".CRC = @crc").Append(modelCount);
+                        hasModelWhereClause = true;
                         dbDict.Add("crc" + modelCount, model.CRC);
                     }
                 }
 
-                if (modelWhereClauses.Count > 0)
+                if (hasModelWhereClause)
                 {
-                    modelGameMatchClauses.Add("EXISTS (SELECT 1 FROM Signatures_Roms sr_model" + modelCount + " WHERE sr_model" + modelCount + ".GameId = view_Signatures_Games.Id AND (" + string.Join(" OR ", modelWhereClauses) + "))");
+                    if (hasModelGameMatchClause)
+                    {
+                        modelGameMatchBuilder.Append(" AND ");
+                    }
+
+                    modelGameMatchBuilder
+                        .Append("EXISTS (SELECT 1 FROM Signatures_Roms sr_model")
+                        .Append(modelCount)
+                        .Append(" WHERE sr_model")
+                        .Append(modelCount)
+                        .Append(".GameId = view_Signatures_Games.Id AND (")
+                        .Append(modelWhereClauseBuilder)
+                        .Append("))");
+
+                    hasModelGameMatchClause = true;
                 }
                 modelCount++;
             }
 
-            if (whereClauses.Count > 0 && modelGameMatchClauses.Count > 0)
+            if (hasWhereClause && hasModelGameMatchClause)
             {
                 // lookup the provided hashes
                 Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
 
-                string sql = "SELECT view_Signatures_Games.*, Signatures_Roms.Id AS romid, Signatures_Roms.Name AS romname, Signatures_Roms.Size, Signatures_Roms.CRC, Signatures_Roms.MD5, Signatures_Roms.SHA1, Signatures_Roms.SHA256, Signatures_Roms.Status, Signatures_Roms.DevelopmentStatus, Signatures_Roms.Attributes, Signatures_Roms.RomType, Signatures_Roms.RomTypeMedia, Signatures_Roms.MediaLabel, Signatures_Roms.MetadataSource, Signatures_Roms.Countries, Signatures_Roms.Languages FROM Signatures_Roms INNER JOIN view_Signatures_Games ON Signatures_Roms.GameId = view_Signatures_Games.Id WHERE (" + string.Join(" OR ", whereClauses) + ") AND " + string.Join(" AND ", modelGameMatchClauses);
+                StringBuilder sqlBuilder = new StringBuilder(1024 + models.Count * 192);
+                sqlBuilder
+                    .Append("SELECT view_Signatures_Games.*, Signatures_Roms.Id AS romid, Signatures_Roms.Name AS romname, Signatures_Roms.Size, Signatures_Roms.CRC, Signatures_Roms.MD5, Signatures_Roms.SHA1, Signatures_Roms.SHA256, Signatures_Roms.Status, Signatures_Roms.DevelopmentStatus, Signatures_Roms.Attributes, Signatures_Roms.RomType, Signatures_Roms.RomTypeMedia, Signatures_Roms.MediaLabel, Signatures_Roms.MetadataSource, Signatures_Roms.Countries, Signatures_Roms.Languages ")
+                    .Append("FROM Signatures_Roms INNER JOIN view_Signatures_Games ON Signatures_Roms.GameId = view_Signatures_Games.Id ")
+                    .Append("WHERE (")
+                    .Append(whereClauseBuilder)
+                    .Append(") AND ")
+                    .Append(modelGameMatchBuilder);
+
+                string sql = sqlBuilder.ToString();
 
                 DataTable sigDb = await db.ExecuteCMDAsync(sql, dbDict);
 
-                List<Signatures_Games_2> GamesList = new List<Signatures_Games_2>();
+                List<Signatures_Games_2> GamesList = new List<Signatures_Games_2>(sigDb.Rows.Count);
 
                 foreach (DataRow sigDbRow in sigDb.Rows)
                 {
-                    Signatures_Games_2.GameItem game = BuildGameItem(sigDbRow);
+                    Signatures_Games_2.GameItem game = await BuildGameItem(sigDbRow);
 
-                    Signatures_Games_2.RomItem rom = BuildRomItem(sigDbRow);
+                    Signatures_Games_2.RomItem rom = await BuildRomItem(sigDbRow);
 
                     Signatures_Games_2 gameItem = new Signatures_Games_2
                     {
@@ -323,7 +400,7 @@ HAVING
                     DataTable gamesData = await db.ExecuteCMDAsync(sql, dbDict);
                     foreach (DataRow row in gamesData.Rows)
                     {
-                        games.Add(BuildGameItem(row));
+                        games.Add(await BuildGameItem(row));
                     }
                     return games.ToArray();
 
@@ -332,7 +409,7 @@ HAVING
                     DataTable romsData = await db.ExecuteCMDAsync(sql, dbDict);
                     foreach (DataRow row in romsData.Rows)
                     {
-                        roms.Add(BuildRomItem(row));
+                        roms.Add(await BuildRomItem(row));
                     }
                     return roms.ToArray();
 
@@ -341,9 +418,22 @@ HAVING
             }
         }
 
-        public Signatures_Games_2.GameItem BuildGameItem(DataRow sigDbRow)
+        public async Task<Signatures_Games_2.GameItem> BuildGameItem(DataRow sigDbRow)
         {
-            return new Signatures_Games_2.GameItem
+            // generate cache key for the game item
+            string cacheKey = RedisConnection.GenerateKey("GameItem", new { GameId = (long)sigDbRow["Id"] });
+
+            // check if the game item is cached
+            if (Config.RedisConfiguration.Enabled)
+            {
+                Signatures_Games_2.GameItem? cachedGameItem = await RedisConnection.GetCacheItem<Signatures_Games_2.GameItem>(cacheKey);
+                if (cachedGameItem != null)
+                {
+                    return cachedGameItem;
+                }
+            }
+
+            Signatures_Games_2.GameItem gameItem = new Signatures_Games_2.GameItem
             {
                 Id = ((long)sigDbRow["Id"]).ToString(),
                 Name = (string)Common.ReturnValueIfNull(sigDbRow["Name"], ""),
@@ -356,18 +446,38 @@ HAVING
                 System = (string)Common.ReturnValueIfNull(sigDbRow["Platform"], ""),
                 SystemVariant = (string)Common.ReturnValueIfNull(sigDbRow["SystemVariant"], ""),
                 Video = (string)Common.ReturnValueIfNull(sigDbRow["Video"], ""),
-                Country = new Dictionary<string, string>(GetLookup(LookupTypes.Country, (long)sigDbRow["Id"])),
-                Countries = new Dictionary<string, string>(GetLookup(LookupTypes.Country, (long)sigDbRow["Id"])),
-                Language = new Dictionary<string, string>(GetLookup(LookupTypes.Language, (long)sigDbRow["Id"])),
-                Languages = new Dictionary<string, string>(GetLookup(LookupTypes.Language, (long)sigDbRow["Id"])),
+                Country = new Dictionary<string, string>(await GetLookup(LookupTypes.Country, (long)sigDbRow["Id"])),
+                Countries = new Dictionary<string, string>(await GetLookup(LookupTypes.Country, (long)sigDbRow["Id"])),
+                Language = new Dictionary<string, string>(await GetLookup(LookupTypes.Language, (long)sigDbRow["Id"])),
+                Languages = new Dictionary<string, string>(await GetLookup(LookupTypes.Language, (long)sigDbRow["Id"])),
                 Copyright = (string)Common.ReturnValueIfNull(sigDbRow["Copyright"], ""),
                 MetadataSource = (int)sigDbRow["MetadataSource"],
                 Category = (string)Common.ReturnValueIfNull(sigDbRow["Category"], "")
             };
+
+            if (Config.RedisConfiguration.Enabled)
+            {
+                await RedisConnection.SetCacheItem(cacheKey, gameItem);
+            }
+
+            return gameItem;
         }
 
-        public Signatures_Games_2.RomItem BuildRomItem(DataRow sigDbRow)
+        public async Task<Signatures_Games_2.RomItem> BuildRomItem(DataRow sigDbRow)
         {
+            // generate cache key for the rom item
+            string cacheKey = RedisConnection.GenerateKey("RomItem", new { RomId = (long)sigDbRow["romid"] });
+
+            // check if the rom item is cached
+            if (Config.RedisConfiguration.Enabled)
+            {
+                Signatures_Games_2.RomItem? cachedRomItem = await RedisConnection.GetCacheItem<Signatures_Games_2.RomItem>(cacheKey);
+                if (cachedRomItem != null)
+                {
+                    return cachedRomItem;
+                }
+            }
+
             Dictionary<string, string> romCountries = new Dictionary<string, string>();
             if (sigDbRow["Countries"] != DBNull.Value)
             {
@@ -433,10 +543,16 @@ HAVING
                     break;
             }
 
+            // cache the result
+            if (Config.RedisConfiguration.Enabled)
+            {
+                await RedisConnection.SetCacheItem(cacheKey, retVal);
+            }
+
             return retVal;
         }
 
-        public Dictionary<string, string> GetLookup(LookupTypes LookupType, long GameId)
+        public async Task<Dictionary<string, string>> GetLookup(LookupTypes LookupType, long GameId)
         {
             string tableName = "";
             switch (LookupType)
@@ -448,15 +564,28 @@ HAVING
                 case LookupTypes.Language:
                     tableName = "Languages";
                     break;
-
             }
 
+            // generate cache key for the lookup
+            string cacheKey = RedisConnection.GenerateKey("Lookup", new { LookupType = LookupType.ToString(), GameId = GameId });
+
+            // check if the lookup is cached
+            if (Config.RedisConfiguration.Enabled)
+            {
+                Dictionary<string, string>? cachedData = await RedisConnection.GetCacheItem<Dictionary<string, string>>(cacheKey);
+                if (cachedData != null)
+                {
+                    return cachedData;
+                }
+            }
+
+            // perform the lookup
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "SELECT " + LookupType.ToString() + ".Code, " + LookupType.ToString() + ".Value FROM Signatures_Games_" + tableName + " JOIN " + LookupType.ToString() + " ON Signatures_Games_" + tableName + "." + LookupType.ToString() + "Id = " + LookupType.ToString() + ".Id WHERE Signatures_Games_" + tableName + ".GameId = @id;";
             Dictionary<string, object> dbDict = new Dictionary<string, object>{
                 { "id", GameId }
             };
-            DataTable data = db.ExecuteCMD(sql, dbDict);
+            DataTable data = await db.ExecuteCMDAsync(sql, dbDict);
 
             Dictionary<string, string> returnDict = new Dictionary<string, string>();
             Dictionary<string, KeyValuePair<string, string>> corrections = GetLookupCorrections(LookupType);
@@ -479,6 +608,9 @@ HAVING
                     returnDict.Add((string)row["Code"], (string)row["Value"]);
                 }
             }
+
+            // cache the result
+            await RedisConnection.SetCacheItem(cacheKey, returnDict, TimeSpan.FromDays(5));
 
             return returnDict;
         }
@@ -504,12 +636,12 @@ HAVING
             }
         }
 
-        public hasheous_server.Models.Signatures_Games_2.RomItem GetRomItemByHash(hasheous_server.Models.HashLookupModel model)
+        public async Task<hasheous_server.Models.Signatures_Games_2.RomItem> GetRomItemByHash(hasheous_server.Models.HashLookupModel model)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "SELECT Signatures_Roms.`Id` AS romid, Signatures_Roms.`Name` AS romname, Signatures_Roms.*, Signatures_Platforms.Platform FROM Signatures_Roms LEFT JOIN Signatures_Games ON Signatures_Roms.`GameId` = Signatures_Games.`Id` LEFT JOIN Signatures_Platforms ON Signatures_Games.`SystemId` = Signatures_Platforms.`Id` WHERE Signatures_Roms.MD5 = @md5 OR Signatures_Roms.SHA1 = @sha1 OR Signatures_Roms.SHA256 = @sha256 OR Signatures_Roms.CRC = @crc;";
 
-            return BuildRomItem(db.ExecuteCMD(sql, new Dictionary<string, object>{
+            return await BuildRomItem(db.ExecuteCMD(sql, new Dictionary<string, object>{
                 { "md5", model.MD5 },
                 { "sha1", model.SHA1 },
                 { "crc", model.CRC },
@@ -526,7 +658,7 @@ HAVING
                 { "id", id }
             });
 
-            return BuildRomItem(result.Rows[0]);
+            return await BuildRomItem(result.Rows[0]);
         }
     }
 }

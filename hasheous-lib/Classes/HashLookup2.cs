@@ -114,7 +114,7 @@ namespace Classes
         public async Task PerformLookup(bool userInteractiveSession = false)
         {
             // parse return fields
-            List<ValidFields> validFields = new List<ValidFields>();
+            HashSet<ValidFields> validFields = new HashSet<ValidFields>();
             if (returnFields == "All")
             {
                 validFields.Add(ValidFields.All);
@@ -135,188 +135,187 @@ namespace Classes
             // get the raw signature
             List<Signatures_Games_2> rawSignatures = await signature.GetRawSignatures(model);
 
-            // organise rawSignatures into a dictionary keyed by game id, with the value being a list of signatures for that game
-            Dictionary<string, List<Signatures_Games_2>> signaturesByGameId = new Dictionary<string, List<Signatures_Games_2>>();
+            // Track unique game ids without storing grouped signature lists to reduce allocations.
+            HashSet<string> uniqueGameIds = new HashSet<string>();
+            Signatures_Games_2? firstSignature = null;
+            Signatures_Games_2? bestScoringSignature = null;
             foreach (Signatures_Games_2 sig in rawSignatures)
             {
                 if (sig.Game != null)
                 {
-                    if (!signaturesByGameId.ContainsKey(sig.Game.Id))
+                    if (firstSignature == null)
                     {
-                        signaturesByGameId.Add(sig.Game.Id, new List<Signatures_Games_2>());
+                        firstSignature = sig;
                     }
-                    signaturesByGameId[sig.Game.Id].Add(sig);
-                }
-            }
 
-            if (signaturesByGameId.Count > 30)
-            {
-                throw new HashNotFoundException("The provided hash returned too many results to process. Please provide a more specific hash or check the input for errors.");
+                    if (bestScoringSignature == null || sig.Score > bestScoringSignature.Score)
+                    {
+                        bestScoringSignature = sig;
+                    }
+
+                    if (uniqueGameIds.Add(sig.Game.Id) && uniqueGameIds.Count > 30)
+                    {
+                        throw new HashNotFoundException("The provided hash returned too many results to process. Please provide a more specific hash or check the input for errors.");
+                    }
+                }
             }
 
             // narrow down the options
-            Signatures_Games_2 discoveredSignature = new Signatures_Games_2();
-            if (signaturesByGameId.Keys.Count == 0)
+            if (uniqueGameIds.Count == 0)
             {
                 throw new HashNotFoundException("The provided hash was not found in any signature database.");
             }
+
+            Signatures_Games_2 discoveredSignature;
+            if (uniqueGameIds.Count == 1)
+            {
+                // only 1 unique game found
+                discoveredSignature = firstSignature!;
+            }
             else
             {
-                if (signaturesByGameId.Keys.Count == 1)
-                {
-                    // only 1 signature found!
-                    discoveredSignature = signaturesByGameId.Values.First().First();
-                }
-                else if (signaturesByGameId.Keys.Count > 1)
-                {
-                    // more than one signature found - find one with highest score
-                    foreach (Signatures_Games_2 Sig in rawSignatures)
-                    {
-                        if (Sig.Score > discoveredSignature.Score)
-                        {
-                            discoveredSignature = Sig;
-                        }
-                    }
-                }
+                // more than one game found - use the signature with highest score
+                discoveredSignature = bestScoringSignature!;
+            }
 
-                // should only have one signature now
-                // compile metadata
-                DataObjects dataObjects = new DataObjects();
+            // should only have one signature now
+            // compile metadata
+            DataObjects dataObjects = new DataObjects();
 
-                // publisher
-                DataObjectItem? publisher = null;
-                if (discoveredSignature.Game != null && (discoveredSignature.Game.PublisherId != 0 || discoveredSignature.Game.Publisher != null && discoveredSignature.Game.Publisher != ""))
-                {
-                    // if redis is enabled, check if the publisher exists in the cache
-                    string publisherCacheKey = RedisConnection.GenerateKey("HashLookup", new { Type = DataObjects.DataObjectType.Company, Id = discoveredSignature.Game.PublisherId });
-                    if (Config.RedisConfiguration.Enabled)
-                    {
-                        string? cachedPublisher = await RedisConnection.GetDatabase(0).StringGetAsync(publisherCacheKey);
-                        if (cachedPublisher != null && cachedPublisher != "")
-                        {
-                            // get the publisher from the cache
-                            publisher = JsonConvert.DeserializeObject<DataObjectItem>(cachedPublisher);
-                        }
-                    }
-
-                    if (publisher == null)
-                    {
-                        // redis is not enabled, so we will not use the cache
-                        publisher = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
-                        if (publisher == null && this.ForceSearch)
-                        {
-                            // no returned publisher! create one
-                            publisher = await dataObjects.NewDataObject(DataObjects.DataObjectType.Company, new DataObjectItemModel
-                            {
-                                Name = discoveredSignature.Game.Publisher
-                            }, allowSearch: false);
-
-                            // add signature mappinto to publisher
-                            dataObjects.AddSignature(publisher.Id, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
-
-                            // force metadata search
-                            await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Company, publisher.Id, true);
-
-                            // re-get the publisher
-                            publisher = await dataObjects.GetDataObject(DataObjects.DataObjectType.Company, publisher.Id);
-                        }
-
-                        // store the publisher in the cache for 7 days
-                        if (Config.RedisConfiguration.Enabled && publisher != null)
-                        {
-                            RedisConnection.GetDatabase(0).StringSet(publisherCacheKey, JsonConvert.SerializeObject(publisher), TimeSpan.FromHours(6));
-                        }
-                    }
-                }
-
-                // platform
-                DataObjectItem? platform = null;
-                // if redis is enabled, check if the platform exists in the cache
-                string platformCacheKey = RedisConnection.GenerateKey("HashLookup", new { Type = DataObjects.DataObjectType.Platform, Id = discoveredSignature.Game.SystemId });
+            // publisher
+            DataObjectItem? publisher = null;
+            if (discoveredSignature.Game != null && (discoveredSignature.Game.PublisherId != 0 || discoveredSignature.Game.Publisher != null && discoveredSignature.Game.Publisher != ""))
+            {
+                // if redis is enabled, check if the publisher exists in the cache
+                string publisherCacheKey = RedisConnection.GenerateKey("HashLookup", new { Type = DataObjects.DataObjectType.Company, Id = discoveredSignature.Game.PublisherId });
                 if (Config.RedisConfiguration.Enabled)
                 {
-                    string? cachedPlatform = await RedisConnection.GetDatabase(0).StringGetAsync(platformCacheKey);
-                    if (cachedPlatform != null && cachedPlatform != "")
+                    string? cachedPublisher = await RedisConnection.GetDatabase(0).StringGetAsync(publisherCacheKey);
+                    if (cachedPublisher != null && cachedPublisher != "")
                     {
-                        // get the platform from the cache
-                        platform = JsonConvert.DeserializeObject<DataObjectItem>(cachedPlatform);
+                        // get the publisher from the cache
+                        publisher = JsonConvert.DeserializeObject<DataObjectItem>(cachedPublisher);
                     }
                 }
 
-                if (platform == null)
+                if (publisher == null)
                 {
                     // redis is not enabled, so we will not use the cache
-                    platform = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId);
-
-                    // store the platform in the cache for 7 days
-                    if (Config.RedisConfiguration.Enabled && platform != null)
+                    publisher = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
+                    if (publisher == null && this.ForceSearch)
                     {
-                        RedisConnection.GetDatabase(0).StringSet(platformCacheKey, JsonConvert.SerializeObject(platform), TimeSpan.FromHours(6));
-                    }
-                }
+                        // no returned publisher! create one
+                        publisher = await dataObjects.NewDataObject(DataObjects.DataObjectType.Company, new DataObjectItemModel
+                        {
+                            Name = discoveredSignature.Game.Publisher
+                        }, allowSearch: false);
 
-                if (platform == null && this.ForceSearch)
-                {
-                    // no returned platform! create one
-                    platform = await dataObjects.NewDataObject(DataObjects.DataObjectType.Platform, new DataObjectItemModel
-                    {
-                        Name = discoveredSignature.Game.System
-                    }, allowSearch: false);
+                        // add signature mappinto to publisher
+                        dataObjects.AddSignature(publisher.Id, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
 
-                    // add signature mapping to platform
-                    dataObjects.AddSignature(platform.Id, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId);
+                        // force metadata search
+                        await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Company, publisher.Id, true);
 
-                    // force metadata search
-                    await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Platform, platform.Id, true);
-
-                    // re-get the platform
-                    platform = await dataObjects.GetDataObject(DataObjects.DataObjectType.Platform, platform.Id);
-                }
-
-                // game
-                DataObjectItem? game = null;
-                // if redis is enabled, check if the game exists in the cache
-                string gameCacheKey = RedisConnection.GenerateKey("HashLookup", new { Type = DataObjects.DataObjectType.Game, Id = discoveredSignature.Game.Id });
-                if (Config.RedisConfiguration.Enabled)
-                {
-                    string? cachedGame = await RedisConnection.GetDatabase(0).StringGetAsync(gameCacheKey);
-                    if (cachedGame != null && cachedGame != "")
-                    {
-                        // get the game from the cache
-                        game = JsonConvert.DeserializeObject<DataObjectItem>(cachedGame);
-                    }
-                }
-
-                if (game == null)
-                {
-                    // redis is not enabled, so we will not use the cache
-                    game = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Game, long.Parse(discoveredSignature.Game.Id));
-
-                    // store the game in the cache for 6 hours
-                    if (Config.RedisConfiguration.Enabled && game != null)
-                    {
-                        RedisConnection.GetDatabase(0).StringSet(gameCacheKey, JsonConvert.SerializeObject(game), TimeSpan.FromHours(1));
-                    }
-                }
-
-                if (game == null && this.ForceSearch)
-                {
-                    // no returned game! trim up the name and check if one exists with the same name and platform
-
-                    // remove version numbers from name
-                    string gameName = discoveredSignature.Game.Name;
-                    gameName = Regex.Replace(gameName, @"v(\d+\.)?(\d+\.)?(\*|\d+)$", "").Trim();
-                    gameName = Regex.Replace(gameName, @"Rev (\d+\.)?(\d+\.)?(\*|\d+)$", "").Trim();
-
-                    // assumption: no games have () in their titles so we'll remove them
-                    int idx = gameName.IndexOf('(');
-                    if (idx >= 0)
-                    {
-                        gameName = gameName.Substring(0, idx);
+                        // re-get the publisher
+                        publisher = await dataObjects.GetDataObject(DataObjects.DataObjectType.Company, publisher.Id);
                     }
 
-                    // check if the game exists - create a new one if it doesn't
-                    game = await dataObjects.SearchDataObject(DataObjects.DataObjectType.Game, gameName, new List<DataObjects.DataObjectSearchCriteriaItem>
+                    // store the publisher in the cache for 7 days
+                    if (Config.RedisConfiguration.Enabled && publisher != null)
+                    {
+                        RedisConnection.GetDatabase(0).StringSet(publisherCacheKey, JsonConvert.SerializeObject(publisher), TimeSpan.FromHours(6));
+                    }
+                }
+            }
+
+            // platform
+            DataObjectItem? platform = null;
+            // if redis is enabled, check if the platform exists in the cache
+            string platformCacheKey = RedisConnection.GenerateKey("HashLookup", new { Type = DataObjects.DataObjectType.Platform, Id = discoveredSignature.Game.SystemId });
+            if (Config.RedisConfiguration.Enabled)
+            {
+                string? cachedPlatform = await RedisConnection.GetDatabase(0).StringGetAsync(platformCacheKey);
+                if (cachedPlatform != null && cachedPlatform != "")
+                {
+                    // get the platform from the cache
+                    platform = JsonConvert.DeserializeObject<DataObjectItem>(cachedPlatform);
+                }
+            }
+
+            if (platform == null)
+            {
+                // redis is not enabled, so we will not use the cache
+                platform = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId);
+
+                // store the platform in the cache for 7 days
+                if (Config.RedisConfiguration.Enabled && platform != null)
+                {
+                    RedisConnection.GetDatabase(0).StringSet(platformCacheKey, JsonConvert.SerializeObject(platform), TimeSpan.FromHours(6));
+                }
+            }
+
+            if (platform == null && this.ForceSearch)
+            {
+                // no returned platform! create one
+                platform = await dataObjects.NewDataObject(DataObjects.DataObjectType.Platform, new DataObjectItemModel
+                {
+                    Name = discoveredSignature.Game.System
+                }, allowSearch: false);
+
+                // add signature mapping to platform
+                dataObjects.AddSignature(platform.Id, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId);
+
+                // force metadata search
+                await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Platform, platform.Id, true);
+
+                // re-get the platform
+                platform = await dataObjects.GetDataObject(DataObjects.DataObjectType.Platform, platform.Id);
+            }
+
+            // game
+            DataObjectItem? game = null;
+            // if redis is enabled, check if the game exists in the cache
+            string gameCacheKey = RedisConnection.GenerateKey("HashLookup", new { Type = DataObjects.DataObjectType.Game, Id = discoveredSignature.Game.Id });
+            if (Config.RedisConfiguration.Enabled)
+            {
+                string? cachedGame = await RedisConnection.GetDatabase(0).StringGetAsync(gameCacheKey);
+                if (cachedGame != null && cachedGame != "")
+                {
+                    // get the game from the cache
+                    game = JsonConvert.DeserializeObject<DataObjectItem>(cachedGame);
+                }
+            }
+
+            if (game == null)
+            {
+                // redis is not enabled, so we will not use the cache
+                game = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Game, long.Parse(discoveredSignature.Game.Id));
+
+                // store the game in the cache for 6 hours
+                if (Config.RedisConfiguration.Enabled && game != null)
+                {
+                    RedisConnection.GetDatabase(0).StringSet(gameCacheKey, JsonConvert.SerializeObject(game), TimeSpan.FromHours(1));
+                }
+            }
+
+            if (game == null && this.ForceSearch)
+            {
+                // no returned game! trim up the name and check if one exists with the same name and platform
+
+                // remove version numbers from name
+                string gameName = discoveredSignature.Game.Name;
+                gameName = Regex.Replace(gameName, @"v(\d+\.)?(\d+\.)?(\*|\d+)$", "").Trim();
+                gameName = Regex.Replace(gameName, @"Rev (\d+\.)?(\d+\.)?(\*|\d+)$", "").Trim();
+
+                // assumption: no games have () in their titles so we'll remove them
+                int idx = gameName.IndexOf('(');
+                if (idx >= 0)
+                {
+                    gameName = gameName.Substring(0, idx);
+                }
+
+                // check if the game exists - create a new one if it doesn't
+                game = await dataObjects.SearchDataObject(DataObjects.DataObjectType.Game, gameName, new List<DataObjects.DataObjectSearchCriteriaItem>
                     {
                         new DataObjects.DataObjectSearchCriteriaItem
                         {
@@ -324,207 +323,204 @@ namespace Classes
                             Value = platform.Id.ToString()
                         }
                     });
-                    if (game == null && this.ForceSearch)
+                if (game == null && this.ForceSearch)
+                {
+                    game = await dataObjects.NewDataObject(DataObjects.DataObjectType.Game, new DataObjectItemModel
                     {
-                        game = await dataObjects.NewDataObject(DataObjects.DataObjectType.Game, new DataObjectItemModel
-                        {
-                            Name = gameName
-                        }, allowSearch: false);
+                        Name = gameName
+                    }, allowSearch: false);
 
-                        // add platform reference
+                    // add platform reference
+                    await dataObjects.AddAttribute(game.Id, new AttributeItem
+                    {
+                        attributeName = AttributeItem.AttributeName.Platform,
+                        attributeType = AttributeItem.AttributeType.ObjectRelationship,
+                        attributeRelationType = DataObjects.DataObjectType.Platform,
+                        Value = platform.Id
+                    });
+                    // add publisher reference
+                    if (publisher != null)
+                    {
                         await dataObjects.AddAttribute(game.Id, new AttributeItem
                         {
-                            attributeName = AttributeItem.AttributeName.Platform,
+                            attributeName = AttributeItem.AttributeName.Publisher,
                             attributeType = AttributeItem.AttributeType.ObjectRelationship,
-                            attributeRelationType = DataObjects.DataObjectType.Platform,
-                            Value = platform.Id
+                            attributeRelationType = DataObjects.DataObjectType.Company,
+                            Value = publisher.Id
                         });
-                        // add publisher reference
-                        if (publisher != null)
+                    }
+                }
+                else if (game == null && !this.ForceSearch)
+                {
+                    throw new HashNotFoundException("The provided hash was not found in any signature database.");
+                }
+
+                // add signature mapping to game
+                dataObjects.AddSignature(game.Id, DataObjects.DataObjectType.Game, long.Parse(discoveredSignature.Game.Id));
+
+                // add all raw signatures to the game
+                foreach (Signatures_Games_2 sig in rawSignatures)
+                {
+                    if (sig.Game != null)
+                    {
+                        if (sig.Game.Id != discoveredSignature.Game.Id)
                         {
-                            await dataObjects.AddAttribute(game.Id, new AttributeItem
-                            {
-                                attributeName = AttributeItem.AttributeName.Publisher,
-                                attributeType = AttributeItem.AttributeType.ObjectRelationship,
-                                attributeRelationType = DataObjects.DataObjectType.Company,
-                                Value = publisher.Id
-                            });
+                            dataObjects.AddSignature(game.Id, DataObjects.DataObjectType.Game, long.Parse(sig.Game.Id));
                         }
                     }
-                    else if (game == null && !this.ForceSearch)
+                }
+
+                Signatures_Games_2? noIntroSignature = rawSignatures.FirstOrDefault(s => s.Rom.SignatureSource == RomSignatureObject.Game.Rom.SignatureSourceType.NoIntros);
+
+                // VIMMSLair manual search
+                foreach (AttributeItem attribute in platform.Attributes)
+                {
+                    if (attribute.attributeName == AttributeItem.AttributeName.VIMMPlatformName)
                     {
-                        throw new HashNotFoundException("The provided hash was not found in any signature database.");
+                        if (noIntroSignature != null)
+                        {
+                            string platformName = (string)attribute.Value;
+
+                            string manualId = await VIMMSLair.ManualSearch.Search(platformName, Path.GetFileNameWithoutExtension(discoveredSignature.Rom.Name));
+                            if (manualId != "")
+                            {
+                                // add manual reference
+                                await dataObjects.AddAttribute(game.Id, new AttributeItem
+                                {
+                                    attributeName = AttributeItem.AttributeName.VIMMManualId,
+                                    attributeType = AttributeItem.AttributeType.ShortString,
+                                    attributeRelationType = DataObjects.DataObjectType.Game,
+                                    Value = manualId
+                                });
+                                break;
+                            }
+                        }
                     }
+                }
 
-                    // add signature mapping to game
-                    dataObjects.AddSignature(game.Id, DataObjects.DataObjectType.Game, long.Parse(discoveredSignature.Game.Id));
+                // force metadata search
+                if (userInteractiveSession)
+                {
+                    // Run with 5 second timeout for interactive sessions
+                    await Task.WhenAny(
+                        dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true),
+                        Task.Delay(TimeSpan.FromSeconds(2))
+                    );
+                }
+                else
+                {
+                    // Run without timeout for background operations
+                    await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true);
+                }
 
-                    // add all raw signatures to the game
+                // re-get the game
+                game = await dataObjects.GetDataObject(DataObjects.DataObjectType.Game, game.Id);
+            }
+
+            bool includeAllFields = validFields.Contains(ValidFields.All);
+            bool includePlatform = includeAllFields || validFields.Contains(ValidFields.Platform);
+            bool includePublisher = includeAllFields || validFields.Contains(ValidFields.Publisher);
+            bool includeSignatures = includeAllFields || validFields.Contains(ValidFields.Signatures);
+            bool includeMetadata = includeAllFields || validFields.Contains(ValidFields.Metadata);
+            bool includeAttributes = includeAllFields || validFields.Contains(ValidFields.Attributes);
+
+            // build return item
+            this.Id = game.Id;
+            this.Name = game.Name;
+            if (includePlatform)
+            {
+                this.Platform = new MiniDataObjectItem
+                {
+                    Name = platform.Name,
+                    metadata = platform.Metadata
+                };
+            }
+            if (includePublisher && publisher != null)
+            {
+                this.Publisher = new MiniDataObjectItem
+                {
+                    Name = publisher.Name,
+                    metadata = publisher.Metadata
+                };
+            }
+
+            if (includeSignatures)
+            {
+                // if returnSources is not null and count is greater than 0, filter signatures by returnSources
+                // if returnSources is null or count is 0, use returnAllSources
+                // if returnAllSources is true, return all signatures
+                // if returnAllSources is false, return only the first signature
+
+                bool useReturnSources = returnSources != null && returnSources.Count > 0;
+                bool breakAfterFirst = false;
+                HashSet<RomSignatureObject.Game.Rom.SignatureSourceType>? selectedSources = null;
+
+                if (!useReturnSources && !returnAllSources)
+                {
+                    breakAfterFirst = true;
+                }
+                else if (useReturnSources)
+                {
+                    selectedSources = new HashSet<RomSignatureObject.Game.Rom.SignatureSourceType>(returnSources!);
+                }
+
+                if (breakAfterFirst == true)
+                {
+                    // get the first signature
+                    this.Signature = new SignatureLookupItem.SignatureResult(discoveredSignature);
+                }
+                else
+                {
+                    // get all signatures or only signatures matching returnSources
+                    this.Signatures = new Dictionary<RomSignatureObject.Game.Rom.SignatureSourceType, List<SignatureLookupItem.SignatureResult>>();
                     foreach (Signatures_Games_2 sig in rawSignatures)
                     {
-                        if (sig.Game != null)
+                        if (selectedSources != null && !selectedSources.Contains(sig.Rom.SignatureSource))
                         {
-                            if (sig.Game.Id != discoveredSignature.Game.Id)
+                            continue;
+                        }
+
+                        if (!this.Signatures.TryGetValue(sig.Rom.SignatureSource, out List<SignatureLookupItem.SignatureResult>? signatureResults))
+                        {
+                            signatureResults = new List<SignatureLookupItem.SignatureResult>();
+                            this.Signatures.Add(sig.Rom.SignatureSource, signatureResults);
+                        }
+
+                        signatureResults.Add(new SignatureLookupItem.SignatureResult(sig));
+                    }
+                }
+            }
+
+            if (includeMetadata)
+            {
+                this.Metadata = game.Metadata;
+            }
+
+            // attributes
+            if (includeAttributes)
+            {
+                this.Attributes = new List<AttributeItemCompiled>(game.Attributes.Count);
+                foreach (AttributeItem attribute in game.Attributes)
+                {
+                    switch (attribute.attributeName)
+                    {
+                        case AttributeItem.AttributeName.Publisher:
+                        case AttributeItem.AttributeName.Platform:
+                        case AttributeItem.AttributeName.ROMs:
+                        case AttributeItem.AttributeName.Country:
+                            break;
+
+                        default:
+                            AttributeItemCompiled attributeItemCompiled = new AttributeItemCompiled
                             {
-                                dataObjects.AddSignature(game.Id, DataObjects.DataObjectType.Game, long.Parse(sig.Game.Id));
-                            }
-                        }
-                    }
-
-                    // VIMMSLair manual search
-                    foreach (AttributeItem attribute in platform.Attributes)
-                    {
-                        if (attribute.attributeName == AttributeItem.AttributeName.VIMMPlatformName)
-                        {
-                            // ensure the signature is a No-Intros one
-                            Signatures_Games_2? sig = null;
-                            foreach (Signatures_Games_2 s in rawSignatures)
-                            {
-                                if (s.Rom.SignatureSource == RomSignatureObject.Game.Rom.SignatureSourceType.NoIntros)
-                                {
-                                    sig = s;
-                                    break;
-                                }
-                            }
-
-                            if (sig != null)
-                            {
-                                string platformName = (string)attribute.Value;
-
-                                string manualId = await VIMMSLair.ManualSearch.Search(platformName, Path.GetFileNameWithoutExtension(discoveredSignature.Rom.Name));
-                                if (manualId != "")
-                                {
-                                    // add manual reference
-                                    await dataObjects.AddAttribute(game.Id, new AttributeItem
-                                    {
-                                        attributeName = AttributeItem.AttributeName.VIMMManualId,
-                                        attributeType = AttributeItem.AttributeType.ShortString,
-                                        attributeRelationType = DataObjects.DataObjectType.Game,
-                                        Value = manualId
-                                    });
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
-                    // force metadata search
-                    if (userInteractiveSession)
-                    {
-                        // Run with 5 second timeout for interactive sessions
-                        await Task.WhenAny(
-                            dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true),
-                            Task.Delay(TimeSpan.FromSeconds(2))
-                        );
-                    }
-                    else
-                    {
-                        // Run without timeout for background operations
-                        await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true);
-                    }
-
-                    // re-get the game
-                    game = await dataObjects.GetDataObject(DataObjects.DataObjectType.Game, game.Id);
-                }
-
-                // build return item
-                this.Id = game.Id;
-                this.Name = game.Name;
-                if (validFields.Contains(ValidFields.Platform) || validFields.Contains(ValidFields.All))
-                {
-                    this.Platform = new MiniDataObjectItem
-                    {
-                        Name = platform.Name,
-                        metadata = platform.Metadata
-                    };
-                }
-                if (validFields.Contains(ValidFields.Publisher) || validFields.Contains(ValidFields.All) && publisher != null)
-                {
-                    this.Publisher = new MiniDataObjectItem
-                    {
-                        Name = publisher.Name,
-                        metadata = publisher.Metadata
-                    };
-                }
-
-                if (validFields.Contains(ValidFields.Signatures) || validFields.Contains(ValidFields.All))
-                {
-                    // if returnSources is not null and count is greater than 0, filter signatures by returnSources
-                    // if returnSources is null or count is 0, use returnAllSources
-                    // if returnAllSources is true, return all signatures
-                    // if returnAllSources is false, return only the first signature
-
-                    bool useReturnSources = returnSources != null && returnSources.Count > 0;
-                    bool breakAfterFirst = false;
-
-                    if (useReturnSources == false && returnAllSources == true)
-                    {
-                        // get all signatures
-                        returnSources = new List<gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType>();
-                        foreach (gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType source in Enum.GetValues(typeof(gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType)))
-                        {
-                            returnSources.Add((gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType)source);
-                        }
-                    }
-                    else if (useReturnSources == false && returnAllSources == false)
-                    {
-                        breakAfterFirst = true;
-                    }
-
-                    if (breakAfterFirst == true)
-                    {
-                        // get the first signature
-                        this.Signature = new SignatureLookupItem.SignatureResult(discoveredSignature);
-                    }
-                    else
-                    {
-                        // get only the signatures in returnSources
-                        this.Signatures = new Dictionary<RomSignatureObject.Game.Rom.SignatureSourceType, List<SignatureLookupItem.SignatureResult>>();
-                        foreach (Signatures_Games_2 sig in rawSignatures)
-                        {
-                            if (returnSources.Contains(sig.Rom.SignatureSource))
-                            {
-                                if (!this.Signatures.ContainsKey(sig.Rom.SignatureSource))
-                                {
-                                    this.Signatures.Add(sig.Rom.SignatureSource, new List<SignatureLookupItem.SignatureResult>());
-                                }
-                                this.Signatures[sig.Rom.SignatureSource].Add(new SignatureLookupItem.SignatureResult(sig));
-                            }
-                        }
-                    }
-                }
-
-                if (validFields.Contains(ValidFields.Metadata) || validFields.Contains(ValidFields.All))
-                {
-                    this.Metadata = game.Metadata;
-                }
-
-                // attributes
-                if (validFields.Contains(ValidFields.Attributes) || validFields.Contains(ValidFields.All))
-                {
-                    this.Attributes = new List<AttributeItemCompiled>();
-                    foreach (AttributeItem attribute in game.Attributes)
-                    {
-                        switch (attribute.attributeName)
-                        {
-                            case AttributeItem.AttributeName.Publisher:
-                            case AttributeItem.AttributeName.Platform:
-                            case AttributeItem.AttributeName.ROMs:
-                            case AttributeItem.AttributeName.Country:
-                                break;
-
-                            default:
-                                AttributeItemCompiled attributeItemCompiled = new AttributeItemCompiled
-                                {
-                                    Id = attribute.Id,
-                                    attributeName = attribute.attributeName,
-                                    attributeRelationType = attribute.attributeRelationType,
-                                    attributeType = attribute.attributeType,
-                                    Value = attribute.Value
-                                };
-                                this.Attributes.Add(attributeItemCompiled);
-                                break;
-                        }
+                                Id = attribute.Id,
+                                attributeName = attribute.attributeName,
+                                attributeRelationType = attribute.attributeRelationType,
+                                attributeType = attribute.attributeType,
+                                Value = attribute.Value
+                            };
+                            this.Attributes.Add(attributeItemCompiled);
+                            break;
                     }
                 }
             }
