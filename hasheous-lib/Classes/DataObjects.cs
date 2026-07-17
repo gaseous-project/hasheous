@@ -337,7 +337,6 @@ namespace hasheous_server.Classes
                 }
                 else
                 {
-                    // sql = "SELECT * FROM DataObject WHERE ObjectType = @objecttype AND `Name` LIKE @search ORDER BY `Name`;";
                     sql = "SELECT * FROM DataObject WHERE ObjectType = @objecttype AND MATCH(`Name`) AGAINST(@name IN BOOLEAN MODE) ORDER BY `Name`;";
                     string searchTerms = Common.BuildFullTextBooleanPrefixQuery(search);
                     dbDict.Add("name", searchTerms);
