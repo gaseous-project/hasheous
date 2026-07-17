@@ -365,7 +365,7 @@ HAVING
             {
                 if (model.Name.Length >= 3)
                 {
-                    whereClause_Name = "`" + whereNameField + "` LIKE CONCAT('%', @name, '%')";
+                    whereClause_Name = "MATCH(`" + whereNameField + "`) AGAINST(@name IN NATURAL LANGUAGE MODE)";
                     dbDict.Add("name", model.Name);
                 }
             }
