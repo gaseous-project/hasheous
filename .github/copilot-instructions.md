@@ -76,6 +76,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Client key header `X-Client-API-Key` via `[Authentication.ClientApiKey.ClientApiKeyAttribute]` — identifies client apps (e.g., Gaseous, Romm); typically required when `Config.RequireClientAPIKey` is true.
   - To exempt specific endpoints from client API key requirement, use `[Authentication.ClientApiKey.NoClientApiKeyNeededAttribute]` on the method. This is useful for public media endpoints that should not require authentication.
   - Inter-host API key for orchestrator calls (see `InterHostApiKey*` and registration in `service-orchestrator/Program.cs`) — security mechanism allowing multiple web server frontends (load-balanced) to securely call the orchestrator.
+  - Admin user list endpoints should avoid per-user role lookups. Prefer a single grouped query against `Users`/`UserRoles`/`Roles`, cache the result briefly in Redis, and invalidate that cache after role mutations.
 
 - Data access & migrations
   - Create a `new Classes.Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString)`.
@@ -84,10 +85,13 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Recent migration note: `hasheous-1034.sql` updates `Signatures_Games.Country`/`Language` to `VARCHAR(100)` and adds country-aware composite indexes for ingestion and game matching.
   - Recent migration note: `hasheous-1035.sql` updates `Signatures_Sources.Url` to nullable `VARCHAR(255)` (from text) so source links are bounded and easier to render safely in the UI.
   - Recent migration note: `hasheous-1036.sql` adds composite indexes on `Signatures_Roms` for (`GameId`, hashes, `IngestorVersion`) to improve multi-hash lookup performance.
+  - Recent migration note: `hasheous-1037.sql` adds FullText indexes for signature search fields (`Signatures_Games.Publisher`, `Signatures_Platforms.Platform`, `Signatures_Roms.Name`).
+  - Recent migration note: `hasheous-1038.sql` adds an index on `Users.NormalizedEmail` to support faster admin user list ordering/filtering.
   - Embedded migration & support file manifest names now start with `hasheous_lib.Schema.` or `hasheous_lib.Support.`. After adding a file, ensure Build Action = EmbeddedResource and verify with `Assembly.GetExecutingAssembly().GetManifestResourceNames()` if debugging mismatches.
 
 - Caching
   - Use `hasheous.Classes.RedisConnection.GenerateKey(prefix, keyObj)` and `PurgeCache(prefix)`. Redis enabled when `Config.RedisConfiguration.Enabled`.
+  - When caching admin/moderation lists or other high-read low-churn data, keep TTLs short and explicitly invalidate on writes that change the result set.
 
 - Background jobs
   - Add/adjust scheduled tasks in `service-orchestrator/Program.cs` under `QueueProcessor.QueueItems` (e.g., `FetchIGDBMetadata`, timings are minutes).
@@ -165,6 +169,7 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 - Keep the non-zero-size filter when extending hash lookup SQL unless a feature explicitly requires zero-byte signatures.
 - `SignatureManagement.BuildGameItem(...)` currently populates both singular and plural dictionary properties for compatibility: `Country` and `Countries`, `Language` and `Languages`.
 - Data object signature listing for games includes `Signatures_Games.Country`; frontend game signature labels/suggestions append country text in `wwwroot/pages/dataobjectdetail.js` and `wwwroot/pages/dataobjectedit.js`.
+- Text search on signature names now uses FullText `MATCH ... AGAINST` with boolean-prefix tokens for partial matches (for example `archer maclean` becomes `+archer* +maclean*`). Prefer this pattern over `LIKE '%...%'` when the column has a FullText index.
 
 ### Multi-hash lookup (new behavior)
 - `GetRawSignatures(...)` accepts an array (`List<HashLookupModel>`) where each element can include one or more hash fields (CRC/MD5/SHA1/SHA256).

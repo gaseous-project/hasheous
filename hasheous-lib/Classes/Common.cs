@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Data;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace Classes
@@ -801,6 +802,43 @@ namespace Classes
 			}
 
 			return d[left.Length, right.Length];
+		}
+
+		public static string BuildFullTextBooleanPrefixQuery(string input)
+		{
+			StringBuilder result = new StringBuilder(input.Length + 16);
+			StringBuilder token = new StringBuilder(32);
+
+			for (int i = 0; i < input.Length; i++)
+			{
+				char current = input[i];
+				if (char.IsLetterOrDigit(current))
+				{
+					token.Append(current);
+				}
+				else if (token.Length > 0)
+				{
+					if (result.Length > 0)
+					{
+						result.Append(' ');
+					}
+
+					result.Append('+').Append(token).Append('*');
+					token.Clear();
+				}
+			}
+
+			if (token.Length > 0)
+			{
+				if (result.Length > 0)
+				{
+					result.Append(' ');
+				}
+
+				result.Append('+').Append(token).Append('*');
+			}
+
+			return result.ToString();
 		}
 
 		/// <summary>

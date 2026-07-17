@@ -365,8 +365,9 @@ HAVING
             {
                 if (model.Name.Length >= 3)
                 {
-                    whereClause_Name = "`" + whereNameField + "` LIKE CONCAT('%', @name, '%')";
-                    dbDict.Add("name", model.Name);
+                    string fullTextNameQuery = BuildFullTextBooleanPrefixQuery(model.Name);
+                    whereClause_Name = "MATCH(`" + whereNameField + "`) AGAINST(@name IN BOOLEAN MODE)";
+                    dbDict.Add("name", fullTextNameQuery);
                 }
             }
 
