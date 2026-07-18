@@ -164,7 +164,7 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 ## Signature lookup behavior
 - `SignatureManagement.GetRawSignatures(...)` excludes zero-size ROM signature rows by default (`Signatures_Roms.Size > 0`) before hash-condition matching.
 - `SignatureManagement.GetRawSignatures(...)` validates input models (non-null, non-empty array) and throws `ArgumentException` on invalid input. This ensures failed input validation is caught early rather than at the database layer.
-- `SignatureManagement.GetRawSignatures(...)` constructs SQL clauses efficiently using `StringBuilder` to reduce allocations, especially important when building complex multi-model OR/AND logic.
+- `SignatureManagement.GetRawSignatures(...)` constructs SQL clauses efficiently using `StringBuilder` to reduce allocations, especially important when building complex multi-model AND logic.
 - `LookupController` now rejects explicit zero-byte hashes early for both raw-body `POST /api/v1/Lookup/ByHash` and direct `GET /api/v1/Lookup/ByHash/{hash}` routes, returning `400 Bad Request` rather than querying the signature database.
 - Keep the non-zero-size filter when extending hash lookup SQL unless a feature explicitly requires zero-byte signatures.
 - `SignatureManagement.BuildGameItem(...)` currently populates both singular and plural dictionary properties for compatibility: `Country` and `Countries`, `Language` and `Languages`.
@@ -173,9 +173,9 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 
 ### Multi-hash lookup (new behavior)
 - `GetRawSignatures(...)` accepts an array (`List<HashLookupModel>`) where each element can include one or more hash fields (CRC/MD5/SHA1/SHA256).
-- Within each `HashLookupModel`, hash fields are evaluated as an `OR` group (any valid hash in that element can satisfy the element).
+- Within each `HashLookupModel`, every provided hash field is evaluated as an `AND` group, and each field comparison also accepts an empty/null database value as a fallback.
 - Across the array, each element is enforced as an `AND` requirement against the same game id using per-model `EXISTS` clauses bound to `view_Signatures_Games.Id`.
-- Practical effect: different array elements can match different ROM rows, but all elements must resolve under one `GameId` to be returned.
+- Practical effect: every array element must resolve for the same `GameId`, and every populated hash field inside each element must succeed for that element to pass.
 - `modelCount` is used for uniquely-named SQL parameters and subquery aliases (for example `@sha256{modelCount}`, `sr_model{modelCount}`) to avoid collisions across models.
 
 - Correlation & logging
@@ -404,7 +404,7 @@ Additional example (rating boards):
 - `SignatureManagement.SearchSignatures(...)` now returns `Task<object[]>`; API endpoints should `await` it before returning results.
 - `SignatureManagement.GetCountriesAndLanguagesForGame(...)` now returns `async Task<List<AttributeItem>>`; callers must `await` it. This reduces duplicate country/language lookups compared to the prior sync implementation that populated both singular and plural dictionary properties separately.
 - `SignatureManagement.GetRomItemByHash(...)` now returns `Task<object>`; all callers must be updated to `await` the result.
-- `SignatureManagement.GetRawSignatures(...)` validates input models (non-null, non-empty) and throws `ArgumentException` on invalid input; uses `StringBuilder` for efficient SQL clause construction to reduce allocations.
+- `SignatureManagement.GetRawSignatures(...)` validates input models (non-null, non-empty) and throws `ArgumentException` on invalid input; uses `StringBuilder` for efficient SQL clause construction to reduce allocations; all populated hash fields in each model must match, and every model in the array must resolve for the same game.
 - `HashLookup.PerformLookup(...)` uses `HashSet<ValidFields>` instead of `List<ValidFields>` to avoid allocations and uses a `HashSet<string>` to track unique game ids without storing grouped signature lists, reducing memory overhead during lookups.
 - For incremental async cleanup, update method signatures and call chains together in one change so no mixed sync/async regressions are introduced.
 
