@@ -86,9 +86,18 @@ namespace Classes
 
                         if (hasModelWhereClause)
                         {
-                            modelWhereClauseBuilder.Append(" OR ");
+                            modelWhereClauseBuilder.Append(" AND ");
                         }
-                        modelWhereClauseBuilder.Append("sr_model").Append(modelCount).Append(".SHA256 = @sha256").Append(modelCount);
+                        modelWhereClauseBuilder
+                            .Append("(sr_model")
+                            .Append(modelCount)
+                            .Append(".SHA256 = @sha256")
+                            .Append(modelCount)
+                            .Append(" OR sr_model")
+                            .Append(modelCount)
+                            .Append(".SHA256 = '' OR sr_model")
+                            .Append(modelCount)
+                            .Append(".SHA256 IS NULL)");
                         hasModelWhereClause = true;
                         dbDict.Add("sha256" + modelCount, model.SHA256);
                     }
@@ -106,9 +115,18 @@ namespace Classes
 
                         if (hasModelWhereClause)
                         {
-                            modelWhereClauseBuilder.Append(" OR ");
+                            modelWhereClauseBuilder.Append(" AND ");
                         }
-                        modelWhereClauseBuilder.Append("sr_model").Append(modelCount).Append(".SHA1 = @sha1").Append(modelCount);
+                        modelWhereClauseBuilder
+                            .Append("(sr_model")
+                            .Append(modelCount)
+                            .Append(".SHA1 = @sha1")
+                            .Append(modelCount)
+                            .Append(" OR sr_model")
+                            .Append(modelCount)
+                            .Append(".SHA1 = '' OR sr_model")
+                            .Append(modelCount)
+                            .Append(".SHA1 IS NULL)");
                         hasModelWhereClause = true;
                         dbDict.Add("sha1" + modelCount, model.SHA1);
                     }
@@ -126,9 +144,18 @@ namespace Classes
 
                         if (hasModelWhereClause)
                         {
-                            modelWhereClauseBuilder.Append(" OR ");
+                            modelWhereClauseBuilder.Append(" AND ");
                         }
-                        modelWhereClauseBuilder.Append("sr_model").Append(modelCount).Append(".MD5 = @md5").Append(modelCount);
+                        modelWhereClauseBuilder
+                            .Append("(sr_model")
+                            .Append(modelCount)
+                            .Append(".MD5 = @md5")
+                            .Append(modelCount)
+                            .Append(" OR sr_model")
+                            .Append(modelCount)
+                            .Append(".MD5 = '' OR sr_model")
+                            .Append(modelCount)
+                            .Append(".MD5 IS NULL)");
                         hasModelWhereClause = true;
                         dbDict.Add("md5" + modelCount, model.MD5);
                     }
@@ -146,9 +173,18 @@ namespace Classes
 
                         if (hasModelWhereClause)
                         {
-                            modelWhereClauseBuilder.Append(" OR ");
+                            modelWhereClauseBuilder.Append(" AND ");
                         }
-                        modelWhereClauseBuilder.Append("sr_model").Append(modelCount).Append(".CRC = @crc").Append(modelCount);
+                        modelWhereClauseBuilder
+                            .Append("(sr_model")
+                            .Append(modelCount)
+                            .Append(".CRC = @crc")
+                            .Append(modelCount)
+                            .Append(" OR sr_model")
+                            .Append(modelCount)
+                            .Append(".CRC = '' OR sr_model")
+                            .Append(modelCount)
+                            .Append(".CRC IS NULL)");
                         hasModelWhereClause = true;
                         dbDict.Add("crc" + modelCount, model.CRC);
                     }
