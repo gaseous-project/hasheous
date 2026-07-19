@@ -21,6 +21,9 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Redis (Valkey) provides caching if enabled (`Classes/RedisConnection`), otherwise an in-memory cache is used.
   - Metadata file caching now supports optional S3-compatible object storage fallback (including MinIO) via shared helpers in `hasheous-lib/Classes/S3StorageTools.cs` and `hasheous-lib/Classes/StorageFallbackResolver.cs`.
   - Metadata proxy image and bundle routes use local-disk first, then S3 fallback, and fail open: if S3 is unavailable they fall back to existing provider fetch/build behavior without surfacing S3 errors to clients.
+  - Metadata proxy redirect handling is centralized in `MetadataProxyController.ResolveRedirectFlag(bool? redirect)` so route methods do not implement per-endpoint redirect date logic.
+  - Redirect policy cutover: for redirect-capable metadata routes, `redirect` remains optional (default false) until 2026-12-01 inclusive; from 2026-12-02 UTC onward redirect is forced on regardless of query input.
+  - S3 redirect probes treat zero-length objects as non-redirectable to avoid handing clients empty downloads.
   - `ProxyCacheManager.DownloadAndCacheAsync(...)` now returns a tuple: `(ResolvedContentStream? ContentStream, string? LocalFilePath)`. Use `ContentStream` for responses and `LocalFilePath` when post-download cleanup is needed.
   - When serving cache reads from `ProxyCacheManager` (`ResolvedContentStream`), register the wrapper for response disposal (for example `HttpContext.Response.RegisterForDispose(resolvedStream)`) before returning `File(resolvedStream.Stream, ...)`; disposing only the inner stream can leak S3 response resources/file handles.
   - S3 uploads for newly downloaded/built files are scheduled on response completion (`HttpContext.Response.OnCompleted`) so client download latency is not blocked by object-store upload time.
@@ -60,6 +63,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - MCP endpoint route: `POST /api/v1/Mcp` (JSON-RPC over HTTP). Keep MCP internet-facing endpoints in `hasheous` (not `service-orchestrator`).
   - Discovery route: `GET /.well-known/mcp.json` for client/server discovery metadata.
   - Metadata proxy file routes (`IGDB/Image`, `TheGamesDB/Images`, `GiantBomb/a/uploads`, `GiantBomb/images`, `ScreenScraper/media{endpoint}.php`, `TheGamesDB/Games/Images`, and `TheGamesDB/Platforms/Images`) may return either physical-file or stream-backed file results depending on cache source; do not assume `PhysicalFileResult` only when consuming these actions internally. These media endpoints do NOT require the `X-Client-API-Key` header and are marked with `[NoClientApiKeyNeeded()]`.
+  - Redirect-capable metadata routes now accept nullable `redirect` query parameters (`bool?`) and should resolve behavior through `ResolveRedirectFlag(...)` rather than endpoint-specific defaults.
   - Metadata bundle route valid sources are currently `IGDB`, `TheGamesDB`, and `Screenscraper`.
   - ScreenScraper proxy routes are exposed under metadata proxy:
     - `GET /api/v1/MetadataProxy/ScreenScraper/jeuInfos.php` supports `gameid` or hash lookup (`crc`, `md5`, `sha1`) and can return JSON or XML via `output`. Requires `X-Client-API-Key`.
