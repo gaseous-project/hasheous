@@ -119,7 +119,7 @@ namespace Classes
 
 										// apply schema!
 										Logging.Log(Logging.LogType.Information, "Database", "Updating schema to version " + i);
-										await ExecuteCMDAsync(dbScript, dbDict);
+										await ExecuteCMDAsync(dbScript, dbDict, 120);
 
 										sql = "UPDATE schema_version SET schema_version=@schemaver";
 										dbDict = new Dictionary<string, object>();

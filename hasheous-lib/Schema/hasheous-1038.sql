@@ -1,0 +1,1 @@
+CREATE INDEX idx_users_normalized_email ON Users (`NormalizedEmail`);

@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text;
 using Authentication;
 using Classes;
+using hasheous.Classes;
 using hasheous_server.Classes;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -19,6 +20,8 @@ namespace hasheous_server.Controllers.v1_0
     [Authorize]
     public class AccountAdminController : Controller
     {
+        private const string AdminUsersCachePrefix = "AccountAdminUsers";
+
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly IEmailSender _emailSender;
@@ -44,42 +47,105 @@ namespace hasheous_server.Controllers.v1_0
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetAllUsers()
         {
-            List<UserViewModel> users = new List<UserViewModel>();
+            string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+            string cacheKey = RedisConnection.GenerateKey(AdminUsersCachePrefix, new { CurrentUserId = currentUserId });
 
-            foreach (ApplicationUser rawUser in _userManager.Users)
+            if (Config.RedisConfiguration.Enabled)
             {
-                UserViewModel user = new UserViewModel();
-                user.Id = rawUser.Id;
-                user.EmailAddress = rawUser.NormalizedEmail.ToLower();
-                user.LockoutEnabled = rawUser.LockoutEnabled;
-                user.LockoutEnd = rawUser.LockoutEnd;
-                user.SecurityProfile = rawUser.SecurityProfile;
-
-                // make sure this user is not the logged in user - this is to prevent an admin from removing their own admin rights
-                if (user.EmailAddress == User.FindFirstValue(ClaimTypes.Email).ToLower())
+                List<UserViewModel>? cachedUsers = await RedisConnection.GetCacheItem<List<UserViewModel>>(cacheKey);
+                if (cachedUsers != null)
                 {
-                    continue;
-                }
-
-                // get roles
-                ApplicationUser? aUser = await _userManager.FindByIdAsync(rawUser.Id);
-                if (aUser != null)
-                {
-                    IList<string> aUserRoles = await _userManager.GetRolesAsync(aUser);
-                    user.Roles = aUserRoles.ToList();
-
-                    user.Roles.Sort();
-                }
-
-                // only add a user to the list if they contain roles other than "Member" or "Verified Email"
-                if (user.Roles.Except(new string[] { "Member", "Verified Email" }).Any())
-                {
-                    users.Add(user);
+                    return Ok(cachedUsers);
                 }
             }
 
-            // sort all users by email
-            users = users.OrderBy(u => u.EmailAddress).ToList();
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            List<Dictionary<string, object>> rows = await db.ExecuteCMDDictAsync(@"
+SELECT
+    u.Id,
+    u.NormalizedEmail,
+    u.Email,
+    u.LockoutEnabled,
+    u.LockoutEnd,
+    u.SecurityProfile,
+    GROUP_CONCAT(DISTINCT r.Name ORDER BY r.Name SEPARATOR ',') AS RolesCsv
+FROM Users u
+INNER JOIN UserRoles ur ON ur.UserId = u.Id
+INNER JOIN Roles r ON r.Id = ur.RoleId
+WHERE (@currentUserId = '' OR u.Id <> @currentUserId)
+GROUP BY u.Id, u.NormalizedEmail, u.Email, u.LockoutEnabled, u.LockoutEnd, u.SecurityProfile
+HAVING SUM(CASE WHEN r.Name NOT IN ('Member', 'Verified Email') THEN 1 ELSE 0 END) > 0
+ORDER BY u.NormalizedEmail, u.Email;",
+            new Dictionary<string, object>
+            {
+                { "currentUserId", currentUserId }
+            });
+
+            List<UserViewModel> users = new List<UserViewModel>(rows.Count);
+
+            foreach (Dictionary<string, object> row in rows)
+            {
+                string normalizedEmail = row["NormalizedEmail"] == DBNull.Value ? string.Empty : Convert.ToString(row["NormalizedEmail"]) ?? string.Empty;
+                string email = row["Email"] == DBNull.Value ? string.Empty : Convert.ToString(row["Email"]) ?? string.Empty;
+                string rolesCsv = row["RolesCsv"] == DBNull.Value ? string.Empty : Convert.ToString(row["RolesCsv"]) ?? string.Empty;
+                string securityProfileString = row["SecurityProfile"] == DBNull.Value ? string.Empty : Convert.ToString(row["SecurityProfile"]) ?? string.Empty;
+
+                SecurityProfileViewModel securityProfile = new SecurityProfileViewModel();
+                if (!string.IsNullOrEmpty(securityProfileString) && securityProfileString != "null")
+                {
+                    SecurityProfileViewModel? parsedSecurityProfile = Newtonsoft.Json.JsonConvert.DeserializeObject<SecurityProfileViewModel>(securityProfileString);
+                    if (parsedSecurityProfile != null)
+                    {
+                        securityProfile = parsedSecurityProfile;
+                    }
+                }
+
+                DateTimeOffset? lockoutEnd = null;
+                if (row["LockoutEnd"] != DBNull.Value)
+                {
+                    if (row["LockoutEnd"] is DateTime lockoutDate)
+                    {
+                        lockoutEnd = new DateTimeOffset(lockoutDate);
+                    }
+                    else if (DateTimeOffset.TryParse(Convert.ToString(row["LockoutEnd"]), out DateTimeOffset parsedLockoutEnd))
+                    {
+                        lockoutEnd = parsedLockoutEnd;
+                    }
+                }
+
+                bool lockoutEnabled = false;
+                object? lockoutEnabledValue = row["LockoutEnabled"];
+                if (lockoutEnabledValue != DBNull.Value)
+                {
+                    if (lockoutEnabledValue is bool asBool)
+                    {
+                        lockoutEnabled = asBool;
+                    }
+                    else if (bool.TryParse(Convert.ToString(lockoutEnabledValue), out bool parsedBool))
+                    {
+                        lockoutEnabled = parsedBool;
+                    }
+                    else
+                    {
+                        lockoutEnabled = Convert.ToInt32(lockoutEnabledValue) != 0;
+                    }
+                }
+
+                users.Add(new UserViewModel
+                {
+                    Id = Convert.ToString(row["Id"]) ?? string.Empty,
+                    EmailAddress = (!string.IsNullOrEmpty(normalizedEmail) ? normalizedEmail : email).ToLowerInvariant(),
+                    LockoutEnabled = lockoutEnabled,
+                    LockoutEnd = lockoutEnd,
+                    SecurityProfile = securityProfile,
+                    Roles = rolesCsv.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList()
+                });
+            }
+
+            if (Config.RedisConfiguration.Enabled)
+            {
+                await RedisConnection.SetCacheItem(cacheKey, users, TimeSpan.FromMinutes(5));
+            }
 
             return Ok(users);
         }
@@ -139,6 +205,11 @@ namespace hasheous_server.Controllers.v1_0
                 foreach (string roleName in roleList)
                 {
                     await _userManager.AddToRoleAsync(user, roleName);
+                }
+
+                if (Config.RedisConfiguration.Enabled)
+                {
+                    await RedisConnection.PurgeCache(AdminUsersCachePrefix);
                 }
 
                 return Ok();

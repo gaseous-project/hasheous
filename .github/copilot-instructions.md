@@ -21,6 +21,8 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Redis (Valkey) provides caching if enabled (`Classes/RedisConnection`), otherwise an in-memory cache is used.
   - Metadata file caching now supports optional S3-compatible object storage fallback (including MinIO) via shared helpers in `hasheous-lib/Classes/S3StorageTools.cs` and `hasheous-lib/Classes/StorageFallbackResolver.cs`.
   - Metadata proxy image and bundle routes use local-disk first, then S3 fallback, and fail open: if S3 is unavailable they fall back to existing provider fetch/build behavior without surfacing S3 errors to clients.
+  - `ProxyCacheManager.DownloadAndCacheAsync(...)` now returns a tuple: `(ResolvedContentStream? ContentStream, string? LocalFilePath)`. Use `ContentStream` for responses and `LocalFilePath` when post-download cleanup is needed.
+  - When serving cache reads from `ProxyCacheManager` (`ResolvedContentStream`), register the wrapper for response disposal (for example `HttpContext.Response.RegisterForDispose(resolvedStream)`) before returning `File(resolvedStream.Stream, ...)`; disposing only the inner stream can leak S3 response resources/file handles.
   - S3 uploads for newly downloaded/built files are scheduled on response completion (`HttpContext.Response.OnCompleted`) so client download latency is not blocked by object-store upload time.
   - Separation: the orchestration server exists to separate background tasks from the frontend web server. The frontend web server only services user requests; the orchestrator schedules and runs internal/background work (`QueueProcessor.QueueItems` in `service-orchestrator/Program.cs`). Note the orchestrator has no public endpoints, and should only be called by trusted web servers using the inter-host API key.
 
@@ -34,6 +36,10 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
 - Configuration
   - File: `~/.hasheous-server/config.json` (auto-updated on startup by `Config.UpdateConfig()`). Env vars (used by Docker): `dbhost`, `dbuser`, `dbpass`, `igdbclientid`, `igdbclientsecret`, `redisenabled`, `redishost`, `redisport`, `reportingserverurl`, etc.
   - S3 config (`Config.S3StorageConfiguration`): `Enabled`, `Region`, `ServiceUrl`, `AccessKey`, `SecretKey`, `SessionToken`, `ForcePathStyle`, `DefaultBucket`.
+  - Tiered cache policy config (`Config.CachePolicies` / config field `Policies`) controls proxy cache retention by content type and storage tier:
+    - `Media`: local tier defaults to size-only retention; S3 tier defaults to 2-year max age.
+    - `Bundles`: local and S3 tiers default to 90-day max age.
+    - `MinFreeDiskSpaceBytes` on local tiers triggers eviction even when size is under target if disk free space is low.
   - S3 env vars: `s3enabled`, `s3region`, `s3serviceurl`, `s3accesskey`, `s3secretkey`, `s3sessiontoken`, `s3forcepathstyle`.
   - For MinIO and similar S3-compatible endpoints, use host-only `ServiceUrl` (for example `https://s3.mrgtech.net`) and typically set `ForcePathStyle = true`.
   - S3 fallback is effectively disabled when either `Enabled` is false or bucket/key inputs are missing.
@@ -53,16 +59,24 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Swagger is enabled with custom schema IDs and API key security definitions.
   - MCP endpoint route: `POST /api/v1/Mcp` (JSON-RPC over HTTP). Keep MCP internet-facing endpoints in `hasheous` (not `service-orchestrator`).
   - Discovery route: `GET /.well-known/mcp.json` for client/server discovery metadata.
-  - Metadata proxy file routes (`IGDB/Image`, `TheGamesDB/Images`, `GiantBomb/a/uploads`, and `Bundles/{MetadataSourceName}/{GameID}.bundle`) may return either physical-file or stream-backed file results depending on cache source; do not assume `PhysicalFileResult` only when consuming these actions internally.
+  - Metadata proxy file routes (`IGDB/Image`, `TheGamesDB/Images`, `GiantBomb/a/uploads`, `GiantBomb/images`, `ScreenScraper/media{endpoint}.php`, `TheGamesDB/Games/Images`, and `TheGamesDB/Platforms/Images`) may return either physical-file or stream-backed file results depending on cache source; do not assume `PhysicalFileResult` only when consuming these actions internally. These media endpoints do NOT require the `X-Client-API-Key` header and are marked with `[NoClientApiKeyNeeded()]`.
+  - Metadata bundle route valid sources are currently `IGDB`, `TheGamesDB`, and `Screenscraper`.
+  - ScreenScraper proxy routes are exposed under metadata proxy:
+    - `GET /api/v1/MetadataProxy/ScreenScraper/jeuInfos.php` supports `gameid` or hash lookup (`crc`, `md5`, `sha1`) and can return JSON or XML via `output`. Requires `X-Client-API-Key`.
+    - `GET /api/v1/MetadataProxy/ScreenScraper/systemesListe.php` returns cached/platform metadata from ScreenScraper integration. Requires `X-Client-API-Key`.
+    - `GET /api/v1/MetadataProxy/ScreenScraper/media{endpoint}.php` proxies/caches media and rejects traversal-like media IDs. Does NOT require `X-Client-API-Key`.
   - MCP lookups are intentionally public: the hosted MCP controller uses `[AllowAnonymous]` rather than API key auth.
+  - Hash lookup endpoints (`POST /api/v1/Lookup/ByHash`) enforce request payload limits: `MaxLookupPayloadBytes = 262_144` (256 KB) and `MaxLookupArrayItems = 50`. These are enforced via `[RequestSizeLimit]` and manual JSON array size validation before database queries run.
 
 - Auth & security
   - Identity cookies configured; roles/policies: Admin, Moderator, Member, "Verified Email". Roles are seeded on startup.
   - Role hierarchy: Admin > Moderator > Member. "Verified Email" is a status role (not hierarchical) automatically assigned/removed based on email confirmation status.
   - API keys:
   - User key header `X-API-Key` via `[Authentication.ApiKey.ApiKeyAttribute]` (`ApiKeyAuthorizationFilter` wired in `hasheous/Program.cs`) — identifies individual users and their actions.
-  - Client key header `X-Client-API-Key` via `[Authentication.ClientApiKey.ClientApiKeyAttribute]` — identifies client apps (e.g., Gaseous, Romm); typically required when `Config.RequireClientAPIKey` is true. Required to access the metadata proxy endpoints.
+  - Client key header `X-Client-API-Key` via `[Authentication.ClientApiKey.ClientApiKeyAttribute]` — identifies client apps (e.g., Gaseous, Romm); typically required when `Config.RequireClientAPIKey` is true.
+  - To exempt specific endpoints from client API key requirement, use `[Authentication.ClientApiKey.NoClientApiKeyNeededAttribute]` on the method. This is useful for public media endpoints that should not require authentication.
   - Inter-host API key for orchestrator calls (see `InterHostApiKey*` and registration in `service-orchestrator/Program.cs`) — security mechanism allowing multiple web server frontends (load-balanced) to securely call the orchestrator.
+  - Admin user list endpoints should avoid per-user role lookups. Prefer a single grouped query against `Users`/`UserRoles`/`Roles`, cache the result briefly in Redis, and invalidate that cache after role mutations.
 
 - Data access & migrations
   - Create a `new Classes.Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString)`.
@@ -71,17 +85,22 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Recent migration note: `hasheous-1034.sql` updates `Signatures_Games.Country`/`Language` to `VARCHAR(100)` and adds country-aware composite indexes for ingestion and game matching.
   - Recent migration note: `hasheous-1035.sql` updates `Signatures_Sources.Url` to nullable `VARCHAR(255)` (from text) so source links are bounded and easier to render safely in the UI.
   - Recent migration note: `hasheous-1036.sql` adds composite indexes on `Signatures_Roms` for (`GameId`, hashes, `IngestorVersion`) to improve multi-hash lookup performance.
+  - Recent migration note: `hasheous-1037.sql` adds FullText indexes for signature search fields (`Signatures_Games.Publisher`, `Signatures_Platforms.Platform`, `Signatures_Roms.Name`).
+  - Recent migration note: `hasheous-1038.sql` adds an index on `Users.NormalizedEmail` to support faster admin user list ordering/filtering.
   - Embedded migration & support file manifest names now start with `hasheous_lib.Schema.` or `hasheous_lib.Support.`. After adding a file, ensure Build Action = EmbeddedResource and verify with `Assembly.GetExecutingAssembly().GetManifestResourceNames()` if debugging mismatches.
 
 - Caching
   - Use `hasheous.Classes.RedisConnection.GenerateKey(prefix, keyObj)` and `PurgeCache(prefix)`. Redis enabled when `Config.RedisConfiguration.Enabled`.
+  - When caching admin/moderation lists or other high-read low-churn data, keep TTLs short and explicitly invalidate on writes that change the result set.
 
 - Background jobs
   - Add/adjust scheduled tasks in `service-orchestrator/Program.cs` under `QueueProcessor.QueueItems` (e.g., `FetchIGDBMetadata`, timings are minutes).
   - GiantBomb: when `Config.GiantBomb.APIKey` is present a `FetchGiantBombMetadata` job is queued (default 10080 minutes / 7 days) to refresh GiantBomb platform/game/image data.
   - ScreenScraper: `FetchScreenScraperMetadata` is queued every 1440 minutes (24 hours). It reads cached metadata JSON under `Config.LibraryConfiguration.LibraryMetadataDirectory_Screenscraper/games` and imports records through `XML.XMLIngestor.ImportDatRecord(...)`.
+  - Hourly maintenance now runs proxy cache policy maintenance via `ProxyCacheManager.RunMaintenanceAsync()` (tiered LRU/age eviction for local and S3 cache tiers).
   - Queue task refactor: obsolete blocking entries `GetMissingArtwork` and `MetadataMatchSearch` were removed from metadata fetch task `Blocks` lists. Don’t rely on them for future coordination.
   - Data object metadata guard: `DataObjects.DataObjectMetadataSearch(objectType, id?, ForceSearch)` now uses an atomic file lock under `~/.hasheous-server/Data/Metadata/Hasheous/DataObjectFlags` to prevent duplicate concurrent runs for the same `(objectType, id)` key.
+  - Metadata search tasks are launched concurrently per metadata source. The per-run `jobId` must be unique, the bounded return guard is controlled by `maxWaitSeconds` (currently 4), and `finalise()` must wait until every launched task has completed before running.
   - Guard behavior details: lock acquisition uses create-new semantics (`FileMode.CreateNew`) and keeps the lock handle open for the full search duration; lock-file collisions cause immediate skip/return.
   - Stale lock policy: existing lock files are treated as valid for up to 1 hour; older lock files are deleted and lock acquisition is retried. For `id == null`, the lock key uses `all` (for example: `Game_all_MetadataSearchInProgress.flag`).
 
@@ -99,6 +118,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Large uploads are allowed (Kestrel/FormOptions set to max); ensure proxies forward `X-Forwarded-*` (already configured).
   - Keep XML docs for Swagger (`IncludeXmlComments` expects generated XML files from the projects); build output paths are `bin/Debug/net10.0/` (not net8.0).
   - Swagger filter custom implementations: framework now uses Swashbuckle 10.x, which brings `Microsoft.OpenApi` 2.x. Schema types are `JsonSchemaType` flags (e.g., `JsonSchemaType.String | JsonSchemaType.Null` for nullable strings), examples use `JsonNode` instead of `OpenApiObject`/`OpenApiString`, and tag/security references use `OpenApiTagReference`/`OpenApiSecuritySchemeReference` instead of embedding objects directly. See `hasheous-lib/Classes/SwaggerLookupRequestBodyFilter.cs` and `SwaggerIDocumentFilter.cs` for reference implementations.
+  - Swagger auth requirements now account for both direct attributes and service filters (`[ServiceFilter(...AuthorizationFilter)]`) when determining required API key schemes. The `AuthorizationOperationFilter` also checks for `[NoClientApiKeyNeeded()]` and excludes endpoints with this attribute from the "Client API Key" security requirement. If you add security filters via service filters, ensure `AuthorizationOperationFilter` continues to recognize them.
 
 If something is unclear or missing (e.g., additional services, tests, or new auth flows), ask and this guide can be refined.
 
@@ -108,6 +128,7 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
   - API version attributes (`[ApiVersion]`, `[MapToApiVersion]`) are available globally via project-level `global using Asp.Versioning;` — no per-file using directive needed.
   - Reuse cache profiles via `[ResponseCache(CacheProfileName = "5Minute")]` or `"7Days"`.
   - Protect with `[Authentication.ApiKey.ApiKeyAttribute]` or `[Authentication.ClientApiKey.ClientApiKeyAttribute]` when needed.
+  - If an endpoint protected with `[Authentication.ClientApiKey.ClientApiKeyAttribute]` should not require the key (e.g., public media endpoints), add `[Authentication.ClientApiKey.NoClientApiKeyNeededAttribute]` to exempt it.
   - For authenticated endpoints, use `[Authorize]` and access user context via `_userManager.GetUserAsync(User)`.
   - Use `new Classes.Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString)` and `ExecuteCMD/ExecuteCMDDict` for DB work.
   - If caching, build keys with `hasheous.Classes.RedisConnection.GenerateKey(prefix, keyObj)`.
@@ -131,6 +152,7 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 - Use the lookup timeout pattern
   - See `LookupController.LookupPost`: `Task.WhenAny(..., Task.Delay(TimeSpan.FromSeconds(10)))` and set `Retry-After = 90` on 503 responses.
   - Interactive hash lookup metadata searches use a short `Task.Delay(TimeSpan.FromSeconds(2))` guard to keep UI-driven requests responsive.
+  - That guard must not serialize provider work: launch metadata tasks concurrently, return promptly if the guard expires, and let the outstanding tasks finish before finalising the run.
 
 - Raw-body POST endpoints and Swagger documentation
   - `LookupPost` (`POST /api/v1/Lookup/ByHash`) accepts a raw JSON body instead of a bound model parameter. The action reads `Request.Body` directly via `StreamReader` and calls `JsonDocument.Parse(...)` manually.
@@ -141,16 +163,19 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 
 ## Signature lookup behavior
 - `SignatureManagement.GetRawSignatures(...)` excludes zero-size ROM signature rows by default (`Signatures_Roms.Size > 0`) before hash-condition matching.
+- `SignatureManagement.GetRawSignatures(...)` validates input models (non-null, non-empty array) and throws `ArgumentException` on invalid input. This ensures failed input validation is caught early rather than at the database layer.
+- `SignatureManagement.GetRawSignatures(...)` constructs SQL clauses efficiently using `StringBuilder` to reduce allocations, especially important when building complex multi-model AND logic.
 - `LookupController` now rejects explicit zero-byte hashes early for both raw-body `POST /api/v1/Lookup/ByHash` and direct `GET /api/v1/Lookup/ByHash/{hash}` routes, returning `400 Bad Request` rather than querying the signature database.
 - Keep the non-zero-size filter when extending hash lookup SQL unless a feature explicitly requires zero-byte signatures.
 - `SignatureManagement.BuildGameItem(...)` currently populates both singular and plural dictionary properties for compatibility: `Country` and `Countries`, `Language` and `Languages`.
 - Data object signature listing for games includes `Signatures_Games.Country`; frontend game signature labels/suggestions append country text in `wwwroot/pages/dataobjectdetail.js` and `wwwroot/pages/dataobjectedit.js`.
+- Text search on signature names now uses FullText `MATCH ... AGAINST` with boolean-prefix tokens for partial matches (for example `archer maclean` becomes `+archer* +maclean*`). Prefer this pattern over `LIKE '%...%'` when the column has a FullText index.
 
 ### Multi-hash lookup (new behavior)
 - `GetRawSignatures(...)` accepts an array (`List<HashLookupModel>`) where each element can include one or more hash fields (CRC/MD5/SHA1/SHA256).
-- Within each `HashLookupModel`, hash fields are evaluated as an `OR` group (any valid hash in that element can satisfy the element).
+- Within each `HashLookupModel`, every provided hash field is evaluated as an `AND` group, and each field comparison also accepts an empty/null database value as a fallback.
 - Across the array, each element is enforced as an `AND` requirement against the same game id using per-model `EXISTS` clauses bound to `view_Signatures_Games.Id`.
-- Practical effect: different array elements can match different ROM rows, but all elements must resolve under one `GameId` to be returned.
+- Practical effect: every array element must resolve for the same `GameId`, and every populated hash field inside each element must succeed for that element to pass.
 - `modelCount` is used for uniquely-named SQL parameters and subquery aliases (for example `@sha256{modelCount}`, `sr_model{modelCount}`) to avoid collisions across models.
 
 - Correlation & logging
@@ -259,6 +284,13 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 - Local cache source: `~/.hasheous-server/Data/Metadata/ScreenScraper/games` (resolved from `Config.LibraryConfiguration.LibraryMetadataDirectory_Screenscraper`).
 - Import path: cached JSON files are parsed with `gaseous_signature_parser` (ScreenScraper parser mode), language/country short codes are normalized via `Common.GetNameByCode(...)`, then records are imported using `XML.XMLIngestor.ImportDatRecord(...)`.
 - Blocking behavior: this task blocks `QueueItemType.SignatureIngestor` while it runs.
+- Metadata proxy parity endpoints now include:
+  - `jeuInfos.php` response shaping (matching ScreenScraper style) with support for `gameid` and hash-based fallback lookup (`crc`/`md5`/`sha1`).
+  - `systemesListe.php` for platform listing.
+  - `media{endpoint}.php` for media passthrough with cache-first behavior via `ProxyCacheManager`.
+- Cache miss sentinel handling: when ScreenScraper media download succeeds but the cached payload is tiny (`ContentLength <= 7`), treat it as a provider "not found" marker, dispose stream, delete the cached local file, and return `404`.
+- Bundle support now includes ScreenScraper via `GET /api/v1/MetadataProxy/Bundles/Screenscraper/{GameID}.bundle`, with game metadata plus media files sourced from ScreenScraper payloads.
+- Sensitive ScreenScraper query credentials (`devid`, `devpassword`, `ssid`, `sspassword`, `softname`) are stripped from rewritten media URLs before responses are returned.
 
 ## SteamGridDB metadata
 - Provider class: `hasheous-lib/Classes/Metadata/SteamGridDB/IMetadata_SteamGridDB.cs` (`MetadataSteamGridDB : IMetadata`).
@@ -395,4 +427,14 @@ Additional example (rating boards):
 - Keep the synchronous wrappers (`ExecuteCMD` / `ExecuteCMDDict`) as compatibility shims only; prefer async callers and avoid introducing new sync call sites.
 - `DataObjectPermission.GetObjectPermission(...)` and `DataObjectPermission.GetObjectPermissionList(...)` now return `Task<...>` and must be awaited by controller/service callers.
 - `SignatureManagement.SearchSignatures(...)` now returns `Task<object[]>`; API endpoints should `await` it before returning results.
+- `SignatureManagement.GetCountriesAndLanguagesForGame(...)` now returns `async Task<List<AttributeItem>>`; callers must `await` it. This reduces duplicate country/language lookups compared to the prior sync implementation that populated both singular and plural dictionary properties separately.
+- `SignatureManagement.GetRomItemByHash(...)` now returns `Task<object>`; all callers must be updated to `await` the result.
+- `SignatureManagement.GetRawSignatures(...)` validates input models (non-null, non-empty) and throws `ArgumentException` on invalid input; uses `StringBuilder` for efficient SQL clause construction to reduce allocations; all populated hash fields in each model must match, and every model in the array must resolve for the same game.
+- `HashLookup.PerformLookup(...)` uses `HashSet<ValidFields>` instead of `List<ValidFields>` to avoid allocations and uses a `HashSet<string>` to track unique game ids without storing grouped signature lists, reducing memory overhead during lookups.
 - For incremental async cleanup, update method signatures and call chains together in one change so no mixed sync/async regressions are introduced.
+
+### Hash lookup request validation (current)
+- `POST /api/v1/Lookup/ByHash` now enforces request payload limits: `MaxLookupPayloadBytes = 262_144` (256 KB) via `[RequestSizeLimit]` and `MaxLookupArrayItems = 50` for the number of hash objects in the request body.
+- Zero-byte hashes are rejected with `400 Bad Request` for known hashes: MD5 `d41d8cd98f00b204e9800998ecf8427e`, SHA1 `da39a3ee5e6b4b0d3255bfef95601890afd80709`, SHA256 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`, CRC `00000000`.
+- Request body JSON parsing uses `JsonSerializerOptions` with `PropertyNameCaseInsensitive = true` to normalize input.
+- Validation occurs before any database lookups to fail fast on invalid input.

@@ -248,7 +248,7 @@ public class IGDBMetadataDocumentFilter : IDocumentFilter
                     new OpenApiSecurityRequirement
                     {
                         {
-                            new OpenApiSecuritySchemeReference("Client API Key", null!, null),
+                            new OpenApiSecuritySchemeReference("Client API Key", openApiDocument, null),
                             []
                         }
                     }
