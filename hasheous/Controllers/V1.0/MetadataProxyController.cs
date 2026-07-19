@@ -2007,7 +2007,7 @@ namespace hasheous_server.Controllers.v1_0
                 .Split('/', StringSplitOptions.RemoveEmptyEntries)
                 .Select(Uri.EscapeDataString));
 
-            string s3Url = $"https://{Config.S3StorageConfiguration.Host}/{encodedBucket}/{encodedService}/{encodedResourcePath}";
+            string s3Url = $"{Config.S3StorageConfiguration.Host}/{encodedBucket}/{encodedService}/{encodedResourcePath}";
 
             // check if content is in s3 cache first - a simple HEAD should be enough - return null if not found
 
