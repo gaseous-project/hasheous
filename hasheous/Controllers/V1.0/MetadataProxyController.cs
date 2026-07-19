@@ -2014,6 +2014,7 @@ namespace hasheous_server.Controllers.v1_0
             if (await HttpFileExistsAsync(s3Url))
             {
                 // Use an explicit 303 with Location. Some download clients treat 302 as a final empty response.
+                Logging.Log(Logging.LogType.Information, "MetadataProxyController", $"Redirecting to S3 for {s3Url}");
                 Response.Headers.Location = s3Url;
                 return StatusCode(StatusCodes.Status303SeeOther);
             }
