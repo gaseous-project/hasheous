@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Data.SqlTypes;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO.Compression;
@@ -517,7 +518,7 @@ namespace hasheous_server.Controllers.v1_0
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [Route("IGDB/Image/{ImageId}.jpg")]
         [ResponseCache(CacheProfileName = "7Days")]
-        public async Task<IActionResult> GetImage(string ImageId)
+        public async Task<IActionResult> GetImage(string ImageId, bool? redirect = null)
         {
             // Validate ImageId to prevent path traversal
             if (ImageId.Contains("..") || ImageId.Contains("/") || ImageId.Contains("\\"))
@@ -527,18 +528,30 @@ namespace hasheous_server.Controllers.v1_0
 
             string resourcePath = $"Images/{ImageId}.jpg";
             string url = String.Format("https://images.igdb.com/igdb/image/upload/t_{0}/{1}.jpg", "original", ImageId);
+            string serviceName = "IGDB";
+
+            bool useRedirect = ResolveRedirectFlag(redirect);
+            if (useRedirect)
+            {
+                // redirect to s3
+                var redirectResponse = await HandleRedirect(serviceName, resourcePath);
+                if (redirectResponse != null)
+                {
+                    return redirectResponse;
+                }
+            }
 
             try
             {
                 // Try to resolve from cache (local or S3 fallback)
-                var cachedStream = await ProxyCacheManager.ResolveReadAsync("IGDB", resourcePath, CachePolicyType.Media, "image/jpeg");
+                var cachedStream = await ProxyCacheManager.ResolveReadAsync(serviceName, resourcePath, CachePolicyType.Media, "image/jpeg");
                 if (cachedStream != null)
                 {
                     return FileWithManagedStream(cachedStream, "image/jpeg");
                 }
 
                 // Download and cache the image
-                var fileStream = await ProxyCacheManager.DownloadAndCacheAsync(url, "IGDB", resourcePath, CachePolicyType.Media, "image/jpeg", HttpContext);
+                var fileStream = await ProxyCacheManager.DownloadAndCacheAsync(url, serviceName, resourcePath, CachePolicyType.Media, "image/jpeg", HttpContext);
                 if (fileStream.ContentStream != null)
                 {
                     return FileWithManagedStream(fileStream.ContentStream, "image/jpeg");
@@ -572,7 +585,7 @@ namespace hasheous_server.Controllers.v1_0
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [Route("TheGamesDB/Images/{ImageSize}/{*FileName}")]
         [ResponseCache(CacheProfileName = "7Days")]
-        public async Task<IActionResult> GetTheGamesDBImage(MetadataQuery.imageSize ImageSize, string FileName)
+        public async Task<IActionResult> GetTheGamesDBImage(MetadataQuery.imageSize ImageSize, string FileName, bool? redirect = null)
         {
             FileName = System.Uri.UnescapeDataString(FileName);
             if (FileName.Contains("..") || FileName.Contains("\\"))
@@ -582,18 +595,30 @@ namespace hasheous_server.Controllers.v1_0
 
             string resourcePath = $"Images/{ImageSize}/{FileName}";
             string url = $"https://cdn.thegamesdb.net/images/{ImageSize}/{FileName}";
+            string serviceName = "TheGamesDB";
+
+            bool useRedirect = ResolveRedirectFlag(redirect);
+            if (useRedirect)
+            {
+                // redirect to s3
+                var redirectResponse = await HandleRedirect(serviceName, resourcePath);
+                if (redirectResponse != null)
+                {
+                    return redirectResponse;
+                }
+            }
 
             try
             {
                 // Try to resolve from cache (local or S3 fallback)
-                var cachedStream = await ProxyCacheManager.ResolveReadAsync("TheGamesDB", resourcePath, CachePolicyType.Media, "image/jpeg");
+                var cachedStream = await ProxyCacheManager.ResolveReadAsync(serviceName, resourcePath, CachePolicyType.Media, "image/jpeg");
                 if (cachedStream != null)
                 {
                     return FileWithManagedStream(cachedStream, "image/jpeg");
                 }
 
                 // Download and cache the image
-                var fileStream = await ProxyCacheManager.DownloadAndCacheAsync(url, "TheGamesDB", resourcePath, CachePolicyType.Media, "image/jpeg", HttpContext);
+                var fileStream = await ProxyCacheManager.DownloadAndCacheAsync(url, serviceName, resourcePath, CachePolicyType.Media, "image/jpeg", HttpContext);
                 if (fileStream.ContentStream != null)
                 {
                     return FileWithManagedStream(fileStream.ContentStream, "image/jpeg");
@@ -1156,7 +1181,7 @@ namespace hasheous_server.Controllers.v1_0
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [Route("GiantBomb/a/uploads/{*GiantBombImagePath}")]
         [ResponseCache(CacheProfileName = "7Days")]
-        public async Task<IActionResult> GetGiantBombImage(string GiantBombImagePath)
+        public async Task<IActionResult> GetGiantBombImage(string GiantBombImagePath, bool? redirect = null)
         {
             GiantBombImagePath = System.Uri.UnescapeDataString(GiantBombImagePath);
             if (GiantBombImagePath.Contains("..") || GiantBombImagePath.Contains("\\"))
@@ -1166,18 +1191,30 @@ namespace hasheous_server.Controllers.v1_0
 
             string resourcePath = $"Images/{GiantBombImagePath}";
             string url = $"https://www.giantbomb.com/a/uploads/{GiantBombImagePath}";
+            string serviceName = "GiantBomb";
+
+            bool useRedirect = ResolveRedirectFlag(redirect);
+            if (useRedirect)
+            {
+                // redirect to s3
+                var redirectResponse = await HandleRedirect(serviceName, resourcePath);
+                if (redirectResponse != null)
+                {
+                    return redirectResponse;
+                }
+            }
 
             try
             {
                 // Try to resolve from cache (local or S3 fallback)
-                var cachedStream = await ProxyCacheManager.ResolveReadAsync("GiantBomb", resourcePath, CachePolicyType.Media, "image/jpeg");
+                var cachedStream = await ProxyCacheManager.ResolveReadAsync(serviceName, resourcePath, CachePolicyType.Media, "image/jpeg");
                 if (cachedStream != null)
                 {
                     return FileWithManagedStream(cachedStream, "image/jpeg");
                 }
 
                 // Download and cache the image
-                var fileStream = await ProxyCacheManager.DownloadAndCacheAsync(url, "GiantBomb", resourcePath, CachePolicyType.Media, "image/jpeg", HttpContext);
+                var fileStream = await ProxyCacheManager.DownloadAndCacheAsync(url, serviceName, resourcePath, CachePolicyType.Media, "image/jpeg", HttpContext);
                 if (fileStream.ContentStream != null)
                 {
                     return FileWithManagedStream(fileStream.ContentStream, "image/jpeg");
@@ -1366,7 +1403,7 @@ namespace hasheous_server.Controllers.v1_0
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [Route("ScreenScraper/media{endpoint}.php")]
         [ResponseCache(CacheProfileName = "7Days")]
-        public async Task<IActionResult> GetScreenScraperMedia(string endpoint, long systemeid, long jeuid, string media)
+        public async Task<IActionResult> GetScreenScraperMedia(string endpoint, long systemeid, long jeuid, string media, bool? redirect = null)
         {
             // Validate media to prevent path traversal
             if (media.Contains("..") || media.Contains("/") || media.Contains("\\"))
@@ -1454,17 +1491,30 @@ namespace hasheous_server.Controllers.v1_0
             string resourcePath = $"Images/{systemeid}/{jeuid}/{media}.{extension}";
             string url = Classes.MetadataLib.MetadataScreenScraper.ssMedia.Endpoint(jeuid, systemeid, media, null);
 
+            string serviceName = "Screenscraper";
+
+            bool useRedirect = ResolveRedirectFlag(redirect);
+            if (useRedirect)
+            {
+                // redirect to s3
+                var redirectResponse = await HandleRedirect(serviceName, resourcePath);
+                if (redirectResponse != null)
+                {
+                    return redirectResponse;
+                }
+            }
+
             try
             {
                 // Try to resolve from cache (local or S3 fallback)
-                var cachedStream = await ProxyCacheManager.ResolveReadAsync("Screenscraper", resourcePath, CachePolicyType.Media, mimeType);
+                var cachedStream = await ProxyCacheManager.ResolveReadAsync(serviceName, resourcePath, CachePolicyType.Media, mimeType);
                 if (cachedStream != null)
                 {
                     return FileWithManagedStream(cachedStream, mimeType);
                 }
 
                 // Download and cache the image
-                var fileStream = await ProxyCacheManager.DownloadAndCacheAsync(url, "Screenscraper", resourcePath, CachePolicyType.Media, mimeType, HttpContext);
+                var fileStream = await ProxyCacheManager.DownloadAndCacheAsync(url, serviceName, resourcePath, CachePolicyType.Media, mimeType, HttpContext);
                 if (fileStream.ContentStream != null)
                 {
                     if (fileStream.ContentStream.ContentLength.HasValue && fileStream.ContentStream.ContentLength.Value <= 7)
@@ -1510,7 +1560,7 @@ namespace hasheous_server.Controllers.v1_0
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [Route("Bundles/{MetadataSourceName}/{GameID}.bundle")]
-        public async Task<IActionResult> GetMetadataBundle(string MetadataSourceName, string GameID)
+        public async Task<IActionResult> GetMetadataBundle(string MetadataSourceName, string GameID, bool? redirect = null)
         {
             // validate GameID
             GameID = System.Uri.UnescapeDataString(GameID);
@@ -1540,6 +1590,17 @@ namespace hasheous_server.Controllers.v1_0
             string bundleFilePath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataBundlesDirectory, fileName);
             string resourcePath = fileName;
             bool buildNewBundle = true;
+
+            bool useRedirect = ResolveRedirectFlag(redirect);
+            if (useRedirect)
+            {
+                // redirect to s3
+                var redirectResponse = await HandleRedirect("Bundles", resourcePath);
+                if (redirectResponse != null)
+                {
+                    return redirectResponse;
+                }
+            }
 
             if (System.IO.File.Exists(bundleFilePath))
             {
@@ -1905,5 +1966,95 @@ namespace hasheous_server.Controllers.v1_0
         }
 
         #endregion MetadataBundles
+
+        #region Utility
+        // Redirect is optional before this cutover and forced on afterwards.
+        private static readonly DateTimeOffset RedirectAlwaysOnAfterUtc = new DateTimeOffset(2026, 12, 2, 0, 0, 0, TimeSpan.Zero);
+
+        private static bool ResolveRedirectFlag(bool? redirect)
+        {
+            if (DateTimeOffset.UtcNow >= RedirectAlwaysOnAfterUtc)
+            {
+                return true;
+            }
+
+            return redirect == true;
+        }
+
+        /// <summary>
+        /// Checks S3 for the requested content and responds with a redirect if available
+        /// </summary>
+        /// <param name="serviceName">
+        /// The metadata service provider
+        /// </param>
+        /// <param name="resourcePath">
+        /// The relative path for the requested object
+        /// </param>
+        /// <returns>
+        /// Returns a 303 redirect if the content is in s3, or null if not found.
+        /// </returns>
+        private async Task<IActionResult?> HandleRedirect(string serviceName, string resourcePath)
+        {
+            if (!Config.S3StorageConfiguration.Enabled)
+            {
+                return null;
+            }
+
+            // Build a safely-escaped object URL while preserving path separators.
+            string encodedBucket = Uri.EscapeDataString(Config.S3StorageConfiguration.DefaultBucket ?? string.Empty);
+            string encodedService = Uri.EscapeDataString(serviceName ?? string.Empty);
+            string encodedResourcePath = string.Join('/', (resourcePath ?? string.Empty)
+                .Split('/', StringSplitOptions.RemoveEmptyEntries)
+                .Select(Uri.EscapeDataString));
+
+            string s3Url = $"https://media.hasheous.org/{encodedBucket}/{encodedService}/{encodedResourcePath}";
+
+            // check if content is in s3 cache first - a simple HEAD should be enough - return null if not found
+
+            if (await HttpFileExistsAsync(s3Url))
+            {
+                // Use an explicit 303 with Location. Some download clients treat 302 as a final empty response.
+                Response.Headers.Location = s3Url;
+                return StatusCode(StatusCodes.Status303SeeOther);
+            }
+            else
+            {
+                return null;
+            }
+        }
+
+        private static async Task<bool> HttpFileExistsAsync(string url)
+        {
+            try
+            {
+                // Create a HEAD request message
+                using var request = new HttpRequestMessage(HttpMethod.Head, url);
+
+                // Send the request and get the response headers
+                using var response = await client.SendAsync(request);
+
+                // Any 2xx response indicates the object is reachable.
+                // Do not redirect to known-empty objects because clients will download 0-byte files.
+                if (!response.IsSuccessStatusCode)
+                {
+                    return false;
+                }
+
+                if (response.Content.Headers.ContentLength.HasValue && response.Content.Headers.ContentLength.Value == 0)
+                {
+                    return false;
+                }
+
+                return true;
+            }
+            catch (HttpRequestException ex)
+            {
+                Debug.WriteLine(ex.ToString());
+
+                // Network failure, DNS issue, or invalid URL structure
+                return false;
+            }
+        }
+        #endregion Utility
     }
 }
