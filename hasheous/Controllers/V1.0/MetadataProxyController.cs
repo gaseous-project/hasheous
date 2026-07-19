@@ -1995,7 +1995,7 @@ namespace hasheous_server.Controllers.v1_0
         /// </returns>
         private async Task<IActionResult?> HandleRedirect(string serviceName, string resourcePath)
         {
-            if (!Config.S3StorageConfiguration.Enabled)
+            if (!Config.S3StorageConfiguration.Enabled || string.IsNullOrWhiteSpace(Config.S3StorageConfiguration.Host) || string.IsNullOrWhiteSpace(Config.S3StorageConfiguration.DefaultBucket))
             {
                 return null;
             }
@@ -2007,7 +2007,7 @@ namespace hasheous_server.Controllers.v1_0
                 .Split('/', StringSplitOptions.RemoveEmptyEntries)
                 .Select(Uri.EscapeDataString));
 
-            string s3Url = $"https://media.hasheous.org/{encodedBucket}/{encodedService}/{encodedResourcePath}";
+            string s3Url = $"https://{Config.S3StorageConfiguration.Host}/{encodedBucket}/{encodedService}/{encodedResourcePath}";
 
             // check if content is in s3 cache first - a simple HEAD should be enough - return null if not found
 

@@ -1646,6 +1646,29 @@ namespace Classes
                 /// Gets or sets the default bucket used by callers that do not provide one.
                 /// </summary>
                 public string DefaultBucket = "";
+
+                /// <summary>
+                /// Gets or sets the external URL for accessing S3 resources, if applicable.
+                /// </summary>
+                public string ExternalUrl = "";
+
+                /// <summary>
+                /// Gets the effective host URL for S3 access, prioritizing the external URL if set, otherwise falling back to the service URL. Used for generating public-facing links to S3 resources.
+                /// </summary>
+                public string Host
+                {
+                    get
+                    {
+                        if (!String.IsNullOrWhiteSpace(ExternalUrl))
+                        {
+                            return ExternalUrl;
+                        }
+                        else
+                        {
+                            return ServiceUrl;
+                        }
+                    }
+                }
             }
 
             /// <summary>
