@@ -44,6 +44,7 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Build" Version="18.8.2" />
+    <PackageReference Include="NuGet.Protocol" Version="6.12.5" />
     <EmbeddedResource Include="Support\*.txt" />
     <EmbeddedResource Include="Schema\hasheous-*.sql" />
   </ItemGroup>
