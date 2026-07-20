@@ -5,7 +5,6 @@ using System.Security.Policy;
 using System.Text.RegularExpressions;
 using Classes;
 using hasheous.Classes;
-using NuGet.Packaging;
 
 namespace TheGamesDB.SQL
 {
