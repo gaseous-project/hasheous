@@ -15,6 +15,6 @@ namespace Classes.ProcessQueue
         /// <summary>
         /// Executes the task asynchronously.
         /// </summary>
-        Task<object?> ExecuteAsync();
+        Task<object?> ExecuteAsync(object? options = null);
     }
 }

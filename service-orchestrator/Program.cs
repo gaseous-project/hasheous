@@ -217,8 +217,8 @@ app.Use(async (context, next) =>
 // configure background services
 Classes.ProcessQueue.QueueProcessor.QueueItems = new List<Classes.ProcessQueue.QueueProcessor.QueueItem>
 {
-    // signature ingestor
-    new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.SignatureIngestor, 10080, false),
+    // // signature ingestor
+    // new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.SignatureIngestor, 10080, false),
 
     // tally votes
     new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.TallyVotes, 1440, false),
@@ -242,37 +242,22 @@ Classes.ProcessQueue.QueueProcessor.QueueItems = new List<Classes.ProcessQueue.Q
     new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchVIMMMetadata, 10080, false),
     // fetch TheGamesDB metadata
     new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchTheGamesDbMetadata, 10080, false),
-    // fetch Redump metadata
-    new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchRedumpMetadata, 10080, false),
-    // fetch MAMERedump metadata
-    new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchMAMERedumpMetadata, 10080, false),
-    // fetch PureDOSDAT metadata
-    new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchPureDOSDATMetadata, 10080, false),
-    // fetch TOSEC metadata
-    new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchTOSECMetadata, 10080, false),
-    // fetch WHDLoad metadata
-    new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchWHDLoadMetadata, 10080, false),
-    // fetch FBNEO metadata
-    new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchFBNEOMetadata, 10080, false),
-    // fetch ScreenScraper metadata
-    new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchScreenScraperMetadata, 1440, false),
     // fetch LaunchBox metadata
-    new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchLaunchBoxMetadata, 1440, false),
+    new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchLaunchBoxMetadata, 10080, false),
 
     // dump all data objects
     new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.MetadataMapDump, 10080, false)
 };
+
+// add all registered signature ingestors to the queue
+List<Classes.ProcessQueue.QueueProcessor.QueueItem> ingestorQueueItems = DATImport.SignatureIngestor.GetRegisteredIngestors();
+Classes.ProcessQueue.QueueProcessor.QueueItems.AddRange(ingestorQueueItems);
 
 // non-default metadata fetchers
 // IGDB
 if (Config.IGDB.UseDumps == true)
 {
     Classes.ProcessQueue.QueueProcessor.QueueItems.Add(new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchIGDBMetadata, 10080, false));
-}
-// RetroAchievements
-if (Config.RetroAchievements.APIKey != "")
-{
-    Classes.ProcessQueue.QueueProcessor.QueueItems.Add(new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchRetroAchievementsMetadata, 10080, false));
 }
 // GiantBomb
 if (Config.GiantBomb.APIKey != "")

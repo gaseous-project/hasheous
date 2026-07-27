@@ -1,17 +1,32 @@
+using System.Runtime.CompilerServices;
 using Classes;
+using DATImport;
 using hasheous_server.Classes;
 
 namespace FBNEO
 {
-    public class DownloadManager
+    public class DownloadManager : IDATFileImport
     {
-        public static string GitUrl { get; } = "https://github.com/libretro/FBNeo.git";
+        [ModuleInitializer]
+        public static void RegisterImporter() => SignatureIngestor.Register<DownloadManager>();
 
-        public static string GitBranch { get; } = "master";
+        /// <inheritdoc/>
+        public gaseous_signature_parser.parser.SignatureParser SourceType => gaseous_signature_parser.parser.SignatureParser.FBNeo;
 
-        public static string SourceName { get; } = "FBNEO";
+        /// <inheritdoc/>
+        public int Interval => 10080; // 7 days in minutes
 
-        public async Task Download()
+        /// <inheritdoc/>
+        public bool IsEnabled => true; // Always enabled for metadata download
+
+        private static string GitUrl { get; } = "https://github.com/libretro/FBNeo.git";
+
+        private static string GitBranch { get; } = "master";
+
+        private static string SourceName { get; } = "FBNEO";
+
+        /// <inheritdoc/>
+        public async Task StageFiles()
         {
             try
             {
@@ -21,7 +36,7 @@ namespace FBNEO
                 // clone the repository
                 try
                 {
-                    bool cloneSuccess = await DownloadTools.CloneOrRefreshRepoAsync(GitUrl, "master", extractDir);
+                    bool cloneSuccess = await DownloadTools.CloneOrRefreshRepoAsync(GitUrl, GitBranch, extractDir);
                     if (!cloneSuccess)
                     {
                         Logging.Log(Logging.LogType.Warning, SourceName, $"{SourceName} repository is already up to date; no changes detected.");
@@ -57,6 +72,19 @@ namespace FBNEO
             {
                 Logging.Log(Logging.LogType.Critical, SourceName, $"Error downloading {SourceName} metadata: {ex.Message}");
             }
+        }
+
+        /// <inheritdoc/>
+        public async Task ProcessFiles()
+        {
+            return; // No additional processing needed for FBNEO metadata
+        }
+
+        /// <inheritdoc/>
+        public async Task<bool> ValidateFiles()
+        {
+            // Implement validation logic if needed
+            return true; // No validation needed for FBNEO metadata
         }
     }
 }

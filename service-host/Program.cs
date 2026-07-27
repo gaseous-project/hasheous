@@ -25,6 +25,7 @@ if (cmdArgs.Contains("--version"))
 
 // process other command line arguments
 string serviceName = null;
+string subServiceName = null;
 string reportingServerUrl = null;
 string processId = Guid.Empty.ToString();
 string correlationId = null;
@@ -33,7 +34,18 @@ for (int i = 0; i < cmdArgs.Length; i++)
 {
     if (cmdArgs[i] == "--service" && i + 1 < cmdArgs.Length)
     {
-        serviceName = cmdArgs[i + 1];
+        string serviceNameArg = cmdArgs[i + 1];
+        // Check if the service name contains a colon, indicating a sub-service
+        if (serviceNameArg.Contains(":"))
+        {
+            var parts = serviceNameArg.Split(':');
+            serviceName = parts[0];
+            subServiceName = parts[1];
+        }
+        else
+        {
+            serviceName = serviceNameArg;
+        }
     }
     else if (cmdArgs[i] == "--reportingserver" && i + 1 < cmdArgs.Length)
     {
@@ -63,6 +75,30 @@ if (!Enum.TryParse(serviceName, out QueueItemType taskType) || taskType == Queue
     Console.WriteLine($"Error: Invalid service name '{serviceName}'.");
     Help.DisplayHelp();
     return;
+}
+
+// If a sub-service name is provided, verify it can be parsed as a DATImport.IDATFileImport implementation
+object? serviceObject = null;
+if (!string.IsNullOrEmpty(subServiceName))
+{
+    // Check if the sub-service name corresponds to a registered DATImport.IDATFileImport implementation
+    var matchingIngestor = DATImport.SignatureIngestor.DATImporters.FirstOrDefault(i => (i.GetType().FullName ?? i.GetType().Name).ToString().Equals(subServiceName, StringComparison.OrdinalIgnoreCase) && i.IsEnabled);
+    if (matchingIngestor == null)
+    {
+        Console.WriteLine($"Error: Invalid sub-service name '{subServiceName}'. No matching registered DATImport.IDATFileImport implementation found.");
+        Help.DisplayHelp();
+        return;
+    }
+    if (matchingIngestor is DATImport.IDATFileImport datIngestor)
+    {
+        serviceObject = datIngestor;
+    }
+    else
+    {
+        Console.WriteLine($"Error: The matching registered DATImport.IDATFileImport implementation for '{subServiceName}' is not of type DATImport.IDATFileImport.");
+        Help.DisplayHelp();
+        return;
+    }
 }
 
 // If no reporting server URL is provided, abort
@@ -124,44 +160,12 @@ switch (taskType)
         Task = new FetchTheGamesDbMetadata();
         break;
 
-    case QueueItemType.FetchRetroAchievementsMetadata:
-        Task = new FetchRetroAchievementsMetadata();
-        break;
-
     case QueueItemType.FetchIGDBMetadata:
         Task = new FetchIGDBMetadata();
         break;
 
     case QueueItemType.FetchGiantBombMetadata:
         Task = new FetchGiantBombMetadata();
-        break;
-
-    case QueueItemType.FetchRedumpMetadata:
-        Task = new FetchRedumpMetadata();
-        break;
-
-    case QueueItemType.FetchMAMERedumpMetadata:
-        Task = new FetchMAMERedumpMetadata();
-        break;
-
-    case QueueItemType.FetchPureDOSDATMetadata:
-        Task = new FetchPureDOSDATMetadata();
-        break;
-
-    case QueueItemType.FetchTOSECMetadata:
-        Task = new FetchTOSECMetadata();
-        break;
-
-    case QueueItemType.FetchWHDLoadMetadata:
-        Task = new FetchWHDLoadMetadata();
-        break;
-
-    case QueueItemType.FetchFBNEOMetadata:
-        Task = new FetchFBNEOMetadata();
-        break;
-
-    case QueueItemType.FetchScreenScraperMetadata:
-        Task = new FetchScreenScraperMetadata();
         break;
 
     case QueueItemType.FetchLaunchBoxMetadata:
@@ -201,7 +205,7 @@ switch (taskType)
 try
 {
     Config.database = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-    await Task.ExecuteAsync();
+    await Task.ExecuteAsync(serviceObject);
 }
 catch (Exception ex)
 {

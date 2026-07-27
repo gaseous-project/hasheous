@@ -1,17 +1,31 @@
+using System.Runtime.CompilerServices;
 using Classes;
+using DATImport;
 using hasheous_server.Classes;
 
 namespace MAMERedump
 {
-    public class DownloadManager
+    public class DownloadManager : IDATFileImport
     {
-        public static string GitUrl { get; } = "https://github.com/MetalSlug/MAMERedump.git";
+        [ModuleInitializer]
+        public static void RegisterImporter() => SignatureIngestor.Register<DownloadManager>();
 
-        public static string GitBranch { get; } = "main";
+        /// <inheritdoc/>
+        public gaseous_signature_parser.parser.SignatureParser SourceType => gaseous_signature_parser.parser.SignatureParser.MAMERedump;
 
-        public static string SourceName { get; } = "MAMERedump";
+        /// <inheritdoc/>
+        public int Interval => 10080; // 7 days in minutes
 
-        public async Task Download()
+        /// <inheritdoc/>
+        public bool IsEnabled => true; // Always enabled for metadata download
+
+        private static string GitUrl { get; } = "https://github.com/MetalSlug/MAMERedump.git";
+
+        private static string GitBranch { get; } = "main";
+
+        private static string SourceName { get; } = "MAMERedump";
+
+        public async Task StageFiles()
         {
             try
             {
@@ -62,6 +76,20 @@ namespace MAMERedump
             {
                 Logging.Log(Logging.LogType.Critical, SourceName, $"Error downloading {SourceName} metadata: {ex.Message}");
             }
+        }
+
+        /// <inheritdoc/>
+        public async Task ProcessFiles()
+        {
+            // No additional processing needed for MAMERedump metadata
+            await Task.CompletedTask;
+        }
+
+        /// <inheritdoc/>
+        public async Task<bool> ValidateFiles()
+        {
+            // Implement validation logic if needed
+            return true; // No validation needed for MAMERedump metadata
         }
     }
 }

@@ -1,17 +1,31 @@
+using System.Runtime.CompilerServices;
 using Classes;
+using DATImport;
 using hasheous_server.Classes;
 
 namespace WHDLoad
 {
-    public class DownloadManager
+    public class DownloadManager : IDATFileImport
     {
-        public static string GitUrl { get; } = "https://github.com/BlitterStudio/amiberry.git";
+        [ModuleInitializer]
+        public static void RegisterImporter() => SignatureIngestor.Register<DownloadManager>();
 
-        public static string GitBranch { get; } = "master";
+        /// <inheritdoc/>
+        public gaseous_signature_parser.parser.SignatureParser SourceType => gaseous_signature_parser.parser.SignatureParser.WHDLoad;
 
-        public static string SourceName { get; } = "WHDLoad";
+        /// <inheritdoc/>
+        public int Interval => 10080; // 7 days in minutes
 
-        public async Task Download()
+        /// <inheritdoc/>
+        public bool IsEnabled => true; // Always enabled for metadata download
+
+        private static string GitUrl { get; } = "https://github.com/BlitterStudio/amiberry.git";
+
+        private static string GitBranch { get; } = "master";
+
+        private static string SourceName { get; } = "WHDLoad";
+
+        public async Task StageFiles()
         {
             try
             {
@@ -55,6 +69,19 @@ namespace WHDLoad
             {
                 Logging.Log(Logging.LogType.Critical, SourceName, $"Error downloading {SourceName} metadata: {ex.Message}");
             }
+        }
+
+        /// <inheritdoc/>
+        public async Task ProcessFiles()
+        {
+            return; // No additional processing needed for WHDLoad metadata
+        }
+
+        /// <inheritdoc/>
+        public async Task<bool> ValidateFiles()
+        {
+            // Implement validation logic if needed
+            return true; // No validation needed for WHDLoad metadata
         }
     }
 }

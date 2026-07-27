@@ -1,15 +1,29 @@
+using System.Runtime.CompilerServices;
 using Classes;
+using DATImport;
 using hasheous_server.Classes;
 
 namespace TOSEC
 {
-    public class DownloadManager
+    public class DownloadManager : IDATFileImport
     {
+        [ModuleInitializer]
+        public static void RegisterImporter() => SignatureIngestor.Register<DownloadManager>();
+
+        /// <inheritdoc/>
+        public gaseous_signature_parser.parser.SignatureParser SourceType => gaseous_signature_parser.parser.SignatureParser.TOSEC;
+
+        /// <inheritdoc/>
+        public int Interval => 10080; // 7 days in minutes
+
+        /// <inheritdoc/>
+        public bool IsEnabled => true; // Always enabled for metadata download
+
         private static readonly HttpClient client = new HttpClient();
 
-        public string IndexUrl { get; } = "https://www.tosecdev.org/downloads/category/22-datfiles";
+        private string IndexUrl { get; } = "https://www.tosecdev.org/downloads/category/22-datfiles";
 
-        public async Task Download()
+        public async Task StageFiles()
         {
             try
             {
@@ -119,6 +133,19 @@ namespace TOSEC
             {
                 Logging.Log(Logging.LogType.Critical, "TOSEC", $"Error during TOSEC metadata download: {ex.Message}");
             }
+        }
+
+        /// <inheritdoc/>
+        public async Task ProcessFiles()
+        {
+            return; // No additional processing needed for TOSEC metadata
+        }
+
+        /// <inheritdoc/>
+        public async Task<bool> ValidateFiles()
+        {
+            // Implement validation logic if needed
+            return true; // No validation needed for TOSEC metadata
         }
     }
 }

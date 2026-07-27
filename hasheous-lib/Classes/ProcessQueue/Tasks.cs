@@ -45,10 +45,6 @@ namespace Classes.ProcessQueue
         /// </summary>
         FetchTheGamesDbMetadata,
 
-        /// <summary>
-        /// Fetch RetroAchievements metadata
-        /// </summary>
-        FetchRetroAchievementsMetadata,
 
         /// <summary>
         /// Fetch IGDB metadata
@@ -59,36 +55,6 @@ namespace Classes.ProcessQueue
         /// Fetch GiantBomb metadata
         /// </summary>
         FetchGiantBombMetadata,
-
-        /// <summary>
-        /// Fetch Redump metadata
-        /// </summary>
-        FetchRedumpMetadata,
-
-        /// <summary>
-        /// Fetch MAMERedump metadata
-        /// </summary>
-        FetchMAMERedumpMetadata,
-
-        /// <summary>
-        /// Fetch TOSEC metadata
-        /// </summary>
-        FetchTOSECMetadata,
-
-        /// <summary>
-        /// Fetch WHDLoad metadata
-        /// </summary>
-        FetchWHDLoadMetadata,
-
-        /// <summary>
-        /// Fetch FBNEO metadata
-        /// </summary>
-        FetchFBNEOMetadata,
-
-        /// <summary>
-        /// Fetch PureDOSDAT metadata
-        /// </summary>
-        FetchPureDOSDATMetadata,
 
         /// <summary>
         /// Runs hourly maintenance tasks for the frontend
@@ -124,11 +90,6 @@ namespace Classes.ProcessQueue
         /// Task Result Parser
         /// </summary>
         TaskResultParser,
-
-        /// <summary>
-        /// Fetches ScreenScraper metadata - uses already cached metadata files
-        /// </summary>
-        FetchScreenScraperMetadata,
 
         /// <summary>
         /// Fetches LaunchBox metadata - uses already cached metadata files

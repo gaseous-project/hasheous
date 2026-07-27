@@ -1,62 +1,53 @@
-using System.Diagnostics;
-using System.IO.Compression;
-using System.Linq;
 using System.Net;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using System.Xml;
 using Classes;
-using HasheousClient.Models.Metadata.IGDB;
-using NuGet.Common;
+using DATImport;
 using RetroAchievements.Models;
 
 namespace RetroAchievements
 {
-    public class DownloadManager
+    public class DownloadManager : IDATFileImport
     {
+        [ModuleInitializer]
+        public static void RegisterImporter() => SignatureIngestor.Register<DownloadManager>();
+
+        /// <inheritdoc/>
+        public gaseous_signature_parser.parser.SignatureParser SourceType => gaseous_signature_parser.parser.SignatureParser.RetroAchievements;
+
+        /// <inheritdoc/>
+        public int Interval => 10080; // 7 days in minutes
+
+        public bool IsEnabled
+        {
+            get
+            {
+                if (Config.RetroAchievements.APIKey != "")
+                {
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+        }
+
         private static readonly HttpClient client = new HttpClient();
 
-        public string PlatformsUrl
-        {
-            get
-            {
-                return $"https://retroachievements.org/API/API_GetConsoleIDs.php?y={Config.RetroAchievements.APIKey}&g=1";
-            }
-        }
+        private static string PlatformsUrl { get; } = $"https://retroachievements.org/API/API_GetConsoleIDs.php?y={Config.RetroAchievements.APIKey}&g=1";
 
-        public string PlatformGamesUrl
-        {
-            get
-            {
-                return $"https://retroachievements.org/API/API_GetGameList.php?y={Config.RetroAchievements.APIKey}&i=<PlatformID>&h=1&c=<PageSize>&o=<PageOffset>";
-            }
-        }
+        private static string PlatformGamesUrl { get; } = $"https://retroachievements.org/API/API_GetGameList.php?y={Config.RetroAchievements.APIKey}&i=<PlatformID>&h=1&c=<PageSize>&o=<PageOffset>";
 
-        public string PlatformGamesHashesUrl
-        {
-            get
-            {
-                return $"https://retroachievements.org/API/API_GetGameHashes.php?y={Config.RetroAchievements.APIKey}&i=<GameID>";
-            }
-        }
+        private static string PlatformGamesHashesUrl { get; } = $"https://retroachievements.org/API/API_GetGameHashes.php?y={Config.RetroAchievements.APIKey}&i=<GameID>";
 
-        public string LocalFilePath
-        {
-            get
-            {
-                return Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_RetroAchievements);
-            }
-        }
+        private static string LocalFilePath { get; } = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_RetroAchievements);
 
-        public string PlatformsLocalFileName
-        {
-            get
-            {
-                return Path.Combine(LocalFilePath, "platforms.json");
-            }
-        }
+        private static string PlatformsLocalFileName { get; } = Path.Combine(LocalFilePath, "platforms.json");
 
-        public int MaxAgeInDays { get; set; } = 90;
+        private static int MaxAgeInDays { get; set; } = 90;
 
         public bool IsLocalCopyOlderThanMaxAge(string LocalFileName)
         {
@@ -70,7 +61,7 @@ namespace RetroAchievements
             return age.TotalDays > MaxAgeInDays;
         }
 
-        public async Task Download()
+        public async Task StageFiles()
         {
             // download the platforms file
             _Download(PlatformsUrl, PlatformsLocalFileName, "Platforms");
@@ -193,17 +184,19 @@ namespace RetroAchievements
 
                 Logging.Log(Logging.LogType.Information, "RetroAchievements", $"RetroAchievements metadata file copied to processing directory: {destFile}");
             }
+        }
 
-            // force start the signature ingest process
-            foreach (var process in Classes.ProcessQueue.QueueProcessor.QueueItems)
-            {
-                if (process.ItemType == Classes.ProcessQueue.QueueItemType.SignatureIngestor)
-                {
-                    process.ForceExecute();
-                }
-            }
+        /// <inheritdoc/>
+        public async Task ProcessFiles()
+        {
+            return; // No additional processing needed for RetroAchievements metadata
+        }
 
-            return;
+        /// <inheritdoc/>
+        public async Task<bool> ValidateFiles()
+        {
+            // Implement validation logic if needed
+            return true; // No validation needed for RetroAchievements metadata
         }
 
         private Dictionary<string, string> _Download(string Url, string DestinationFile, string DataType)
@@ -272,7 +265,7 @@ namespace RetroAchievements
             return results;
         }
 
-        public async Task<bool?> DownloadFile(string url, string DestinationFile)
+        private async Task<bool?> DownloadFile(string url, string DestinationFile)
         {
             var result = await _DownloadFile(new Uri(url), DestinationFile);
 

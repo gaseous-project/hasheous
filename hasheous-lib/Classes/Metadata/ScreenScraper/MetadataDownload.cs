@@ -1,28 +1,40 @@
 using System.Data;
-using static gaseous_signature_parser.models.provider.ScreenScaperModel;
+using System.Runtime.CompilerServices;
+using Classes;
+using DATImport;
+using hasheous_server.Classes;
 
-namespace Classes.ProcessQueue
+namespace ScreenScraper
 {
-    /// <summary>
-    /// Represents a queue task that fetches ScreenScraper metadata.
-    /// </summary>
-    public class FetchScreenScraperMetadata : IQueueTask
+    public class DownloadManager : IDATFileImport
     {
-        /// <inheritdoc/>
-        public List<QueueItemType> Blocks => new List<QueueItemType>
-        {
-            QueueItemType.SignatureIngestor
-        };
+        [ModuleInitializer]
+        public static void RegisterImporter() => SignatureIngestor.Register<DownloadManager>();
 
         /// <inheritdoc/>
-        public async Task<object?> ExecuteAsync()
+        public gaseous_signature_parser.parser.SignatureParser SourceType => gaseous_signature_parser.parser.SignatureParser.ScreenScraper;
+
+        /// <inheritdoc/>
+        public int Interval => 1440; // 1 day in minutes
+
+        /// <inheritdoc/>
+        public bool IsEnabled
+        {
+            get
+            {
+                // Check if the ScreenScraper API key is set in the configuration
+                return !string.IsNullOrEmpty(Config.ScreenScraperConfiguration.ClientId) && !string.IsNullOrEmpty(Config.ScreenScraperConfiguration.Secret) && !string.IsNullOrEmpty(Config.ScreenScraperConfiguration.DevClientId) && !string.IsNullOrEmpty(Config.ScreenScraperConfiguration.DevSecret);
+            }
+        }
+
+        public async Task StageFiles()
         {
             // get all of the ScreenScraper metadata in the cache
             string cachePath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_Screenscraper, "games");
             if (!Directory.Exists(cachePath))
             {
                 Logging.Log(Logging.LogType.Information, "Fetch ScreenScraper", "Cache directory not found, skipping: " + cachePath);
-                return null;
+                return;
             }
 
             string[] metadataFiles = Directory.GetFiles(cachePath, "*.json", SearchOption.AllDirectories);
@@ -202,8 +214,19 @@ namespace Classes.ProcessQueue
                     Logging.Log(Logging.LogType.Warning, "Fetch ScreenScraper", "Failed to deserialize ScreenScraper metadata file: " + metadataFile + " Exception: " + ex.Message);
                 }
             }
+        }
 
-            return null; // Assuming the method returns void, we return null here.
+        /// <inheritdoc/>
+        public async Task ProcessFiles()
+        {
+            return; // No additional processing needed for ScreenScraper metadata
+        }
+
+        /// <inheritdoc/>
+        public async Task<bool> ValidateFiles()
+        {
+            // Implement validation logic if needed
+            return true; // No validation needed for ScreenScraper metadata
         }
     }
 }
