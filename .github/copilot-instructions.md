@@ -241,7 +241,7 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 - Downloader class: `hasheous-lib/Classes/Metadata/Redump/MetadataDownload.cs`.
 - Redump host migration: use `https://redump.info` as the base host (`BaseUrl`) and `https://redump.info/downloads/` for platform listing.
 - HTML parsing expectation: platform rows are parsed from the first `div.downloads-table-scaler` table; links are selected by anchor label (`DAT + Serial/Version` and `Cuesheets`) instead of fixed table-column positions.
-- URL handling: relative Redump links should be expanded with `BaseUrl`; avoid hardcoded `http://redump.org` URLs or appending legacy query suffixes manually.
+- URL handling: relative Redump links should be expanded with `BaseUrl`; avoid hardcoded `https://redump.info` URLs or appending legacy query suffixes manually.
 
 ## LaunchBox metadata
 - Background task: `QueueItemType.FetchLaunchBoxMetadata` (implemented under `hasheous-lib/Classes/ProcessQueue/Tasks/FetchLaunchBoxMetadata.cs`).

@@ -25,6 +25,7 @@ namespace TotalDOSCollection
         public async Task StageFiles()
         {
             string datDirectoryPath = System.IO.Path.Combine(Config.LibraryConfiguration.LibrarySignaturesDirectory, gaseous_signature_parser.parser.SignatureParser.TotalDOSCollection.ToString());
+            string zipFilePath = System.IO.Path.Combine(datDirectoryPath, "tdc_daily.zip");
             string datFilePath = System.IO.Path.Combine(datDirectoryPath, "tdc_daily.dat");
 
             if (Directory.Exists(datDirectoryPath))
@@ -36,12 +37,23 @@ namespace TotalDOSCollection
             // download the DAT file
             try
             {
-                await DownloadTools.DownloadFile(new Uri(DatUrl), datFilePath);
+                await DownloadTools.DownloadFile(new Uri(DatUrl), zipFilePath);
             }
             catch (Exception ex)
             {
                 // handle download error
                 Console.WriteLine($"Error downloading DAT file: {ex.Message}");
+            }
+
+            // extract the DAT file
+            try
+            {
+                System.IO.Compression.ZipFile.ExtractToDirectory(zipFilePath, datDirectoryPath);
+            }
+            catch (Exception ex)
+            {
+                // handle extraction error
+                Console.WriteLine($"Error extracting DAT file: {ex.Message}");
             }
         }
 
