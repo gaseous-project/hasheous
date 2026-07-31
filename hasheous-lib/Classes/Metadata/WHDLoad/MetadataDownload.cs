@@ -1,4 +1,7 @@
 using System.Runtime.CompilerServices;
+using System.Text;
+using System.Text.Json;
+using System.Xml;
 using Classes;
 using DATImport;
 using hasheous_server.Classes;
@@ -47,13 +50,13 @@ namespace WHDLoad
                 }
 
                 // copy the signature files to the processing directory
-                string datFile = Path.Combine(extractDir, "whdboot", "game-data", "whdload_db.xml");
+                string datFile = Path.Combine(extractDir, "whdboot", "game-data", "whdload_db.json");
                 if (File.Exists(datFile))
                 {
                     string destDir = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesDirectory, "WHDLoad");
                     if (Directory.Exists(destDir)) { Directory.Delete(destDir, true); }
                     Directory.CreateDirectory(destDir);
-                    string destFile = Path.Combine(destDir, "whdload_db.dat");
+                    string destFile = Path.Combine(destDir, "whdload_db.json");
                     File.Copy(datFile, destFile);
 
                     Logging.Log(Logging.LogType.Information, SourceName, $"{SourceName} metadata file copied to processing directory: {destFile}");
@@ -74,7 +77,112 @@ namespace WHDLoad
         /// <inheritdoc/>
         public async Task ProcessFiles()
         {
-            return; // No additional processing needed for WHDLoad metadata
+            // convert the json to XML for importing
+            string jsonSource = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesDirectory, "WHDLoad", "whdload_db.json");
+            using FileStream fs = File.OpenRead(jsonSource);
+            using JsonDocument doc = await JsonDocument.ParseAsync(fs);
+
+            JsonElement root = doc.RootElement;
+
+            // create the XML document
+            string xmlOutput = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesDirectory, "WHDLoad", "whdload_db.dat");
+            using FileStream xmlFs = File.Create(xmlOutput);
+            XmlWriterSettings settings = new XmlWriterSettings { Indent = true, NewLineOnAttributes = false, Encoding = Encoding.UTF8 };
+
+            using (XmlWriter writer = XmlWriter.Create(xmlFs, settings))
+            {
+                writer.WriteStartDocument();
+                writer.WriteStartElement("whdbooter");
+                writer.WriteAttributeString("timestamp", root.TryGetProperty("upstream_timestamp", out JsonElement timestamp) ? timestamp.GetString() : DateTime.UtcNow.ToString("o"));
+
+                var gamesElement = root.TryGetProperty("games", out JsonElement games) ? games : default;
+
+                var convertElement = (JsonElement el, string elementName) =>
+                {
+                    if (el.TryGetProperty(elementName, out JsonElement element))
+                    {
+                        switch (element.ValueKind)
+                        {
+                            case JsonValueKind.String:
+                                writer.WriteElementString(elementName, element.GetString());
+                                break;
+                            case JsonValueKind.Number:
+                                writer.WriteElementString(elementName, element.GetRawText());
+                                break;
+                            case JsonValueKind.True:
+                            case JsonValueKind.False:
+                                writer.WriteElementString(elementName, element.GetBoolean().ToString().ToLower());
+                                break;
+                            default:
+                                // Handle other types if necessary
+                                break;
+                        }
+                    }
+                };
+
+                foreach (JsonElement game in gamesElement.EnumerateArray())
+                {
+                    // start game element
+                    writer.WriteStartElement("game");
+                    writer.WriteAttributeString("filename", game.GetProperty("filename").GetString());
+                    writer.WriteAttributeString("sha1", game.GetProperty("sha1").GetString());
+
+                    convertElement(game, "name");
+                    convertElement(game, "subpath");
+                    convertElement(game, "variant_uuid");
+                    convertElement(game, "slave_count");
+                    convertElement(game, "slave_default");
+                    convertElement(game, "slave_libraries");
+
+                    var slavesElement = game.TryGetProperty("slaves", out JsonElement slaves) ? slaves : default;
+                    int slaveCounter = 0;
+                    foreach (JsonElement slave in slavesElement.EnumerateArray())
+                    {
+                        slaveCounter += 1;
+                        writer.WriteStartElement("slave");
+                        writer.WriteAttributeString("number", slaveCounter.ToString());
+                        convertElement(slave, "filename");
+                        convertElement(slave, "datapath");
+                        convertElement(slave, "custom");
+                        writer.WriteEndElement();
+                    }
+
+                    var hardwareElement = game.TryGetProperty("hardware", out JsonElement hardware) ? hardware : default;
+                    writer.WriteStartElement("hardware");
+                    // hardware works differently, it is a single string elemenet with each json property on a new line. The key name is in all caps, and the value is separated by an equals sign. For example:
+                    // CPU=68020
+                    string hardwareString = "";
+                    foreach (JsonProperty hwProp in hardware.EnumerateObject())
+                    {
+                        string hardwareValue = "";
+                        switch (hwProp.Value.ValueKind)
+                        {
+                            case JsonValueKind.String:
+                                hardwareValue = hwProp.Value.GetString();
+                                break;
+                            case JsonValueKind.Number:
+                                hardwareValue = hwProp.Value.GetRawText();
+                                break;
+                            case JsonValueKind.True:
+                            case JsonValueKind.False:
+                                hardwareValue = hwProp.Value.GetBoolean().ToString().ToLower();
+                                break;
+                            default:
+                                // Handle other types if necessary
+                                break;
+                        }
+
+                        hardwareString += $"{hwProp.Name.ToUpper()}={hardwareValue}\n";
+                    }
+                    writer.WriteString($"\n{hardwareString}");
+                    writer.WriteEndElement(); // hardware
+
+                    writer.WriteEndElement(); // Game
+                }
+
+                writer.WriteEndElement(); // whdbooter
+                writer.WriteEndDocument();
+            }
         }
 
         /// <inheritdoc/>
