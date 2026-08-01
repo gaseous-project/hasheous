@@ -9,7 +9,6 @@ using hasheous_server.Classes.Metadata.IGDB;
 using hasheous_server.Models;
 using IGDB.Models;
 using Newtonsoft.Json;
-using NuGet.Common;
 using static Classes.Common;
 
 namespace Classes

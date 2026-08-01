@@ -18,7 +18,6 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using NuGet.Common;
 using static hasheous_server.Classes.Metadata.Communications;
 using static hasheous_server.Models.DataObjectItem;
 
