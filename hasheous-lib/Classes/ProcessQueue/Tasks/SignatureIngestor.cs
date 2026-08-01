@@ -33,11 +33,10 @@ namespace Classes.ProcessQueue
 
             // remove existing signature files for the importer type to avoid conflicts or duplicates
             string signaturePath = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesDirectory, importer.SourceType.ToString());
-            if (Directory.Exists(signaturePath))
+            if (!Directory.Exists(signaturePath))
             {
-                Directory.Delete(signaturePath, true);
+                Directory.CreateDirectory(signaturePath);
             }
-            Directory.CreateDirectory(signaturePath);
 
             // start the ingestion process for the provided importer
             try
@@ -103,35 +102,9 @@ namespace Classes.ProcessQueue
             {
                 Directory.Delete(ProcessedSignaturePath, true);
             }
-            Directory.Move(SignaturePath, ProcessedSignaturePath);
+            Common.CopyDirectory(SignaturePath, ProcessedSignaturePath, true);
 
-            // var parserTypes = Enum.GetValues(typeof(gaseous_signature_parser.parser.SignatureParser));
-
-            // foreach (int i in parserTypes)
-            // {
-            //     gaseous_signature_parser.parser.SignatureParser parserType = (gaseous_signature_parser.parser.SignatureParser)i;
-            //     if (
-            //         parserType != gaseous_signature_parser.parser.SignatureParser.Auto &&
-            //         parserType != gaseous_signature_parser.parser.SignatureParser.Unknown
-            //     )
-            //     {
-
-            //         string SignaturePath = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesDirectory, parserType.ToString());
-
-            //         if (!Directory.Exists(SignaturePath))
-            //         {
-            //             Directory.CreateDirectory(SignaturePath);
-            //         }
-
-            //         if (parserType == gaseous_signature_parser.parser.SignatureParser.TotalDOSCollection)
-            //         {
-            //             TotalDOSCollection.MetadataManagement metadataManagement = new TotalDOSCollection.MetadataManagement();
-            //             metadataManagement.VerifyDATFile();
-            //         }
-
-            //         await tIngest.Import(SignaturePath, parserType);
-            //     }
-            // }
+            Common.DeleteDirectoryContents(SignaturePath, true);
 
             return null; // Assuming the method returns void, we return null here.
         }

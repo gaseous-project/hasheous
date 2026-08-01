@@ -62,10 +62,7 @@ function LoadBackgroundTasks() {
 
                     const tableGroups = {
                         "signatures": [
-                            "SignatureIngestor",
-                            "FetchTOSECMetadata",
-                            "FetchWHDLoadMetadata",
-                            "FetchScreenScraperMetadata"
+                            "SignatureIngestor"
                         ],
                         "metadataproxy": [
                             "FetchIGDBMetadata",
@@ -118,7 +115,7 @@ function LoadBackgroundTasks() {
                                     rowCell1.className = 'tablecell';
                                     let serviceName = lang.getLang('service' + task.itemType);
                                     if (task.itemName && task.itemName.trim() !== '' && task.itemName !== task.itemType) {
-                                        serviceName += ` (${lang.getLang('service' + task.itemName)})`;
+                                        serviceName = `${lang.getLang('service.' + task.itemName)}`;
                                     }
                                     rowCell1.textContent = serviceName;
                                     row.appendChild(rowCell1);
