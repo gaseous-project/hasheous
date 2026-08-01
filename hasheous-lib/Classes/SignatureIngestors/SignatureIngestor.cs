@@ -58,7 +58,7 @@ namespace DATImport
             {
                 if (datImporter.IsEnabled)
                 {
-                    Classes.ProcessQueue.QueueProcessor.QueueItem queueItem = new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.SignatureIngestor, 10080, false, true, false, datImporter);
+                    Classes.ProcessQueue.QueueProcessor.QueueItem queueItem = new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.SignatureIngestor, datImporter.Interval, false, true, false, datImporter);
                     queueItems.Add(queueItem);
                 }
             }

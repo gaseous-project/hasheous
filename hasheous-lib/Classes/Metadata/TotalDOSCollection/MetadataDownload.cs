@@ -43,6 +43,7 @@ namespace TotalDOSCollection
             {
                 // handle download error
                 Console.WriteLine($"Error downloading DAT file: {ex.Message}");
+                throw;
             }
 
             // extract the DAT file
@@ -54,6 +55,7 @@ namespace TotalDOSCollection
             {
                 // handle extraction error
                 Console.WriteLine($"Error extracting DAT file: {ex.Message}");
+                throw;
             }
         }
 

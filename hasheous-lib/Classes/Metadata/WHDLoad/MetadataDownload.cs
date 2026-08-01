@@ -84,6 +84,14 @@ namespace WHDLoad
 
             JsonElement root = doc.RootElement;
 
+            var gamesElement = root.TryGetProperty("games", out JsonElement games) ? games : default;
+
+            if (!gamesElement.ValueKind.Equals(JsonValueKind.Array))
+            {
+                Logging.Log(Logging.LogType.Warning, SourceName, $"{SourceName} metadata 'games' element is not an array. No games to process.");
+                return;
+            }
+
             // create the XML document
             string xmlOutput = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesDirectory, "WHDLoad", "whdload_db.dat");
             using FileStream xmlFs = File.Create(xmlOutput);
@@ -94,8 +102,6 @@ namespace WHDLoad
                 writer.WriteStartDocument();
                 writer.WriteStartElement("whdbooter");
                 writer.WriteAttributeString("timestamp", root.TryGetProperty("upstream_timestamp", out JsonElement timestamp) ? timestamp.GetString() : DateTime.UtcNow.ToString("o"));
-
-                var gamesElement = root.TryGetProperty("games", out JsonElement games) ? games : default;
 
                 var convertElement = (JsonElement el, string elementName) =>
                 {

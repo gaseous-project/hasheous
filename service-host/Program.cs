@@ -36,11 +36,17 @@ for (int i = 0; i < cmdArgs.Length; i++)
     {
         string serviceNameArg = cmdArgs[i + 1];
         // Check if the service name contains a colon, indicating a sub-service
-        if (serviceNameArg.Contains(":"))
+        var argParts = serviceNameArg.Split(':');
+        if (argParts.Length > 2)
         {
-            var parts = serviceNameArg.Split(':');
-            serviceName = parts[0];
-            subServiceName = parts[1];
+            Console.WriteLine($"Error: Invalid service name '{serviceNameArg}'. Too many colons.");
+            Help.DisplayHelp();
+            return;
+        }
+        else if (argParts.Length == 2)
+        {
+            serviceName = argParts[0];
+            subServiceName = argParts[1];
         }
         else
         {
