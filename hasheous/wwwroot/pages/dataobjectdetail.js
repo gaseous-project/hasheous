@@ -263,7 +263,7 @@ function renderContent() {
 
                 let descBody = document.createElement('span');
                 descBody.classList.add('descriptionspan');
-                descBody.innerHTML = dataObject.attributes[i].value;
+                descBody.textContent = dataObject.attributes[i].value;
                 descriptionElement.appendChild(descBody);
 
                 break;
@@ -278,7 +278,11 @@ function renderContent() {
 
                 let aiDescBody = document.createElement('span');
                 aiDescBody.classList.add('descriptionspan');
-                aiDescBody.innerHTML = htmlContent;
+                let tempEl = document.createElement('div');
+                tempEl.innerHTML = htmlContent;
+                tempEl.querySelectorAll('script,iframe,object,embed,style').forEach(el => el.remove());
+                tempEl.querySelectorAll('*').forEach(el => Array.from(el.attributes).forEach(a => { if (a.name.startsWith('on') || (a.name === 'href' && /^javascript:/i.test(a.value))) el.removeAttribute(a.name); }));
+                aiDescBody.innerHTML = tempEl.innerHTML;
                 aiDescriptionElement.appendChild(aiDescBody);
 
                 break;
