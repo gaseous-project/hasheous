@@ -24,13 +24,15 @@
     <ProjectReference Include="../hasheous-lib/hasheous-lib.csproj" />
   </ItemGroup>
 
-  <!-- This runs automatically before the main orchestrator build begins -->
-  <Target Name="PublishAndMigrateServiceHost" BeforeTargets="BeforeBuild">
-    
-    <!-- FIX: Instruct MSBuild to run a focused standalone publish command for the child app -->
-    <MSBuild Projects="../service-host/service-host.csproj" 
-            Targets="Publish" 
-            Properties="Configuration=$(Configuration);Platform=$(Platform);PublishDir=$(TargetDir)service-host/" />
-            
+  <!-- Ensure service-host is published alongside the orchestrator for both build output and dotnet publish -->
+  <Target Name="PublishAndMigrateServiceHost" BeforeTargets="BeforeBuild;Publish">
+    <PropertyGroup>
+      <_ServiceHostPublishDir Condition="'$(PublishDir)' != ''">$(PublishDir)service-host/</_ServiceHostPublishDir>
+      <_ServiceHostPublishDir Condition="'$(PublishDir)' == ''">$(TargetDir)service-host/</_ServiceHostPublishDir>
+    </PropertyGroup>
+
+    <MSBuild Projects="../service-host/service-host.csproj"
+             Targets="Publish"
+             Properties="Configuration=$(Configuration);Platform=$(Platform);PublishDir=$(_ServiceHostPublishDir)" />
   </Target>
 </Project>
