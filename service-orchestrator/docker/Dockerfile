@@ -15,11 +15,11 @@ RUN dotnet restore -a $TARGETARCH
 
 # Build Hasheous Service Orchestrator
 # Build and publish a release
-RUN dotnet publish "service-orchestrator/service-orchestrator.csproj" --no-restore --self-contained true -c Release -o out -a $TARGETARCH
+RUN dotnet publish "service-orchestrator/service-orchestrator.csproj" --no-restore --self-contained true -c Release -o out -a linux-$TARGETARCH
 
 # Build Hasheous Service Host
 # Build and publish a release
-RUN dotnet publish "service-host/service-host.csproj" --no-restore --self-contained true -c Release -o out/service-host -a $TARGETARCH
+RUN dotnet publish "service-host/service-host.csproj" --no-restore --self-contained true -c Release -o out/service-host -a linux-$TARGETARCH
 
 # Build runtime image
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
