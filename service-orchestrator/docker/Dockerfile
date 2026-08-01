@@ -10,15 +10,14 @@ RUN echo "Build: $BUILDPLATFORM"
 # Copy everything
 COPY . ./
 
+# Restore all packages
+RUN dotnet restore -a $TARGETARCH
+
 # Build Hasheous Service Orchestrator
-# Restore as distinct layers
-RUN dotnet restore "service-orchestrator/service-orchestrator.csproj" -a $TARGETARCH
 # Build and publish a release
 RUN dotnet publish "service-orchestrator/service-orchestrator.csproj" --no-restore --use-current-runtime --self-contained true -c Release -o out -a $TARGETARCH
 
 # Build Hasheous Service Host
-# Restore as distinct layers
-RUN dotnet restore "service-host/service-host.csproj" -a $TARGETARCH
 # Build and publish a release
 RUN dotnet publish "service-host/service-host.csproj" --no-restore --use-current-runtime --self-contained true -c Release -o out/service-host -a $TARGETARCH
 
