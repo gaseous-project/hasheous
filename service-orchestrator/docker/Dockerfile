@@ -14,13 +14,13 @@ COPY . ./
 # Restore as distinct layers
 RUN dotnet restore "service-orchestrator/service-orchestrator.csproj" -a $TARGETARCH
 # Build and publish a release
-RUN dotnet publish "service-orchestrator/service-orchestrator.csproj" --use-current-runtime --self-contained true -c Release -o out -a $TARGETARCH
+RUN dotnet publish "service-orchestrator/service-orchestrator.csproj" --no-restore --use-current-runtime --self-contained true -c Release -o out -a $TARGETARCH
 
 # Build Hasheous Service Host
 # Restore as distinct layers
 RUN dotnet restore "service-host/service-host.csproj" -a $TARGETARCH
 # Build and publish a release
-RUN dotnet publish "service-host/service-host.csproj" --use-current-runtime --self-contained true -c Release -o out -a $TARGETARCH
+RUN dotnet publish "service-host/service-host.csproj" --no-restore --use-current-runtime --self-contained true -c Release -o out/service-host -a $TARGETARCH
 
 # Build runtime image
 FROM mcr.microsoft.com/dotnet/aspnet:10.0

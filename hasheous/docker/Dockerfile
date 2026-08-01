@@ -14,13 +14,13 @@ COPY . ./
 # Restore as distinct layers
 RUN dotnet restore "hasheous/hasheous.csproj" -a $TARGETARCH
 # Build and publish a release
-RUN dotnet publish "hasheous/hasheous.csproj" --use-current-runtime --self-contained true -c Release -o out -a $TARGETARCH
+RUN dotnet publish "hasheous/hasheous.csproj" --no-restore --use-current-runtime --self-contained true -c Release -o out -a $TARGETARCH
 
 # Build Gaseous CLI
 # Restore as distinct layers
 RUN dotnet restore "hasheous-cli/hasheous-cli.csproj" -a $TARGETARCH
 # Build and publish a release
-RUN dotnet publish "hasheous-cli/hasheous-cli.csproj" --use-current-runtime --self-contained true -c Release -o out -a $TARGETARCH
+RUN dotnet publish "hasheous-cli/hasheous-cli.csproj" --no-restore --use-current-runtime --self-contained true -c Release -o out -a $TARGETARCH
 
 # Build runtime image
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
