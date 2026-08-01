@@ -12,7 +12,7 @@ namespace Classes.ProcessQueue
         };
 
         /// <inheritdoc/>
-        public async Task<object?> ExecuteAsync()
+        public async Task<object?> ExecuteAsync(object? options = null)
         {
             Maintenance dMaintenance = new Maintenance();
             await dMaintenance.RunHourlyMaintenance_Frontend();
@@ -33,7 +33,7 @@ namespace Classes.ProcessQueue
         };
 
         /// <inheritdoc/>
-        public async Task<object?> ExecuteAsync()
+        public async Task<object?> ExecuteAsync(object? options = null)
         {
             Maintenance dMaintenance = new Maintenance();
             await dMaintenance.RunHourlyMaintenance();
@@ -54,7 +54,7 @@ namespace Classes.ProcessQueue
         };
 
         /// <inheritdoc/>
-        public async Task<object?> ExecuteAsync()
+        public async Task<object?> ExecuteAsync(object? options = null)
         {
             Maintenance dMaintenance = new Maintenance();
             await dMaintenance.RunDailyMaintenance();
@@ -75,7 +75,7 @@ namespace Classes.ProcessQueue
         };
 
         /// <inheritdoc/>
-        public async Task<object?> ExecuteAsync()
+        public async Task<object?> ExecuteAsync(object? options = null)
         {
             Maintenance wMaintenance = new Maintenance();
             await wMaintenance.RunWeeklyMaintenance();

@@ -11,8 +11,9 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
 
 - Architecture & data flow
   - MariaDB/MySQL is the source of truth. On startup, schema is created/migrated via embedded scripts (see `hasheous-lib/Classes/Database.cs::InitDB`, scripts named `hasheous-####.sql`).
-  - Signature data is ingested from DAT/XML (TOSEC/No-Intro/etc.) by `Classes/SignatureIngestors/XML.cs` into `Signatures_*` tables.
-  - Signature game import in `Classes/SignatureIngestors/XML.cs` now runs with a bounded worker pool (`MaxConcurrentImportWorkers`, currently 4) that repeatedly processes the next game via `ImportDatRecordInternal(...)` until all parsed games are consumed.
+  - Signature data is ingested from DAT/XML (TOSEC/No-Intro/etc.) by the shared importer stack under `hasheous-lib/Classes/SignatureIngestors/` into `Signatures_*` tables.
+  - Signature import has been refactored around a pluggable importer contract: `IDATFileImport` defines `StageFiles()`, `ProcessFiles()`, and `ValidateFiles()`, and `SignatureIngestor.Register<T>()`/`GetRegisteredIngestors()` discover enabled importers and create queue items. Follow this pattern for new DAT/XML sources instead of hard-coding logic in `XML.cs`.
+  - Signature game import still uses the bounded worker pool pattern (`MaxConcurrentImportWorkers`, currently 4) for processing games, but the surrounding importer lifecycle is now registry-driven rather than tied to a single XML implementation.
   - Signature ingestion now stores game names from `SortingName` and includes a one-time per-parser migration flag (`HasMigratedToSortingName_<ParserType>`) to migrate legacy name records while preserving alternate-name mappings.
   - Signature game records now also persist country/language variants on `Signatures_Games` (`Country`, `Language`), and migration logic updates legacy null-country rows plus links variant rows back to existing `DataObject_SignatureMap` entries.
   - Public API (versioned) handles lookups like `POST /api/v1/Lookup/ByHash` via `Classes/HashLookup` + `Classes/Database`.
@@ -146,8 +147,9 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 
 - Add a background job
   - Edit `service-orchestrator/Program.cs` and add a `QueueProcessor.QueueItem(QueueItemType.YourItem, <minutes>, false)` to `QueueProcessor.QueueItems`.
-  - Implement the corresponding handler under `hasheous-lib/Classes/ProcessQueue/` (follow existing `QueueItemType` patterns).
+  - Implement a task class under `hasheous-lib/Classes/ProcessQueue/` that follows the `IQueueTask` contract (`Blocks` + `ExecuteAsync(object? options = null)`) and matches the existing queue-item patterns.
   - Wire the queue item into both dispatchers: `hasheous-lib/Classes/ProcessQueue/ProcessQueue.cs` and `service-host/Program.cs` so orchestrator and one-off service-host execution can resolve the task.
+  - Prefer reusing shared helpers in `hasheous-lib/Classes/Common.cs` and provider-specific downloaders under `hasheous-lib/Classes/Metadata/*/MetadataDownload.cs` when adding new metadata fetchers rather than duplicating download/parse logic.
 
 - Add a DB migration
   - Create `hasheous-lib/Schema/hasheous-####.sql` using the next available number; `InitDB()` applies scripts in order and bumps `schema_version`.
@@ -241,7 +243,7 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 - Downloader class: `hasheous-lib/Classes/Metadata/Redump/MetadataDownload.cs`.
 - Redump host migration: use `https://redump.info` as the base host (`BaseUrl`) and `https://redump.info/downloads/` for platform listing.
 - HTML parsing expectation: platform rows are parsed from the first `div.downloads-table-scaler` table; links are selected by anchor label (`DAT + Serial/Version` and `Cuesheets`) instead of fixed table-column positions.
-- URL handling: relative Redump links should be expanded with `BaseUrl`; avoid hardcoded `http://redump.org` URLs or appending legacy query suffixes manually.
+- URL handling: relative Redump links should be expanded with `BaseUrl`; avoid hardcoded `https://redump.info` URLs or appending legacy query suffixes manually.
 
 ## LaunchBox metadata
 - Background task: `QueueItemType.FetchLaunchBoxMetadata` (implemented under `hasheous-lib/Classes/ProcessQueue/Tasks/FetchLaunchBoxMetadata.cs`).

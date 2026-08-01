@@ -14,7 +14,7 @@ namespace Classes.ProcessQueue
         public List<QueueItemType> Blocks => new List<QueueItemType>();
 
         /// <inheritdoc/>
-        public async Task<object?> ExecuteAsync()
+        public async Task<object?> ExecuteAsync(object? options = null)
         {
             if (Config.RedisConfiguration.Enabled)
             {

@@ -59,6 +59,7 @@ namespace Classes
                             {
                                 ProcessId = queueItem.ProcessId,
                                 ItemType = queueItem.ItemType,
+                                ItemName = queueItem.ItemName,
                                 ItemState = queueItem.ItemState,
                                 LastRunTime = queueItem.LastRunTime,
                                 LastFinishTime = queueItem.LastFinishTime,

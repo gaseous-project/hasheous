@@ -12,7 +12,7 @@ namespace Classes.ProcessQueue
         };
 
         /// <inheritdoc/>
-        public async Task<object?> ExecuteAsync()
+        public async Task<object?> ExecuteAsync(object? options = null)
         {
             GiantBomb.MetadataDownload gbDownloader = new GiantBomb.MetadataDownload();
 

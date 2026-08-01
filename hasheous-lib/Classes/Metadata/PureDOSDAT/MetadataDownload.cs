@@ -1,17 +1,32 @@
+using System.Runtime.CompilerServices;
 using Classes;
+using DATImport;
 using hasheous_server.Classes;
 
 namespace PureDOSDAT
 {
-    public class DownloadManager
+    public class DownloadManager : IDATFileImport
     {
-        public static string GitUrl { get; } = "https://github.com/PureDOS/DAT.git";
+        [ModuleInitializer]
+        public static void RegisterImporter() => SignatureIngestor.Register<DownloadManager>();
 
-        public static string GitBranch { get; } = "main";
+        /// <inheritdoc/>
+        public gaseous_signature_parser.parser.SignatureParser SourceType => gaseous_signature_parser.parser.SignatureParser.PureDOSDAT;
 
-        public static string SourceName { get; } = "PureDOSDAT";
+        /// <inheritdoc/>
+        public int Interval => 10080; // 7 days in minutes
 
-        public async Task Download()
+        /// <inheritdoc/>
+        public bool IsEnabled => true; // Always enabled for metadata download
+
+        private static string GitUrl { get; } = "https://github.com/PureDOS/DAT.git";
+
+        private static string GitBranch { get; } = "main";
+
+        private static string SourceName { get; } = "PureDOSDAT";
+
+        /// <inheritdoc/>
+        public async Task StageFiles()
         {
             try
             {
@@ -29,7 +44,7 @@ namespace PureDOSDAT
                 }
                 catch (Exception ex)
                 {
-                    throw new Exception($"Failed to clone or refresh ${SourceName} repository from '{GitUrl}': {ex.Message}", ex);
+                    throw new Exception($"Failed to clone or refresh {SourceName} repository from '{GitUrl}': {ex.Message}", ex);
                 }
 
                 // copy the signature files to the processing directory
@@ -63,6 +78,19 @@ namespace PureDOSDAT
             {
                 Logging.Log(Logging.LogType.Critical, SourceName, $"Error downloading {SourceName} metadata: {ex.Message}");
             }
+        }
+
+        /// <inheritdoc/>
+        public async Task ProcessFiles()
+        {
+            return; // No additional processing needed for PureDOSDAT metadata
+        }
+
+        /// <inheritdoc/>
+        public async Task<bool> ValidateFiles()
+        {
+            // Implement validation logic if needed
+            return true; // No validation needed for PureDOSDAT metadata
         }
     }
 }

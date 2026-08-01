@@ -62,14 +62,7 @@ function LoadBackgroundTasks() {
 
                     const tableGroups = {
                         "signatures": [
-                            "SignatureIngestor",
-                            "FetchTOSECMetadata",
-                            "FetchRedumpMetadata",
-                            "FetchMAMERedumpMetadata",
-                            "FetchWHDLoadMetadata",
-                            "FetchFBNEOMetadata",
-                            "FetchPureDOSDATMetadata",
-                            "FetchScreenScraperMetadata"
+                            "SignatureIngestor"
                         ],
                         "metadataproxy": [
                             "FetchIGDBMetadata",
@@ -106,115 +99,122 @@ function LoadBackgroundTasks() {
 
                         let groupFound = false;
                         tableGroups[group].forEach(itemType => {
-                            const task = serverData.find(task => task.itemType === itemType);
-                            if (task) {
-                                let itemState = task.itemState;
-                                if (task.enabled === false) {
-                                    itemState = 'Disabled';
-                                }
+                            // const task = serverData.find(task => task.itemType === itemType);
+                            const tasks = serverData.filter(task => task.itemType === itemType);
+                            if (tasks.length > 0) {
+                                tasks.forEach(task => {
+                                    let itemState = task.itemState;
+                                    if (task.enabled === false) {
+                                        itemState = 'Disabled';
+                                    }
 
-                                const row = document.createElement('tr');
-                                row.setAttribute('data-processid', task.processId || '');
+                                    const row = document.createElement('tr');
+                                    row.setAttribute('data-processid', task.processId || '');
 
-                                const rowCell1 = document.createElement('td');
-                                rowCell1.className = 'tablecell';
-                                rowCell1.textContent = lang.getLang('service' + task.itemType);
-                                row.appendChild(rowCell1);
+                                    const rowCell1 = document.createElement('td');
+                                    rowCell1.className = 'tablecell';
+                                    let serviceName = lang.getLang('service' + task.itemType);
+                                    if (task.itemName && task.itemName.trim() !== '' && task.itemName !== task.itemType) {
+                                        serviceName = `${lang.getLang('service.' + task.itemName)}`;
+                                    }
+                                    rowCell1.textContent = serviceName;
+                                    row.appendChild(rowCell1);
 
-                                const rowCell2 = document.createElement('td');
-                                rowCell2.className = 'tablecell';
-                                rowCell2.textContent = lang.getLang('service' + itemState);
-                                row.appendChild(rowCell2);
+                                    const rowCell2 = document.createElement('td');
+                                    rowCell2.className = 'tablecell';
+                                    rowCell2.textContent = lang.getLang('service' + itemState);
+                                    row.appendChild(rowCell2);
 
-                                const rowCell3 = document.createElement('td');
-                                rowCell3.className = 'tablecell';
-                                rowCell3.textContent = task.lastRunTime ? new Date(task.lastRunTime).toLocaleString() : '-';
-                                row.appendChild(rowCell3);
+                                    const rowCell3 = document.createElement('td');
+                                    rowCell3.className = 'tablecell';
+                                    rowCell3.textContent = task.lastRunTime ? new Date(task.lastRunTime).toLocaleString() : '-';
+                                    row.appendChild(rowCell3);
 
-                                const rowCell4 = document.createElement('td');
-                                rowCell4.className = 'tablecell';
-                                rowCell4.textContent = task.nextRunTime ? new Date(task.nextRunTime).toLocaleString() : '-';
-                                row.appendChild(rowCell4);
+                                    const rowCell4 = document.createElement('td');
+                                    rowCell4.className = 'tablecell';
+                                    rowCell4.textContent = task.nextRunTime ? new Date(task.nextRunTime).toLocaleString() : '-';
+                                    row.appendChild(rowCell4);
 
-                                const rowCell5 = document.createElement('td');
-                                rowCell5.className = 'tablecell';
-                                rowCell5.style.textAlign = 'right';
-                                row.appendChild(rowCell5);
+                                    const rowCell5 = document.createElement('td');
+                                    rowCell5.className = 'tablecell';
+                                    rowCell5.style.textAlign = 'right';
+                                    row.appendChild(rowCell5);
 
-                                if (userProfile != null) {
-                                    if (userProfile.Roles != null) {
-                                        let startButton = '';
-                                        if (userProfile.Roles.includes('Admin') && ['Stopped', 'NeverStarted'].includes(itemState)) {
-                                            startButton = `<button class="btn btn-primary" onclick="SetTask('${server}', '${task.itemType}', '${task.processId}', true);">${lang.getLang('servicestart')}</button>`;
+                                    if (userProfile != null) {
+                                        if (userProfile.Roles != null) {
+                                            let startButton = '';
+                                            if (userProfile.Roles.includes('Admin') && ['Stopped', 'NeverStarted'].includes(itemState)) {
+                                                startButton = `<button class="btn btn-primary" onclick="SetTask('${server}', '${task.itemType}', '${task.processId}', true);">${lang.getLang('servicestart')}</button>`;
+                                            }
+
+                                            let enabledButtonLabel = task.enabled ? lang.getLang('disable') : lang.getLang('enable');
+                                            let enabledToggle = `<button class="btn btn-primary" onclick="SetTask('${server}', '${task.itemType}', '${task.processId}', null, ${!task.enabled});">${enabledButtonLabel}</button>`;
+
+                                            rowCell5.innerHTML += startButton;
+                                            rowCell5.innerHTML += enabledToggle;
                                         }
-
-                                        let enabledButtonLabel = task.enabled ? lang.getLang('disable') : lang.getLang('enable');
-                                        let enabledToggle = `<button class="btn btn-primary" onclick="SetTask('${server}', '${task.itemType}', '${task.processId}', null, ${!task.enabled});">${enabledButtonLabel}</button>`;
-
-                                        rowCell5.innerHTML += startButton;
-                                        rowCell5.innerHTML += enabledToggle;
                                     }
-                                }
 
-                                groupBody.appendChild(row);
+                                    groupBody.appendChild(row);
 
-                                // display report status if available
-                                if (task.lastReport) {
-                                    if (task.lastReport.progress) {
-                                        // task.lastReport.progress is a dictionary of progress items
-                                        const progressItems = Object.keys(task.lastReport.progress);
-                                        progressItems.forEach(progressKey => {
-                                            const progress = task.lastReport.progress[progressKey];
-                                            const progressRow = document.createElement('tr');
+                                    // display report status if available
+                                    if (task.lastReport) {
+                                        if (task.lastReport.progress) {
+                                            // task.lastReport.progress is a dictionary of progress items
+                                            const progressItems = Object.keys(task.lastReport.progress);
+                                            progressItems.forEach(progressKey => {
+                                                const progress = task.lastReport.progress[progressKey];
+                                                const progressRow = document.createElement('tr');
 
-                                            const progressCell = document.createElement('td');
-                                            progressCell.className = 'tablecell';
-                                            progressCell.colSpan = columnCount;
-                                            let progressText = ``;
-                                            if (progress.total && progress.total > 0) {
-                                                const percentage = ((progress.count / progress.total) * 100).toFixed(2);
-                                                progressText += `${progress.count} / ${progress.total} (${percentage}%)`;
-                                            } else if (progress.count) {
-                                                progressText += `${progress.count}`;
-                                            } else {
-                                                progressText += `-`;
-                                            }
-                                            if (progress.description) {
-                                                progressText += ` - ${progress.description}`;
-                                            }
-                                            if (progress.estimatedSecondsRemaining) {
-                                                let timeRemaining = `${progress.estimatedSecondsRemaining} seconds`;
-                                                if (progress.estimatedSecondsRemaining > 604800) {
-                                                    // more than a week
-                                                    const weeks = Math.floor(progress.estimatedSecondsRemaining / 604800);
-                                                    const days = Math.floor((progress.estimatedSecondsRemaining % 604800) / 86400);
-                                                    timeRemaining = `${weeks} weeks${days > 0 ? ' ' + days + ' days' : ''}`;
-                                                } else if (progress.estimatedSecondsRemaining > 86400) {
-                                                    // more than a day
-                                                    const days = Math.floor(progress.estimatedSecondsRemaining / 86400);
-                                                    const hours = Math.floor((progress.estimatedSecondsRemaining % 86400) / 3600);
-                                                    timeRemaining = `${days} days${hours > 0 ? ' ' + hours + ' hours' : ''}`;
-                                                } else if (progress.estimatedSecondsRemaining > 3600) {
-                                                    // more than an hour
-                                                    const hours = Math.floor(progress.estimatedSecondsRemaining / 3600);
-                                                    const minutes = Math.floor((progress.estimatedSecondsRemaining % 3600) / 60);
-                                                    timeRemaining = `${hours} hours${minutes > 0 ? ' ' + minutes + ' minutes' : ''}`;
-                                                } else if (progress.estimatedSecondsRemaining > 60) {
-                                                    // more than a minute
-                                                    const minutes = Math.floor(progress.estimatedSecondsRemaining / 60);
-                                                    const seconds = Math.floor(progress.estimatedSecondsRemaining % 60);
-                                                    timeRemaining = `${minutes} minutes${seconds > 0 ? ' ' + seconds + ' seconds' : ''}`;
+                                                const progressCell = document.createElement('td');
+                                                progressCell.className = 'tablecell';
+                                                progressCell.colSpan = columnCount;
+                                                let progressText = ``;
+                                                if (progress.total && progress.total > 0) {
+                                                    const percentage = ((progress.count / progress.total) * 100).toFixed(2);
+                                                    progressText += `${progress.count} / ${progress.total} (${percentage}%)`;
+                                                } else if (progress.count) {
+                                                    progressText += `${progress.count}`;
+                                                } else {
+                                                    progressText += `-`;
                                                 }
+                                                if (progress.description) {
+                                                    progressText += ` - ${progress.description}`;
+                                                }
+                                                if (progress.estimatedSecondsRemaining) {
+                                                    let timeRemaining = `${progress.estimatedSecondsRemaining} seconds`;
+                                                    if (progress.estimatedSecondsRemaining > 604800) {
+                                                        // more than a week
+                                                        const weeks = Math.floor(progress.estimatedSecondsRemaining / 604800);
+                                                        const days = Math.floor((progress.estimatedSecondsRemaining % 604800) / 86400);
+                                                        timeRemaining = `${weeks} weeks${days > 0 ? ' ' + days + ' days' : ''}`;
+                                                    } else if (progress.estimatedSecondsRemaining > 86400) {
+                                                        // more than a day
+                                                        const days = Math.floor(progress.estimatedSecondsRemaining / 86400);
+                                                        const hours = Math.floor((progress.estimatedSecondsRemaining % 86400) / 3600);
+                                                        timeRemaining = `${days} days${hours > 0 ? ' ' + hours + ' hours' : ''}`;
+                                                    } else if (progress.estimatedSecondsRemaining > 3600) {
+                                                        // more than an hour
+                                                        const hours = Math.floor(progress.estimatedSecondsRemaining / 3600);
+                                                        const minutes = Math.floor((progress.estimatedSecondsRemaining % 3600) / 60);
+                                                        timeRemaining = `${hours} hours${minutes > 0 ? ' ' + minutes + ' minutes' : ''}`;
+                                                    } else if (progress.estimatedSecondsRemaining > 60) {
+                                                        // more than a minute
+                                                        const minutes = Math.floor(progress.estimatedSecondsRemaining / 60);
+                                                        const seconds = Math.floor(progress.estimatedSecondsRemaining % 60);
+                                                        timeRemaining = `${minutes} minutes${seconds > 0 ? ' ' + seconds + ' seconds' : ''}`;
+                                                    }
 
-                                                progressText += ` - ${timeRemaining} remaining`;
-                                            }
-                                            progressCell.innerHTML = progressText;
-                                            progressRow.appendChild(progressCell);
-                                            groupBody.appendChild(progressRow);
-                                        });
+                                                    progressText += ` - ${timeRemaining} remaining`;
+                                                }
+                                                progressCell.innerHTML = progressText;
+                                                progressRow.appendChild(progressCell);
+                                                groupBody.appendChild(progressRow);
+                                            });
+                                        }
                                     }
-                                }
-                                groupFound = true;
+                                    groupFound = true;
+                                });
                             }
                         });
 

@@ -18,7 +18,7 @@ namespace Classes.ProcessQueue
         public List<QueueItemType> Blocks => new List<QueueItemType>();
 
         /// <inheritdoc/>
-        public async Task<object?> ExecuteAsync()
+        public async Task<object?> ExecuteAsync(object? options = null)
         {
             Logging.Log(Logging.LogType.Information, "Metadata Dump", "Starting metadata dump processes...");
 

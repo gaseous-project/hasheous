@@ -1,17 +1,32 @@
-using System.IO.Compression;
+using System.Runtime.CompilerServices;
 using Classes;
+using DATImport;
 using hasheous_server.Classes;
 
 namespace Redump
 {
-    public class DownloadManager
+    public class DownloadManager : IDATFileImport
     {
+        [ModuleInitializer]
+        public static void RegisterImporter() => SignatureIngestor.Register<DownloadManager>();
+
+        /// <inheritdoc/>
+        public gaseous_signature_parser.parser.SignatureParser SourceType => gaseous_signature_parser.parser.SignatureParser.Redump;
+
+        /// <inheritdoc/>
+        public int Interval => 10080; // 7 days in minutes
+
+        /// <inheritdoc/>
+        public bool IsEnabled => true; // Always enabled for metadata download
+
         private static readonly HttpClient client = new HttpClient();
 
-        public static string BaseUrl = "https://redump.info";
-        public static string PlatformsUrl = $"{BaseUrl}/downloads/";
+        private static string BaseUrl = "https://redump.info";
 
-        public async Task Download()
+        private static string PlatformsUrl = $"{BaseUrl}/downloads/";
+
+        /// <inheritdoc/>
+        public async Task StageFiles()
         {
             try
             {
@@ -167,6 +182,19 @@ namespace Redump
             {
                 Logging.Log(Logging.LogType.Critical, "Redump", $"Error during Redump metadata download: {ex.Message}");
             }
+        }
+
+        /// <inheritdoc/>
+        public async Task ProcessFiles()
+        {
+            return; // No additional processing needed for Redump metadata
+        }
+
+        /// <inheritdoc/>
+        public async Task<bool> ValidateFiles()
+        {
+            // Implement validation logic if needed
+            return true; // No validation needed for Redump metadata
         }
     }
 }

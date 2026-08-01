@@ -46,16 +46,16 @@ namespace Classes.ProcessQueue
             ///  </param>
             /// <param name="AllowManualStart">Whether manual start is allowed.</param>
             /// <param name="RemoveWhenStopped">Whether to remove the item when stopped.</param>
-            public QueueItem(QueueItemType ItemType, int ExecutionInterval, bool InProcess, bool AllowManualStart = true, bool RemoveWhenStopped = false)
+            public QueueItem(QueueItemType ItemType, int ExecutionInterval, bool InProcess, bool AllowManualStart = true, bool RemoveWhenStopped = false, object? Options = null)
             {
                 _ItemType = ItemType;
+                this.Options = Options;
                 _ItemState = QueueItemState.NeverStarted;
-                _LastRunTime = Config.ReadSetting("LastRun_" + _ItemType.ToString(), DateTime.UtcNow);
+                _LastRunTime = Config.ReadSetting("LastRun_" + _ItemName, DateTime.UtcNow);
                 _Interval = ExecutionInterval;
                 _InProcess = InProcess;
                 _AllowManualStart = AllowManualStart;
                 _RemoveWhenStopped = RemoveWhenStopped;
-
                 _SaveLastRunTime = true;
 
                 switch (ItemType)
@@ -84,44 +84,12 @@ namespace Classes.ProcessQueue
                         Task = new FetchTheGamesDbMetadata();
                         break;
 
-                    case QueueItemType.FetchRetroAchievementsMetadata:
-                        Task = new FetchRetroAchievementsMetadata();
-                        break;
-
                     case QueueItemType.FetchIGDBMetadata:
                         Task = new FetchIGDBMetadata();
                         break;
 
                     case QueueItemType.FetchGiantBombMetadata:
                         Task = new FetchGiantBombMetadata();
-                        break;
-
-                    case QueueItemType.FetchRedumpMetadata:
-                        Task = new FetchRedumpMetadata();
-                        break;
-
-                    case QueueItemType.FetchPureDOSDATMetadata:
-                        Task = new FetchPureDOSDATMetadata();
-                        break;
-
-                    case QueueItemType.FetchMAMERedumpMetadata:
-                        Task = new FetchMAMERedumpMetadata();
-                        break;
-
-                    case QueueItemType.FetchTOSECMetadata:
-                        Task = new FetchTOSECMetadata();
-                        break;
-
-                    case QueueItemType.FetchWHDLoadMetadata:
-                        Task = new FetchWHDLoadMetadata();
-                        break;
-
-                    case QueueItemType.FetchFBNEOMetadata:
-                        Task = new FetchFBNEOMetadata();
-                        break;
-
-                    case QueueItemType.FetchScreenScraperMetadata:
-                        Task = new FetchScreenScraperMetadata();
                         break;
 
                     case QueueItemType.FetchLaunchBoxMetadata:
@@ -164,19 +132,34 @@ namespace Classes.ProcessQueue
             public readonly Guid ProcessId = Guid.NewGuid();
 
             private QueueItemType _ItemType = QueueItemType.NotConfigured;
+            private string _ItemName
+            {
+                get
+                {
+                    // if options is a class, return the name of the class, otherwise return _ItemType.ToString()
+                    if (Options != null && Options.GetType().IsClass)
+                    {
+                        return Options.GetType().FullName ?? Options.GetType().Name;
+                    }
+                    else
+                    {
+                        return _ItemType.ToString();
+                    }
+                }
+            }
             private QueueItemState _ItemState = QueueItemState.NeverStarted;
             private DateTime _LastRunTime = DateTime.UtcNow;
             private DateTime _LastFinishTime
             {
                 get
                 {
-                    return Config.ReadSetting("LastRun_" + _ItemType.ToString(), DateTime.UtcNow);
+                    return Config.ReadSetting("LastRun_" + _ItemName, DateTime.UtcNow);
                 }
                 set
                 {
                     if (_SaveLastRunTime == true)
                     {
-                        Config.SetSetting("LastRun_" + _ItemType.ToString(), value);
+                        Config.SetSetting("LastRun_" + _ItemName, value);
                     }
                 }
             }
@@ -193,6 +176,7 @@ namespace Classes.ProcessQueue
             private string _CorrelationId = "";
 
             public QueueItemType ItemType => _ItemType;
+            public string ItemName => _ItemName;
             public QueueItemState ItemState => _ItemState;
             public DateTime LastRunTime => _LastRunTime;
             private double _LastRunDuration = 0;
@@ -218,11 +202,11 @@ namespace Classes.ProcessQueue
             {
                 get
                 {
-                    return Config.ReadSetting<bool>("Enabled_" + _ItemType.ToString(), true);
+                    return Config.ReadSetting<bool>("Enabled_" + _ItemName, true);
                 }
                 set
                 {
-                    Config.SetSetting("Enabled_" + _ItemType.ToString(), value);
+                    Config.SetSetting("Enabled_" + _ItemName, value);
                 }
             }
             public object? Options { get; set; } = null;
@@ -261,29 +245,34 @@ namespace Classes.ProcessQueue
                         Guid correlationId = Guid.NewGuid();
                         _CorrelationId = correlationId.ToString();
                         CallContext.SetData("CorrelationId", correlationId);
-                        CallContext.SetData("CallingProcess", _ItemType.ToString());
+                        CallContext.SetData("CallingProcess", _ItemName);
                         CallContext.SetData("CallingUser", "System");
 
                         // log the start
-                        Logging.Log(Logging.LogType.Debug, "Timered Event", "Executing " + _ItemType + " with correlation id " + _CorrelationId);
+                        Logging.Log(Logging.LogType.Debug, "Timered Event", "Executing " + _ItemName + " with correlation id " + _CorrelationId);
 
                         try
                         {
                             // if we have a task, execute it
                             if (Task != null && _InProcess == true)
                             {
-                                await Task.ExecuteAsync();
+                                await Task.ExecuteAsync(this.Options);
                             }
                             else
                             {
                                 // if we don't have a task, execute the service-host with item type
-                                string[] args = new string[] { "service-host.dll", "--service", _ItemType.ToString(), "--reportingserver", Config.ServiceCommunication.ReportingServerUrl, "--processid", ProcessId.ToString(), "--correlationid", _CorrelationId };
+                                string serviceName = _ItemType.ToString();
+                                if (_ItemName != _ItemType.ToString())
+                                {
+                                    serviceName = _ItemType + ":" + _ItemName;
+                                }
+                                string[] args = new string[] { "service-host.dll", "--service", serviceName, "--reportingserver", Config.ServiceCommunication.ReportingServerUrl, "--processid", ProcessId.ToString(), "--correlationid", _CorrelationId };
                                 using var process = new Process
                                 {
                                     StartInfo = new ProcessStartInfo
                                     {
                                         FileName = "dotnet",
-                                        WorkingDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location),
+                                        WorkingDirectory = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "service-host"),
                                         Arguments = string.Join(" ", args),
                                         UseShellExecute = false,
                                         RedirectStandardOutput = false,
@@ -317,7 +306,7 @@ namespace Classes.ProcessQueue
                         _LastFinishTime = DateTime.UtcNow;
                         _LastRunDuration = Math.Round((DateTime.UtcNow - _LastRunTime).TotalSeconds, 2);
 
-                        Logging.Log(Logging.LogType.Information, "Timered Event", "Total " + _ItemType + " run time = " + _LastRunDuration);
+                        Logging.Log(Logging.LogType.Information, "Timered Event", "Total " + _ItemName + " run time = " + _LastRunDuration);
                     }
                 }
             }
@@ -345,6 +334,7 @@ namespace Classes.ProcessQueue
         {
             public Guid ProcessId { get; set; }
             public QueueItemType ItemType { get; set; }
+            public string ItemName { get; set; }
             public QueueItemState ItemState { get; set; }
             public DateTime LastRunTime { get; set; }
             public DateTime LastFinishTime { get; set; }

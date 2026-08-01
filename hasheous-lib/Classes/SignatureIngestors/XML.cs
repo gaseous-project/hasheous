@@ -30,9 +30,6 @@ namespace XML
 
         private const int MaxConcurrentImportWorkers = 4;
 
-        private static List<int> gameCountries = new List<int>();
-        private static List<int> gameLanguages = new List<int>();
-
         /// <summary>
         /// Imports signature data from XML/DAT files into the database.
         /// </summary>
@@ -450,6 +447,9 @@ namespace XML
 
         private async Task ImportDatRecordInternal(RomSignatureObject.Game gameObject, DateTime now, int sourceId, gaseous_signature_parser.parser.SignatureParser XMLType, ImportLookupCache lookupCache)
         {
+            // Per-record sets avoid cross-worker mutation when processing games concurrently.
+            HashSet<int> gameCountries = new HashSet<int>();
+            HashSet<int> gameLanguages = new HashSet<int>();
 
             // store in database
             string[] flipNameAndDescription = {

@@ -842,6 +842,71 @@ namespace Classes
 		}
 
 		/// <summary>
+		/// Copies all files and subdirectories from the source directory to the destination directory.
+		/// If the destination directory does not exist, it will be created.
+		/// If recursive is true, all subdirectories will be copied as well.
+		/// </summary>
+		/// <param name="sourceDir">
+		/// The path of the source directory to copy from.
+		/// </param>
+		/// <param name="destinationDir">
+		/// The path of the destination directory to copy to.
+		/// </param>
+		/// <param name="recursive">
+		/// If true, subdirectories will be copied recursively; otherwise, only the top-level files will be copied.
+		/// </param>
+		public static void CopyDirectory(string sourceDir, string destinationDir, bool recursive)
+		{
+			var dir = new DirectoryInfo(sourceDir);
+			Directory.CreateDirectory(destinationDir); // Create dest dir
+
+			// Copy files
+			foreach (FileInfo file in dir.GetFiles())
+				file.CopyTo(Path.Combine(destinationDir, file.Name), true);
+
+			// Copy subdirectories recursively
+			if (recursive)
+			{
+				foreach (DirectoryInfo subDir in dir.GetDirectories())
+					CopyDirectory(subDir.FullName, Path.Combine(destinationDir, subDir.Name), true);
+			}
+		}
+
+		/// <summary>
+		/// Deletes all files and subdirectories within the specified target directory.
+		/// If preserveDirectoryStructure is true, child directories will be preserved but emptied; otherwise, they will be deleted entirely.
+		/// </summary>
+		/// <param name="targetDir">
+		/// The path of the target directory whose contents are to be deleted.
+		/// </param>
+		/// <param name="preserveDirectoryStructure">
+		/// If true, child directories will be preserved but emptied; if false, they will be deleted entirely.
+		/// </param>
+		public static void DeleteDirectoryContents(string targetDir, bool preserveDirectoryStructure = false)
+		{
+			var dir = new DirectoryInfo(targetDir);
+
+			if (!dir.Exists) return;
+
+			// Always clear files at the current level.
+			foreach (FileInfo file in dir.GetFiles()) file.Delete();
+
+			if (preserveDirectoryStructure)
+			{
+				// Recursively clear child directories without deleting the directories themselves.
+				foreach (DirectoryInfo subDir in dir.GetDirectories())
+				{
+					DeleteDirectoryContents(subDir.FullName, true);
+				}
+			}
+			else
+			{
+				// Remove child directories entirely when structure preservation is not required.
+				foreach (DirectoryInfo subDir in dir.GetDirectories()) subDir.Delete(true);
+			}
+		}
+
+		/// <summary>
 		/// Provides a way to set contextual data that flows with the call and 
 		/// async context of a test or invocation.
 		/// </summary>
