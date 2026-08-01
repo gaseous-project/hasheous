@@ -2,7 +2,6 @@ using System.Data;
 using System.Text;
 using Classes;
 using GiantBomb.Models;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace GiantBomb
 {

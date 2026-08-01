@@ -1,5 +1,3 @@
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-
 namespace GiantBomb.Models
 {
     public class IBaseResponse<T> where T : class

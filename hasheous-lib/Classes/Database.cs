@@ -5,7 +5,6 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Threading.Tasks;
 using IGDB.Models;
-using Microsoft.VisualStudio.Web.CodeGenerators.Mvc.Templates.Blazor;
 using MySqlConnector;
 
 namespace Classes

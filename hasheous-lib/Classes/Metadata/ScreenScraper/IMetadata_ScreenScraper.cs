@@ -1037,6 +1037,7 @@ namespace hasheous_server.Classes.MetadataLib
             /// digital identifier of the parent system
             /// </summary>
             public long? parentid { get; set; }
+            ///<summary>
             /// List of names for the platform in different languages, providing localized information about the platform based on language preferences. This property allows for structured access to platform names in various languages, enabling the application to present platform information effectively based on the language preferences of users or regional differences in platform information as returned by the ScreenScraper API.
             /// </summary>
             public Dictionary<string, string> noms { get; set; }

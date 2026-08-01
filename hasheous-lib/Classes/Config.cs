@@ -2,7 +2,6 @@
 using System.Data;
 using hasheous_server.Classes.Metadata;
 using IGDB.Models;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Newtonsoft.Json;
 using StackExchange.Redis;
 
