@@ -341,6 +341,97 @@ function fetchTaskWorkerClients() {
 }
 fetchTaskWorkerClients();
 
+// setup linked apps section
+function fetchLinkedApps() {
+    fetch('/api/v1/Account/AppLinks', {
+        method: 'GET',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+    })
+        .then(response => {
+            if (!response.ok) return [];
+            return response.json();
+        })
+        .then(data => {
+            let linkedAppsDiv = document.getElementById('linkedApps');
+            let linkedAppsList = document.getElementById('linkedAppsList');
+            linkedAppsList.innerHTML = '';
+
+            if (!Array.isArray(data) || data.length === 0) {
+                linkedAppsDiv.style.display = 'none';
+                return;
+            }
+
+            linkedAppsDiv.style.display = 'block';
+
+            data.forEach(app => {
+                let row = document.createElement('tr');
+
+                // Logo cell
+                let logoCell = document.createElement('td');
+                logoCell.style.width = '40px';
+                if (app.logoUrl) {
+                    let img = document.createElement('img');
+                    img.src = app.logoUrl;
+                    img.alt = app.appName;
+                    img.style.width = '32px';
+                    img.style.height = '32px';
+                    img.style.objectFit = 'contain';
+                    logoCell.appendChild(img);
+                }
+                row.appendChild(logoCell);
+
+                // App name cell
+                let nameCell = document.createElement('td');
+                nameCell.textContent = app.appName;
+                row.appendChild(nameCell);
+
+                // Status cell
+                let statusCell = document.createElement('td');
+                statusCell.style.width = '80px';
+                if (app.revoked) {
+                    let badge = document.createElement('span');
+                    badge.classList.add('badge');
+                    badge.style.backgroundColor = 'var(--invalid-color, #cc0000)';
+                    badge.style.color = '#ffffff';
+                    badge.textContent = lang.getLang('revoked');
+                    statusCell.appendChild(badge);
+                }
+                row.appendChild(statusCell);
+
+                // Last used cell
+                let lastUsedCell = document.createElement('td');
+                lastUsedCell.textContent = app.lastUsed
+                    ? new Date(app.lastUsed).toLocaleString()
+                    : lang.getLang('never');
+                row.appendChild(lastUsedCell);
+
+                // Revoke button cell
+                let actionCell = document.createElement('td');
+                actionCell.style.width = '100px';
+                if (!app.revoked) {
+                    let revokeBtn = document.createElement('button');
+                    revokeBtn.type = 'button';
+                    revokeBtn.textContent = lang.getLang('revokeapplink');
+                    revokeBtn.classList.add('redbutton');
+                    revokeBtn.addEventListener('click', () => {
+                        revokeBtn.disabled = true;
+                        postData('/api/v1/Account/AppLinks/' + app.id, 'DELETE', {}, true)
+                            .then(() => fetchLinkedApps());
+                    });
+                    actionCell.appendChild(revokeBtn);
+                }
+                row.appendChild(actionCell);
+
+                linkedAppsList.appendChild(row);
+            });
+        })
+        .catch(() => {
+            document.getElementById('linkedApps').style.display = 'none';
+        });
+}
+fetchLinkedApps();
+
 // setup delete account confirmation checkbox
 let deleteAccountButton = document.getElementById('deleteaccount');
 document.getElementById('deleteaccountconfirm').addEventListener("change", function (e) {

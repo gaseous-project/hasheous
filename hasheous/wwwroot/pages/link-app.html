@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="color-scheme" content="light dark">
+    <link type="text/css" href="/styles/light.css" rel="stylesheet" />
+    <link type="text/css" href="/styles/dark.css" rel="stylesheet" />
+    <link type="text/css" href="/styles/style.css" rel="stylesheet" />
+    <script src="/scripts/jquery-3.6.0.min.js"></script>
+    <script src="/scripts/login.js"></script>
+    <script src="/scripts/language.js"></script>
+    <script src="/scripts/common.js"></script>
+    <title>Hasheous – Link Application</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .link-app-container {
+            max-width: 420px;
+            width: 100%;
+        }
+
+        #app-logo {
+            display: block;
+            max-width: 80px;
+            max-height: 80px;
+            margin: 0 auto 12px auto;
+        }
+
+        #app-name {
+            font-size: 1.4em;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        #confirm-section,
+        #login-section,
+        #error-section,
+        #success-section {
+            display: none;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+            justify-content: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="link-app-container">
+        <img src="/images/logo.svg" style="display: block; width: 60px; margin: 0 auto 20px auto;" alt="Hasheous" />
+
+        <!-- Unrecognised app -->
+        <div id="error-section">
+            <h2 data-lang="linkapp_error_heading">Application Not Recognised</h2>
+            <p id="error-message" data-lang="linkapp_error_body"></p>
+        </div>
+
+        <!-- Login required -->
+        <div id="login-section">
+            <h2 data-lang="linkapp_login_heading">Sign In to Continue</h2>
+            <p data-lang="linkapp_login_body">Please sign in to your Hasheous account to authorise this application.</p>
+
+            <table style="width: 100%; margin-top: 16px;" cellpadding="5px">
+                <tr>
+                    <th data-lang="email">Email</th>
+                    <td><input type="email" id="login_email" class="inputwide" /></td>
+                </tr>
+                <tr>
+                    <th data-lang="password">Password</th>
+                    <td><input type="password" id="login_password" class="inputwide" /></td>
+                </tr>
+                <tr>
+                    <td colspan="2" id="login_errorlabel" style="color: var(--invalid-color);"></td>
+                </tr>
+                <tr>
+                    <td colspan="2">
+                        <input type="checkbox" id="login_rememberme">
+                        <label for="login_rememberme" data-lang="rememberme">Remember Me</label>
+                    </td>
+                </tr>
+            </table>
+
+            <div class="action-buttons">
+                <button type="button" class="bigbutton" id="login-btn" data-lang="signin">Sign In</button>
+                <button type="button" id="cancel-btn-login" data-lang="cancel">Cancel</button>
+            </div>
+
+            <p style="margin-top: 12px; text-align: center;">
+                <a id="register-link" data-lang="createanaccount">Create an account</a>
+            </p>
+        </div>
+
+        <!-- Confirmation -->
+        <div id="confirm-section">
+            <img id="app-logo" alt="" />
+            <div id="app-name"></div>
+            <p id="confirm-message" data-lang="linkapp_confirm_body"></p>
+            <div class="action-buttons">
+                <button type="button" class="bigbutton" id="authorise-btn" data-lang="linkapp_authorise">Authorise</button>
+                <button type="button" id="cancel-btn-confirm" class="redbutton" data-lang="cancel">Cancel</button>
+            </div>
+        </div>
+
+        <!-- Success (briefly shown before window closes) -->
+        <div id="success-section">
+            <p data-lang="linkapp_success">Authorisation complete. You may close this window.</p>
+        </div>
+    </div>
+
+    <script src="/pages/link-app.js"></script>
+</body>
+
+</html>
