@@ -304,10 +304,26 @@ namespace hasheous_server.Classes
         public async Task<DataObjectsList> GetDataObjects(DataObjectType objectType, int pageNumber = 0, int pageSize = 0, string? search = null, bool GetChildRelations = false, bool GetMetadataMap = true, AttributeItem.AttributeName? filterAttribute = null, string? filterValue = null, ApplicationUser? user = null)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql;
             Dictionary<string, object> dbDict = new Dictionary<string, object>{
                 { "objecttype", objectType }
             };
+
+            // a page is only taken when both a page number and a page size are given -
+            // otherwise every matching row is returned
+            bool paged = pageNumber >= 1 && pageSize >= 1;
+
+            // the query is assembled in parts so the row count can be asked for separately
+            // from the rows themselves
+            string selectClause;
+            string countClause;
+            string fromWhereClause;
+            string orderByClause;
+
+            // whether the page can be taken by the database. Searches order by a relevance
+            // expression that no index can serve, so the server sorts every match whether or not
+            // a LIMIT is applied - asking for the count separately would just run the full text
+            // match a second time for no gain. Those rows are paged in memory instead.
+            bool pageInDatabase = true;
 
             if (filterAttribute == null)
             {
@@ -316,21 +332,29 @@ namespace hasheous_server.Classes
                     switch (objectType)
                     {
                         case DataObjectType.App:
+                            // DISTINCT because the ACL join returns one row per ACL entry, which
+                            // would otherwise repeat an app once per entry and inflate the count
+                            selectClause = "SELECT DISTINCT DataObject.*";
+                            countClause = "SELECT COUNT(DISTINCT DataObject.Id)";
                             if (user != null)
                             {
-                                sql = "SELECT * FROM DataObject LEFT JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId AND DataObject_Attributes.AttributeType = 6 LEFT JOIN DataObject_ACL ON DataObject.Id = DataObject_ACL.DataObject_ID WHERE ObjectType = @objecttype AND (DataObject_Attributes.AttributeValue = 1 OR (DataObject_ACL.UserId = @userid AND DataObject_ACL.Read = 1)) ORDER BY `Name`;";
+                                fromWhereClause = " FROM DataObject LEFT JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId AND DataObject_Attributes.AttributeType = 6 LEFT JOIN DataObject_ACL ON DataObject.Id = DataObject_ACL.DataObject_ID WHERE ObjectType = @objecttype AND (DataObject_Attributes.AttributeValue = 1 OR (DataObject_ACL.UserId = @userid AND DataObject_ACL.Read = 1))";
                                 dbDict.Add("userid", user.Id);
                             }
                             else
                             {
-                                sql = "SELECT * FROM DataObject LEFT JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId AND DataObject_Attributes.AttributeType = 6 LEFT JOIN DataObject_ACL ON DataObject.Id = DataObject_ACL.DataObject_ID WHERE ObjectType = @objecttype AND DataObject_Attributes.AttributeValue = 1 ORDER BY `Name`;";
+                                fromWhereClause = " FROM DataObject LEFT JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId AND DataObject_Attributes.AttributeType = 6 LEFT JOIN DataObject_ACL ON DataObject.Id = DataObject_ACL.DataObject_ID WHERE ObjectType = @objecttype AND DataObject_Attributes.AttributeValue = 1";
                             }
                             break;
 
                         default:
-                            sql = "SELECT * FROM DataObject WHERE ObjectType = @objecttype ORDER BY `Name`;";
+                            selectClause = "SELECT *";
+                            countClause = "SELECT COUNT(*)";
+                            fromWhereClause = " FROM DataObject WHERE ObjectType = @objecttype";
                             break;
                     }
+
+                    orderByClause = " ORDER BY `Name`";
                 }
                 else
                 {
@@ -349,8 +373,11 @@ namespace hasheous_server.Classes
                         };
                     }
 
-                    string orderBy = Common.BuildNameRelevanceOrderBy("Name", search, dbDict);
-                    sql = "SELECT * FROM DataObject WHERE ObjectType = @objecttype AND " + searchPredicate + " ORDER BY " + orderBy + ";";
+                    pageInDatabase = false;
+                    selectClause = "SELECT *";
+                    countClause = "SELECT COUNT(*)";
+                    fromWhereClause = " FROM DataObject WHERE ObjectType = @objecttype AND " + searchPredicate;
+                    orderByClause = " ORDER BY " + Common.BuildNameRelevanceOrderBy("Name", search, dbDict);
                 }
             }
             else
@@ -358,34 +385,57 @@ namespace hasheous_server.Classes
                 dbDict.Add("filterAttribute", filterAttribute);
                 dbDict.Add("filterValue", filterValue);
 
+                selectClause = "SELECT DISTINCT DataObject.*";
+                countClause = "SELECT COUNT(DISTINCT DataObject.Id)";
+
                 switch (filterAttribute)
                 {
                     case AttributeItem.AttributeName.Manufacturer:
                     case AttributeItem.AttributeName.Publisher:
                     case AttributeItem.AttributeName.Platform:
-                        sql = "SELECT DISTINCT DataObject.* FROM DataObject JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId WHERE ObjectType = @objecttype AND DataObject_Attributes.AttributeName = @filterAttribute AND (DataObject_Attributes.AttributeRelation = @filterValue) ORDER BY `Name`;";
+                        fromWhereClause = " FROM DataObject JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId WHERE ObjectType = @objecttype AND DataObject_Attributes.AttributeName = @filterAttribute AND (DataObject_Attributes.AttributeRelation = @filterValue)";
                         break;
 
                     default:
-                        sql = "SELECT DISTINCT DataObject.* FROM DataObject JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId WHERE ObjectType = @objecttype AND DataObject_Attributes.AttributeName = @filterAttribute AND (DataObject_Attributes.AttributeValue = @filterValue) ORDER BY `Name`;";
+                        fromWhereClause = " FROM DataObject JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId WHERE ObjectType = @objecttype AND DataObject_Attributes.AttributeName = @filterAttribute AND (DataObject_Attributes.AttributeValue = @filterValue)";
                         break;
                 }
+
+                orderByClause = " ORDER BY `Name`";
             }
 
-            DataTable data = await db.ExecuteCMDAsync(sql, dbDict);
+            // the offset of the first row of the requested page within the whole result set
+            int pageOffset = paged ? pageSize * (pageNumber - 1) : 0;
+
+            DataTable data;
+            int totalCount;
+
+            if (paged && pageInDatabase)
+            {
+                // ask for the size of the result set, then for just the rows of this page
+                DataTable countData = await db.ExecuteCMDAsync(countClause + fromWhereClause + ";", dbDict);
+                totalCount = Convert.ToInt32(countData.Rows[0][0]);
+
+                dbDict.Add("pagesize", pageSize);
+                dbDict.Add("pageoffset", pageOffset);
+                data = await db.ExecuteCMDAsync(selectClause + fromWhereClause + orderByClause + " LIMIT @pagesize OFFSET @pageoffset;", dbDict);
+            }
+            else
+            {
+                data = await db.ExecuteCMDAsync(selectClause + fromWhereClause + orderByClause + ";", dbDict);
+                totalCount = data.Rows.Count;
+            }
 
             List<Models.DataObjectItem> DataObjects = new List<Models.DataObjectItem>();
 
-            // compile data for return
-            int pageOffset = pageSize * (pageNumber - 1);
-            for (int i = pageOffset; i < data.Rows.Count; i++)
+            // compile data for return. Rows the database has already paged start at the first
+            // row returned; rows paged here start at the offset of the requested page.
+            int firstRow = (paged && pageInDatabase) ? 0 : pageOffset;
+            for (int i = firstRow; i < data.Rows.Count; i++)
             {
-                if (pageNumber != 0 && pageSize != 0)
+                if (paged && !pageInDatabase && i >= (pageOffset + pageSize))
                 {
-                    if (i >= (pageOffset + pageSize))
-                    {
-                        break;
-                    }
+                    break;
                 }
 
                 Models.DataObjectItem item = await BuildDataObject(
@@ -400,14 +450,14 @@ namespace hasheous_server.Classes
                 DataObjects.Add(item);
             }
 
-            float pageCount = (float)data.Rows.Count / (float)pageSize;
             DataObjectsList objectsList = new DataObjectsList
             {
                 Objects = DataObjects,
-                Count = data.Rows.Count,
+                Count = totalCount,
                 PageNumber = pageNumber,
                 PageSize = pageSize,
-                TotalPages = (int)Math.Ceiling(pageCount)
+                // without a page size there is a single page holding everything
+                TotalPages = paged ? (int)Math.Ceiling((double)totalCount / pageSize) : (totalCount > 0 ? 1 : 0)
             };
 
             return objectsList;
