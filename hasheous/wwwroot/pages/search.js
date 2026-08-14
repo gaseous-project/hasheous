@@ -105,6 +105,10 @@ function createDataObjectsTable(targetDiv, pageType, pageNumber, pageSize) {
                 resultDiv.appendChild(newTable);
             }
             );
+    } else if (pageSearchBox.value.length > 0) {
+        // tell the user why nothing happened instead of claiming there are no records
+        document.getElementById('searchresultspanel').style.display = '';
+        ShowError(targetDiv, lang.getLang('searchminlength'));
     } else {
         ShowError(targetDiv);
     }
@@ -206,12 +210,17 @@ function createDataObjectsTableFromMD5Search(hashType) {
 }
 
 function performSearch() {
-    const regexExp_md5 = /^[a-f0-9]{32}$/gi;
-    const regexExp_sha256 = /\b([a-f0-9]{64})\b/;
-    const regexExp_sha256_alt = /\b([a-f0-9]{64})\b/; // Some SHA256 hashes may be in uppercase
-    const regexExp_sha1 = /\b([a-f0-9]{40})\b/;
-    const regexExp_crc32 = /\b([a-f0-9]{8})\b/;
-    if (regexExp_sha256.test(pageSearchBox.value) || regexExp_sha256_alt.test(pageSearchBox.value)) {
+    // a hash is the whole search string or it is not a hash - an unanchored match would
+    // send ordinary text searches that happen to contain a hex word to the hash lookup
+    const regexExp_sha256 = /^[a-f0-9]{64}$/i;
+    const regexExp_sha1 = /^[a-f0-9]{40}$/i;
+    const regexExp_md5 = /^[a-f0-9]{32}$/i;
+    const regexExp_crc32 = /^[a-f0-9]{8}$/i;
+
+    // trailing whitespace from a copied hash, or from typing, should not change the search
+    pageSearchBox.value = pageSearchBox.value.trim();
+
+    if (regexExp_sha256.test(pageSearchBox.value)) {
         // is a SHA256
         createDataObjectsTableFromMD5Search('sha256');
     } else if (regexExp_md5.test(pageSearchBox.value)) {
@@ -230,12 +239,12 @@ function performSearch() {
     }
 }
 
-function ShowError(targetDiv) {
+function ShowError(targetDiv, message) {
     let errorDiv = document.getElementById(targetDiv);
     errorDiv.innerHTML = '';
 
     let errorMessage = document.createElement('span');
-    errorMessage.innerHTML = lang.getLang('norecords');
+    errorMessage.innerHTML = message || lang.getLang('norecords');
 
     errorDiv.appendChild(errorMessage);
 }

@@ -804,41 +804,223 @@ namespace Classes
 			return d[left.Length, right.Length];
 		}
 
-		public static string BuildFullTextBooleanPrefixQuery(string input)
+		/// <summary>
+		/// The shortest word the database full text engine will index, as controlled by
+		/// InnoDB's innodb_ft_min_token_size (default 3). Words shorter than this never
+		/// enter the index, so requiring one in a boolean mode query - for example the
+		/// "4" in "dynasty warriors 4" - makes the entire query match nothing.
+		/// Short words are matched with a regular expression instead.
+		/// </summary>
+		public const int FullTextMinimumTokenLength = 3;
+
+		/// <summary>
+		/// InnoDB's default stopword list. These words are skipped when the full text index is
+		/// built, so - exactly like words below <see cref="FullTextMinimumTokenLength"/> -
+		/// requiring one in a boolean mode query matches nothing. "The Legend of Zelda" is
+		/// unfindable without this, because "the" never reaches the index.
+		/// </summary>
+		private static readonly HashSet<string> FullTextStopWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
 		{
-			StringBuilder result = new StringBuilder(input.Length + 16);
-			StringBuilder token = new StringBuilder(32);
+			"a", "about", "an", "are", "as", "at", "be", "by", "com", "de", "en", "for",
+			"from", "how", "i", "in", "is", "it", "la", "of", "on", "or", "that", "the",
+			"this", "to", "und", "was", "what", "when", "where", "who", "will", "with", "www"
+		};
+
+		/// <summary>
+		/// The words of a search string, split by whether the full text index can serve them.
+		/// </summary>
+		public class SearchTerms
+		{
+			/// <summary>
+			/// Words the full text index contains, and which can be matched through it.
+			/// </summary>
+			public List<string> IndexedWords { get; } = new List<string>();
+
+			/// <summary>
+			/// Words the full text index does not contain - those below
+			/// <see cref="FullTextMinimumTokenLength"/> and those on the stopword list.
+			/// </summary>
+			public List<string> UnindexedWords { get; } = new List<string>();
+
+			/// <summary>
+			/// True if the search string contained anything searchable at all.
+			/// </summary>
+			public bool HasWords => IndexedWords.Count > 0 || UnindexedWords.Count > 0;
+
+			/// <summary>
+			/// The indexed words as a MySQL boolean mode query, each required and prefix matched.
+			/// Empty if there are no indexed words.
+			/// </summary>
+			public string BooleanQuery
+			{
+				get
+				{
+					StringBuilder result = new StringBuilder();
+					foreach (string word in IndexedWords)
+					{
+						if (result.Length > 0)
+						{
+							result.Append(' ');
+						}
+						result.Append('+').Append(word).Append('*');
+					}
+					return result.ToString();
+				}
+			}
+		}
+
+		/// <summary>
+		/// Splits a search string into words on any non alphanumeric character, and sorts them
+		/// into those the full text index can serve and those it cannot.
+		/// </summary>
+		/// <param name="input">The raw search string entered by the user.</param>
+		/// <returns>The words of the search string.</returns>
+		public static SearchTerms SplitSearchTerms(string? input)
+		{
+			SearchTerms terms = new SearchTerms();
+
+			if (string.IsNullOrWhiteSpace(input))
+			{
+				return terms;
+			}
+
+			StringBuilder word = new StringBuilder(32);
+
+			void FlushWord()
+			{
+				if (word.Length == 0)
+				{
+					return;
+				}
+
+				string value = word.ToString();
+				if (value.Length >= FullTextMinimumTokenLength && !FullTextStopWords.Contains(value))
+				{
+					terms.IndexedWords.Add(value);
+				}
+				else
+				{
+					terms.UnindexedWords.Add(value);
+				}
+
+				word.Clear();
+			}
 
 			for (int i = 0; i < input.Length; i++)
 			{
 				char current = input[i];
 				if (char.IsLetterOrDigit(current))
 				{
-					token.Append(current);
+					word.Append(current);
 				}
-				else if (token.Length > 0)
+				else
 				{
-					if (result.Length > 0)
-					{
-						result.Append(' ');
-					}
-
-					result.Append('+').Append(token).Append('*');
-					token.Clear();
+					FlushWord();
 				}
 			}
 
-			if (token.Length > 0)
+			FlushWord();
+
+			return terms;
+		}
+
+		public static string BuildFullTextBooleanPrefixQuery(string input)
+		{
+			return SplitSearchTerms(input).BooleanQuery;
+		}
+
+		/// <summary>
+		/// Builds a WHERE fragment that matches every word of the search string against the
+		/// supplied column. Words the full text index holds are matched through it; the words it
+		/// does not hold - short words and stopwords - are matched with a word prefix regular
+		/// expression against the rows the index has already narrowed down.
+		/// </summary>
+		/// <param name="column">
+		/// The column to search. Must be a literal column name supplied by the caller - it is
+		/// interpolated into the SQL and is not parameterised.
+		/// </param>
+		/// <param name="search">The raw search string entered by the user.</param>
+		/// <param name="parameters">The parameter dictionary the query will be executed with. Added to in place.</param>
+		/// <param name="parameterPrefix">A prefix for the parameter names, to keep them unique within the query.</param>
+		/// <returns>A parenthesised SQL fragment, or null if the search string contained nothing searchable.</returns>
+		public static string? BuildNameSearchPredicate(string column, string? search, Dictionary<string, object> parameters, string parameterPrefix = "search")
+		{
+			SearchTerms terms = SplitSearchTerms(search);
+
+			if (!terms.HasWords)
 			{
-				if (result.Length > 0)
-				{
-					result.Append(' ');
-				}
-
-				result.Append('+').Append(token).Append('*');
+				return null;
 			}
 
-			return result.ToString();
+			List<string> clauses = new List<string>();
+
+			if (terms.IndexedWords.Count > 0)
+			{
+				string parameterName = parameterPrefix + "_fulltext";
+				parameters[parameterName] = terms.BooleanQuery;
+				clauses.Add("MATCH(`" + column + "`) AGAINST(@" + parameterName + " IN BOOLEAN MODE)");
+			}
+
+			for (int i = 0; i < terms.UnindexedWords.Count; i++)
+			{
+				string parameterName = parameterPrefix + "_unindexed" + i;
+				// words are alphanumeric only, so they carry no regular expression metacharacters.
+				// \b anchors to a word start, giving the same prefix match the full text words get.
+				parameters[parameterName] = "\\b" + terms.UnindexedWords[i];
+				clauses.Add("`" + column + "` RLIKE @" + parameterName);
+			}
+
+			return "(" + string.Join(" AND ", clauses) + ")";
+		}
+
+		/// <summary>
+		/// Builds an ORDER BY fragment that puts the closest matches first: an exact name match,
+		/// then names starting with the search string, then names containing it, then everything
+		/// else. Within each band the shortest name wins, so "Dynasty Warriors 4" outranks
+		/// "Dynasty Warriors 4: Empires".
+		/// </summary>
+		/// <param name="column">
+		/// The column that was searched. Must be a literal column name supplied by the caller - it
+		/// is interpolated into the SQL and is not parameterised.
+		/// </param>
+		/// <param name="search">The raw search string entered by the user.</param>
+		/// <param name="parameters">The parameter dictionary the query will be executed with. Added to in place.</param>
+		/// <param name="parameterPrefix">A prefix for the parameter names, to keep them unique within the query.</param>
+		/// <returns>A SQL fragment for use after ORDER BY.</returns>
+		public static string BuildNameRelevanceOrderBy(string column, string? search, Dictionary<string, object> parameters, string parameterPrefix = "search")
+		{
+			string trimmed = (search ?? "").Trim();
+
+			if (trimmed.Length == 0)
+			{
+				return "`" + column + "`";
+			}
+
+			string escaped = EscapeLikePattern(trimmed);
+
+			parameters[parameterPrefix + "_exact"] = trimmed;
+			parameters[parameterPrefix + "_prefix"] = escaped + "%";
+			parameters[parameterPrefix + "_contains"] = "%" + escaped + "%";
+
+			return "CASE" +
+				" WHEN `" + column + "` = @" + parameterPrefix + "_exact THEN 0" +
+				" WHEN `" + column + "` LIKE @" + parameterPrefix + "_prefix THEN 1" +
+				" WHEN `" + column + "` LIKE @" + parameterPrefix + "_contains THEN 2" +
+				" ELSE 3 END, CHAR_LENGTH(`" + column + "`), `" + column + "`";
+		}
+
+		/// <summary>
+		/// Escapes the characters that carry meaning inside a SQL LIKE pattern, so a user supplied
+		/// string is matched literally.
+		/// </summary>
+		/// <param name="value">The string to escape.</param>
+		/// <returns>The escaped string.</returns>
+		public static string EscapeLikePattern(string value)
+		{
+			return value
+				.Replace("\\", "\\\\")
+				.Replace("%", "\\%")
+				.Replace("_", "\\_");
 		}
 
 		/// <summary>

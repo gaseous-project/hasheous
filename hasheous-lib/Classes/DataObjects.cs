@@ -334,9 +334,23 @@ namespace hasheous_server.Classes
                 }
                 else
                 {
-                    sql = "SELECT * FROM DataObject WHERE ObjectType = @objecttype AND MATCH(`Name`) AGAINST(@name IN BOOLEAN MODE) ORDER BY `Name`;";
-                    string searchTerms = Common.BuildFullTextBooleanPrefixQuery(search);
-                    dbDict.Add("name", searchTerms);
+                    string? searchPredicate = Common.BuildNameSearchPredicate("Name", search, dbDict);
+
+                    if (searchPredicate == null)
+                    {
+                        // the search string held no letters or digits, so there is nothing to match on
+                        return new DataObjectsList
+                        {
+                            Objects = new List<Models.DataObjectItem>(),
+                            Count = 0,
+                            PageNumber = pageNumber,
+                            PageSize = pageSize,
+                            TotalPages = 0
+                        };
+                    }
+
+                    string orderBy = Common.BuildNameRelevanceOrderBy("Name", search, dbDict);
+                    sql = "SELECT * FROM DataObject WHERE ObjectType = @objecttype AND " + searchPredicate + " ORDER BY " + orderBy + ";";
                 }
             }
             else
