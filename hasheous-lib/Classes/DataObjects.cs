@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Data;
 using System.Reflection;
 using System.Security.Cryptography.Xml;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Authentication;
@@ -623,6 +624,21 @@ namespace hasheous_server.Classes
 
         private void UpdateDataObjectDate(long DataObjectId)
         {
+            UpdateDataObjectDate(DataObjectId, null);
+        }
+
+        /// <summary>
+        /// Stamps the object as updated and drops its cache entry.
+        /// </summary>
+        /// <param name="DataObjectId">The object to stamp.</param>
+        /// <param name="objectType">
+        /// The object's type, when the caller already knows it. Only the type is needed here, to
+        /// build the cache key - pass it in and no lookup happens at all. When it is null the type
+        /// is read with a single row query rather than by building the object, which would walk
+        /// every signature and every rom the object has.
+        /// </param>
+        private void UpdateDataObjectDate(long DataObjectId, DataObjectType? objectType)
+        {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "UPDATE DataObject SET UpdatedDate=@updateddate WHERE Id=@id;";
             db.ExecuteNonQuery(sql, new Dictionary<string, object>{
@@ -631,13 +647,23 @@ namespace hasheous_server.Classes
             });
 
             // get the object type
-            DataObjectItem? item = GetDataObject(DataObjectId).Result;
-            if (item != null)
+            DataObjectType? resolvedObjectType = objectType;
+            if (resolvedObjectType == null)
             {
-                DataObjectType objectType = item.ObjectType;
+                DataTable data = db.ExecuteCMD("SELECT ObjectType FROM DataObject WHERE Id=@id;", new Dictionary<string, object>{
+                    { "id", DataObjectId }
+                });
 
+                if (data.Rows.Count > 0)
+                {
+                    resolvedObjectType = (DataObjectType)data.Rows[0]["ObjectType"];
+                }
+            }
+
+            if (resolvedObjectType != null)
+            {
                 // generate a cache key for this object id
-                string cacheKey = DataObjectCacheKey(objectType, DataObjectId);
+                string cacheKey = DataObjectCacheKey((DataObjectType)resolvedObjectType, DataObjectId);
                 // purge redis cache of this object
                 if (Config.RedisConfiguration.Enabled)
                 {
@@ -1767,17 +1793,50 @@ namespace hasheous_server.Classes
             }
 
             // signatures
-            sql = "DELETE FROM DataObject_SignatureMap WHERE DataObjectId=@id";
-            db.ExecuteNonQuery(sql, new Dictionary<string, object>{
-                { "id", id }
-            });
-            List<long> signatureIds = new List<long>();
-            foreach (Dictionary<string, object>? signature in model.SignatureDataObjects)
+            HashSet<long> signatureIds = new HashSet<long>();
+            foreach (Dictionary<string, object>? signature in model.SignatureDataObjects ?? new List<Dictionary<string, object>>())
             {
-                if (!signatureIds.Contains(long.Parse(signature["SignatureId"].ToString())))
+                signatureIds.Add(long.Parse(signature["SignatureId"].ToString()));
+            }
+
+            HashSet<long> existingSignatureIds = new HashSet<long>();
+            foreach (Dictionary<string, object>? signature in EditedObject.SignatureDataObjects ?? new List<Dictionary<string, object>>())
+            {
+                existingSignatureIds.Add(long.Parse(signature["SignatureId"].ToString()));
+            }
+
+            // only rewrite the map when it has actually changed - an edit that leaves the
+            // signatures alone should not touch them at all
+            if (!signatureIds.SetEquals(existingSignatureIds))
+            {
+                sql = "DELETE FROM DataObject_SignatureMap WHERE DataObjectId=@id";
+                db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                    { "id", id }
+                });
+
+                if (signatureIds.Count > 0)
                 {
-                    AddSignature(id, objectType, long.Parse(signature["SignatureId"].ToString()));
-                    signatureIds.Add(long.Parse(signature["SignatureId"].ToString()));
+                    // insert the whole map in one statement rather than a round trip per signature
+                    StringBuilder signatureSql = new StringBuilder("INSERT INTO DataObject_SignatureMap (DataObjectId, DataObjectTypeId, SignatureId) VALUES ");
+                    Dictionary<string, object> signatureDict = new Dictionary<string, object>{
+                        { "id", id },
+                        { "typeid", objectType }
+                    };
+
+                    int signatureIndex = 0;
+                    foreach (long signatureId in signatureIds)
+                    {
+                        if (signatureIndex > 0)
+                        {
+                            signatureSql.Append(", ");
+                        }
+                        signatureSql.Append("(@id, @typeid, @sigid").Append(signatureIndex).Append(')');
+                        signatureDict.Add("sigid" + signatureIndex, signatureId);
+                        signatureIndex++;
+                    }
+                    signatureSql.Append(';');
+
+                    db.ExecuteNonQuery(signatureSql.ToString(), signatureDict);
                 }
             }
 
@@ -1834,7 +1893,7 @@ namespace hasheous_server.Classes
                 }
             }
 
-            UpdateDataObjectDate(id);
+            UpdateDataObjectDate(id, objectType);
 
             if (metadataChangeDetected == true)
             {
@@ -2416,7 +2475,7 @@ namespace hasheous_server.Classes
                 }
 
                 // update date
-                UpdateDataObjectDate((long)item.Id);
+                UpdateDataObjectDate((long)item.Id, objectType);
 
                 // enqueue AI description and tagging task if not already present
                 if (aiTaskPresent == false)
@@ -2917,20 +2976,20 @@ namespace hasheous_server.Classes
                 { "sigid", SignatureId }
             });
 
-            UpdateDataObjectDate(DataObjectId);
+            UpdateDataObjectDate(DataObjectId, dataObjectType);
         }
 
         public void DeleteSignature(long DataObjectId, DataObjectType dataObjectType, long SignatureId)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql = "DELETE FROM DataObject_SignatureMap WHERE DataObjectId=@id AND DataObjectTypeId=@typeid AND SignatureId=@sigid);";
+            string sql = "DELETE FROM DataObject_SignatureMap WHERE DataObjectId=@id AND DataObjectTypeId=@typeid AND SignatureId=@sigid;";
             db.ExecuteNonQuery(sql, new Dictionary<string, object>{
                 { "id", DataObjectId },
                 { "typeid", dataObjectType },
                 { "sigid", SignatureId }
             });
 
-            UpdateDataObjectDate(DataObjectId);
+            UpdateDataObjectDate(DataObjectId, dataObjectType);
         }
 
         /// <summary>
@@ -3201,7 +3260,7 @@ namespace hasheous_server.Classes
             {
                 var editDataObject = EditDataObject(targetObject.ObjectType, targetObject.Id, targetObject);
                 var dataObjectMetadataSearch = DataObjectMetadataSearch(targetObject.ObjectType, targetObject.Id, false);
-                UpdateDataObjectDate(targetObject.Id);
+                UpdateDataObjectDate(targetObject.Id, targetObject.ObjectType);
                 DeleteDataObject(sourceObject.ObjectType, sourceObject.Id);
             }
 
