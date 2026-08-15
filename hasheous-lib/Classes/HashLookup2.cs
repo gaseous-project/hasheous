@@ -108,7 +108,7 @@ namespace Classes
         /// Perform the hash lookup operation. This will populate the properties of the HashLookup object with the results of the lookup.
         /// </summary>
         /// <param name="userInteractiveSession">If true, will run with a 5 second timeout for metadata search to ensure a timely response for the user. If false, will run without a timeout to ensure the most complete metadata possible, even if it takes a long time.</param>
-        /// <param name="applyMatchingBlocks">If true, will check for and apply any matching blocks that may be in place for the discovered game. If false, will not check for or apply any matching blocks. Default is true.</param>
+        /// <param name="applyMatchingBlocks">If true, will check for and apply any matching blocks that may be in place for the discovered game. If false, will not check for or apply any matching blocks. Default is false.</param>
         /// <exception cref="HashNotFoundException">Thrown if the provided hash is not found in any signature database.</exception>
         /// <returns>A Task representing the asynchronous operation.</returns>
         public async Task PerformLookup(bool userInteractiveSession = false, bool applyMatchingBlocks = false)
@@ -145,9 +145,9 @@ namespace Classes
                 if (sig.Game != null)
                 {
                     // check signature is not mapped to a blocked dataobject
-                    long sigId = sig.Game.Id != null ? long.Parse(sig.Game.Id) : 0;
                     if (applyMatchingBlocks)
                     {
+                        long sigId = sig.Game.Id != null ? long.Parse(sig.Game.Id) : 0;
                         var dataObject = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Game, sigId);
                         if (dataObject != null && dataObject.Any(d => d.IsBlockedFromMatching == true))
                         {
@@ -214,7 +214,11 @@ namespace Classes
                 if (publisher == null)
                 {
                     // redis is not enabled, so we will not use the cache
-                    publisher = (await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId)).FirstOrDefault();
+                    var publishers = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
+                    if (publishers != null && publishers.Count > 0)
+                    {
+                        publisher = publishers.FirstOrDefault();
+                    }
                     if (publisher == null && this.ForceSearch)
                     {
                         // no returned publisher! create one
@@ -306,7 +310,11 @@ namespace Classes
             if (game == null)
             {
                 // redis is not enabled, so we will not use the cache
-                game = (await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Game, long.Parse(discoveredSignature.Game.Id))).FirstOrDefault();
+                var games = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Game, long.Parse(discoveredSignature.Game.Id));
+                if (games != null && games.Count > 0)
+                {
+                    game = games.FirstOrDefault();
+                }
 
                 // store the game in the cache for 6 hours
                 if (Config.RedisConfiguration.Enabled && game != null)

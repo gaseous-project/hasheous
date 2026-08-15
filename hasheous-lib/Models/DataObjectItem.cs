@@ -424,9 +424,5 @@ namespace hasheous_server.Models
         /// Gets or sets the user-specific permissions for the data object item. This property is a dictionary that maps user identifiers to a list of permission types, allowing for fine-grained control over access to the data object item based on individual users.
         /// </summary>
         public Dictionary<string, List<DataObjectPermission.PermissionType>>? UserPermissions { get; set; }
-        /// <summary>
-        /// Gets or sets a value indicating whether the data object item is blocked from being returned when querying for signature matches. When set to true, any associated signature matches will be excluded from the results, effectively preventing the data object item from being considered in matching operations.
-        /// </summary>
-        public bool IsBlockedFromMatching { get; set; }
     }
 }

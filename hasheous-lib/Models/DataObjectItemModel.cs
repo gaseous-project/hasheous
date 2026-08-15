@@ -4,7 +4,13 @@ namespace hasheous_server.Models
 {
     public class DataObjectItemModel
     {
+        /// <summary>
+        /// Gets or sets the unique identifier for the data object item. This identifier is used to distinguish the data object item from other items in the system.
+        /// </summary>
         public string Name { get; set; }
+        /// <summary>
+        /// Gets or sets a value indicating whether the data object item is blocked from being returned when querying for signature matches. When set to true, any associated signature matches will be excluded from the results, effectively preventing the data object item from being considered in matching operations.
+        /// </summary>
         public bool IsBlockedFromMatching { get; set; }
     }
 
