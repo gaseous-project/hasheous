@@ -5,6 +5,7 @@ namespace hasheous_server.Models
     public class DataObjectItemModel
     {
         public string Name { get; set; }
+        public bool IsBlockedFromMatching { get; set; }
     }
 
     public class AttributeItem

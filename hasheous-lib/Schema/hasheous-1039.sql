@@ -1,0 +1,2 @@
+ALTER TABLE `DataObject`
+ADD COLUMN `IsBlockedFromMatching` BOOLEAN DEFAULT 0;

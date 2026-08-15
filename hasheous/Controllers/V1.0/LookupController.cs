@@ -177,7 +177,7 @@ namespace hasheous_server.Controllers.v1_0
                 }
 
                 HashLookup hashLookup = new HashLookup(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), modelList, returnAllSources, returnFields, returnSourcesList);
-                await hashLookup.PerformLookup(true);
+                await hashLookup.PerformLookup(true, true);
 
                 if (hashLookup == null)
                 {

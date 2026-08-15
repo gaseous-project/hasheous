@@ -425,8 +425,8 @@ namespace hasheous_server.Models
         /// </summary>
         public Dictionary<string, List<DataObjectPermission.PermissionType>>? UserPermissions { get; set; }
         /// <summary>
-        /// Gets or sets a value indicating whether the data object item is blocked. A blocked data object item will not be returned to the user in API responses.
+        /// Gets or sets a value indicating whether the data object item is blocked from being returned when querying for signature matches. When set to true, any associated signature matches will be excluded from the results, effectively preventing the data object item from being considered in matching operations.
         /// </summary>
-        public bool IsBlocked { get; set; }
+        public bool IsBlockedFromMatching { get; set; }
     }
 }

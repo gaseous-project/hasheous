@@ -203,6 +203,12 @@ function renderContent() {
     document.getElementById('page_date_box_createdDate').innerHTML = moment(dataObject.createdDate + 'Z').format('lll');
     document.getElementById('page_date_box_updatedDate').innerHTML = moment(dataObject.updatedDate + 'Z').format('lll');
 
+    if (dataObject.isBlockedFromMatching) {
+        document.getElementById('dataObject_object_isBlockedFromMatching').style.display = '';
+    } else {
+        document.getElementById('dataObject_object_isBlockedFromMatching').style.display = 'none';
+    }
+
     let mergeIntoSelector = document.getElementById('dataObjectMergeSelect');
     $(mergeIntoSelector).select2({
         minimumInputLength: 3,
