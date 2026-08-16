@@ -278,17 +278,12 @@ function renderContent() {
                 document.getElementById('dataObjectAIDescriptionSection').style.display = '';
 
                 // render AI description - content is markdown
-                let markdownText = dataObject.attributes[i].value;
-                // convert markdown to HTML using marked
-                let htmlContent = marked.parse(markdownText);
+                const markdownText = dataObject.attributes[i].value;
+                const safeHtml = renderSafeMarkdown(markdownText);
 
                 let aiDescBody = document.createElement('span');
                 aiDescBody.classList.add('descriptionspan');
-                let tempEl = document.createElement('div');
-                tempEl.innerHTML = htmlContent;
-                tempEl.querySelectorAll('script,iframe,object,embed,style').forEach(el => el.remove());
-                tempEl.querySelectorAll('*').forEach(el => Array.from(el.attributes).forEach(a => { if (a.name.startsWith('on') || (a.name === 'href' && /^javascript:/i.test(a.value))) el.removeAttribute(a.name); }));
-                aiDescBody.innerHTML = tempEl.innerHTML;
+                aiDescBody.innerHTML = safeHtml;
                 aiDescriptionElement.appendChild(aiDescBody);
 
                 break;
