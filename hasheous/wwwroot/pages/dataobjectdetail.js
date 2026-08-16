@@ -269,7 +269,7 @@ function renderContent() {
 
                 let descBody = document.createElement('span');
                 descBody.classList.add('descriptionspan');
-                descBody.innerHTML = dataObject.attributes[i].value;
+                descBody.textContent = dataObject.attributes[i].value;
                 descriptionElement.appendChild(descBody);
 
                 break;
@@ -278,13 +278,12 @@ function renderContent() {
                 document.getElementById('dataObjectAIDescriptionSection').style.display = '';
 
                 // render AI description - content is markdown
-                let markdownText = dataObject.attributes[i].value;
-                // convert markdown to HTML using marked
-                let htmlContent = marked.parse(markdownText);
+                const markdownText = dataObject.attributes[i].value;
+                const safeHtml = renderSafeMarkdown(markdownText);
 
                 let aiDescBody = document.createElement('span');
                 aiDescBody.classList.add('descriptionspan');
-                aiDescBody.innerHTML = htmlContent;
+                aiDescBody.innerHTML = safeHtml;
                 aiDescriptionElement.appendChild(aiDescBody);
 
                 break;
