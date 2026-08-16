@@ -485,7 +485,7 @@ namespace InternetGameDatabase
                                                 {
                                                     case "BOOLEAN":
                                                         // if columnValue is any value other than "0" or "1", treat it as true
-                                                        columnValues.Add(columns[j], columnValue == "1" || columnValue.ToLower() == "true");
+                                                        columnValues.Add(columns[j], columnValue == "1" || columnValue.ToLower() == "t" || columnValue.ToLower() == "true");
                                                         break;
 
                                                     case "INTEGER[]":

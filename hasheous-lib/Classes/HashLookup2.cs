@@ -108,9 +108,10 @@ namespace Classes
         /// Perform the hash lookup operation. This will populate the properties of the HashLookup object with the results of the lookup.
         /// </summary>
         /// <param name="userInteractiveSession">If true, will run with a 5 second timeout for metadata search to ensure a timely response for the user. If false, will run without a timeout to ensure the most complete metadata possible, even if it takes a long time.</param>
+        /// <param name="applyMatchingBlocks">If true, will check for and apply any matching blocks that may be in place for the discovered game. If false, will not check for or apply any matching blocks. Default is false.</param>
         /// <exception cref="HashNotFoundException">Thrown if the provided hash is not found in any signature database.</exception>
         /// <returns>A Task representing the asynchronous operation.</returns>
-        public async Task PerformLookup(bool userInteractiveSession = false)
+        public async Task PerformLookup(bool userInteractiveSession = false, bool applyMatchingBlocks = false)
         {
             // parse return fields
             HashSet<ValidFields> validFields = new HashSet<ValidFields>();
@@ -138,10 +139,23 @@ namespace Classes
             HashSet<string> uniqueGameIds = new HashSet<string>();
             Signatures_Games_2? firstSignature = null;
             Signatures_Games_2? bestScoringSignature = null;
-            foreach (Signatures_Games_2 sig in rawSignatures)
+            var rawSignaturesList = rawSignatures.ToList();
+            foreach (Signatures_Games_2 sig in rawSignaturesList)
             {
                 if (sig.Game != null)
                 {
+                    // check signature is not mapped to a blocked dataobject
+                    if (applyMatchingBlocks)
+                    {
+                        long sigId = sig.Game.Id != null ? long.Parse(sig.Game.Id) : 0;
+                        var dataObject = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Game, sigId);
+                        if (dataObject != null && dataObject.Any(d => d.IsBlockedFromMatching == true))
+                        {
+                            rawSignatures.Remove(sig);
+                            continue;
+                        }
+                    }
+
                     if (firstSignature == null)
                     {
                         firstSignature = sig;
@@ -200,7 +214,11 @@ namespace Classes
                 if (publisher == null)
                 {
                     // redis is not enabled, so we will not use the cache
-                    publisher = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
+                    var publishers = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
+                    if (publishers != null && publishers.Count > 0)
+                    {
+                        publisher = publishers.FirstOrDefault();
+                    }
                     if (publisher == null && this.ForceSearch)
                     {
                         // no returned publisher! create one
@@ -244,12 +262,16 @@ namespace Classes
             if (platform == null)
             {
                 // redis is not enabled, so we will not use the cache
-                platform = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId);
-
-                // store the platform in the cache for 7 days
-                if (Config.RedisConfiguration.Enabled && platform != null)
+                var platforms = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId);
+                if (platforms != null && platforms.Count > 0)
                 {
-                    RedisConnection.GetDatabase(0).StringSet(platformCacheKey, JsonConvert.SerializeObject(platform), TimeSpan.FromHours(6));
+                    platform = platforms.FirstOrDefault();
+
+                    // store the platform in the cache for 7 days
+                    if (Config.RedisConfiguration.Enabled && platform != null)
+                    {
+                        RedisConnection.GetDatabase(0).StringSet(platformCacheKey, JsonConvert.SerializeObject(platform), TimeSpan.FromHours(6));
+                    }
                 }
             }
 
@@ -288,7 +310,11 @@ namespace Classes
             if (game == null)
             {
                 // redis is not enabled, so we will not use the cache
-                game = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Game, long.Parse(discoveredSignature.Game.Id));
+                var games = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Game, long.Parse(discoveredSignature.Game.Id));
+                if (games != null && games.Count > 0)
+                {
+                    game = games.FirstOrDefault();
+                }
 
                 // store the game in the cache for 6 hours
                 if (Config.RedisConfiguration.Enabled && game != null)
@@ -532,7 +558,7 @@ namespace Classes
         /// <param name="objectType">The type of the object to retrieve</param>
         /// <param name="sigId">The signature id to search for</param>
         /// <returns>Null if not found; otherwise returns a DataObjectItem of type objectType</returns>
-        private async Task<DataObjectItem?> GetDataObjectFromSignatureId(Database db, DataObjects.DataObjectType objectType, long sigId)
+        private async Task<List<DataObjectItem>?> GetDataObjectFromSignatureId(Database db, DataObjects.DataObjectType objectType, long sigId)
         {
             string sql = @"
                 SELECT 
@@ -550,8 +576,18 @@ namespace Classes
             if (data.Rows.Count > 0)
             {
                 DataObjects dataObject = new DataObjects();
-                DataObjectItem item = await dataObject.GetDataObject(objectType, (long)data.Rows[0][0]);
-                return item;
+
+                List<DataObjectItem> items = new List<DataObjectItem>();
+                foreach (DataRow row in data.Rows)
+                {
+                    DataObjectItem? item = await dataObject.GetDataObject(objectType, (long)row[0]);
+                    if (item != null)
+                    {
+                        items.Add(item);
+                    }
+                }
+
+                return items;
             }
             else
             {

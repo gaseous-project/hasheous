@@ -361,5 +361,6 @@
     "servicetaskstatus": "Distributed Task Status",
     "possibleduplicates": "Possible Duplicates",
     "mergeduplicates": "Merge Duplicates",
-    "searchaliases": "Search Aliases"
+    "searchaliases": "Search Aliases",
+    "isblockedfrommatching": "Blocked from Matching. This object and associated signatures will not be used for automatic matching of hashes to metadata."
 }
