@@ -92,6 +92,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Recent migration note: `hasheous-1036.sql` adds composite indexes on `Signatures_Roms` for (`GameId`, hashes, `IngestorVersion`) to improve multi-hash lookup performance.
   - Recent migration note: `hasheous-1037.sql` adds FullText indexes for signature search fields (`Signatures_Games.Publisher`, `Signatures_Platforms.Platform`, `Signatures_Roms.Name`).
   - Recent migration note: `hasheous-1038.sql` adds an index on `Users.NormalizedEmail` to support faster admin user list ordering/filtering.
+  - Recent migration note: `hasheous-1039.sql` adds `IsBlockedFromMatching` BOOLEAN column to `DataObject` table (default 0) to allow excluding objects from automatic matching.
   - Embedded migration & support file manifest names now start with `hasheous_lib.Schema.` or `hasheous_lib.Support.`. After adding a file, ensure Build Action = EmbeddedResource and verify with `Assembly.GetExecutingAssembly().GetManifestResourceNames()` if debugging mismatches.
 
 - Caching
@@ -184,6 +185,14 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 - Practical effect: every array element must resolve for the same `GameId`, and every populated hash field inside each element must succeed for that element to pass.
 - `modelCount` is used for uniquely-named SQL parameters and subquery aliases (for example `@sha256{modelCount}`, `sr_model{modelCount}`) to avoid collisions across models.
 
+### DataObject matching blocks (new behavior)
+- `DataObject` model now includes `IsBlockedFromMatching` boolean field to allow manual exclusion of objects from automatic hash-to-metadata matching.
+- `HashLookup.PerformLookup(bool userInteractiveSession = false, bool applyMatchingBlocks = false)` now accepts `applyMatchingBlocks` parameter (defaults to false).
+- When `applyMatchingBlocks = true`, the lookup skips any discovered signatures that map to a DataObject with `IsBlockedFromMatching = true`.
+- Frontend (Game detail page): `IsBlockedFromMatching` is displayed as read-only when viewing games; edit page exposes it as a checkbox labeled "Blocked from Matching" to allow users to prevent automatic metadata matching for specific games.
+- Use case: allows moderators/admins to block problematic games from being auto-matched (e.g., for duplicate/incorrect mappings) while keeping the object in the system.
+- Database: `DataObject.IsBlockedFromMatching` persists the blocking state; backend enforces the block during lookups when the flag is enabled.
+
 - Correlation & logging
   - Middleware sets `CallContext` values (CorrelationId, CallingProcess, CallingUser); orchestrator also returns `x-correlation-id` header.
 
@@ -221,7 +230,7 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 
 ## Maintenance
 - A PR guard (`.github/workflows/copilot-instructions-guard.yml`) fails when architecture/config files change without updating this file; it prints hints via `.github/scripts/copilot-instructions-help.sh`.
-  - Update this file when: resource namespace conventions change (e.g., `hasheous_lib.*` migration), new cross-cutting utilities like `ComputeObjectPropertyHash` are added, queue coordination semantics are modified, MCP routing/tooling/auth changes, or major framework/dependency updates occur (e.g., .NET version bumps, Swagger/OpenAPI package upgrades).
+  - Update this file when: resource namespace conventions change (e.g., `hasheous_lib.*` migration), new cross-cutting utilities like `ComputeObjectPropertyHash` are added, queue coordination semantics are modified, MCP routing/tooling/auth changes, DataObject model or lookup behavior changes, or major framework/dependency updates occur (e.g., .NET version bumps, Swagger/OpenAPI package upgrades).
 
 ## API key usage examples
 - User API key (header `X-API-Key`):

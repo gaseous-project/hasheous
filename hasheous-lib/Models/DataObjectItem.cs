@@ -1,50 +1,129 @@
-using System.Threading.Tasks;
-using GiantBomb.Models;
 using hasheous_server.Classes;
 using hasheous_server.Classes.Metadata;
-using hasheous_server.Classes.Metadata.IGDB;
 
+/// <summary>
+/// Represents a data object item with its properties and metadata.
+/// </summary>
 namespace hasheous_server.Models
 {
+    /// <summary>
+    /// Represents a list of data objects with pagination information.
+    /// </summary>
     public class DataObjectsList
     {
-        public List<DataObjectItem> Objects { get; set; }
+        /// <summary>
+        /// Gets or sets the list of data objects.
+        /// </summary>
+        public List<DataObjectItem> Objects { get; set; } = new List<DataObjectItem>();
+        /// <summary>
+        /// Gets or sets the total count of data objects in the list.
+        /// </summary>
         public int Count { get; set; }
+        /// <summary>
+        /// Gets or sets the current page number of the data objects list.
+        /// </summary>
         public int PageNumber { get; set; }
+        /// <summary>
+        /// Gets or sets the page size (number of items per page) of the data objects list.
+        /// </summary>
         public int PageSize { get; set; }
+        /// <summary>
+        /// Gets or sets the total number of pages available for the data objects list.
+        /// </summary>
         public int TotalPages { get; set; }
     }
 
+    /// <summary>
+    /// Represents a data object item with its properties, metadata, and attributes.
+    /// </summary>
     public class DataObjectItem : DataObjectItemModel
     {
+        /// <summary>
+        /// Gets or sets the unique identifier of the data object item.
+        /// </summary>
         public long Id { get; set; }
+        /// <summary>
+        /// Gets or sets the type of the data object item.
+        /// </summary>
         public DataObjects.DataObjectType ObjectType { get; set; }
+        /// <summary>
+        /// Gets or sets the list of signature data objects associated with the data object item.
+        /// </summary>
         public List<Dictionary<string, object>>? SignatureDataObjects { get; set; }
+        /// <summary>
+        /// Gets or sets the list of metadata items associated with the data object item.
+        /// </summary>
         public List<MetadataItem>? Metadata { get; set; }
+        /// <summary>
+        /// Gets or sets the list of attribute items associated with the data object item.
+        /// </summary>
         public List<AttributeItem>? Attributes { get; set; }
 
+        /// <summary>
+        /// Represents a metadata item associated with a data object item, including its properties and link generation logic.
+        /// </summary>
         public class MetadataItem
         {
+            /// <summary>
+            /// Initializes a new instance of the MetadataItem class with the specified object type.
+            /// </summary>
+            /// <param name="ObjectType">The type of the data object item.</param>
             public MetadataItem(DataObjects.DataObjectType ObjectType)
             {
                 _ObjectType = ObjectType;
             }
 
+            /// <summary>
+            /// Gets the type of the data object item associated with this metadata item.
+            /// </summary>
             private DataObjects.DataObjectType _ObjectType;
 
+            /// <summary>
+            /// Gets the type of the data object item associated with this metadata item.
+            /// </summary>
             public DataObjects.DataObjectType ObjectType => _ObjectType;
 
+            /// <summary>
+            /// Gets or sets the unique identifier of the metadata item.
+            /// </summary>
             public string Id { get; set; }
+            /// <summary>
+            /// Gets or sets the immutable identifier of the metadata item, which is used to uniquely identify the item across different sources and systems.
+            /// </summary>
             public string? ImmutableId { get; set; }
+            /// <summary>
+            /// Gets or sets the status of the metadata item, indicating whether it is mapped, not mapped, or mapped with errors.
+            /// </summary>
             public MappingStatus Status { get; set; }
+            /// <summary>
+            /// Gets or sets the mapping status of the metadata item, indicating whether it is mapped, not mapped, or mapped with errors.
+            /// </summary>
             public enum MappingStatus
             {
+                /// <summary>
+                /// Indicates that the metadata item is not mapped to any data object.
+                /// </summary>
                 NotMapped,
+                /// <summary>
+                /// Indicates that the metadata item is successfully mapped to a data object.
+                /// </summary>
                 Mapped,
+                /// <summary>
+                /// Indicates that the metadata item is mapped to a data object but has encountered errors during the mapping process.
+                /// </summary>
                 MappedWithErrors
             }
+            /// <summary>
+            /// Gets or sets the match method used to determine the mapping of the metadata item, which can be based on various criteria such as exact match, fuzzy match, or custom matching algorithms.
+            /// </summary>
             public BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod? MatchMethod { get; set; }
+            /// <summary>
+            /// Gets or sets the source of the metadata item, indicating the external system or service from which the metadata was obtained.
+            /// </summary>
             public Communications.MetadataSources Source { get; set; }
+            /// <summary>
+            /// Gets the link to the metadata item based on its source and object type. If the link cannot be generated, it returns an empty string.
+            /// </summary>
             public string Link
             {
                 get
@@ -60,10 +139,25 @@ namespace hasheous_server.Models
                     }
                 }
             }
+            /// <summary>
+            /// Gets or sets the date and time when the metadata item was last searched for updates or changes.
+            /// </summary>
             public DateTime LastSearch { get; set; }
+            /// <summary>
+            /// Gets or sets the date and time when the metadata item is scheduled to be searched for updates or changes next.
+            /// </summary>
             public DateTime NextSearch { get; set; }
+            /// <summary>
+            /// Gets or sets the number of votes received by the metadata item that support its mapping to a data object.
+            /// </summary>
             public int WinningVoteCount { get; set; }
+            /// <summary>
+            /// Gets or sets the total number of votes received by the metadata item, including both supporting and opposing votes.
+            /// </summary>
             public int TotalVoteCount { get; set; }
+            /// <summary>
+            /// Gets the percentage of winning votes for the metadata item, calculated as (WinningVoteCount / TotalVoteCount) * 100. If there are no votes, it returns 0.
+            /// </summary>
             public uint WinningVotePercent
             {
                 get
@@ -79,6 +173,21 @@ namespace hasheous_server.Models
                 }
             }
 
+            /// <summary>
+            /// Builds a link to the metadata item based on its source, object type, and identifier. If the identifier is null or empty, it returns null. If the identifier is a valid URL, it returns the URL. If the source is IGDB and the identifier is an integer or long, it retrieves the corresponding IGDB object and uses its slug to build the link. Otherwise, it uses predefined link templates for different sources and object types to construct the link.
+            /// </summary>
+            /// <param name="source">
+            /// The source of the metadata item, indicating the external system or service from which the metadata was obtained.
+            /// </param>
+            /// <param name="objectType">
+            /// The type of the data object to which the metadata item is related.
+            /// </param>
+            /// <param name="id">
+            /// The identifier of the metadata item.
+            /// </param>
+            /// <returns>
+            /// A URI linking to the metadata item, or null if the link cannot be constructed.
+            /// </returns>
             private static async Task<Uri?> LinkBuilder(Communications.MetadataSources source, DataObjects.DataObjectType objectType, string id)
             {
                 // if id is null or empty, return an empty string
@@ -137,6 +246,9 @@ namespace hasheous_server.Models
                 return null;
             }
 
+            /// <summary>
+            /// Gets the predefined link templates for different metadata sources and object types. Each entry in the dictionary maps a metadata source to a list of link template items, which specify the object type and the corresponding URL template for constructing links to metadata items.
+            /// </summary>
             private static Dictionary<Communications.MetadataSources, List<LinkTemplateItem>>? _LinkTemplates = new Dictionary<Communications.MetadataSources, List<LinkTemplateItem>>
             {
                 {
@@ -286,6 +398,9 @@ namespace hasheous_server.Models
                 }
             };
 
+            /// <summary>
+            /// Represents a link template item that specifies the metadata source, object type, and URL template for constructing links to metadata items.
+            /// </summary>
             private class LinkTemplateItem
             {
                 public Communications.MetadataSources Source { get; set; }
@@ -293,9 +408,21 @@ namespace hasheous_server.Models
                 public string Template { get; set; }
             }
         }
+        /// <summary>
+        /// Gets or sets the date and time when the data object item was created. This property is used to track the creation timestamp of the data object item in the system.
+        /// </summary>
         public DateTime CreatedDate { get; set; }
+        /// <summary>
+        /// Gets or sets the date and time when the data object item was last updated. This property is used to track the last modification timestamp of the data object item in the system.
+        /// </summary>
         public DateTime UpdatedDate { get; set; }
+        /// <summary>
+        /// Gets or sets the list of permissions associated with the data object item. Each permission specifies the type of access granted to users or roles for the data object item.
+        /// </summary>
         public List<DataObjectPermission.PermissionType>? Permissions { get; set; }
+        /// <summary>
+        /// Gets or sets the user-specific permissions for the data object item. This property is a dictionary that maps user identifiers to a list of permission types, allowing for fine-grained control over access to the data object item based on individual users.
+        /// </summary>
         public Dictionary<string, List<DataObjectPermission.PermissionType>>? UserPermissions { get; set; }
     }
 }
