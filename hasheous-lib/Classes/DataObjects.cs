@@ -1305,6 +1305,7 @@ namespace hasheous_server.Classes
         public async Task<Models.DataObjectItem> EditDataObject(DataObjectType objectType, long id, Models.DataObjectItem model, bool trustModelMetadataSearchType = false)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+            List<Database.SQLTransactionItem> transactionItems = new List<Database.SQLTransactionItem>();
             string sql = "UPDATE DataObject SET `Name`=@name, `UpdatedDate`=@updateddate, `IsBlockedFromMatching`=@isblockedfrommatching WHERE ObjectType=@objecttype AND Id=@id";
             Dictionary<string, object> dbDict = new Dictionary<string, object>{
                 { "id", id },
@@ -1314,7 +1315,7 @@ namespace hasheous_server.Classes
                 { "isblockedfrommatching", model.IsBlockedFromMatching }
             };
 
-            db.ExecuteNonQuery(sql, dbDict);
+            transactionItems.Add(new Database.SQLTransactionItem(sql, dbDict));
 
             // generate a cache key for this object id
             string cacheKey = DataObjectCacheKey(objectType, id);
@@ -1581,11 +1582,11 @@ namespace hasheous_server.Classes
                                 {
                                     // update existing value
                                     sql = "UPDATE DataObject_Attributes SET " + sqlField + "=@value WHERE DataObjectId=@id AND AttributeId=@attrid;";
-                                    db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                                    transactionItems.Add(new Database.SQLTransactionItem(sql, new Dictionary<string, object>{
                                         { "id", id },
                                         { "attrid", existingAttribute.Id },
                                         { "value", newAttribute.Value }
-                                    });
+                                    }));
                                 }
                             }
                             else
@@ -1712,14 +1713,14 @@ namespace hasheous_server.Classes
 
                                 // change to manually set
                                 sql = "UPDATE DataObject_MetadataMap SET MatchMethod=@match, MetadataId=@metaid, WinningVoteCount=@winningvotecount, TotalVoteCount=@totalvotecount WHERE DataObjectId=@id AND SourceId=@source;";
-                                db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                                transactionItems.Add(new Database.SQLTransactionItem(sql, new Dictionary<string, object>{
                                     { "id", id },
                                     { "match", matchMethod ?? BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin },
                                     { "metaid", newMetadataId },
                                     { "source", existingMetadataItem.Source },
                                     { "winningvotecount", 0 },
                                     { "totalvotecount", 0 }
-                                });
+                                }));
                             }
                         }
                         else
@@ -1727,14 +1728,14 @@ namespace hasheous_server.Classes
                             metadataChangeDetected = true;
 
                             sql = "INSERT INTO DataObject_MetadataMap (DataObjectId, MetadataId, SourceId, MatchMethod, LastSearched, NextSearch) VALUES (@id, @metaid, @source, @match, @last, @next);";
-                            db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                            transactionItems.Add(new Database.SQLTransactionItem(sql, new Dictionary<string, object>{
                                 { "id", id },
                                 { "match", matchMethod ?? BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin },
                                 { "metaid", newMetadataId },
                                 { "source", newMetadataItem.Source },
                                 { "last", DateTime.UtcNow },
                                 { "next", DateTime.UtcNow.AddMonths(1) }
-                            });
+                            }));
                         }
 
                         if (trustModelMetadataSearchType == true)
@@ -1748,12 +1749,12 @@ namespace hasheous_server.Classes
                             {
                                 // update next search regardless of changes
                                 sql = "UPDATE DataObject_MetadataMap SET LastSearched=@lastsearched, NextSearch=@nextsearch WHERE DataObjectId=@id AND SourceId=@source;";
-                                db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                                transactionItems.Add(new Database.SQLTransactionItem(sql, new Dictionary<string, object>{
                                     { "id", id },
                                     { "source", newMetadataItem.Source },
                                     { "lastsearched", newMetadataItem.LastSearch },
                                     { "nextsearch", newMetadataItem.NextSearch }
-                                });
+                                }));
                             }
                         }
                     }
@@ -1786,22 +1787,22 @@ namespace hasheous_server.Classes
             {
                 // delete ai description
                 sql = "DELETE FROM DataObject_Attributes WHERE DataObjectId=@id AND AttributeType=@attrtype AND AttributeName=@attrname;";
-                db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                transactionItems.Add(new Database.SQLTransactionItem(sql, new Dictionary<string, object>{
                     { "id", id },
                     { "attrtype", (int)AttributeItem.AttributeType.LongString },
                     { "attrname", (int)AttributeItem.AttributeName.AIDescription }
-                });
+                }));
                 // delete ai tags
                 sql = "DELETE FROM DataObject_Tags WHERE DataObjectId=@id AND AIAssigned=@aiassigned;";
-                db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                transactionItems.Add(new Database.SQLTransactionItem(sql, new Dictionary<string, object>{
                     { "id", id },
                     { "aiassigned", true }
-                });
+                }));
                 // delete ai tasks
                 sql = "DELETE FROM Task_Queue WHERE dataobjectid=@id;";
-                db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                transactionItems.Add(new Database.SQLTransactionItem(sql, new Dictionary<string, object>{
                     { "id", id }
-                });
+                }));
             }
 
             // signatures
@@ -1863,9 +1864,9 @@ namespace hasheous_server.Classes
             {
                 // update access control
                 sql = "DELETE FROM DataObject_ACL WHERE DataObject_ID=@id";
-                db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                transactionItems.Add(new Database.SQLTransactionItem(sql, new Dictionary<string, object>{
                     { "id", id}
-                });
+                }));
 
                 foreach (KeyValuePair<string, List<DataObjectPermission.PermissionType>> acl in model.UserPermissions)
                 {
@@ -1906,9 +1907,14 @@ namespace hasheous_server.Classes
                         {
                             dbDict.Add("delete", false);
                         }
-                        db.ExecuteNonQuery(sql, dbDict);
+                        transactionItems.Add(new Database.SQLTransactionItem(sql, dbDict));
                     }
                 }
+            }
+
+            if (transactionItems.Count > 0)
+            {
+                await db.ExecuteTransactionCMDAsync(transactionItems);
             }
 
             UpdateDataObjectDate(id, objectType);
