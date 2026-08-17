@@ -11,6 +11,9 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
 
 - Architecture & data flow
   - MariaDB/MySQL is the source of truth. On startup, schema is created/migrated via embedded scripts (see `hasheous-lib/Classes/Database.cs::InitDB`, scripts named `hasheous-####.sql`).
+  - Data object edits now use a minimal `GetObjectStateForEdit` fetch instead of rebuilding the full object graph per signature while saving. Keep the object comparison focused on the persisted state and avoid rehydrating entire child graphs unless the code genuinely needs them.
+  - Data object save-path mutations should be collected into a `List<Database.SQLTransactionItem>` and committed once via `ExecuteTransactionCMDAsync(...)` at the end of the edit. Keep reads, metadata lookups, and comparison logic outside the transaction; only the actual SQL writes should be batched.
+  - Synthetic/generated data-object attributes (for example `SearchAliases`, `Country`, `Language`, `ROMs`, `DumpFile`) are not persisted rows in `DataObject_Attributes` and must be filtered out before handing any payload to `EditDataObject(...)`.
   - Signature data is ingested from DAT/XML (TOSEC/No-Intro/etc.) by the shared importer stack under `hasheous-lib/Classes/SignatureIngestors/` into `Signatures_*` tables.
   - Signature import has been refactored around a pluggable importer contract: `IDATFileImport` defines `StageFiles()`, `ProcessFiles()`, and `ValidateFiles()`, and `SignatureIngestor.Register<T>()`/`GetRegisteredIngestors()` discover enabled importers and create queue items. Follow this pattern for new DAT/XML sources instead of hard-coding logic in `XML.cs`.
   - Signature game import still uses the bounded worker pool pattern (`MaxConcurrentImportWorkers`, currently 4) for processing games, but the surrounding importer lifecycle is now registry-driven rather than tied to a single XML implementation.
@@ -86,6 +89,8 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
 - Data access & migrations
   - Create a `new Classes.Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString)`.
   - Prefer async methods: `ExecuteCMDAsync`/`ExecuteCMDDictAsync`; use `await` in controllers/handlers. Avoid blocking sync calls unless there’s no async alternative.
+  - For multi-step writes inside a logical edit, prefer building a transaction list and committing once with `Database.ExecuteTransactionCMDAsync(...)` rather than issuing many independent `ExecuteNonQuery` calls. This preserves atomicity and reduces repeated DB round-trips without rewriting the surrounding business logic.
+  - Generated/synthetic attribute names should be represented as a dedicated non-persisted set (or an explicit allowlist/denylist helper) rather than hidden in a broad save-time filter. Keep the persistence rule close to the edit logic so future contributors do not accidentally persist read-only values.
   - Add new migration scripts in `hasheous-lib/Schema` as `hasheous-####.sql` with the next number.
   - Recent migration note: `hasheous-1034.sql` updates `Signatures_Games.Country`/`Language` to `VARCHAR(100)` and adds country-aware composite indexes for ingestion and game matching.
   - Recent migration note: `hasheous-1035.sql` updates `Signatures_Sources.Url` to nullable `VARCHAR(255)` (from text) so source links are bounded and easier to render safely in the UI.

@@ -606,7 +606,7 @@ namespace hasheous_server.Controllers.v1_0
                         return BadRequest("The target object must be of the same type as the source object.");
                     }
 
-                    var result = DataObjects.MergeObjects(DataObject, TargetDataObject, Commit);
+                    var result = await DataObjects.MergeObjects(DataObject, TargetDataObject, Commit);
                     return Ok(result);
                 }
             }
