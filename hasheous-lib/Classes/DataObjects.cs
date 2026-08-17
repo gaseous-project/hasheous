@@ -1286,6 +1286,22 @@ namespace hasheous_server.Classes
             }
         }
 
+        private async Task<DataObjectItem> GetObjectStateForEdit(DataObjectType objectType, long id)
+        {
+            var attributes = await GetAttributes(id, true);
+            var metadata = await GetMetadataMap(objectType, id);
+            var signatures = await GetSignatures(objectType, id);
+
+            return new DataObjectItem
+            {
+                Id = id,
+                ObjectType = objectType,
+                Attributes = attributes,
+                Metadata = metadata,
+                SignatureDataObjects = signatures
+            };
+        }
+
         public async Task<Models.DataObjectItem> EditDataObject(DataObjectType objectType, long id, Models.DataObjectItem model, bool trustModelMetadataSearchType = false)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
@@ -1308,7 +1324,10 @@ namespace hasheous_server.Classes
                 RedisConnection.GetDatabase(0).KeyDelete(cacheKey);
             }
 
-            DataObjectItem EditedObject = await GetDataObject(objectType, id);
+            DataObjectItem EditedObject = await GetObjectStateForEdit(objectType, id);
+            Dictionary<(AttributeItem.AttributeType attributeType, AttributeItem.AttributeName attributeName), AttributeItem> existingAttributesByKey = EditedObject.Attributes
+                .GroupBy(attribute => (attribute.attributeType, attribute.attributeName))
+                .ToDictionary(group => group.Key, group => group.First());
 
             // update attributes
             foreach (AttributeItem newAttribute in model.Attributes)
@@ -1499,90 +1518,85 @@ namespace hasheous_server.Classes
 
                     default:
                         bool attributeFound = false;
-                        foreach (AttributeItem existingAttribute in EditedObject.Attributes)
+                        var existingAttributeKey = (newAttribute.attributeType, newAttribute.attributeName);
+                        if (existingAttributesByKey.TryGetValue(existingAttributeKey, out AttributeItem? existingAttribute))
                         {
-                            if (
-                                (newAttribute.attributeType == existingAttribute.attributeType) &&
-                                (newAttribute.attributeName == existingAttribute.attributeName)
-                            )
-                            {
-                                attributeFound = true;
+                            attributeFound = true;
 
-                                string sqlField;
-                                bool isMatch = false;
-                                string matchValue = "";
-                                switch (existingAttribute.attributeType)
-                                {
-                                    case AttributeItem.AttributeType.ObjectRelationship:
-                                        sqlField = "AttributeRelation";
-                                        DataObjectItem tempCompare = (DataObjectItem)existingAttribute.Value;
-                                        if (tempCompare != null)
+                            string sqlField;
+                            bool isMatch = false;
+                            string matchValue = "";
+                            switch (existingAttribute.attributeType)
+                            {
+                                case AttributeItem.AttributeType.ObjectRelationship:
+                                    sqlField = "AttributeRelation";
+                                    DataObjectItem tempCompare = (DataObjectItem)existingAttribute.Value;
+                                    if (tempCompare != null)
+                                    {
+                                        if (long.TryParse(newAttribute.Value.ToString(), out long newCompareLong))
                                         {
-                                            if (long.TryParse(newAttribute.Value.ToString(), out long newCompareLong))
+                                            if (tempCompare.Id == newCompareLong)
                                             {
-                                                if (tempCompare.Id == newCompareLong)
-                                                {
-                                                    isMatch = true;
-                                                    matchValue = newCompareLong.ToString();
-                                                }
+                                                isMatch = true;
+                                                matchValue = newCompareLong.ToString();
+                                            }
+                                        }
+                                        else
+                                        {
+                                            DataObjectItem? newCompare = null;
+                                            if (newAttribute.Value is hasheous_server.Models.RelationItem)
+                                            {
+                                                newCompare = await GetDataObject((newAttribute.Value as hasheous_server.Models.RelationItem).relationId);
                                             }
                                             else
                                             {
-                                                DataObjectItem? newCompare = null;
-                                                if (newAttribute.Value is hasheous_server.Models.RelationItem)
-                                                {
-                                                    newCompare = await GetDataObject((newAttribute.Value as hasheous_server.Models.RelationItem).relationId);
-                                                }
-                                                else
-                                                {
-                                                    newCompare = (DataObjectItem)newAttribute.Value;
-                                                }
+                                                newCompare = (DataObjectItem)newAttribute.Value;
+                                            }
 
-                                                if (tempCompare.Name == newCompare.Name)
-                                                {
-                                                    isMatch = true;
-                                                    matchValue = newCompare.Id.ToString();
-                                                }
+                                            if (tempCompare.Name == newCompare.Name)
+                                            {
+                                                isMatch = true;
+                                                matchValue = newCompare.Id.ToString();
                                             }
                                         }
-                                        break;
+                                    }
+                                    break;
 
-                                    default:
-                                        sqlField = "AttributeValue";
-                                        if ((string)newAttribute.Value == (string)existingAttribute.Value)
-                                        {
-                                            isMatch = true;
-                                        }
-                                        break;
+                                default:
+                                    sqlField = "AttributeValue";
+                                    if ((string)newAttribute.Value == (string)existingAttribute.Value)
+                                    {
+                                        isMatch = true;
+                                    }
+                                    break;
 
-                                }
+                            }
 
-                                //if (compareValue != (string)newAttribute.Value)
-                                if (isMatch == false)
+                            //if (compareValue != (string)newAttribute.Value)
+                            if (isMatch == false)
+                            {
+                                if (newAttribute.Value == "")
                                 {
-                                    if (newAttribute.Value == "")
-                                    {
-                                        // blank value - delete it
-                                        DeleteAttribute(id, (long)existingAttribute.Id);
-                                    }
-                                    else
-                                    {
-                                        // update existing value
-                                        sql = "UPDATE DataObject_Attributes SET " + sqlField + "=@value WHERE DataObjectId=@id AND AttributeId=@attrid;";
-                                        db.ExecuteNonQuery(sql, new Dictionary<string, object>{
-                                            { "id", id },
-                                            { "attrid", existingAttribute.Id },
-                                            { "value", newAttribute.Value }
-                                        });
-                                    }
+                                    // blank value - delete it
+                                    DeleteAttribute(id, (long)existingAttribute.Id);
                                 }
                                 else
                                 {
-                                    if (newAttribute.Value == "")
-                                    {
-                                        // blank value - delete it
-                                        DeleteAttribute(id, (long)existingAttribute.Id);
-                                    }
+                                    // update existing value
+                                    sql = "UPDATE DataObject_Attributes SET " + sqlField + "=@value WHERE DataObjectId=@id AND AttributeId=@attrid;";
+                                    db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                                        { "id", id },
+                                        { "attrid", existingAttribute.Id },
+                                        { "value", newAttribute.Value }
+                                    });
+                                }
+                            }
+                            else
+                            {
+                                if (newAttribute.Value == "")
+                                {
+                                    // blank value - delete it
+                                    DeleteAttribute(id, (long)existingAttribute.Id);
                                 }
                             }
                         }
@@ -1606,6 +1620,10 @@ namespace hasheous_server.Classes
                 case DataObjectType.Company:
                 case DataObjectType.Platform:
                 case DataObjectType.Game:
+                    Dictionary<Metadata.Communications.MetadataSources, DataObjectItem.MetadataItem> existingMetadataBySource = EditedObject.Metadata
+                        .GroupBy(metadataItem => metadataItem.Source)
+                        .ToDictionary(group => group.Key, group => group.First());
+
                     foreach (DataObjectItem.MetadataItem newMetadataItem in model.Metadata)
                     {
                         // skip none
@@ -1683,57 +1701,31 @@ namespace hasheous_server.Classes
                                 break;
                         }
 
-                        bool metadataFound = false;
                         BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod? matchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin;
                         if (trustModelMetadataSearchType == true)
                         {
                             matchMethod = newMetadataItem.MatchMethod;
                         }
 
-                        foreach (DataObjectItem.MetadataItem existingMetadataItem in EditedObject.Metadata)
+                        if (existingMetadataBySource.TryGetValue(newMetadataItem.Source, out DataObjectItem.MetadataItem? existingMetadataItem))
                         {
-                            if (newMetadataItem.Source == existingMetadataItem.Source)
+                            if (newMetadataId.ToString() != existingMetadataItem.Id)
                             {
-                                metadataFound = true;
-                                if (newMetadataId.ToString() != existingMetadataItem.Id)
-                                {
-                                    metadataChangeDetected = true;
+                                metadataChangeDetected = true;
 
-                                    // change to manually set
-                                    sql = "UPDATE DataObject_MetadataMap SET MatchMethod=@match, MetadataId=@metaid, WinningVoteCount=@winningvotecount, TotalVoteCount=@totalvotecount WHERE DataObjectId=@id AND SourceId=@source;";
-                                    db.ExecuteNonQuery(sql, new Dictionary<string, object>{
-                                        { "id", id },
-                                        { "match", matchMethod ?? BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin },
-                                        { "metaid", newMetadataId },
-                                        { "source", existingMetadataItem.Source },
-                                        { "winningvotecount", 0 },
-                                        { "totalvotecount", 0 }
-                                    });
-                                }
-                            }
-
-                            if (trustModelMetadataSearchType == true)
-                            {
-                                // update next search field if match method is NoMatch or Automatic
-                                if (new List<BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod?>{
-                                    BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
-                                    BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic,
-                                    BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.AutomaticTooManyMatches
-                                }.Contains(matchMethod))
-                                {
-                                    // update next search regardless of changes
-                                    sql = "UPDATE DataObject_MetadataMap SET LastSearched=@lastsearched, NextSearch=@nextsearch WHERE DataObjectId=@id AND SourceId=@source;";
-                                    db.ExecuteNonQuery(sql, new Dictionary<string, object>{
-                                        { "id", id },
-                                        { "source", newMetadataItem.Source },
-                                        { "lastsearched", newMetadataItem.LastSearch },
-                                        { "nextsearch", newMetadataItem.NextSearch }
-                                    });
-                                }
+                                // change to manually set
+                                sql = "UPDATE DataObject_MetadataMap SET MatchMethod=@match, MetadataId=@metaid, WinningVoteCount=@winningvotecount, TotalVoteCount=@totalvotecount WHERE DataObjectId=@id AND SourceId=@source;";
+                                db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                                    { "id", id },
+                                    { "match", matchMethod ?? BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin },
+                                    { "metaid", newMetadataId },
+                                    { "source", existingMetadataItem.Source },
+                                    { "winningvotecount", 0 },
+                                    { "totalvotecount", 0 }
+                                });
                             }
                         }
-
-                        if (metadataFound == false)
+                        else
                         {
                             metadataChangeDetected = true;
 
@@ -1746,6 +1738,26 @@ namespace hasheous_server.Classes
                                 { "last", DateTime.UtcNow },
                                 { "next", DateTime.UtcNow.AddMonths(1) }
                             });
+                        }
+
+                        if (trustModelMetadataSearchType == true)
+                        {
+                            // update next search field if match method is NoMatch or Automatic
+                            if (new List<BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod?>{
+                                BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
+                                BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic,
+                                BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.AutomaticTooManyMatches
+                            }.Contains(matchMethod))
+                            {
+                                // update next search regardless of changes
+                                sql = "UPDATE DataObject_MetadataMap SET LastSearched=@lastsearched, NextSearch=@nextsearch WHERE DataObjectId=@id AND SourceId=@source;";
+                                db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                                    { "id", id },
+                                    { "source", newMetadataItem.Source },
+                                    { "lastsearched", newMetadataItem.LastSearch },
+                                    { "nextsearch", newMetadataItem.NextSearch }
+                                });
+                            }
                         }
                     }
                     break;
