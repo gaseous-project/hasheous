@@ -3172,6 +3172,21 @@ namespace hasheous_server.Classes
             return tagAttribute;
         }
 
+        /// <summary>
+        /// Attributes that BuildDataObject generates while reading an object. They have no row in
+        /// DataObject_Attributes and are not meant to be stored, so they must be kept out of
+        /// anything handed to EditDataObject. Tags are deliberately not listed - they are also
+        /// generated on read, but EditDataObject has real persistence for them.
+        /// </summary>
+        private static readonly HashSet<AttributeItem.AttributeName> GeneratedAttributeNames = new HashSet<AttributeItem.AttributeName>
+        {
+            AttributeItem.AttributeName.SearchAliases,
+            AttributeItem.AttributeName.Country,
+            AttributeItem.AttributeName.Language,
+            AttributeItem.AttributeName.ROMs,
+            AttributeItem.AttributeName.DumpFile
+        };
+
         public DataObjectItem MergeObjects(DataObjectItem sourceObject, DataObjectItem targetObject, bool commit = false)
         {
             // first, ensure both objects are the same type
@@ -3282,7 +3297,25 @@ namespace hasheous_server.Classes
             // apply changes if commit = true
             if (commit == true)
             {
-                var editDataObject = EditDataObject(targetObject.ObjectType, targetObject.Id, targetObject);
+                // targetObject was built for display, so it carries the attributes generated during
+                // the read. Saving those would insert derived values as if they were stored ones,
+                // so the save gets a copy without them - the object returned to the caller keeps
+                // them, since it feeds the merge preview.
+                DataObjectItem objectToSave = new DataObjectItem
+                {
+                    Id = targetObject.Id,
+                    ObjectType = targetObject.ObjectType,
+                    Name = targetObject.Name,
+                    IsBlockedFromMatching = targetObject.IsBlockedFromMatching,
+                    Attributes = targetObject.Attributes?
+                        .Where(attribute => !GeneratedAttributeNames.Contains(attribute.attributeName))
+                        .ToList(),
+                    Metadata = targetObject.Metadata,
+                    SignatureDataObjects = targetObject.SignatureDataObjects,
+                    UserPermissions = targetObject.UserPermissions
+                };
+
+                var editDataObject = EditDataObject(targetObject.ObjectType, targetObject.Id, objectToSave);
                 var dataObjectMetadataSearch = DataObjectMetadataSearch(targetObject.ObjectType, targetObject.Id, false);
                 UpdateDataObjectDate(targetObject.Id, targetObject.ObjectType);
                 DeleteDataObject(sourceObject.ObjectType, sourceObject.Id);
