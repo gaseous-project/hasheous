@@ -118,6 +118,77 @@ function formatBytes(bytes, decimals = 2) {
 }
 
 /**
+ * Checks whether a URL-like value is safe to use in HTML attributes such as href or src.
+ * This blocks dangerous schemes that can execute script or load unsafe content.
+ *
+ * @param {string|undefined|null} value The candidate URL value.
+ * @returns {boolean} True when the value is non-empty and does not use a blocked scheme.
+ */
+function isSafeUrl(value) {
+    if (typeof value !== 'string') {
+        return false;
+    }
+
+    const trimmedValue = value.trim();
+    if (!trimmedValue) {
+        return false;
+    }
+
+    const normalizedValue = trimmedValue.replace(/[\u0000-\u001F\u007F]/g, '');
+    if (/^(javascript|vbscript|data|file):/i.test(normalizedValue)) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Converts markdown into sanitized HTML for safe display in the UI.
+ * The generated HTML is cleaned before insertion to prevent script execution,
+ * inline event handlers, and unsafe URL schemes from surviving the render step.
+ *
+ * @param {string|undefined|null} markdownText The markdown content to render.
+ * @returns {string} Sanitized HTML suitable for insertion into the page.
+ */
+function renderSafeMarkdown(markdownText) {
+    const rawMarkdown = markdownText == null ? '' : String(markdownText);
+    if (!rawMarkdown.trim()) {
+        return '';
+    }
+
+    // marked.parse() is intentionally used here because the source content is markdown, not raw HTML.
+    const parsedHtml = typeof marked !== 'undefined' && typeof marked.parse === 'function'
+        ? marked.parse(rawMarkdown)
+        : rawMarkdown;
+
+    // Work on a detached DOM fragment so the original page is not modified while we clean it.
+    const sanitizedRoot = document.createElement('div');
+    sanitizedRoot.innerHTML = String(parsedHtml);
+
+    // Remove active elements that can execute code or load unexpected content.
+    sanitizedRoot.querySelectorAll('script, iframe, object, embed, svg, math, base, meta, link, style, template').forEach(node => node.remove());
+
+    // Strip inline event handlers and blocked URL-bearing attributes from all nodes.
+    sanitizedRoot.querySelectorAll('*').forEach(node => {
+        Array.from(node.attributes).forEach(attribute => {
+            const attributeName = attribute.name.toLowerCase();
+            const attributeValue = (attribute.value || '').trim();
+
+            if (attributeName.startsWith('on') || attributeName === 'srcdoc' || attributeName === 'style') {
+                node.removeAttribute(attribute.name);
+                return;
+            }
+
+            if (['href', 'src', 'xlink:href', 'action', 'formaction', 'background', 'poster'].includes(attributeName) && !isSafeUrl(attributeValue)) {
+                node.removeAttribute(attribute.name);
+            }
+        });
+    });
+
+    return sanitizedRoot.innerHTML;
+}
+
+/**
  * Generates an HTML table from a dataset.
  */
 class generateTable {

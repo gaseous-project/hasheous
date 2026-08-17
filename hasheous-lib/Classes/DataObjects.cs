@@ -785,7 +785,8 @@ namespace hasheous_server.Classes
                 UpdatedDate = (DateTime)row["UpdatedDate"],
                 Metadata = metadataItems,
                 SignatureDataObjects = signatureItems,
-                Attributes = attributes
+                Attributes = attributes,
+                IsBlockedFromMatching = (bool)row["IsBlockedFromMatching"]
             };
 
             return item;
@@ -1276,12 +1277,13 @@ namespace hasheous_server.Classes
         public async Task<Models.DataObjectItem> EditDataObject(DataObjectType objectType, long id, Models.DataObjectItemModel model, bool allowSearch = true)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql = "UPDATE DataObject SET `Name`=@name, `UpdatedDate`=@updateddate WHERE ObjectType=@objecttype AND Id=@id";
+            string sql = "UPDATE DataObject SET `Name`=@name, `UpdatedDate`=@updateddate, `IsBlockedFromMatching`=@isblockedfrommatching WHERE ObjectType=@objecttype AND Id=@id";
             Dictionary<string, object> dbDict = new Dictionary<string, object>{
                 { "id", id },
                 { "name", model.Name },
                 { "objecttype", objectType },
-                { "updateddate", DateTime.UtcNow }
+                { "updateddate", DateTime.UtcNow },
+                { "isblockedfrommatching", model.IsBlockedFromMatching }
             };
 
             db.ExecuteNonQuery(sql, dbDict);
@@ -1325,12 +1327,13 @@ namespace hasheous_server.Classes
         public async Task<Models.DataObjectItem> EditDataObject(DataObjectType objectType, long id, Models.DataObjectItem model, bool trustModelMetadataSearchType = false)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql = "UPDATE DataObject SET `Name`=@name, `UpdatedDate`=@updateddate WHERE ObjectType=@objecttype AND Id=@id";
+            string sql = "UPDATE DataObject SET `Name`=@name, `UpdatedDate`=@updateddate, `IsBlockedFromMatching`=@isblockedfrommatching WHERE ObjectType=@objecttype AND Id=@id";
             Dictionary<string, object> dbDict = new Dictionary<string, object>{
                 { "id", id },
                 { "name", model.Name },
                 { "objecttype", objectType },
-                { "updateddate", DateTime.UtcNow }
+                { "updateddate", DateTime.UtcNow },
+                { "isblockedfrommatching", model.IsBlockedFromMatching }
             };
 
             db.ExecuteNonQuery(sql, dbDict);

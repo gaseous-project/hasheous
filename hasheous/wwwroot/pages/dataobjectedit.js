@@ -103,7 +103,8 @@ document.getElementById('dataObjectSave').addEventListener("click", function (e)
         metadata: metadata,
         signatureDataObjects: signatures,
         permissions: [],
-        userPermissions: userPermissions
+        userPermissions: userPermissions,
+        isBlockedFromMatching: document.getElementById('dataObject_object_isBlockedFromMatching').checked
     };
 
     postData(
@@ -157,6 +158,14 @@ function renderContent() {
     setPageTitle(dataObject.name, true);
     let objectName = document.getElementById('dataObject_object_name');
     objectName.value = dataObject.name;
+
+    let isBlockedFromMatchingCheckbox = document.getElementById('dataObject_object_isBlockedFromMatching');
+    isBlockedFromMatchingCheckbox.checked = dataObject.isBlockedFromMatching;
+    if (pageType == "game") {
+        document.getElementById('editblocksearch').style.display = 'block';
+    } else {
+        document.getElementById('editblocksearch').style.display = 'none';
+    }
 
     // render attributes fields
     let dataObjectAttributesInput = document.getElementById('dataObjectAttributesInput');
