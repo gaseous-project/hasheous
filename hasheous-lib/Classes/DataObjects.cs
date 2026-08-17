@@ -3184,10 +3184,11 @@ namespace hasheous_server.Classes
             AttributeItem.AttributeName.Country,
             AttributeItem.AttributeName.Language,
             AttributeItem.AttributeName.ROMs,
-            AttributeItem.AttributeName.DumpFile
+            AttributeItem.AttributeName.DumpFile,
+            AttributeItem.AttributeName.LogoAttribution
         };
 
-        public DataObjectItem MergeObjects(DataObjectItem sourceObject, DataObjectItem targetObject, bool commit = false)
+        public async Task<DataObjectItem> MergeObjects(DataObjectItem sourceObject, DataObjectItem targetObject, bool commit = false)
         {
             // first, ensure both objects are the same type
             if (sourceObject.ObjectType != targetObject.ObjectType)
@@ -3315,8 +3316,8 @@ namespace hasheous_server.Classes
                     UserPermissions = targetObject.UserPermissions
                 };
 
-                var editDataObject = EditDataObject(targetObject.ObjectType, targetObject.Id, objectToSave);
-                var dataObjectMetadataSearch = DataObjectMetadataSearch(targetObject.ObjectType, targetObject.Id, false);
+                await EditDataObject(targetObject.ObjectType, targetObject.Id, objectToSave);
+                await DataObjectMetadataSearch(targetObject.ObjectType, targetObject.Id, false);
                 UpdateDataObjectDate(targetObject.Id, targetObject.ObjectType);
                 DeleteDataObject(sourceObject.ObjectType, sourceObject.Id);
             }
