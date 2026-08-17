@@ -46,6 +46,7 @@
     "search": "Search",
     "searchfieldlabel": "Search - Game / Company / Platform / Hash",
     "searchresults": "Search Results",
+    "searchminlength": "Enter at least 3 characters to search",
     "id": "ID",
     "name": "Name",
     "size": "Size",

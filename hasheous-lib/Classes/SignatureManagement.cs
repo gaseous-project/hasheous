@@ -401,14 +401,17 @@ HAVING
             {
                 if (model.Name.Length >= 3)
                 {
-                    string fullTextNameQuery = BuildFullTextBooleanPrefixQuery(model.Name);
-                    whereClause_Name = "MATCH(`" + whereNameField + "`) AGAINST(@name IN BOOLEAN MODE)";
-                    dbDict.Add("name", fullTextNameQuery);
+                    // whereNameField is set by every branch of the search type switch above
+                    whereClause_Name = BuildNameSearchPredicate(whereNameField!, model.Name, dbDict, "name");
                 }
             }
 
             // attach where clauses
-            sql += " WHERE ";
+            if (whereClause_Ids != null || whereClause_Name != null)
+            {
+                sql += " WHERE ";
+            }
+
             if (whereClause_Ids != null)
             {
                 sql += whereClause_Ids;
