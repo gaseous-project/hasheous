@@ -1525,7 +1525,6 @@ namespace hasheous_server.Classes
 
                             string sqlField;
                             bool isMatch = false;
-                            string matchValue = "";
                             switch (existingAttribute.attributeType)
                             {
                                 case AttributeItem.AttributeType.ObjectRelationship:
@@ -1538,7 +1537,6 @@ namespace hasheous_server.Classes
                                             if (tempCompare.Id == newCompareLong)
                                             {
                                                 isMatch = true;
-                                                matchValue = newCompareLong.ToString();
                                             }
                                         }
                                         else
@@ -1556,7 +1554,6 @@ namespace hasheous_server.Classes
                                             if (tempCompare.Name == newCompare.Name)
                                             {
                                                 isMatch = true;
-                                                matchValue = newCompare.Id.ToString();
                                             }
                                         }
                                     }
@@ -1824,10 +1821,14 @@ namespace hasheous_server.Classes
             // signatures alone should not touch them at all
             if (!signatureIds.SetEquals(existingSignatureIds))
             {
-                sql = "DELETE FROM DataObject_SignatureMap WHERE DataObjectId=@id";
-                db.ExecuteNonQuery(sql, new Dictionary<string, object>{
-                    { "id", id }
-                });
+                // the delete and the insert have to land together - a failure between them would
+                // leave the object with no signatures at all
+                List<Database.SQLTransactionItem> signatureCommands = new List<Database.SQLTransactionItem>
+                {
+                    new Database.SQLTransactionItem("DELETE FROM DataObject_SignatureMap WHERE DataObjectId=@id;", new Dictionary<string, object>{
+                        { "id", id }
+                    })
+                };
 
                 if (signatureIds.Count > 0)
                 {
@@ -1851,8 +1852,10 @@ namespace hasheous_server.Classes
                     }
                     signatureSql.Append(';');
 
-                    db.ExecuteNonQuery(signatureSql.ToString(), signatureDict);
+                    signatureCommands.Add(new Database.SQLTransactionItem(signatureSql.ToString(), signatureDict));
                 }
+
+                await db.ExecuteTransactionCMDAsync(signatureCommands);
             }
 
             // access control
