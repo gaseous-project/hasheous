@@ -207,9 +207,10 @@ class generateTable {
      * @param {*} pageNumber The current page number
      * @param {*} pageCount The total number of pages
      * @param {*} pagingCallback A callback function to call when a page is changed
+     * @param {*} rowLinkCallback A callback function returning the URL a row points at - rows built this way are real links, so they can be opened in a new tab, bookmarked, or copied
      * @returns 
      */
-    constructor(dataSet, columns, indexColumn, hideIndex, rowClickCallback, recordCount, pageNumber, pageCount, pagingCallback) {
+    constructor(dataSet, columns, indexColumn, hideIndex, rowClickCallback, recordCount, pageNumber, pageCount, pagingCallback, rowLinkCallback) {
         this.resultSet = dataSet;
 
         if (hideIndex == undefined) {
@@ -266,6 +267,8 @@ class generateTable {
             for (let i = 0; i < this.resultSet.length; i++) {
                 let dataRow = document.createElement('tr');
                 let rowId = null;
+                let rowHref = null;
+                let rowCells = [];
 
                 for (let x = 0; x < columns.length; x++) {
                     let cellDetails;
@@ -363,7 +366,7 @@ class generateTable {
                             cellName = columns[x].split(":")[0];
                         }
                         cell.setAttribute('media-selector', 'cell_' + cellName.toLowerCase());
-                        cell.appendChild(cellContent);
+                        rowCells.push({ cell: cell, content: cellContent });
                         dataRow.appendChild(cell);
                     }
 
@@ -373,12 +376,41 @@ class generateTable {
                     }
                 }
 
+                if (rowId != null && rowLinkCallback) {
+                    rowHref = rowLinkCallback(rowId, this.resultSet);
+                }
+
+                for (let c = 0; c < rowCells.length; c++) {
+                    if (rowHref) {
+                        let cellLink = document.createElement('a');
+                        cellLink.href = rowHref;
+                        cellLink.classList.add('tablecelllink');
+                        cellLink.appendChild(rowCells[c].content);
+                        rowCells[c].cell.appendChild(cellLink);
+                    } else {
+                        rowCells[c].cell.appendChild(rowCells[c].content);
+                    }
+                }
+
                 if (rowId != null) {
                     if (rowClickCallback) {
                         dataRow.classList.add('tablerowhighlight');
                         let clickbackResultSet = this.resultSet;
                         dataRow.addEventListener("click", function () {
                             rowClickCallback(rowId, clickbackResultSet);
+                        }, false);
+                    } else if (rowHref) {
+                        dataRow.classList.add('tablerowhighlight');
+                        dataRow.addEventListener("click", function (ev) {
+                            // clicks on the anchors themselves are the browser's to handle, so
+                            // modified clicks (new tab, new window, download) keep working
+                            if (ev.target.closest('a')) {
+                                return;
+                            }
+                            if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) {
+                                return;
+                            }
+                            window.location = rowHref;
                         }, false);
                     }
                 }

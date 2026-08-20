@@ -12,6 +12,10 @@ pageSearchBox.addEventListener("keypress", function (e) {
     }
 });
 
+function dataObjectDetailUrl(pageType, id) {
+    return '/index.html?page=dataobjectdetail&type=' + encodeURIComponent(pageType) + '&id=' + encodeURIComponent(id);
+}
+
 function createDataObjectsTable(targetDiv, pageType, pageNumber, pageSize) {
     let resultDiv = document.getElementById(targetDiv);
     resultDiv.innerHTML = '';
@@ -90,14 +94,15 @@ function createDataObjectsTable(targetDiv, pageType, pageNumber, pageSize) {
                     columns,
                     'id',
                     true,
-                    function (id) {
-                        window.location = '/index.html?page=dataobjectdetail&type=' + pageType + '&id=' + id;
-                    },
+                    null,
                     success.count,
                     success.pageNumber,
                     success.totalPages,
                     function (p) {
                         createDataObjectsTable(targetDiv, pageType, p, pageSize);
+                    },
+                    function (id) {
+                        return dataObjectDetailUrl(pageType, id);
                     }
                 );
                 let resultDiv = document.getElementById(targetDiv);
@@ -189,8 +194,13 @@ function createDataObjectsTableFromMD5Search(hashType) {
                 ],
                 'id',
                 true,
+                null,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
                 function (id) {
-                    window.location = '/index.html?page=dataobjectdetail&type=game&id=' + id;
+                    return dataObjectDetailUrl('game', id);
                 }
             );
             resultDiv.innerHTML = '';
