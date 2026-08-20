@@ -12,10 +12,6 @@ pageSearchBox.addEventListener("keypress", function (e) {
     }
 });
 
-function dataObjectDetailUrl(pageType, id) {
-    return '/index.html?page=dataobjectdetail&type=' + encodeURIComponent(pageType) + '&id=' + encodeURIComponent(id);
-}
-
 function createDataObjectsTable(targetDiv, pageType, pageNumber, pageSize) {
     let resultDiv = document.getElementById(targetDiv);
     resultDiv.innerHTML = '';

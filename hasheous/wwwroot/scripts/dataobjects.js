@@ -458,14 +458,15 @@ function createDataObjectsTable(pageNumber, pageSize, objectType, filterByPlatfo
             columns,
             'id',
             true,
-            function (id) {
-                window.location = '/index.html?page=dataobjectdetail&type=' + objectType + '&id=' + id;
-            },
+            null,
             success.count,
             success.pageNumber,
             success.totalPages,
             function (p) {
                 createDataObjectsTable(p, pageSize, objectType, filterByPlatformId);
+            },
+            function (id) {
+                return dataObjectDetailUrl(objectType, id);
             }
         );
         let tableTarget = document.getElementById('dataObjectTable');

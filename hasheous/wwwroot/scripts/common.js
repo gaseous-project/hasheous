@@ -189,6 +189,16 @@ function renderSafeMarkdown(markdownText) {
 }
 
 /**
+ * Builds the URL of a data object's detail page.
+ * @param {*} pageType The data object type (game, platform, company, app, ...)
+ * @param {*} id The data object id
+ * @returns The detail page URL
+ */
+function dataObjectDetailUrl(pageType, id) {
+    return '/index.html?page=dataobjectdetail&type=' + encodeURIComponent(pageType) + '&id=' + encodeURIComponent(id);
+}
+
+/**
  * Generates an HTML table from a dataset.
  */
 class generateTable {
@@ -381,7 +391,12 @@ class generateTable {
                 }
 
                 for (let c = 0; c < rowCells.length; c++) {
-                    if (rowHref) {
+                    // a cell that is already a link (the "link" column type) keeps its own
+                    // anchor - nesting one inside the row link would be invalid markup
+                    let cellHasLink = rowCells[c].content.tagName === 'A' ||
+                        (rowCells[c].content.querySelector && rowCells[c].content.querySelector('a') != null);
+
+                    if (rowHref && !cellHasLink) {
                         let cellLink = document.createElement('a');
                         cellLink.href = rowHref;
                         cellLink.classList.add('tablecelllink');
