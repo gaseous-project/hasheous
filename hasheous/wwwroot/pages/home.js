@@ -18,7 +18,10 @@ fetch('/api/v1.0/Insights/app/0/Insights', {
                 let insightElement = document.createElement('div');
                 insightElement.classList.add('dataObjectInsight');
 
+                let showHeader = false;
+
                 if (key == 'busiest_endpoints') {
+                    showHeader = true;
                     insightElement.style.width = 'auto';
                 }
 
@@ -33,6 +36,17 @@ fetch('/api/v1.0/Insights/app/0/Insights', {
                     // value is a hashtable, create a table with the keys and values
                     let insightList = document.createElement('table');
                     insightList.classList.add('tablerowhighlight');
+
+                    if (showHeader) {
+                        let headerRow = document.createElement('tr');
+                        for (const [subKey, subValue] of Object.entries(value[0])) {
+                            let headerCell = document.createElement('th');
+                            headerCell.classList.add('tablecell');
+                            headerCell.innerHTML = lang.getLang(subKey);
+                            headerRow.appendChild(headerCell);
+                        }
+                        insightList.appendChild(headerRow);
+                    }
 
                     for (const subKey of Object.keys(value)) {
                         let row = document.createElement('tr');
