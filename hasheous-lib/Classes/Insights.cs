@@ -178,11 +178,11 @@ namespace Classes.Insights
                 SELECT 
                     endpoint_address,
                     `method`,
-                    COUNT(*) AS total_requests,
-                    ROUND(AVG(execution_time_ms), 2) AS average_response_time_ms,
-                    MAX(execution_time_ms) AS max_response_time_ms
+                    SUM(total_requests) AS total_requests,
+                    ROUND(AVG(average_execution_time_ms), 2) AS average_response_time_ms,
+                    MAX(average_execution_time_ms) AS max_response_time_ms
                 FROM
-                    Insights_API_Requests
+                    Insights_API_Requests_Daily
                 WHERE
                     event_datetime >= @startdate AND event_datetime <= @enddate
                         " + appWhereClause + @"
@@ -351,11 +351,13 @@ namespace Classes.Insights
                         country, 
                         client_id, 
                         client_apikey_id, 
-                        COUNT(*) AS total_requests, 
+                        endpoint_address,
+                        `method`,
+                        SUM(1) AS total_requests, 
                         AVG(execution_time_ms) AS average_response_time 
                     FROM Insights_API_Requests 
                     WHERE event_datetime >= @hourStart AND event_datetime < @hourEnd 
-                    GROUP BY insightType, remote_ip, user_id, country, client_id, client_apikey_id;";
+                    GROUP BY insightType, remote_ip, user_id, country, client_id, client_apikey_id, endpoint_address, `method`;";
                 Dictionary<string, object> aggregateParams = new Dictionary<string, object>
                 {
                     { "hourStart", hourStart },
@@ -367,9 +369,9 @@ namespace Classes.Insights
                 {
                     string insertSql = @"
                         INSERT INTO Insights_API_Requests_Hourly
-                            (event_datetime, insightType, remote_ip, user_id, country, client_id, client_apikey_id, total_requests, average_execution_time_ms)
+                            (event_datetime, insightType, remote_ip, user_id, country, client_id, client_apikey_id, endpoint_address, `method`, total_requests, average_execution_time_ms)
                         VALUES
-                            (@hourStart, @insightType, @remote_ip, @user_id, @country, @client_id, @client_apikey_id, @total_requests, @average_response_time);";
+                            (@hourStart, @insightType, @remote_ip, @user_id, @country, @client_id, @client_apikey_id, @endpoint_address, @method, @total_requests, @average_response_time);";
                     Dictionary<string, object> insertParams = new Dictionary<string, object>
                     {
                         { "@hourStart", hourStart },
@@ -379,6 +381,8 @@ namespace Classes.Insights
                         { "@country", row["country"] },
                         { "@client_id", row["client_id"] },
                         { "@client_apikey_id", row["client_apikey_id"] },
+                        { "@endpoint_address", row["endpoint_address"] ?? "/unknown" },
+                        { "@method", row["method"] ?? "UNKNOWN" },
                         { "@total_requests", row["total_requests"] },
                         { "@average_response_time", row["average_response_time"] }
                     };
@@ -454,6 +458,8 @@ namespace Classes.Insights
                         country, 
                         client_id, 
                         client_apikey_id, 
+                        endpoint_address,
+                        `method`,
                         SUM(total_requests) AS total_requests, 
                         AVG(average_execution_time_ms) AS average_response_time 
                     FROM 
@@ -461,7 +467,7 @@ namespace Classes.Insights
                     WHERE 
                         event_datetime >= @dayStart 
                         AND event_datetime < @dayEnd 
-                    GROUP BY insightType, remote_ip, user_id, country, client_id, client_apikey_id;";
+                    GROUP BY insightType, remote_ip, user_id, country, client_id, client_apikey_id, endpoint_address, `method`;";
                 Dictionary<string, object> aggregateParams = new Dictionary<string, object>
                 {
                     { "dayStart", dayStart },
@@ -473,9 +479,9 @@ namespace Classes.Insights
                 {
                     string insertSql = @"
                         INSERT INTO Insights_API_Requests_Daily
-                            (event_datetime, insightType, remote_ip, user_id, country, client_id, client_apikey_id, total_requests, average_execution_time_ms)
+                            (event_datetime, insightType, remote_ip, user_id, country, client_id, client_apikey_id, endpoint_address, `method`, total_requests, average_execution_time_ms)
                         VALUES
-                            (@dayStart, @insightType, @remote_ip, @user_id, @country, @client_id, @client_apikey_id, @total_requests, @average_response_time);";
+                            (@dayStart, @insightType, @remote_ip, @user_id, @country, @client_id, @client_apikey_id, @endpoint_address, @method, @total_requests, @average_response_time);";
                     Dictionary<string, object> insertParams = new Dictionary<string, object>
                     {
                         { "@dayStart", dayStart },
@@ -485,6 +491,8 @@ namespace Classes.Insights
                         { "@country", row["country"] },
                         { "@client_id", row["client_id"] },
                         { "@client_apikey_id", row["client_apikey_id"] },
+                        { "@endpoint_address", row["endpoint_address"] ?? "/unknown" },
+                        { "@method", row["method"] ?? "UNKNOWN" },
                         { "@total_requests", row["total_requests"] },
                         { "@average_response_time", row["average_response_time"] }
                     };
@@ -553,6 +561,8 @@ namespace Classes.Insights
                         country, 
                         client_id, 
                         client_apikey_id, 
+                        endpoint_address,
+                        `method`,
                         SUM(total_requests) AS total_requests, 
                         AVG(average_execution_time_ms) AS average_response_time 
                     FROM 
@@ -560,7 +570,7 @@ namespace Classes.Insights
                     WHERE 
                         event_datetime >= @monthStart 
                         AND event_datetime < @monthEnd 
-                    GROUP BY insightType, remote_ip, user_id, country, client_id, client_apikey_id;";
+                    GROUP BY insightType, remote_ip, user_id, country, client_id, client_apikey_id, endpoint_address, `method`;";
                 Dictionary<string, object> aggregateParams = new Dictionary<string, object>
                 {
                     { "monthStart", monthStart },
@@ -572,9 +582,9 @@ namespace Classes.Insights
                 {
                     string insertSql = @"
                         INSERT INTO Insights_API_Requests_Monthly
-                            (event_datetime, insightType, remote_ip, user_id, country, client_id, client_apikey_id, total_requests, average_execution_time_ms)
+                            (event_datetime, insightType, remote_ip, user_id, country, client_id, client_apikey_id, endpoint_address, `method`, total_requests, average_execution_time_ms)
                         VALUES
-                            (@monthStart, @insightType, @remote_ip, @user_id, @country, @client_id, @client_apikey_id, @total_requests, @average_response_time);";
+                            (@monthStart, @insightType, @remote_ip, @user_id, @country, @client_id, @client_apikey_id, @endpoint_address, @method, @total_requests, @average_response_time);";
                     Dictionary<string, object> insertParams = new Dictionary<string, object>
                     {
                         { "@monthStart", monthStart },
@@ -584,6 +594,8 @@ namespace Classes.Insights
                         { "@country", row["country"] },
                         { "@client_id", row["client_id"] },
                         { "@client_apikey_id", row["client_apikey_id"] },
+                        { "@endpoint_address", row["endpoint_address"] ?? "/unknown" },
+                        { "@method", row["method"] ?? "UNKNOWN" },
                         { "@total_requests", row["total_requests"] },
                         { "@average_response_time", row["average_response_time"] }
                     };
