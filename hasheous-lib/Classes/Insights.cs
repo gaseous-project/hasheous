@@ -173,6 +173,25 @@ namespace Classes.Insights
                 report["average_response_time"] = 0;
             }
 
+            // get busiest endpoints for the last 30 days
+            sql = @"
+                SELECT 
+                    endpoint_address,
+                    `method`,
+                    COUNT(*) AS total_requests,
+                    ROUND(AVG(execution_time_ms), 2) AS average_response_time_ms,
+                    MAX(execution_time_ms) AS max_response_time_ms
+                FROM
+                    Insights_API_Requests
+                WHERE
+                    event_datetime >= @startdate AND event_datetime <= @enddate
+                        " + appWhereClause + @"
+                GROUP BY endpoint_address, `method`
+                ORDER BY total_requests DESC, average_response_time_ms DESC
+                LIMIT 10;";
+            DataTable busiestEndpointsTable = await db.ExecuteCMDAsync(sql, dbDict, 90);
+            report["busiest_endpoints"] = BuildBusiestEndpoints(busiestEndpointsTable);
+
             // load countries into a dictionary for mapping
             sql = "SELECT Code, Value FROM Country;";
             DataTable countryTable = await db.ExecuteCMDAsync(sql);
@@ -259,6 +278,29 @@ namespace Classes.Insights
             }
 
             return report;
+        }
+
+        /// <summary>
+        /// Transforms the aggregated endpoint summary rows into a consistent report payload used by the API reports.
+        /// </summary>
+        /// <param name="busiestEndpointsTable">The aggregated endpoint query data.</param>
+        /// <returns>A list of endpoint summaries ordered by request volume.</returns>
+        public static List<Dictionary<string, object>> BuildBusiestEndpoints(DataTable busiestEndpointsTable)
+        {
+            List<Dictionary<string, object>> busiestEndpoints = new List<Dictionary<string, object>>();
+            foreach (DataRow row in busiestEndpointsTable.Rows)
+            {
+                busiestEndpoints.Add(new Dictionary<string, object>
+                {
+                    { "method", row["method"]?.ToString() ?? "UNKNOWN" },
+                    { "endpoint", row["endpoint_address"]?.ToString() ?? "unknown" },
+                    { "total_requests", row["total_requests"] ?? 0 },
+                    { "average_response_time_ms", row["average_response_time_ms"] ?? 0 },
+                    { "max_response_time_ms", row["max_response_time_ms"] ?? 0 }
+                });
+            }
+
+            return busiestEndpoints;
         }
 
         /// <summary>

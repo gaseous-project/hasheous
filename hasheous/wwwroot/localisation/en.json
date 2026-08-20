@@ -259,6 +259,7 @@
     "total_requests": "Total Requests",
     "average_response_time": "Average Response Time (ms)",
     "unique_visitors_per_api_key": "Unique Visitors per API Key",
+    "busiest_endpoints": "Busiest Endpoints",
     "dataobjectdetailerror": "An error occurred while fetching the data object details. Please try again later.",
     "servicestatus": "Service Status",
     "serviceitemtype": "Item Type",

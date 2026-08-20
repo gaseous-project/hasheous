@@ -18,6 +18,10 @@ fetch('/api/v1.0/Insights/app/0/Insights', {
                 let insightElement = document.createElement('div');
                 insightElement.classList.add('dataObjectInsight');
 
+                if (key == 'busiest_endpoints') {
+                    insightElement.style.width = 'auto';
+                }
+
                 let insightTitle = document.createElement('span');
                 insightTitle.classList.add('insightHeading');
                 insightTitle.innerHTML = lang.getLang(key);
