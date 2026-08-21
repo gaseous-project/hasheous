@@ -61,6 +61,8 @@ namespace Classes
                 firstModel.SHA1 = observedHashes.SHA1;
                 firstModel.SHA256 = observedHashes.SHA256;
                 firstModel.CRC = observedHashes.CRC;
+
+                models = new List<HashLookupModel> { firstModel };
             }
 
             Dictionary<string, object> dbDict = new Dictionary<string, object>(models.Count * 4);

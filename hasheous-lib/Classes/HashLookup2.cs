@@ -148,7 +148,7 @@ namespace Classes
                     if (applyMatchingBlocks)
                     {
                         long sigId = sig.Game.Id != null ? long.Parse(sig.Game.Id) : 0;
-                        var dataObject = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Game, sigId, false, false);
+                        var dataObject = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Game, sigId);
                         if (dataObject != null && dataObject.Any(d => d.IsBlockedFromMatching == true))
                         {
                             rawSignatures.Remove(sig);
@@ -423,19 +423,19 @@ namespace Classes
                     }
                 }
 
-                    // force metadata search
-                    if (userInteractiveSession)
-                    {
-                        // Run with timeout for interactive sessions
-                        await Task.WhenAny(
-                            dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true),
-                            Task.Delay(TimeSpan.FromSeconds(4))
-                        );
-                    }
-                    else
-                    {
-                        // Run without timeout for background operations
-                        await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true);
+                // force metadata search
+                if (userInteractiveSession)
+                {
+                    // Run with timeout for interactive sessions
+                    await Task.WhenAny(
+                        dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true),
+                        Task.Delay(TimeSpan.FromSeconds(4))
+                    );
+                }
+                else
+                {
+                    // Run without timeout for background operations
+                    await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true);
                 }
 
                 // re-get the game
@@ -558,7 +558,7 @@ namespace Classes
         /// <param name="objectType">The type of the object to retrieve</param>
         /// <param name="sigId">The signature id to search for</param>
         /// <returns>Null if not found; otherwise returns a DataObjectItem of type objectType</returns>
-        private async Task<List<DataObjectItem>?> GetDataObjectFromSignatureId(Database db, DataObjects.DataObjectType objectType, long sigId, bool getChildRelations = false, bool getMetadata = true)
+        private async Task<List<DataObjectItem>?> GetDataObjectFromSignatureId(Database db, DataObjects.DataObjectType objectType, long sigId)
         {
             string sql = @"
                 SELECT 
@@ -580,7 +580,7 @@ namespace Classes
                 List<DataObjectItem> items = new List<DataObjectItem>();
                 foreach (DataRow row in data.Rows)
                 {
-                    DataObjectItem? item = await dataObject.GetDataObject(objectType, (long)row[0], getChildRelations, getMetadata, false);
+                    DataObjectItem? item = await dataObject.GetDataObject(objectType, (long)row[0]);
                     if (item != null)
                     {
                         items.Add(item);
