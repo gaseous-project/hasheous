@@ -485,7 +485,7 @@ namespace hasheous_server.Classes
             {
                 reportItems.Add(new SubmissionReportItem
                 {
-                    MetadataSource = (Communications.MetadataSources)(long)row["MetadataSourceId"],
+                    MetadataSource = (Communications.MetadataSources)(int)row["MetadataSourceId"],
                     MetadataGameId = row["MetadataGameId"].ToString(),
                     VoteCount = (int)(long)row["VoteCount"]
                 });
