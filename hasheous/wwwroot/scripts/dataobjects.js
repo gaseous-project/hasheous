@@ -356,7 +356,7 @@ function createDataObjectsTable(pageNumber, pageSize, objectType, filterByPlatfo
         filterString = '&filterAttribute=Platform&filterValue=' + filterByPlatformId;
     }
 
-    fetch('/api/v1/DataObjects/' + objectType + '?pageSize=' + pageSize + '&pageNumber=' + pageNumber + '&getchildrelations=true' + filterString + '&getMetadata=true', {
+    fetch('/api/v1/DataObjects/' + objectType + '?pageSize=' + pageSize + '&pageNumber=' + pageNumber + '&getchildrelations=false' + filterString + '&getMetadata=false', {
         method: 'GET'
     }).then(response => {
         if (!response.ok) {

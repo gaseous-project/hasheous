@@ -27,7 +27,7 @@ function createDataObjectsTable(targetDiv, pageType, pageNumber, pageSize) {
         let progressObj = document.createElement('progress');
         resultDiv.appendChild(progressObj);
 
-        fetch('/api/v1/DataObjects/' + pageType + '?search=' + encodeURIComponent(pageSearchBox.value) + '&pageSize=' + pageSize + '&pageNumber=' + pageNumber + '&getchildrelations=true', {
+        fetch('/api/v1/DataObjects/' + pageType + '?search=' + encodeURIComponent(pageSearchBox.value) + '&pageSize=' + pageSize + '&pageNumber=' + pageNumber + '&getchildrelations=false&getMetadata=false', {
             method: 'GET'
         })
             .then(response => {
