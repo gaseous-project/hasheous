@@ -39,18 +39,6 @@ namespace Classes
                 throw new Exception("Invalid search model");
             }
 
-            // check the archive observations for the provided hashes
-            HashLookupModel firstModel = models[0];
-            HashLookupModel? observedHashes = await GetObservedArchiveHashesAsync(firstModel);
-            if (observedHashes != null)
-            {
-                // if the archive is observed, return the hashes from the observations
-                firstModel.MD5 = observedHashes.MD5;
-                firstModel.SHA1 = observedHashes.SHA1;
-                firstModel.SHA256 = observedHashes.SHA256;
-                firstModel.CRC = observedHashes.CRC;
-            }
-
             string cacheKey = RedisConnection.GenerateKey("Signature", models);
             // check if the query is cached
             if (Config.RedisConfiguration.Enabled)
@@ -61,6 +49,20 @@ namespace Classes
                     // if cached data is found, deserialize it and return
                     return Newtonsoft.Json.JsonConvert.DeserializeObject<List<Signatures_Games_2>>(cachedData);
                 }
+            }
+
+            // check the archive observations for the provided hashes
+            HashLookupModel firstModel = models[0];
+            HashLookupModel? observedHashes = await GetObservedArchiveHashesAsync(firstModel);
+            if (observedHashes != null)
+            {
+                // if the archive is observed, return the hashes from the observations
+                firstModel.MD5 = observedHashes.MD5;
+                firstModel.SHA1 = observedHashes.SHA1;
+                firstModel.SHA256 = observedHashes.SHA256;
+                firstModel.CRC = observedHashes.CRC;
+
+                models = new List<HashLookupModel> { firstModel };
             }
 
             Dictionary<string, object> dbDict = new Dictionary<string, object>(models.Count * 4);
