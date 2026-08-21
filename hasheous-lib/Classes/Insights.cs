@@ -292,11 +292,11 @@ namespace Classes.Insights
             {
                 busiestEndpoints.Add(new Dictionary<string, object>
                 {
-                    { "method", row["method"]?.ToString() ?? "UNKNOWN" },
-                    { "endpoint", row["endpoint_address"]?.ToString() ?? "unknown" },
-                    { "total_requests", row["total_requests"] ?? 0 },
-                    { "average_response_time_ms", row["average_response_time_ms"] ?? 0 },
-                    { "max_response_time_ms", row["max_response_time_ms"] ?? 0 }
+                    { "method", row.IsNull("method") ? "UNKNOWN" : row["method"].ToString()! },
+                    { "endpoint", row.IsNull("endpoint_address") ? "unknown" : row["endpoint_address"].ToString()! },
+                    { "total_requests", row.IsNull("total_requests") ? 0L : Convert.ToInt64(row["total_requests"]) },
+                    { "average_response_time_ms", row.IsNull("average_response_time_ms") ? 0m : Convert.ToDecimal(row["average_response_time_ms"]) },
+                    { "max_response_time_ms", row.IsNull("max_response_time_ms") ? 0m : Convert.ToDecimal(row["max_response_time_ms"]) }
                 });
             }
 
