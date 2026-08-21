@@ -111,59 +111,8 @@ namespace Classes
         /// <param name="applyMatchingBlocks">If true, will check for and apply any matching blocks that may be in place for the discovered game. If false, will not check for or apply any matching blocks. Default is false.</param>
         /// <exception cref="HashNotFoundException">Thrown if the provided hash is not found in any signature database.</exception>
         /// <returns>A Task representing the asynchronous operation.</returns>
-        public static bool ShouldLoadMetadata(string? returnFields)
-        {
-            if (string.IsNullOrWhiteSpace(returnFields))
-            {
-                return true;
-            }
-
-            if (returnFields.Equals("All", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            foreach (string field in returnFields.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            {
-                if (field.Equals("All", StringComparison.OrdinalIgnoreCase) ||
-                    field.Equals("Metadata", StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        public static bool ShouldLoadChildRelations(string? returnFields)
-        {
-            if (string.IsNullOrWhiteSpace(returnFields))
-            {
-                return false;
-            }
-
-            if (returnFields.Equals("All", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            foreach (string field in returnFields.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            {
-                if (field.Equals("All", StringComparison.OrdinalIgnoreCase) ||
-                    field.Equals("Attributes", StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
         public async Task PerformLookup(bool userInteractiveSession = false, bool applyMatchingBlocks = false)
         {
-            bool loadMetadata = ShouldLoadMetadata(returnFields);
-            bool loadChildRelations = ShouldLoadChildRelations(returnFields);
-
             // parse return fields
             HashSet<ValidFields> validFields = new HashSet<ValidFields>();
             if (returnFields == "All")
@@ -265,7 +214,7 @@ namespace Classes
                 if (publisher == null)
                 {
                     // redis is not enabled, so we will not use the cache
-                    var publishers = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId, loadChildRelations, loadMetadata);
+                    var publishers = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
                     if (publishers != null && publishers.Count > 0)
                     {
                         publisher = publishers.FirstOrDefault();
@@ -313,7 +262,7 @@ namespace Classes
             if (platform == null)
             {
                 // redis is not enabled, so we will not use the cache
-                var platforms = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId, loadChildRelations, loadMetadata);
+                var platforms = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId);
                 if (platforms != null && platforms.Count > 0)
                 {
                     platform = platforms.FirstOrDefault();
@@ -361,7 +310,7 @@ namespace Classes
             if (game == null)
             {
                 // redis is not enabled, so we will not use the cache
-                var games = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Game, long.Parse(discoveredSignature.Game.Id), loadChildRelations, loadMetadata);
+                var games = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Game, long.Parse(discoveredSignature.Game.Id));
                 if (games != null && games.Count > 0)
                 {
                     game = games.FirstOrDefault();
@@ -474,8 +423,6 @@ namespace Classes
                     }
                 }
 
-                if (loadMetadata)
-                {
                     // force metadata search
                     if (userInteractiveSession)
                     {
@@ -489,11 +436,10 @@ namespace Classes
                     {
                         // Run without timeout for background operations
                         await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true);
-                    }
                 }
 
-                // re-get the game with the minimal required depth for the requested response shape
-                game = await dataObjects.GetDataObject(DataObjects.DataObjectType.Game, game.Id, loadChildRelations, loadMetadata, false);
+                // re-get the game
+                game = await dataObjects.GetDataObject(DataObjects.DataObjectType.Game, game.Id);
             }
 
             bool includeAllFields = validFields.Contains(ValidFields.All);
@@ -511,7 +457,7 @@ namespace Classes
                 this.Platform = new MiniDataObjectItem
                 {
                     Name = platform.Name,
-                    metadata = includeMetadata ? platform.Metadata : new List<DataObjectItem.MetadataItem>()
+                    metadata = platform.Metadata
                 };
             }
             if (includePublisher && publisher != null)
@@ -519,7 +465,7 @@ namespace Classes
                 this.Publisher = new MiniDataObjectItem
                 {
                     Name = publisher.Name,
-                    metadata = includeMetadata ? publisher.Metadata : new List<DataObjectItem.MetadataItem>()
+                    metadata = publisher.Metadata
                 };
             }
 

@@ -3013,29 +3013,6 @@ namespace hasheous_server.Classes
             UpdateDataObjectDate(DataObjectId);
         }
 
-        private async Task<DataObjectItem?> GetLightweightDataObjectSummary(DataObjectType objectType, long id)
-        {
-            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql = "SELECT `Id`, `Name`, `ObjectType` FROM DataObject WHERE ObjectType=@objecttype AND Id=@id;";
-            DataTable data = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>
-            {
-                { "id", id },
-                { "objecttype", objectType }
-            });
-
-            if (data.Rows.Count == 0)
-            {
-                return null;
-            }
-
-            return new DataObjectItem
-            {
-                Id = (long)data.Rows[0]["Id"],
-                ObjectType = (DataObjectType)data.Rows[0]["ObjectType"],
-                Name = (string)data.Rows[0]["Name"]
-            };
-        }
-
         private async Task<AttributeItem> BuildAttributeItem(DataRow row, bool GetChildRelations = false)
         {
             AttributeItem attributeItem = new AttributeItem()
@@ -3054,12 +3031,12 @@ namespace hasheous_server.Classes
                     }
                     else
                     {
-                        object? lightweightRelation = await GetLightweightDataObjectSummary(attributeItem.attributeRelationType, (long)row["AttributeRelation"]);
-                        attributeItem.Value = lightweightRelation ?? (object)new RelationItem()
+                        RelationItem relationItem = new RelationItem()
                         {
                             relationType = attributeItem.attributeRelationType,
                             relationId = (long)row["AttributeRelation"]
                         };
+                        attributeItem.Value = relationItem;
                     }
                     break;
                 default:
