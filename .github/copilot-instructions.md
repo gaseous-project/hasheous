@@ -20,6 +20,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Signature ingestion now stores game names from `SortingName` and includes a one-time per-parser migration flag (`HasMigratedToSortingName_<ParserType>`) to migrate legacy name records while preserving alternate-name mappings.
   - Signature game records now also persist country/language variants on `Signatures_Games` (`Country`, `Language`), and migration logic updates legacy null-country rows plus links variant rows back to existing `DataObject_SignatureMap` entries.
   - Public API (versioned) handles lookups like `POST /api/v1/Lookup/ByHash` via `Classes/HashLookup` + `Classes/Database`.
+  - Submission voting/reporting is handled by `hasheous-lib/Classes/Submissions.cs`: `AddVote(...)` resolves the target object by `DataObjectId` or hash lookup, validates source-specific IDs before inserting/updating `MatchUserVotes`, and `TallyVotes()` aggregates votes into the metadata map only when the vote threshold is reached and the metadata is not locked by manual/admin overrides.
   - Insights logging records request method, endpoint path, execution time, and status on `Insights_API_Requests`; aggregated hourly/daily/monthly tables must preserve `endpoint_address` and `method` so reports can rank the busiest endpoints and identify CPU hotspots.
   - MCP is hosted on the public `hasheous` web API at `POST /api/v1/Mcp` (controller: `hasheous/Controllers/V1.0/McpController.cs`; shared processor: `hasheous-lib/Classes/Mcp/McpRequestProcessor.cs`).
   - MCP discovery is published at `GET /.well-known/mcp.json` (controller: `hasheous/Controllers/WellKnownController.cs`) and should point clients to the hosted MCP endpoint.
@@ -64,6 +65,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Data object admin task endpoints are exposed on `DataObjectsController` for moderators/admins:
     - `GET /api/v1/DataObjects/{ObjectType}/{Id}/Tasks` returns all task records for the object.
     - `GET /api/v1/DataObjects/{ObjectType}/{Id}/Tasks/{TaskId}?resetTask=true` returns a single task and optionally resets it.
+  - Submission/reporting routes are also admin/moderator scoped: `GET /api/v1/DataObjects/{ObjectType}/{Id}/SubmissionReport` returns the current match-submission summary, and user submit flows live under `hasheous/Controllers/V1.0/SubmissionsController.cs` via `POST /api/v1/Submissions/FixMatch`.
   - Swagger is enabled with custom schema IDs and API key security definitions.
   - MCP endpoint route: `POST /api/v1/Mcp` (JSON-RPC over HTTP). Keep MCP internet-facing endpoints in `hasheous` (not `service-orchestrator`).
   - Discovery route: `GET /.well-known/mcp.json` for client/server discovery metadata.

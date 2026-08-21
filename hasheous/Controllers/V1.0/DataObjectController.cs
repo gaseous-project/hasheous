@@ -508,6 +508,27 @@ namespace hasheous_server.Controllers.v1_0
         }
 
         [MapToApiVersion("1.0")]
+        [HttpGet]
+        [Authorize(Roles = "Admin,Moderator")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [Route("{ObjectType}/{Id}/SubmissionReport")]
+        public async Task<IActionResult> GetDataObjectSubmissionReport(Classes.DataObjects.DataObjectType ObjectType, long Id)
+        {
+            hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
+
+            Models.DataObjectItem? DataObject = await DataObjects.GetDataObject(ObjectType, Id, false, false, false);
+
+            if (DataObject == null)
+            {
+                return NotFound();
+            }
+            else
+            {
+                return Ok(await Submissions.GenerateSubmissionReport(Id));
+            }
+        }
+
+        [MapToApiVersion("1.0")]
         [HttpPost]
         [Authorize(Roles = "Admin,Moderator")]
         [ProducesResponseType(StatusCodes.Status200OK)]

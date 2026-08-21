@@ -458,5 +458,47 @@ namespace hasheous_server.Classes
             // return the model with the archive details
             return model;
         }
+
+
+        /// <summary>
+        /// Returns all submissions for a given dataobject, including the metadata source, and the vote count for that submission
+        /// </summary>
+        /// <param name="DataObjectId">
+        /// The ID of the dataobject to generate the report for
+        /// </param>
+        /// <returns>
+        /// A list of SubmissionReportItem objects, each containing the metadata source, the metadata game ID, and the vote count for that submission
+        /// </returns>
+        public static async Task<List<SubmissionReportItem>> GenerateSubmissionReport(long DataObjectId)
+        {
+            Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
+
+            string sql = "SELECT MetadataSourceId, MetadataGameId, COUNT(*) AS VoteCount FROM MatchUserVotes WHERE DataObjectId = @dataObjectId GROUP BY MetadataSourceId, MetadataGameId ORDER BY MetadataSourceId, VoteCount DESC;";
+            DataTable data = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>
+            {
+                { "dataObjectId", DataObjectId }
+            });
+
+            List<SubmissionReportItem> reportItems = new List<SubmissionReportItem>();
+
+            foreach (DataRow row in data.Rows)
+            {
+                reportItems.Add(new SubmissionReportItem
+                {
+                    MetadataSource = (Communications.MetadataSources)(int)row["MetadataSourceId"],
+                    MetadataGameId = row["MetadataGameId"].ToString(),
+                    VoteCount = (int)(long)row["VoteCount"]
+                });
+            }
+
+            return reportItems;
+        }
+
+        public class SubmissionReportItem
+        {
+            public Communications.MetadataSources MetadataSource { get; set; }
+            public string MetadataGameId { get; set; }
+            public int VoteCount { get; set; }
+        }
     }
 }
