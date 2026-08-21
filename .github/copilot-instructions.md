@@ -102,6 +102,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Recent migration note: `hasheous-1038.sql` adds an index on `Users.NormalizedEmail` to support faster admin user list ordering/filtering.
   - Recent migration note: `hasheous-1039.sql` adds `IsBlockedFromMatching` BOOLEAN column to `DataObject` table (default 0) to allow excluding objects from automatic matching.
   - Recent migration note: `hasheous-1040.sql` adds `endpoint_address` and `method` columns to the aggregated `Insights_API_Requests_*` tables so the busiest-endpoints report can aggregate and rank hot routes without re-reading raw request logs.
+  - Recent migration note: `hasheous-1041.sql` adds a composite index on `Task_Queue` (`task_name`, `status`) to support the task progress summary aggregation used by the task dashboard.
   - Embedded migration & support file manifest names now start with `hasheous_lib.Schema.` or `hasheous_lib.Support.`. After adding a file, ensure Build Action = EmbeddedResource and verify with `Assembly.GetExecutingAssembly().GetManifestResourceNames()` if debugging mismatches.
 
 - Caching
