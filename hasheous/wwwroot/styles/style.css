@@ -456,6 +456,18 @@ td {
     vertical-align: top;
 }
 
+/* rows that navigate somewhere are built from real anchors, but should still read as table text */
+.tablecelllink {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+}
+
+.tablecelllink:hover {
+    color: inherit;
+    text-decoration: none;
+}
+
 .tablerowhighlight:hover {
     background-color: var(--element-background-color-translucent);
     cursor: pointer;
