@@ -143,6 +143,29 @@ public class BuildNameSearchPredicateTests
     }
 }
 
+public class HashLookupPerformanceOptimizationTests
+{
+    [Theory]
+    [InlineData("All", true)]
+    [InlineData("Metadata", true)]
+    [InlineData("Publisher,Platform,Signatures", false)]
+    [InlineData("Publisher,Metadata,Attributes", true)]
+    public void DeterminesWhetherMetadataMustBeLoaded(string returnFields, bool expected)
+    {
+        Assert.Equal(expected, HashLookup.ShouldLoadMetadata(returnFields));
+    }
+
+    [Theory]
+    [InlineData("All", true)]
+    [InlineData("Publisher,Platform,Signatures", false)]
+    [InlineData("Publisher,Metadata", false)]
+    [InlineData("Publisher,Attributes", true)]
+    public void DeterminesWhetherChildRelationsNeedToBeLoaded(string returnFields, bool expected)
+    {
+        Assert.Equal(expected, HashLookup.ShouldLoadChildRelations(returnFields));
+    }
+}
+
 public class BuildNameRelevanceOrderByTests
 {
     [Fact]

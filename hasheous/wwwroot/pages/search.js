@@ -156,7 +156,7 @@ function createDataObjectsTableFromMD5Search(hashType) {
     let resultsPanel = document.getElementById('searchresultspanel');
     resultsPanel.style.display = '';
 
-    postData('/api/v1/Lookup/ByHash?getchildrelations=true', 'POST', searchModel, true)
+    postData('/api/v1/Lookup/ByHash?returnFields=Publisher,Platform,Signatures&getchildrelations=false&getMetadata=false', 'POST', searchModel, true)
         .then(response => {
             if (!response.ok) {
                 throw new Error('Network response was not ok');

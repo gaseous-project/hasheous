@@ -66,7 +66,7 @@ namespace hasheous_server.Controllers.v1_0
         [ResponseCache(CacheProfileName = "5Minute")]
         [RequestSizeLimit(MaxLookupPayloadBytes)]
         [Route("ByHash")]
-        public async Task<IActionResult> LookupPost(bool? returnAllSources = false, string? returnFields = "All", string? returnSources = null)
+        public async Task<IActionResult> LookupPost(bool? returnAllSources = false, string? returnFields = "All", string? returnSources = null, bool getchildrelations = false, bool getMetadata = true)
         {
             try
             {
@@ -161,6 +161,18 @@ namespace hasheous_server.Controllers.v1_0
                 catch (JsonException)
                 {
                     return BadRequest("Invalid model payload. Unable to deserialize request body into hash lookup model(s).");
+                }
+
+                if (string.IsNullOrWhiteSpace(returnFields) || returnFields == "All")
+                {
+                    if (!getMetadata)
+                    {
+                        returnFields = "Publisher,Platform,Signatures";
+                    }
+                    else if (getchildrelations)
+                    {
+                        returnFields = "All";
+                    }
                 }
 
                 // Drop known zero-byte hashes before lookup to avoid unnecessary work.

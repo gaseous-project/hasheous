@@ -111,8 +111,59 @@ namespace Classes
         /// <param name="applyMatchingBlocks">If true, will check for and apply any matching blocks that may be in place for the discovered game. If false, will not check for or apply any matching blocks. Default is false.</param>
         /// <exception cref="HashNotFoundException">Thrown if the provided hash is not found in any signature database.</exception>
         /// <returns>A Task representing the asynchronous operation.</returns>
+        public static bool ShouldLoadMetadata(string? returnFields)
+        {
+            if (string.IsNullOrWhiteSpace(returnFields))
+            {
+                return true;
+            }
+
+            if (returnFields.Equals("All", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            foreach (string field in returnFields.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                if (field.Equals("All", StringComparison.OrdinalIgnoreCase) ||
+                    field.Equals("Metadata", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public static bool ShouldLoadChildRelations(string? returnFields)
+        {
+            if (string.IsNullOrWhiteSpace(returnFields))
+            {
+                return false;
+            }
+
+            if (returnFields.Equals("All", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            foreach (string field in returnFields.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                if (field.Equals("All", StringComparison.OrdinalIgnoreCase) ||
+                    field.Equals("Attributes", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public async Task PerformLookup(bool userInteractiveSession = false, bool applyMatchingBlocks = false)
         {
+            bool loadMetadata = ShouldLoadMetadata(returnFields);
+            bool loadChildRelations = ShouldLoadChildRelations(returnFields);
+
             // parse return fields
             HashSet<ValidFields> validFields = new HashSet<ValidFields>();
             if (returnFields == "All")
@@ -148,7 +199,7 @@ namespace Classes
                     if (applyMatchingBlocks)
                     {
                         long sigId = sig.Game.Id != null ? long.Parse(sig.Game.Id) : 0;
-                        var dataObject = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Game, sigId);
+                        var dataObject = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Game, sigId, false, false);
                         if (dataObject != null && dataObject.Any(d => d.IsBlockedFromMatching == true))
                         {
                             rawSignatures.Remove(sig);
@@ -214,7 +265,7 @@ namespace Classes
                 if (publisher == null)
                 {
                     // redis is not enabled, so we will not use the cache
-                    var publishers = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
+                    var publishers = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId, loadChildRelations, loadMetadata);
                     if (publishers != null && publishers.Count > 0)
                     {
                         publisher = publishers.FirstOrDefault();
@@ -262,7 +313,7 @@ namespace Classes
             if (platform == null)
             {
                 // redis is not enabled, so we will not use the cache
-                var platforms = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId);
+                var platforms = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId, loadChildRelations, loadMetadata);
                 if (platforms != null && platforms.Count > 0)
                 {
                     platform = platforms.FirstOrDefault();
@@ -310,7 +361,7 @@ namespace Classes
             if (game == null)
             {
                 // redis is not enabled, so we will not use the cache
-                var games = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Game, long.Parse(discoveredSignature.Game.Id));
+                var games = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Game, long.Parse(discoveredSignature.Game.Id), loadChildRelations, loadMetadata);
                 if (games != null && games.Count > 0)
                 {
                     game = games.FirstOrDefault();
@@ -423,23 +474,26 @@ namespace Classes
                     }
                 }
 
-                // force metadata search
-                if (userInteractiveSession)
+                if (loadMetadata)
                 {
-                    // Run with timeout for interactive sessions
-                    await Task.WhenAny(
-                        dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true),
-                        Task.Delay(TimeSpan.FromSeconds(4))
-                    );
-                }
-                else
-                {
-                    // Run without timeout for background operations
-                    await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true);
+                    // force metadata search
+                    if (userInteractiveSession)
+                    {
+                        // Run with timeout for interactive sessions
+                        await Task.WhenAny(
+                            dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true),
+                            Task.Delay(TimeSpan.FromSeconds(4))
+                        );
+                    }
+                    else
+                    {
+                        // Run without timeout for background operations
+                        await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true);
+                    }
                 }
 
-                // re-get the game
-                game = await dataObjects.GetDataObject(DataObjects.DataObjectType.Game, game.Id);
+                // re-get the game with the minimal required depth for the requested response shape
+                game = await dataObjects.GetDataObject(DataObjects.DataObjectType.Game, game.Id, loadChildRelations, loadMetadata, false);
             }
 
             bool includeAllFields = validFields.Contains(ValidFields.All);
@@ -457,7 +511,7 @@ namespace Classes
                 this.Platform = new MiniDataObjectItem
                 {
                     Name = platform.Name,
-                    metadata = platform.Metadata
+                    metadata = includeMetadata ? platform.Metadata : new List<DataObjectItem.MetadataItem>()
                 };
             }
             if (includePublisher && publisher != null)
@@ -465,7 +519,7 @@ namespace Classes
                 this.Publisher = new MiniDataObjectItem
                 {
                     Name = publisher.Name,
-                    metadata = publisher.Metadata
+                    metadata = includeMetadata ? publisher.Metadata : new List<DataObjectItem.MetadataItem>()
                 };
             }
 
@@ -558,7 +612,7 @@ namespace Classes
         /// <param name="objectType">The type of the object to retrieve</param>
         /// <param name="sigId">The signature id to search for</param>
         /// <returns>Null if not found; otherwise returns a DataObjectItem of type objectType</returns>
-        private async Task<List<DataObjectItem>?> GetDataObjectFromSignatureId(Database db, DataObjects.DataObjectType objectType, long sigId)
+        private async Task<List<DataObjectItem>?> GetDataObjectFromSignatureId(Database db, DataObjects.DataObjectType objectType, long sigId, bool getChildRelations = false, bool getMetadata = true)
         {
             string sql = @"
                 SELECT 
@@ -580,7 +634,7 @@ namespace Classes
                 List<DataObjectItem> items = new List<DataObjectItem>();
                 foreach (DataRow row in data.Rows)
                 {
-                    DataObjectItem? item = await dataObject.GetDataObject(objectType, (long)row[0]);
+                    DataObjectItem? item = await dataObject.GetDataObject(objectType, (long)row[0], getChildRelations, getMetadata, false);
                     if (item != null)
                     {
                         items.Add(item);
