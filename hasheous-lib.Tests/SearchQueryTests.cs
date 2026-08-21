@@ -1,6 +1,39 @@
+using System.Data;
 using Classes;
+using Classes.Insights;
 
 namespace hasheous_lib.Tests;
+
+public class InsightsReportTests
+{
+    [Fact]
+    public void BuildBusiestEndpointsIncludesMethodAndPerformanceMetrics()
+    {
+        DataTable table = new DataTable();
+        table.Columns.Add("endpoint_address", typeof(string));
+        table.Columns.Add("method", typeof(string));
+        table.Columns.Add("total_requests", typeof(long));
+        table.Columns.Add("average_response_time_ms", typeof(decimal));
+        table.Columns.Add("max_response_time_ms", typeof(decimal));
+
+        DataRow row = table.NewRow();
+        row["endpoint_address"] = "/api/v1/Lookup/ByHash";
+        row["method"] = "POST";
+        row["total_requests"] = 742L;
+        row["average_response_time_ms"] = 182.35m;
+        row["max_response_time_ms"] = 842.10m;
+        table.Rows.Add(row);
+
+        var result = Insights.BuildBusiestEndpoints(table);
+
+        Assert.Single(result);
+        Assert.Equal("POST", result[0]["method"]);
+        Assert.Equal("/api/v1/Lookup/ByHash", result[0]["endpoint"]);
+        Assert.Equal(742L, result[0]["total_requests"]);
+        Assert.Equal(182.35m, result[0]["average_response_time_ms"]);
+        Assert.Equal(842.10m, result[0]["max_response_time_ms"]);
+    }
+}
 
 public class SplitSearchTermsTests
 {
