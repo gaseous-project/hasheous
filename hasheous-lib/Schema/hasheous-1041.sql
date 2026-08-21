@@ -1,1 +1,1 @@
-CREATE INDEX idx_task_queue_task_status ON `hasheous`.`Task_Queue` (`task_name`, `status`);
+CREATE INDEX idx_task_queue_task_status ON `Task_Queue` (`task_name`, `status`);
