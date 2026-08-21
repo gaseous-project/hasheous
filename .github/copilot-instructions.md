@@ -20,6 +20,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Signature ingestion now stores game names from `SortingName` and includes a one-time per-parser migration flag (`HasMigratedToSortingName_<ParserType>`) to migrate legacy name records while preserving alternate-name mappings.
   - Signature game records now also persist country/language variants on `Signatures_Games` (`Country`, `Language`), and migration logic updates legacy null-country rows plus links variant rows back to existing `DataObject_SignatureMap` entries.
   - Public API (versioned) handles lookups like `POST /api/v1/Lookup/ByHash` via `Classes/HashLookup` + `Classes/Database`.
+  - Insights logging records request method, endpoint path, execution time, and status on `Insights_API_Requests`; aggregated hourly/daily/monthly tables must preserve `endpoint_address` and `method` so reports can rank the busiest endpoints and identify CPU hotspots.
   - MCP is hosted on the public `hasheous` web API at `POST /api/v1/Mcp` (controller: `hasheous/Controllers/V1.0/McpController.cs`; shared processor: `hasheous-lib/Classes/Mcp/McpRequestProcessor.cs`).
   - MCP discovery is published at `GET /.well-known/mcp.json` (controller: `hasheous/Controllers/WellKnownController.cs`) and should point clients to the hosted MCP endpoint.
   - Redis (Valkey) provides caching if enabled (`Classes/RedisConnection`), otherwise an in-memory cache is used.
@@ -98,6 +99,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Recent migration note: `hasheous-1037.sql` adds FullText indexes for signature search fields (`Signatures_Games.Publisher`, `Signatures_Platforms.Platform`, `Signatures_Roms.Name`).
   - Recent migration note: `hasheous-1038.sql` adds an index on `Users.NormalizedEmail` to support faster admin user list ordering/filtering.
   - Recent migration note: `hasheous-1039.sql` adds `IsBlockedFromMatching` BOOLEAN column to `DataObject` table (default 0) to allow excluding objects from automatic matching.
+  - Recent migration note: `hasheous-1040.sql` adds `endpoint_address` and `method` columns to the aggregated `Insights_API_Requests_*` tables so the busiest-endpoints report can aggregate and rank hot routes without re-reading raw request logs.
   - Embedded migration & support file manifest names now start with `hasheous_lib.Schema.` or `hasheous_lib.Support.`. After adding a file, ensure Build Action = EmbeddedResource and verify with `Assembly.GetExecutingAssembly().GetManifestResourceNames()` if debugging mismatches.
 
 - Caching
