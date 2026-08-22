@@ -463,14 +463,7 @@ namespace Classes.Supporters
         /// <returns>The number of days a contribution remains active.</returns>
         private static int GetActiveContributionDays()
         {
-            try
-            {
-                return Math.Max(1, Config.SupporterRecognitionConfiguration.ActiveContributionDays);
-            }
-            catch
-            {
-                return 30;
-            }
+            return Math.Max(1, Config.SupporterRecognitionConfiguration.ActiveContributionDays);
         }
     }
 }

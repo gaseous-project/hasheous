@@ -478,7 +478,10 @@ public static class StartupExtensions
 
         using HttpResponseMessage response = await context.Backchannel.SendAsync(request, context.HttpContext.RequestAborted);
         string responseContent = await response.Content.ReadAsStringAsync(context.HttpContext.RequestAborted);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException($"OpenCollective profile lookup failed with status code {(int)response.StatusCode}: {responseContent}");
+        }
 
         using JsonDocument document = JsonDocument.Parse(responseContent);
         JsonElement me = document.RootElement.GetProperty("data").GetProperty("me");

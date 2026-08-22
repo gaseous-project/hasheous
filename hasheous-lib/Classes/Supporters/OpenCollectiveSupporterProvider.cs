@@ -36,9 +36,9 @@ namespace Classes.Supporters
             }
 
             string graphQlQuery = """
-                query SupporterTransactions($slug: String!, $dateFrom: DateTime!) {
+                query SupporterTransactions($slug: String!, $dateFrom: DateTime!, $limit: Int!) {
                   account(slug: $slug) {
-                    transactions(limit: %PAGE_SIZE%, type: CREDIT, dateFrom: $dateFrom) {
+                    transactions(limit: $limit, type: CREDIT, dateFrom: $dateFrom) {
                       nodes {
                         createdAt
                         fromAccount {
@@ -51,7 +51,6 @@ namespace Classes.Supporters
                   }
                 }
                 """;
-            graphQlQuery = graphQlQuery.Replace("%PAGE_SIZE%", RecentContributionPageSize.ToString());
 
             string payload = JsonSerializer.Serialize(new
             {
@@ -59,7 +58,8 @@ namespace Classes.Supporters
                 variables = new
                 {
                     slug = Config.SupporterRecognitionConfiguration.OpenCollectiveCollectiveSlug,
-                    dateFrom = utcNow.AddDays(-Config.SupporterRecognitionConfiguration.ActiveContributionDays).ToString("yyyy-MM-ddTHH:mm:ssZ")
+                    dateFrom = utcNow.AddDays(-Config.SupporterRecognitionConfiguration.ActiveContributionDays).ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                    limit = RecentContributionPageSize
                 }
             });
 
@@ -69,7 +69,10 @@ namespace Classes.Supporters
 
             using HttpResponseMessage response = await HttpClient.SendAsync(request, cancellationToken);
             string responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException($"OpenCollective contribution query failed with status code {(int)response.StatusCode}: {responseContent}");
+            }
 
             using JsonDocument document = JsonDocument.Parse(responseContent);
             ThrowIfGraphQlErrorsExist(document);
@@ -115,7 +118,16 @@ namespace Classes.Supporters
         {
             if (document.RootElement.TryGetProperty("errors", out JsonElement errors) && errors.ValueKind == JsonValueKind.Array && errors.GetArrayLength() > 0)
             {
-                throw new InvalidOperationException("OpenCollective GraphQL request returned one or more errors.");
+                List<string> messages = new List<string>();
+                foreach (JsonElement error in errors.EnumerateArray())
+                {
+                    if (error.TryGetProperty("message", out JsonElement message) && message.ValueKind == JsonValueKind.String)
+                    {
+                        messages.Add(message.GetString() ?? string.Empty);
+                    }
+                }
+
+                throw new InvalidOperationException($"OpenCollective GraphQL request returned one or more errors: {string.Join("; ", messages.Where(message => !string.IsNullOrWhiteSpace(message)))}");
             }
         }
 
