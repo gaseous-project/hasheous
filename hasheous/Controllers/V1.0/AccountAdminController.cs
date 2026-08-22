@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text;
 using Authentication;
 using Classes;
+using Classes.Supporters;
 using hasheous.Classes;
 using hasheous_server.Classes;
 using Microsoft.AspNetCore.Authorization;
@@ -60,7 +61,7 @@ namespace hasheous_server.Controllers.v1_0
             }
 
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            List<Dictionary<string, object>> rows = await db.ExecuteCMDDictAsync(@"
+            List<Dictionary<string, object>> rows = await db.ExecuteCMDDictAsync($@"
 SELECT
     u.Id,
     u.NormalizedEmail,
@@ -74,7 +75,7 @@ INNER JOIN UserRoles ur ON ur.UserId = u.Id
 INNER JOIN Roles r ON r.Id = ur.RoleId
 WHERE (@currentUserId = '' OR u.Id <> @currentUserId)
 GROUP BY u.Id, u.NormalizedEmail, u.Email, u.LockoutEnabled, u.LockoutEnd, u.SecurityProfile
-HAVING SUM(CASE WHEN r.Name NOT IN ('Member', 'Verified Email') THEN 1 ELSE 0 END) > 0
+HAVING SUM(CASE WHEN r.Name NOT IN ('Member', 'Verified Email', '{SupporterConstants.SupporterRoleName}') THEN 1 ELSE 0 END) > 0
 ORDER BY u.NormalizedEmail, u.Email;",
             new Dictionary<string, object>
             {
@@ -195,7 +196,7 @@ ORDER BY u.NormalizedEmail, u.Email;",
                 // delete all roles
                 foreach (string role in userRoles)
                 {
-                    if (role != "Member" && role != "Verified Email")
+                    if (role != "Member" && role != "Verified Email" && role != SupporterConstants.SupporterRoleName)
                     {
                         await _userManager.RemoveFromRoleAsync(user, role);
                     }

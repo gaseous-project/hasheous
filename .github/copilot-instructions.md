@@ -23,6 +23,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Hash lookup performance: lightweight list/search callers should avoid forcing full child relation or metadata hydration; keep list responses to the minimal requested fields (`Publisher`, `Platform`, `Signatures`, etc.) and only load metadata/expanded attributes when the caller explicitly requests them. The `LookupController` response is intentionally cached for five minutes, which is acceptable because the raw signature lookup is already Redis-cached and repeated hash lookups are read-heavy and highly re-entrant.
   - Raw signature lookups are cached in `SignatureManagement.GetRawSignatures(...)` using a Redis key derived from the normalized hash model list; the result remains valid for a long TTL and should be reused before deeper object hydration work is performed.
   - Submission voting/reporting is handled by `hasheous-lib/Classes/Submissions.cs`: `AddVote(...)` resolves the target object by `DataObjectId` or hash lookup, validates source-specific IDs before inserting/updating `MatchUserVotes`, and `TallyVotes()` aggregates votes into the metadata map only when the vote threshold is reached and the metadata is not locked by manual/admin overrides.
+  - Supporter recognition uses linked provider accounts stored in `UserSupporterLinks`, grants the provider-agnostic `Supporter` role when a linked provider reports a payment within the configured active window, and currently syncs OpenCollective through `hasheous-lib/Classes/Supporters/SupporterRecognitionService.cs`.
   - Insights logging records request method, endpoint path, execution time, and status on `Insights_API_Requests`; aggregated hourly/daily/monthly tables must preserve `endpoint_address` and `method` so reports can rank the busiest endpoints and identify CPU hotspots.
   - MCP is hosted on the public `hasheous` web API at `POST /api/v1/Mcp` (controller: `hasheous/Controllers/V1.0/McpController.cs`; shared processor: `hasheous-lib/Classes/Mcp/McpRequestProcessor.cs`).
   - MCP discovery is published at `GET /.well-known/mcp.json` (controller: `hasheous/Controllers/WellKnownController.cs`) and should point clients to the hosted MCP endpoint.
@@ -52,6 +53,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
     - `Bundles`: local and S3 tiers default to 90-day max age.
     - `MinFreeDiskSpaceBytes` on local tiers triggers eviction even when size is under target if disk free space is low.
   - S3 env vars: `s3enabled`, `s3region`, `s3serviceurl`, `s3accesskey`, `s3secretkey`, `s3sessiontoken`, `s3forcepathstyle`.
+  - Supporter recognition env vars: `opencollectiveclientid`, `opencollectiveclientsecret`, `opencollectiveapitoken`, `opencollectivecollectiveslug`.
   - For MinIO and similar S3-compatible endpoints, use host-only `ServiceUrl` (for example `https://s3.mrgtech.net`) and typically set `ForcePathStyle = true`.
   - S3 fallback is effectively disabled when either `Enabled` is false or bucket/key inputs are missing.
   - Temporary metadata bundle workspace is configured via `Config.LibraryConfiguration.LibraryTemporaryBundlesDirectory` (defaults to `Path.Combine(Path.GetTempPath(), "Bundles")`).
@@ -85,6 +87,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
 - Auth & security
   - Identity cookies configured; roles/policies: Admin, Moderator, Member, "Verified Email". Roles are seeded on startup.
   - Role hierarchy: Admin > Moderator > Member. "Verified Email" is a status role (not hierarchical) automatically assigned/removed based on email confirmation status.
+  - `Supporter` is also a status role (non-manual) that depends on `Member` and is automatically assigned/removed by supporter sync.
   - API keys:
   - User key header `X-API-Key` via `[Authentication.ApiKey.ApiKeyAttribute]` (`ApiKeyAuthorizationFilter` wired in `hasheous/Program.cs`) — identifies individual users and their actions.
   - Client key header `X-Client-API-Key` via `[Authentication.ClientApiKey.ClientApiKeyAttribute]` — identifies client apps (e.g., Gaseous, Romm); typically required when `Config.RequireClientAPIKey` is true.
@@ -118,6 +121,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - ScreenScraper: `FetchScreenScraperMetadata` is queued every 1440 minutes (24 hours). It reads cached metadata JSON under `Config.LibraryConfiguration.LibraryMetadataDirectory_Screenscraper/games` and imports records through `XML.XMLIngestor.ImportDatRecord(...)`.
   - Hourly maintenance now runs proxy cache policy maintenance via `ProxyCacheManager.RunMaintenanceAsync()` (tiered LRU/age eviction for local and S3 cache tiers).
   - Queue task refactor: obsolete blocking entries `GetMissingArtwork` and `MetadataMatchSearch` were removed from metadata fetch task `Blocks` lists. Don’t rely on them for future coordination.
+  - Supporter recognition sync is scheduled through `QueueItemType.SyncSupporterStatus` in `service-orchestrator/Program.cs`; wire new provider sync tasks through both `hasheous-lib/Classes/ProcessQueue/ProcessQueue.cs` and `service-host/Program.cs`.
   - Data object metadata guard: `DataObjects.DataObjectMetadataSearch(objectType, id?, ForceSearch)` now uses an atomic file lock under `~/.hasheous-server/Data/Metadata/Hasheous/DataObjectFlags` to prevent duplicate concurrent runs for the same `(objectType, id)` key.
   - Metadata search tasks are launched concurrently per metadata source. The per-run `jobId` must be unique, the bounded return guard is controlled by `maxWaitSeconds` (currently 4), and `finalise()` must wait until every launched task has completed before running.
   - Guard behavior details: lock acquisition uses create-new semantics (`FileMode.CreateNew`) and keeps the lock handle open for the full search duration; lock-file collisions cause immediate skip/return.

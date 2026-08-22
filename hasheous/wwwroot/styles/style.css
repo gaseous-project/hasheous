@@ -768,6 +768,10 @@ td {
     display: inline-block;
 }
 
+.supporter-status-item {
+    margin-bottom: 10px;
+}
+
 .screenshotimage {
     max-width: 24%;
     max-height: 118px;

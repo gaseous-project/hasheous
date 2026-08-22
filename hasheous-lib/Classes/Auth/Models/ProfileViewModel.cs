@@ -36,7 +36,8 @@ namespace Authentication
                             }
                             break;
                         case "Verified Email":
-                            // Verified Email is a status role, not hierarchical - skip it
+                        case "Supporter":
+                            // Verified Email and Supporter are status roles, not hierarchical - skip them
                             break;
                         default:
                             if (_highestRole == "")

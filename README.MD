@@ -13,6 +13,7 @@ Hasheous is hosted at https://hasheous.org/
   * IGDB
 * Provides an API for developers to submit fixes to data matching
 * Includes a hosted MCP endpoint in the Hasheous API for AI-assisted database queries
+* Supports supporter recognition through linked OpenCollective accounts
 * Is completely free to use
 
 ## Discord Server
@@ -46,6 +47,18 @@ When Hasheous-Server is started for the first time, it creates a configuration f
 | ClientId  | igdbclientid         |
 | Secret.   | igdbclientsecret     |
 
+### SupporterRecognitionConfiguration
+| Attribute | Environment Variable |
+| --------- | -------------------- |
+| OpenCollectiveClientId | opencollectiveclientid |
+| OpenCollectiveClientSecret | opencollectiveclientsecret |
+| OpenCollectiveApiToken | opencollectiveapitoken |
+| OpenCollectiveCollectiveSlug | opencollectivecollectiveslug |
+
+When configuring OpenCollective OAuth linking, use this callback URL:
+
+`https://<your-hasheous-host>/signin-opencollective`
+
 ### config.json
 ```json
 {
@@ -60,12 +73,25 @@ When Hasheous-Server is started for the first time, it creates a configuration f
     "ClientId": "<clientid>",
     "Secret": "<secret>"
   },
+  "SupporterRecognitionConfiguration": {
+    "OpenCollectiveClientId": "<clientid>",
+    "OpenCollectiveClientSecret": "<clientsecret>",
+    "OpenCollectiveApiToken": "<apitoken>",
+    "OpenCollectiveCollectiveSlug": "hasheous",
+    "ActiveContributionDays": 30
+  },
   "LoggingConfiguration": {
     "DebugLogging": false,
     "LogRetention": 7
   }
 }
 ```
+
+## Supporter Recognition
+
+Supporter recognition is documented in [`SUPPORTER_RECOGNITION.MD`](./SUPPORTER_RECOGNITION.MD).
+
+Active supporters receive the `Supporter` role when their linked OpenCollective account has made a payment within the last 30 days.
 
 ## Docker
 ### Build and deploy a Docker image from source

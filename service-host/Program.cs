@@ -178,6 +178,10 @@ switch (taskType)
         Task = new FetchLaunchBoxMetadata();
         break;
 
+    case QueueItemType.SyncSupporterStatus:
+        Task = new SyncSupporterStatus();
+        break;
+
     case QueueItemType.HourlyMaintenance:
         Task = new HourlyMaintenance();
         break;

@@ -35,10 +35,18 @@ namespace Authentication
                                 _highestRole = role;
                             }
                             break;
+                        case "Verified Email":
+                        case "Supporter":
+                            break;
                         default:
                             _highestRole = "Member";
                             break;
                     }
+                }
+
+                if (_highestRole == "")
+                {
+                    _highestRole = "Member";
                 }
 
                 return _highestRole;
