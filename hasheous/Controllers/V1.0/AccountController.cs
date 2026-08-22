@@ -723,7 +723,7 @@ namespace hasheous_server.Controllers.v1_0
             {
                 if (!await SynchronizeSupporterLinkAsync(user, info))
                 {
-                    return Unauthorized("Unable to synchronize supporter link");
+                    return StatusCode(StatusCodes.Status500InternalServerError, "Unable to synchronize supporter link");
                 }
 
                 var legacyLogin = existingLogins.FirstOrDefault(x => x.LoginProvider == info.LoginProvider);
