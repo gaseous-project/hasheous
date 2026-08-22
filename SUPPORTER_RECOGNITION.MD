@@ -29,6 +29,7 @@ The feature uses two configuration groups:
 - OAuth linking
   - `opencollectiveclientid`
   - `opencollectiveclientsecret`
+  - OpenCollective OAuth callback URL: `https://<your-hasheous-host>/signin-opencollective`
 - Background supporter sync
   - `opencollectiveapitoken`
   - `opencollectivecollectiveslug`

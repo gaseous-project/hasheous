@@ -55,6 +55,10 @@ When Hasheous-Server is started for the first time, it creates a configuration f
 | OpenCollectiveApiToken | opencollectiveapitoken |
 | OpenCollectiveCollectiveSlug | opencollectivecollectiveslug |
 
+When configuring OpenCollective OAuth linking, use this callback URL:
+
+`https://<your-hasheous-host>/signin-opencollective`
+
 ### config.json
 ```json
 {
