@@ -828,15 +828,19 @@ namespace hasheous_server.Controllers.v1_0
         }
 
         /// <summary>
-        /// Persists and synchronizes a supporter link when the linked provider participates in supporter recognition.
+        /// Determines whether an external provider is reserved for supporter recognition instead of authentication.
         /// </summary>
-        /// <param name="user">The signed-in Hasheous user.</param>
-        /// <param name="externalLoginInfo">The linked external login information.</param>
+        /// <param name="provider">The external provider name.</param>
         private static bool IsSupporterOnlyProvider(string provider)
         {
             return string.Equals(provider, SupporterConstants.OpenCollectiveProviderName, StringComparison.OrdinalIgnoreCase);
         }
 
+        /// <summary>
+        /// Persists and synchronizes a supporter link when the linked provider participates in supporter recognition.
+        /// </summary>
+        /// <param name="user">The signed-in Hasheous user.</param>
+        /// <param name="externalLoginInfo">The linked external login information.</param>
         private static async Task<bool> SynchronizeSupporterLinkAsync(ApplicationUser user, ExternalLoginInfo externalLoginInfo)
         {
             if (!IsSupporterOnlyProvider(externalLoginInfo.LoginProvider))
