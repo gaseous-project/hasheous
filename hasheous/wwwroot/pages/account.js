@@ -22,55 +22,55 @@ for (let i = 0; i < userProfile.Roles.length; i++) {
 function fetchSupporterStatus() {
     postData('/api/v1/Account/SupporterStatus', 'GET', {}, false)
         .then(statuses => {
-        let supporterSection = document.getElementById('supporter_section');
-        let supporterStatusList = document.getElementById('supporter_status_list');
-        supporterStatusList.innerHTML = '';
+            let supporterSection = document.getElementById('supporter_section');
+            let supporterStatusList = document.getElementById('supporter_status_list');
+            supporterStatusList.innerHTML = '';
 
-        if (!statuses || statuses.length === 0) {
-            supporterSection.style.display = 'none';
-            return;
-        }
-
-        supporterSection.style.display = 'block';
-        statuses.forEach(status => {
-            let statusWrapper = document.createElement('div');
-            statusWrapper.classList.add('supporter-status-item');
-
-            let providerHeading = document.createElement('strong');
-            providerHeading.innerHTML = lang.getLang(status.provider.toLowerCase());
-            statusWrapper.appendChild(providerHeading);
-
-            let providerDetails = document.createElement('div');
-            let details = [];
-            details.push(status.isLinked ? lang.getLang('supporterlinked') : lang.getLang('supporternotlinked'));
-
-            if (status.isLinked && status.providerAccountSlug) {
-                details.push(`@${status.providerAccountSlug}`);
+            if (!statuses || statuses.length === 0) {
+                supporterSection.style.display = 'none';
+                return;
             }
 
-            if (status.isActive) {
-                details.push(lang.getLang('supporteractive'));
-            } else if (status.isLinked) {
-                details.push(lang.getLang('supporterinactive'));
-            }
+            supporterSection.style.display = 'block';
+            statuses.forEach(status => {
+                let statusWrapper = document.createElement('div');
+                statusWrapper.classList.add('supporter-status-item');
 
-            if (status.lastPaymentUtc) {
-                details.push(`${lang.getLang('supporterlastpayment')}: ${new Date(status.lastPaymentUtc).toLocaleString()}`);
-            }
+                let providerHeading = document.createElement('strong');
+                providerHeading.innerHTML = lang.getLang(status.provider.toLowerCase());
+                statusWrapper.appendChild(providerHeading);
 
-            if (status.activeUntilUtc) {
-                details.push(`${lang.getLang('supporteractiveuntil')}: ${new Date(status.activeUntilUtc).toLocaleString()}`);
-            }
+                let providerDetails = document.createElement('div');
+                let details = [];
+                details.push(status.isLinked ? lang.getLang('supporterlinked') : lang.getLang('supporternotlinked'));
 
-            if (!status.isSyncEnabled) {
-                details.push(lang.getLang('supportersyncdisabled'));
-            }
+                if (status.isLinked && status.providerAccountSlug) {
+                    details.push(`@${status.providerAccountSlug}`);
+                }
 
-            providerDetails.innerHTML = details.join(' • ');
-            statusWrapper.appendChild(providerDetails);
+                if (status.isActive) {
+                    details.push(lang.getLang('supporteractive'));
+                } else if (status.isLinked) {
+                    details.push(lang.getLang('supporterinactive'));
+                }
 
-            supporterStatusList.appendChild(statusWrapper);
-        });
+                if (status.lastPaymentUtc) {
+                    details.push(`${lang.getLang('supporterlastpayment')}: ${new Date(status.lastPaymentUtc).toLocaleString()}`);
+                }
+
+                if (status.activeUntilUtc) {
+                    details.push(`${lang.getLang('supporteractiveuntil')}: ${new Date(status.activeUntilUtc).toLocaleString()}`);
+                }
+
+                if (!status.isSyncEnabled) {
+                    details.push(lang.getLang('supportersyncdisabled'));
+                }
+
+                providerDetails.innerHTML = details.join(' • ');
+                statusWrapper.appendChild(providerDetails);
+
+                supporterStatusList.appendChild(statusWrapper);
+            });
         }).catch(error => {
             console.error('Error fetching supporter status:', error);
         });
@@ -298,6 +298,9 @@ fetch('/api/v1/Account/social-login', {
                         break;
                     case "Microsoft":
                         accountIcon.src = '/images/ms-signin-logo.svg';
+                        break;
+                    case "OpenCollective":
+                        accountIcon.src = '/images/opencollective-signin-logo.svg';
                         break;
                     default:
                         accountIcon.src = '/images/social-signin-logo.svg';

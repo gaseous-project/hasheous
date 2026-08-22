@@ -12,7 +12,7 @@ namespace Classes
     /// </summary>
     public static class Config
     {
-        static ConfigFile _config = new ConfigFile();
+        static ConfigFile _config;
 
         /// <summary>
         /// Shared database instance using MySQL with the configured connection string.
