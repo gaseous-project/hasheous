@@ -36,7 +36,7 @@ The feature uses two configuration groups:
 
 ### Required API token scopes for `opencollectiveapitoken`
 
-The token is sent as a ****** to the OpenCollective GraphQL v2 API
+The token is sent as a Bearer token to the OpenCollective GraphQL v2 API
 (`https://api.opencollective.com/graphql/v2`) and is used exclusively for
 read-only access to contribution/transaction data.
 
@@ -59,7 +59,7 @@ These values are exposed through `Config.SupporterRecognitionConfiguration`.
 2. The account page lists available external providers, including OpenCollective when OAuth linking is configured.
 3. The user links OpenCollective through OAuth.
 4. Hasheous stores the provider account id and slug in `UserSupporterLinks`.
-5. Hasheous immediately syncs the linked account and then refreshes it daily through the orchestrator queue.
+5. Hasheous immediately syncs the linked account and then refreshes on a regular basis through the orchestrator queue.
 6. If the linked account has a qualifying payment in the last 30 days, the user receives the `Supporter` role.
 
 ## Background synchronization

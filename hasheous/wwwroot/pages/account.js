@@ -37,7 +37,7 @@ function fetchSupporterStatus() {
                 statusWrapper.classList.add('supporter-status-item');
 
                 let providerHeading = document.createElement('strong');
-                providerHeading.innerHTML = lang.getLang(status.provider.toLowerCase());
+                providerHeading.textContent = lang.getLang(status.provider.toLowerCase());
                 statusWrapper.appendChild(providerHeading);
 
                 let providerDetails = document.createElement('div');
@@ -66,7 +66,7 @@ function fetchSupporterStatus() {
                     details.push(lang.getLang('supportersyncdisabled'));
                 }
 
-                providerDetails.innerHTML = details.join(' • ');
+                providerDetails.textContent = details.join(' • ');
                 statusWrapper.appendChild(providerDetails);
 
                 supporterStatusList.appendChild(statusWrapper);
