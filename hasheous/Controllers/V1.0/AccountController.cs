@@ -724,6 +724,12 @@ namespace hasheous_server.Controllers.v1_0
                     return Unauthorized("Unable to synchronize supporter link");
                 }
 
+                var legacyLogin = (await _userManager.GetLoginsAsync(user)).FirstOrDefault(x => x.LoginProvider == info.LoginProvider);
+                if (legacyLogin != null)
+                {
+                    await _userManager.RemoveLoginAsync(user, legacyLogin.LoginProvider, legacyLogin.ProviderKey);
+                }
+
                 await _signInManager.RefreshSignInAsync(user);
                 return LocalRedirect(returnUrl);
             }
