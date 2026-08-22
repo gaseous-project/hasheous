@@ -18,6 +18,76 @@ for (let i = 0; i < userProfile.Roles.length; i++) {
     roleBadgeDiv.appendChild(roleBadge);
 }
 
+// setup supporter recognition status
+function fetchSupporterStatus() {
+    fetch('/api/v1/Account/SupporterStatus', {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+    }).then(response => {
+        if (response.ok) {
+            return response.json();
+        }
+
+        throw new Error('Failed to fetch supporter status');
+    }).then(statuses => {
+        let supporterSection = document.getElementById('supporter_section');
+        let supporterStatusList = document.getElementById('supporter_status_list');
+        supporterStatusList.innerHTML = '';
+
+        if (!statuses || statuses.length === 0) {
+            supporterSection.style.display = 'none';
+            return;
+        }
+
+        supporterSection.style.display = 'block';
+        statuses.forEach(status => {
+            let statusWrapper = document.createElement('div');
+            statusWrapper.style.marginBottom = '10px';
+
+            let providerHeading = document.createElement('strong');
+            providerHeading.innerHTML = lang.getLang(status.provider.toLowerCase());
+            statusWrapper.appendChild(providerHeading);
+
+            let providerDetails = document.createElement('div');
+            let details = [];
+            details.push(status.isLinked ? lang.getLang('supporterlinked') : lang.getLang('supporternotlinked'));
+
+            if (status.isLinked && status.providerAccountSlug) {
+                details.push(`@${status.providerAccountSlug}`);
+            }
+
+            if (status.isActive) {
+                details.push(lang.getLang('supporteractive'));
+            } else if (status.isLinked) {
+                details.push(lang.getLang('supporterinactive'));
+            }
+
+            if (status.lastPaymentUtc) {
+                details.push(`${lang.getLang('supporterlastpayment')}: ${new Date(status.lastPaymentUtc).toLocaleString()}`);
+            }
+
+            if (status.activeUntilUtc) {
+                details.push(`${lang.getLang('supporteractiveuntil')}: ${new Date(status.activeUntilUtc).toLocaleString()}`);
+            }
+
+            if (!status.isSyncEnabled) {
+                details.push(lang.getLang('supportersyncdisabled'));
+            }
+
+            providerDetails.innerHTML = details.join(' • ');
+            statusWrapper.appendChild(providerDetails);
+
+            supporterStatusList.appendChild(statusWrapper);
+        });
+    }).catch(error => {
+        console.error('Error fetching supporter status:', error);
+    });
+}
+fetchSupporterStatus();
+
 // setup email verification status
 let emailField = document.getElementById('account_email');
 let emailStatusField = document.getElementById('email_verified_status');

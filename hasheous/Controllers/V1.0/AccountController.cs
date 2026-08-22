@@ -5,6 +5,7 @@ using System.Text.Encodings.Web;
 using System.Web;
 using Authentication;
 using Classes;
+using Classes.Supporters;
 using hasheous_server.Classes;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authorization;
@@ -466,6 +467,10 @@ namespace hasheous_server.Controllers.v1_0
             return Ok(new { token = tokens.RequestToken });
         }
 
+        /// <summary>
+        /// Returns the configured external login providers available to the current deployment.
+        /// </summary>
+        /// <returns>The list of configured external login providers.</returns>
         [HttpGet]
         [AllowAnonymous]
         [Route("social-login")]
@@ -483,8 +488,32 @@ namespace hasheous_server.Controllers.v1_0
             {
                 availableLogins.Add("Microsoft");
             }
+            if (Config.SupporterRecognitionConfiguration.OpenCollectiveLinkEnabled)
+            {
+                availableLogins.Add(SupporterConstants.OpenCollectiveProviderName);
+            }
 
             return Ok(availableLogins);
+        }
+
+        /// <summary>
+        /// Returns supporter recognition status for the currently signed-in user.
+        /// </summary>
+        /// <returns>The supporter provider status list for the current user.</returns>
+        [HttpGet]
+        [Authorize]
+        [Route("SupporterStatus")]
+        public async Task<IActionResult> GetSupporterStatus()
+        {
+            string? userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return Unauthorized();
+            }
+
+            SupporterRecognitionService supporterRecognitionService = new SupporterRecognitionService();
+            List<SupporterProviderStatusItem> statuses = await supporterRecognitionService.GetUserSupporterStatusesAsync(userId);
+            return Ok(statuses);
         }
 
         [HttpGet]
@@ -670,6 +699,11 @@ namespace hasheous_server.Controllers.v1_0
             return Challenge(properties, provider);
         }
 
+        /// <summary>
+        /// Completes an external login linking flow for the currently signed-in user.
+        /// </summary>
+        /// <param name="returnUrl">The URL to redirect the user to after the link is processed.</param>
+        /// <returns>A redirect to the supplied return URL when linking succeeds.</returns>
         [HttpGet]
         [Authorize]
         [Route("LinkLoginCallback")]
@@ -686,6 +720,7 @@ namespace hasheous_server.Controllers.v1_0
             var result = await _userManager.AddLoginAsync(user, info);
             if (result.Succeeded)
             {
+                await SynchronizeSupporterLinkAsync(user, info);
                 await _signInManager.RefreshSignInAsync(user);
                 return LocalRedirect(returnUrl);
             }
@@ -695,6 +730,12 @@ namespace hasheous_server.Controllers.v1_0
             }
         }
 
+        /// <summary>
+        /// Unlinks an external login provider from the currently signed-in user.
+        /// </summary>
+        /// <param name="provider">The external login provider to unlink.</param>
+        /// <param name="returnUrl">The URL to redirect the user to after unlinking.</param>
+        /// <returns>A redirect to the supplied return URL when unlinking succeeds.</returns>
         [HttpGet]
         [Authorize]
         [Route("unlink-login/{provider}")]
@@ -711,6 +752,12 @@ namespace hasheous_server.Controllers.v1_0
             var result = await _userManager.RemoveLoginAsync(user, login.LoginProvider, login.ProviderKey);
             if (result.Succeeded)
             {
+                if (string.Equals(provider, SupporterConstants.OpenCollectiveProviderName, StringComparison.OrdinalIgnoreCase))
+                {
+                    SupporterRecognitionService supporterRecognitionService = new SupporterRecognitionService();
+                    await supporterRecognitionService.DeleteUserSupporterLinkAsync(user.Id, SupporterConstants.OpenCollectiveProviderName);
+                }
+
                 // Optionally: sign in the user again
                 await _signInManager.RefreshSignInAsync(user);
                 return LocalRedirect(returnUrl);
@@ -721,6 +768,10 @@ namespace hasheous_server.Controllers.v1_0
             }
         }
 
+        /// <summary>
+        /// Returns the external logins currently linked to the signed-in user.
+        /// </summary>
+        /// <returns>The external login providers linked to the current user.</returns>
         [HttpGet]
         [Authorize]
         [Route("linked-logins")]
@@ -734,6 +785,32 @@ namespace hasheous_server.Controllers.v1_0
             var linkedLogins = logins.Select(x => new { x.LoginProvider, x.ProviderKey }).ToList();
 
             return Ok(linkedLogins);
+        }
+
+        /// <summary>
+        /// Persists and synchronizes a supporter link when the linked provider participates in supporter recognition.
+        /// </summary>
+        /// <param name="user">The signed-in Hasheous user.</param>
+        /// <param name="externalLoginInfo">The linked external login information.</param>
+        private static async Task SynchronizeSupporterLinkAsync(ApplicationUser user, ExternalLoginInfo externalLoginInfo)
+        {
+            if (!string.Equals(externalLoginInfo.LoginProvider, SupporterConstants.OpenCollectiveProviderName, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            try
+            {
+                SupporterRecognitionService supporterRecognitionService = new SupporterRecognitionService();
+                string? accountSlug = externalLoginInfo.Principal.FindFirstValue(SupporterConstants.OpenCollectiveSlugClaimType);
+                string? displayName = externalLoginInfo.Principal.FindFirstValue(ClaimTypes.Name) ?? externalLoginInfo.Principal.FindFirstValue(ClaimTypes.Email);
+                await supporterRecognitionService.UpsertUserSupporterLinkAsync(user.Id, SupporterConstants.OpenCollectiveProviderName, externalLoginInfo.ProviderKey, accountSlug, displayName);
+                await supporterRecognitionService.SyncUserAsync(user.Id, SupporterConstants.OpenCollectiveProviderName);
+            }
+            catch (Exception ex)
+            {
+                Logging.Log(Logging.LogType.Warning, "Supporter Recognition", $"Unable to synchronize supporter link for user {user.Id}.", ex);
+            }
         }
     }
 }

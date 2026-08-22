@@ -94,6 +94,11 @@ namespace Classes.ProcessQueue
         /// <summary>
         /// Fetches LaunchBox metadata - uses already cached metadata files
         /// </summary>
-        FetchLaunchBoxMetadata
+        FetchLaunchBoxMetadata,
+
+        /// <summary>
+        /// Synchronizes supporter recognition state for linked payment providers.
+        /// </summary>
+        SyncSupporterStatus
     }
 }

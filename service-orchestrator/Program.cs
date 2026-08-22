@@ -245,6 +245,9 @@ Classes.ProcessQueue.QueueProcessor.QueueItems = new List<Classes.ProcessQueue.Q
     // fetch LaunchBox metadata
     new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchLaunchBoxMetadata, 10080, false),
 
+    // synchronize supporter recognition
+    new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.SyncSupporterStatus, 1440, false),
+
     // dump all data objects
     new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.MetadataMapDump, 10080, false)
 };

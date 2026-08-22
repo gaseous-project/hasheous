@@ -36,6 +36,7 @@ namespace Authentication
                             }
                             break;
                         case "Verified Email":
+                        case "Supporter":
                             // Verified Email is a status role, not hierarchical - skip it
                             break;
                         default:
