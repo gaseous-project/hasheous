@@ -20,19 +20,8 @@ for (let i = 0; i < userProfile.Roles.length; i++) {
 
 // setup supporter recognition status
 function fetchSupporterStatus() {
-    fetch('/api/v1/Account/SupporterStatus', {
-        method: 'GET',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-    }).then(response => {
-        if (response.ok) {
-            return response.json();
-        }
-
-        throw new Error('Failed to fetch supporter status');
-    }).then(statuses => {
+    postData('/api/v1/Account/SupporterStatus', 'GET', {}, false)
+        .then(statuses => {
         let supporterSection = document.getElementById('supporter_section');
         let supporterStatusList = document.getElementById('supporter_status_list');
         supporterStatusList.innerHTML = '';
@@ -45,7 +34,7 @@ function fetchSupporterStatus() {
         supporterSection.style.display = 'block';
         statuses.forEach(status => {
             let statusWrapper = document.createElement('div');
-            statusWrapper.style.marginBottom = '10px';
+            statusWrapper.classList.add('supporter-status-item');
 
             let providerHeading = document.createElement('strong');
             providerHeading.innerHTML = lang.getLang(status.provider.toLowerCase());
@@ -82,9 +71,9 @@ function fetchSupporterStatus() {
 
             supporterStatusList.appendChild(statusWrapper);
         });
-    }).catch(error => {
-        console.error('Error fetching supporter status:', error);
-    });
+        }).catch(error => {
+            console.error('Error fetching supporter status:', error);
+        });
 }
 fetchSupporterStatus();
 

@@ -45,8 +45,8 @@ These values are exposed through `Config.SupporterRecognitionConfiguration`.
 ## Background synchronization
 
 - Queue item: `SyncSupporterStatus`
-- Task implementation: `/home/runner/work/hasheous/hasheous/hasheous-lib/Classes/ProcessQueue/Tasks/SyncSupporterStatus.cs`
-- Service implementation: `/home/runner/work/hasheous/hasheous/hasheous-lib/Classes/Supporters/SupporterRecognitionService.cs`
+- Task implementation: `hasheous-lib/Classes/ProcessQueue/Tasks/SyncSupporterStatus.cs`
+- Service implementation: `hasheous-lib/Classes/Supporters/SupporterRecognitionService.cs`
 
 The synchronization process:
 
@@ -66,7 +66,7 @@ You can gate an endpoint with either:
 - `[Authorize(Roles = "Supporter")]`
 - `[Authorize(Policy = "Supporter")]`
 
-The `Supporter` authorization policy is registered in `/home/runner/work/hasheous/hasheous/hasheous/StartupExtensions.cs`.
+The `Supporter` authorization policy is registered in `hasheous/StartupExtensions.cs`.
 
 ### Backend logic checks
 

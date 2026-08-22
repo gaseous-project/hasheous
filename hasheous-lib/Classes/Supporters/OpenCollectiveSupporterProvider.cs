@@ -10,6 +10,8 @@ namespace Classes.Supporters
     public class OpenCollectiveSupporterProvider : ISupporterProvider
     {
         private const string GraphQlEndpoint = "https://api.opencollective.com/graphql/v2";
+        // OpenCollective contribution sync currently reads a single page of recent transactions.
+        private const int RecentContributionPageSize = 1000;
         private static readonly HttpClient HttpClient = new HttpClient();
 
         /// <inheritdoc/>
@@ -36,7 +38,7 @@ namespace Classes.Supporters
             string graphQlQuery = """
                 query SupporterTransactions($slug: String!, $dateFrom: DateTime!) {
                   account(slug: $slug) {
-                    transactions(limit: 1000, type: CREDIT, dateFrom: $dateFrom) {
+                    transactions(limit: %PAGE_SIZE%, type: CREDIT, dateFrom: $dateFrom) {
                       nodes {
                         createdAt
                         fromAccount {
@@ -49,6 +51,7 @@ namespace Classes.Supporters
                   }
                 }
                 """;
+            graphQlQuery = graphQlQuery.Replace("%PAGE_SIZE%", RecentContributionPageSize.ToString());
 
             string payload = JsonSerializer.Serialize(new
             {
