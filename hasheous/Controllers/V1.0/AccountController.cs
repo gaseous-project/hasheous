@@ -717,6 +717,8 @@ namespace hasheous_server.Controllers.v1_0
             if (info == null)
                 return Unauthorized("External login info not found");
 
+            var existingLogins = await _userManager.GetLoginsAsync(user);
+
             if (IsSupporterOnlyProvider(info.LoginProvider))
             {
                 if (!await SynchronizeSupporterLinkAsync(user, info))
@@ -724,7 +726,7 @@ namespace hasheous_server.Controllers.v1_0
                     return Unauthorized("Unable to synchronize supporter link");
                 }
 
-                var legacyLogin = (await _userManager.GetLoginsAsync(user)).FirstOrDefault(x => x.LoginProvider == info.LoginProvider);
+                var legacyLogin = existingLogins.FirstOrDefault(x => x.LoginProvider == info.LoginProvider);
                 if (legacyLogin != null)
                 {
                     await _userManager.RemoveLoginAsync(user, legacyLogin.LoginProvider, legacyLogin.ProviderKey);
