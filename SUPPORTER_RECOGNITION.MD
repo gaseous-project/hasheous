@@ -9,8 +9,10 @@ Hasheous can recognize active supporters by linking a user account to a payment 
 ## What gets stored
 
 - External supporter account links are stored in `UserSupporterLinks`.
+- Supporter account links are retained even when payments expire so users do not need to relink if they resume support later.
 - The `Supporter` role is granted when a linked account has a qualifying payment within the last 30 days.
 - The role is removed automatically when no linked provider remains active.
+- Linked supporter accounts are for supporter recognition only and are not used as sign-in methods.
 
 ## Active contribution rule
 

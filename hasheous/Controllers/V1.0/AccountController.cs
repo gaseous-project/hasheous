@@ -488,7 +488,7 @@ namespace hasheous_server.Controllers.v1_0
             {
                 availableLogins.Add("Microsoft");
             }
-            if (Config.SupporterRecognitionConfiguration.OpenCollectiveLinkEnabled)
+            if (Config.SupporterRecognitionConfiguration.OpenCollectiveLinkEnabled && User?.Identity?.IsAuthenticated == true)
             {
                 availableLogins.Add(SupporterConstants.OpenCollectiveProviderName);
             }
@@ -717,10 +717,20 @@ namespace hasheous_server.Controllers.v1_0
             if (info == null)
                 return Unauthorized("External login info not found");
 
+            if (IsSupporterOnlyProvider(info.LoginProvider))
+            {
+                if (!await SynchronizeSupporterLinkAsync(user, info))
+                {
+                    return Unauthorized("Unable to synchronize supporter link");
+                }
+
+                await _signInManager.RefreshSignInAsync(user);
+                return LocalRedirect(returnUrl);
+            }
+
             var result = await _userManager.AddLoginAsync(user, info);
             if (result.Succeeded)
             {
-                await SynchronizeSupporterLinkAsync(user, info);
                 await _signInManager.RefreshSignInAsync(user);
                 return LocalRedirect(returnUrl);
             }
@@ -745,27 +755,33 @@ namespace hasheous_server.Controllers.v1_0
             if (user == null)
                 return RedirectToAction(nameof(Login));
 
+            if (IsSupporterOnlyProvider(provider))
+            {
+                SupporterRecognitionService supporterRecognitionService = new SupporterRecognitionService();
+                await supporterRecognitionService.DeleteUserSupporterLinkAsync(user.Id, provider);
+
+                var legacyLogin = (await _userManager.GetLoginsAsync(user)).FirstOrDefault(x => x.LoginProvider == provider);
+                if (legacyLogin != null)
+                {
+                    await _userManager.RemoveLoginAsync(user, legacyLogin.LoginProvider, legacyLogin.ProviderKey);
+                }
+
+                await _signInManager.RefreshSignInAsync(user);
+                return LocalRedirect(returnUrl);
+            }
+
             var login = (await _userManager.GetLoginsAsync(user)).FirstOrDefault(x => x.LoginProvider == provider);
             if (login == null)
                 return NotFound("Login not found");
 
             var result = await _userManager.RemoveLoginAsync(user, login.LoginProvider, login.ProviderKey);
-            if (result.Succeeded)
-            {
-                if (string.Equals(provider, SupporterConstants.OpenCollectiveProviderName, StringComparison.OrdinalIgnoreCase))
-                {
-                    SupporterRecognitionService supporterRecognitionService = new SupporterRecognitionService();
-                    await supporterRecognitionService.DeleteUserSupporterLinkAsync(user.Id, SupporterConstants.OpenCollectiveProviderName);
-                }
-
-                // Optionally: sign in the user again
-                await _signInManager.RefreshSignInAsync(user);
-                return LocalRedirect(returnUrl);
-            }
-            else
+            if (!result.Succeeded)
             {
                 return Unauthorized(result.Errors);
             }
+
+            await _signInManager.RefreshSignInAsync(user);
+            return LocalRedirect(returnUrl);
         }
 
         /// <summary>
@@ -782,7 +798,25 @@ namespace hasheous_server.Controllers.v1_0
                 return Unauthorized("User not found");
 
             var logins = await _userManager.GetLoginsAsync(user);
-            var linkedLogins = logins.Select(x => new { x.LoginProvider, x.ProviderKey }).ToList();
+            List<object> linkedLogins = logins
+                .Select(x => (object)new { x.LoginProvider, x.ProviderKey })
+                .ToList();
+
+            SupporterRecognitionService supporterRecognitionService = new SupporterRecognitionService();
+            HashSet<string> linkedLoginProviders = new HashSet<string>(logins.Select(login => login.LoginProvider), StringComparer.OrdinalIgnoreCase);
+            foreach (SupporterProviderStatusItem supporterStatus in await supporterRecognitionService.GetUserSupporterStatusesAsync(user.Id))
+            {
+                if (!supporterStatus.IsLinked || !IsSupporterOnlyProvider(supporterStatus.Provider) || linkedLoginProviders.Contains(supporterStatus.Provider))
+                {
+                    continue;
+                }
+
+                linkedLogins.Add(new
+                {
+                    LoginProvider = supporterStatus.Provider,
+                    ProviderKey = supporterStatus.ProviderAccountSlug ?? supporterStatus.ProviderDisplayName ?? supporterStatus.Provider
+                });
+            }
 
             return Ok(linkedLogins);
         }
@@ -792,11 +826,16 @@ namespace hasheous_server.Controllers.v1_0
         /// </summary>
         /// <param name="user">The signed-in Hasheous user.</param>
         /// <param name="externalLoginInfo">The linked external login information.</param>
-        private static async Task SynchronizeSupporterLinkAsync(ApplicationUser user, ExternalLoginInfo externalLoginInfo)
+        private static bool IsSupporterOnlyProvider(string provider)
         {
-            if (!string.Equals(externalLoginInfo.LoginProvider, SupporterConstants.OpenCollectiveProviderName, StringComparison.OrdinalIgnoreCase))
+            return string.Equals(provider, SupporterConstants.OpenCollectiveProviderName, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static async Task<bool> SynchronizeSupporterLinkAsync(ApplicationUser user, ExternalLoginInfo externalLoginInfo)
+        {
+            if (!IsSupporterOnlyProvider(externalLoginInfo.LoginProvider))
             {
-                return;
+                return false;
             }
 
             try
@@ -806,10 +845,12 @@ namespace hasheous_server.Controllers.v1_0
                 string? displayName = externalLoginInfo.Principal.FindFirstValue(ClaimTypes.Name) ?? externalLoginInfo.Principal.FindFirstValue(ClaimTypes.Email);
                 await supporterRecognitionService.UpsertUserSupporterLinkAsync(user.Id, SupporterConstants.OpenCollectiveProviderName, externalLoginInfo.ProviderKey, accountSlug, displayName);
                 await supporterRecognitionService.SyncUserAsync(user.Id, SupporterConstants.OpenCollectiveProviderName);
+                return true;
             }
             catch (Exception ex)
             {
                 Logging.Log(Logging.LogType.Warning, "Supporter Recognition", $"Unable to synchronize supporter link for user {user.Id}.", ex);
+                return false;
             }
         }
     }
