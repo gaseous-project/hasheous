@@ -34,6 +34,23 @@ The feature uses two configuration groups:
   - `opencollectiveapitoken`
   - `opencollectivecollectiveslug`
 
+### Required API token scopes for `opencollectiveapitoken`
+
+The token is sent as a ****** to the OpenCollective GraphQL v2 API
+(`https://api.opencollective.com/graphql/v2`) and is used exclusively for
+read-only access to contribution/transaction data.
+
+When creating the token on the OpenCollective platform (Settings → For
+Developers → Personal Tokens), grant the following scope:
+
+| Scope | Reason |
+|---|---|
+| `account` (read) | Required to look up the collective by slug and read its transaction list. The query reads `account.transactions` with fields `createdAt` and `fromAccount` (id, slug, name). |
+
+No write scopes are needed. The token does not require access to expenses,
+orders, legal or financial details beyond the public contribution records
+listed above.
+
 These values are exposed through `Config.SupporterRecognitionConfiguration`.
 
 ## User flow
