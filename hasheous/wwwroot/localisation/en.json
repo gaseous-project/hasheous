@@ -229,7 +229,7 @@
     "supporter": "Supporter",
     "task runner": "Task Runner",
     "supporterrecognition": "Supporter Recognition",
-    "supporterrecognitiondescription": "Link your OpenCollective account below to unlock supporter recognition when you have made a payment within the last 30 days.",
+    "supporterrecognitiondescription": "Link your OpenCollective account below to unlock supporter recognition when you have made a payment within the last 30 days. If you start donating again, your Supporter role will be restored automatically once Hasheous sees the new payment—usually on the next daily sync, or immediately after you link or relink your OpenCollective account.",
     "supporterlinked": "Linked",
     "supporternotlinked": "Not linked",
     "supporteractive": "Active supporter",
