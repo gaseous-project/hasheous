@@ -31,6 +31,7 @@ builder.Services
     .AddHasheousUploadAndForwardingLimits()
     .AddHasheousSwagger()
     .AddHasheousRedis()
+    .AddHasheousRateLimiting()
     .AddHasheousCsrf()
     .AddHasheousIdentityAndAuth()
     .AddHasheousApiKeySupport()

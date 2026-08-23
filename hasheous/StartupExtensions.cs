@@ -11,6 +11,7 @@ using Asp.Versioning;
 using Authentication;
 using Classes;
 using Classes.ProcessQueue;
+using Classes.RateLimiting;
 using Classes.Supporters;
 using hasheous.Classes;
 using hasheous_server.Classes;
@@ -221,6 +222,21 @@ public static class StartupExtensions
             services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(Config.RedisConfiguration.HostName + ":" + Config.RedisConfiguration.Port));
             services.AddHttpClient();
         }
+        return services;
+    }
+
+    /// <summary>
+    /// Registers the dynamic request rate limiter and applies it to MVC requests.
+    /// </summary>
+    public static IServiceCollection AddHasheousRateLimiting(this IServiceCollection services)
+    {
+        services.AddSingleton<DynamicRateLimitManager>();
+        services.AddSingleton<IHostedService>(serviceProvider => serviceProvider.GetRequiredService<DynamicRateLimitManager>());
+        services.AddScoped<DynamicRateLimitFilter>();
+        services.Configure<MvcOptions>(options =>
+        {
+            options.Filters.AddService<DynamicRateLimitFilter>();
+        });
         return services;
     }
 

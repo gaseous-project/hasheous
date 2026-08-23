@@ -47,6 +47,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
 
 - Configuration
   - File: `~/.hasheous-server/config.json` (auto-updated on startup by `Config.UpdateConfig()`). Env vars (used by Docker): `dbhost`, `dbuser`, `dbpass`, `igdbclientid`, `igdbclientsecret`, `redisenabled`, `redishost`, `redisport`, `reportingserverurl`, etc.
+  - Dynamic request rate-limiter rules live in a separate file at `~/.hasheous-server/rate-limit-rules.json` and are reloaded every 5 minutes without restarting the server.
   - S3 config (`Config.S3StorageConfiguration`): `Enabled`, `Region`, `ServiceUrl`, `AccessKey`, `SecretKey`, `SessionToken`, `ForcePathStyle`, `DefaultBucket`.
   - Tiered cache policy config (`Config.CachePolicies` / config field `Policies`) controls proxy cache retention by content type and storage tier:
     - `Media`: local tier defaults to size-only retention; S3 tier defaults to 2-year max age.
@@ -91,6 +92,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - API keys:
   - User key header `X-API-Key` via `[Authentication.ApiKey.ApiKeyAttribute]` (`ApiKeyAuthorizationFilter` wired in `hasheous/Program.cs`) — identifies individual users and their actions.
   - Client key header `X-Client-API-Key` via `[Authentication.ClientApiKey.ClientApiKeyAttribute]` — identifies client apps (e.g., Gaseous, Romm); typically required when `Config.RequireClientAPIKey` is true.
+  - MVC/API request rate limiting is enforced by the shared dynamic limiter in `hasheous-lib/Classes/RateLimiting/RequestRateLimiting.cs`; built-in webpage requests are always exempt and profiles can match on roles, origin, user agent, remote IP, and arbitrary headers from `rate-limit-rules.json`.
   - To exempt specific endpoints from client API key requirement, use `[Authentication.ClientApiKey.NoClientApiKeyNeededAttribute]` on the method. This is useful for public media endpoints that should not require authentication.
   - Inter-host API key for orchestrator calls (see `InterHostApiKey*` and registration in `service-orchestrator/Program.cs`) — security mechanism allowing multiple web server frontends (load-balanced) to securely call the orchestrator.
   - Admin user list endpoints should avoid per-user role lookups. Prefer a single grouped query against `Users`/`UserRoles`/`Roles`, cache the result briefly in Redis, and invalidate that cache after role mutations.

@@ -47,6 +47,17 @@ namespace Classes
         }
 
         /// <summary>
+        /// Gets the path to the standalone rate limiter rules file.
+        /// </summary>
+        public static string RateLimitRulesFilePath
+        {
+            get
+            {
+                return Path.Combine(ConfigurationPath, "rate-limit-rules.json");
+            }
+        }
+
+        /// <summary>
         /// Gets the database configuration settings.
         /// </summary>
         public static ConfigFile.Database DatabaseConfiguration

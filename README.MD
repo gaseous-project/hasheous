@@ -14,6 +14,7 @@ Hasheous is hosted at https://hasheous.org/
 * Provides an API for developers to submit fixes to data matching
 * Includes a hosted MCP endpoint in the Hasheous API for AI-assisted database queries
 * Supports supporter recognition through linked OpenCollective accounts
+* Supports profile-driven API rate limiting with hot-reloaded rules
 * Is completely free to use
 
 ## Discord Server
@@ -33,6 +34,8 @@ The following projects are used by Hasheous
 
 ## Configuration File
 When Hasheous-Server is started for the first time, it creates a configuration file at ~/.hasheous-server/config.json if it doesn't exist. Some values can be filled in using environment variables (such as in the case of using docker).
+
+Rate limiter rules are stored separately at `~/.hasheous-server/rate-limit-rules.json` and are reloaded automatically every 5 minutes. See [`RATE_LIMITING.MD`](./RATE_LIMITING.MD).
 
 ### DatabaseConfiguration
 | Attribute | Environment Variable |
@@ -125,6 +128,17 @@ Currently exposed MCP tools:
 - `hasheous_search_games` (search by game name + optional platform, includes ROM/hash data)
 - `hasheous_get_game_details` (full details for a specific game id)
 - `hasheous_lookup_hashes` (find matching games by CRC/MD5/SHA1/SHA256)
+
+## Rate Limiting
+
+Rate limiting is documented in [`RATE_LIMITING.MD`](./RATE_LIMITING.MD).
+
+Highlights:
+
+- rules are defined in `~/.hasheous-server/rate-limit-rules.json`
+- rules are hot-reloaded every 5 minutes
+- built-in webpage traffic is automatically exempt
+- profiles can match on roles, origin, user agent, remote IP, and arbitrary headers
 
 # Adding Content
 Currently supported DAT's:
