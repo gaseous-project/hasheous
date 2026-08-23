@@ -14,14 +14,13 @@ Hasheous includes a profile-driven request rate limiter for API/controller traff
 
 ## Built-in webpage exemption
 
-Requests made by the hosted Hasheous webpage are excluded from rate limiting when any of the following are true:
+Requests made by the hosted Hasheous webpage are excluded from rate limiting when they present the server-signed `Hasheous.WebSession` cookie.
 
-- `X-Hasheous-Web-Request: 1` is present
-- `Sec-Fetch-Site: same-origin` is present
-- `Origin` matches the current Hasheous host
-- `Referer` matches the current Hasheous host
+- the cookie is issued automatically for non-API browser page requests
+- the cookie is signed with ASP.NET data protection
+- the cookie is then sent back with same-site API requests from the hosted UI
 
-The bundled frontend now automatically adds `X-Hasheous-Web-Request: 1` to same-origin API fetches.
+The bundled frontend also adds `X-Hasheous-Web-Request: 1` to same-origin API fetches for optional profile matching, but exemption itself relies on the signed cookie rather than trusting a client-supplied header.
 
 ## Rule file format
 
@@ -163,11 +162,11 @@ String matching supports `*` wildcards.
 
 ### Add new match inputs
 
-1. Extend `RateLimitRequestContext` in `/home/runner/work/hasheous/hasheous/hasheous-lib/Classes/RateLimiting/RequestRateLimiting.cs`
+1. Extend `RateLimitRequestContext` in `hasheous-lib/Classes/RateLimiting/RequestRateLimiting.cs`
 2. Populate the value in `BuildRequestContextAsync(...)`
 3. Add a property to `RateLimitMatchCriteria`
 4. Update `Matches(...)`
-5. Add tests in `/home/runner/work/hasheous/hasheous/hasheous-lib.Tests/RateLimiterTests.cs`
+5. Add tests in `hasheous-lib.Tests/RateLimiterTests.cs`
 6. Update this document
 
 ### Add a new partition type

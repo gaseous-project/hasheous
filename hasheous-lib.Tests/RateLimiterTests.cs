@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Classes.RateLimiting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace hasheous_lib.Tests;
 
@@ -9,6 +10,7 @@ public class RateLimiterMatchTests
     [Fact]
     public void MatchesWildcardRolePathAndHeaderRules()
     {
+        DynamicRateLimitManager manager = new(Path.Combine(Path.GetTempPath(), "hasheous-rate-limiter-tests", Guid.NewGuid().ToString("N"), "rules.json"), TimeSpan.FromMinutes(5));
         RateLimitRequestContext context = new()
         {
             Method = "POST",
@@ -35,12 +37,13 @@ public class RateLimiterMatchTests
             }
         };
 
-        Assert.True(DynamicRateLimitManager.Matches(context, criteria));
+        Assert.True(manager.Matches(context, criteria));
     }
 
     [Fact]
     public void DoesNotMatchWhenRequiredHeaderIsMissing()
     {
+        DynamicRateLimitManager manager = new(Path.Combine(Path.GetTempPath(), "hasheous-rate-limiter-tests", Guid.NewGuid().ToString("N"), "rules.json"), TimeSpan.FromMinutes(5));
         RateLimitRequestContext context = new()
         {
             Method = "GET",
@@ -56,29 +59,33 @@ public class RateLimiterMatchTests
             }
         };
 
-        Assert.False(DynamicRateLimitManager.Matches(context, criteria));
+        Assert.False(manager.Matches(context, criteria));
     }
 }
 
 public class RateLimiterWebRequestTests
 {
     [Fact]
-    public void CustomWebHeaderMarksBuiltInPageRequestAsExempt()
+    public void SignedWebCookieMarksBuiltInPageRequestAsExempt()
     {
+        IDataProtectionProvider dataProtectionProvider = DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(Path.GetTempPath(), "hasheous-rate-limiter-dp")));
+        DynamicRateLimitManager manager = new(Path.Combine(Path.GetTempPath(), "hasheous-rate-limiter-tests", Guid.NewGuid().ToString("N"), "rules.json"), TimeSpan.FromMinutes(5), dataProtectionProvider);
         DefaultHttpContext context = new();
-        context.Request.Headers[DynamicRateLimitManager.WebRequestHeaderName] = "1";
+        manager.IssueWebRequestCookie(context);
 
-        Assert.True(DynamicRateLimitManager.IsBuiltInWebPageRequest(context));
+        string cookieValue = context.Response.Headers["Set-Cookie"].ToString().Split(';', 2)[0].Split('=', 2)[1];
+        context.Request.Headers.Cookie = $"{DynamicRateLimitManager.WebRequestCookieName}={cookieValue}";
+
+        Assert.True(manager.IsBuiltInWebPageRequest(context));
     }
 
     [Fact]
-    public void SameOriginRefererMarksBuiltInPageRequestAsExempt()
+    public void MissingSignedCookieDoesNotMarkBuiltInPageRequestAsExempt()
     {
+        DynamicRateLimitManager manager = new(Path.Combine(Path.GetTempPath(), "hasheous-rate-limiter-tests", Guid.NewGuid().ToString("N"), "rules.json"), TimeSpan.FromMinutes(5));
         DefaultHttpContext context = new();
-        context.Request.Host = new HostString("hasheous.example");
-        context.Request.Headers.Referer = "https://hasheous.example/index.html?page=search";
 
-        Assert.True(DynamicRateLimitManager.IsBuiltInWebPageRequest(context));
+        Assert.False(manager.IsBuiltInWebPageRequest(context));
     }
 
     [Fact]
@@ -93,7 +100,8 @@ public class RateLimiterWebRequestTests
             new Claim(ClaimTypes.Role, "Moderator")
         ], "Cookies"));
 
-        RateLimitRequestContext requestContext = await DynamicRateLimitManager.BuildRequestContextAsync(context, CancellationToken.None);
+        DynamicRateLimitManager manager = new(Path.Combine(Path.GetTempPath(), "hasheous-rate-limiter-tests", Guid.NewGuid().ToString("N"), "rules.json"), TimeSpan.FromMinutes(5));
+        RateLimitRequestContext requestContext = await manager.BuildRequestContextAsync(context, CancellationToken.None);
 
         Assert.Equal("user-1", requestContext.UserId);
         Assert.Contains("Admin", requestContext.UserRoles);

@@ -4,9 +4,11 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.RateLimiting;
 using Authentication;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
 namespace Classes.RateLimiting;
@@ -97,28 +99,44 @@ public class RateLimitDecision
 public class DynamicRateLimitManager : BackgroundService
 {
     public const string WebRequestHeaderName = "X-Hasheous-Web-Request";
+    public const string WebRequestCookieName = "Hasheous.WebSession";
+    private const string WebRequestCookiePurpose = "Hasheous.RateLimiting.WebRequestCookie";
     private static readonly JsonSerializerOptions SerializerOptions = new JsonSerializerOptions
     {
         WriteIndented = true,
         PropertyNameCaseInsensitive = true
     };
-
     private readonly TimeSpan _reloadInterval;
     private readonly string _rulesFilePath;
     private readonly object _reloadLock = new();
+    private readonly IDataProtector? _webRequestProtector;
+    private readonly IServiceScopeFactory? _serviceScopeFactory;
+    private ConcurrentDictionary<string, Regex> _patternCache = new(StringComparer.Ordinal);
     private ConcurrentDictionary<string, FixedWindowRateLimiter> _limiters = new(StringComparer.Ordinal);
     private RateLimitRuleSet _rules = new();
     private long _rulesVersion = 1;
 
     public DynamicRateLimitManager()
-        : this(Config.RateLimitRulesFilePath, TimeSpan.FromMinutes(5))
+        : this(Config.RateLimitRulesFilePath, TimeSpan.FromMinutes(5), null)
     {
     }
 
-    public DynamicRateLimitManager(string rulesFilePath, TimeSpan reloadInterval)
+    public DynamicRateLimitManager(IDataProtectionProvider dataProtectionProvider)
+        : this(Config.RateLimitRulesFilePath, TimeSpan.FromMinutes(5), dataProtectionProvider, null)
+    {
+    }
+
+    public DynamicRateLimitManager(IDataProtectionProvider dataProtectionProvider, IServiceScopeFactory serviceScopeFactory)
+        : this(Config.RateLimitRulesFilePath, TimeSpan.FromMinutes(5), dataProtectionProvider, serviceScopeFactory)
+    {
+    }
+
+    public DynamicRateLimitManager(string rulesFilePath, TimeSpan reloadInterval, IDataProtectionProvider? dataProtectionProvider = null, IServiceScopeFactory? serviceScopeFactory = null)
     {
         _rulesFilePath = rulesFilePath;
         _reloadInterval = reloadInterval <= TimeSpan.Zero ? TimeSpan.FromMinutes(5) : reloadInterval;
+        _webRequestProtector = dataProtectionProvider?.CreateProtector(WebRequestCookiePurpose);
+        _serviceScopeFactory = serviceScopeFactory;
         EnsureRulesFileExists();
         ReloadRules();
     }
@@ -128,7 +146,7 @@ public class DynamicRateLimitManager : BackgroundService
     public async Task<RateLimitDecision> AcquireLeaseAsync(HttpContext httpContext, CancellationToken cancellationToken)
     {
         RateLimitRequestContext requestContext = await BuildRequestContextAsync(httpContext, cancellationToken);
-        if (requestContext.IsWebPageRequest || HttpMethods.IsOptions(requestContext.Method))
+        if (requestContext.IsWebPageRequest)
         {
             return new RateLimitDecision
             {
@@ -158,24 +176,7 @@ public class DynamicRateLimitManager : BackgroundService
         }
 
         string limiterKey = BuildLimiterKey(profile, requestContext);
-        FixedWindowRateLimiter limiter = _limiters.GetOrAdd(limiterKey, _ => CreateLimiter(profile));
-
-        using RateLimitLease lease = await limiter.AcquireAsync(1, cancellationToken);
-        if (lease.IsAcquired)
-        {
-            return new RateLimitDecision
-            {
-                Allowed = true,
-                ProfileName = profile.Name
-            };
-        }
-
-        return new RateLimitDecision
-        {
-            Allowed = false,
-            ProfileName = profile.Name,
-            RetryAfter = TryGetRetryAfter(lease)
-        };
+        return await AcquireFromLimiterAsync(limiterKey, profile, cancellationToken);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -213,6 +214,7 @@ public class DynamicRateLimitManager : BackgroundService
                 string rawRules = File.ReadAllText(_rulesFilePath);
                 RateLimitRuleSet? parsedRules = JsonSerializer.Deserialize<RateLimitRuleSet>(rawRules, SerializerOptions);
                 _rules = Sanitize(parsedRules ?? new RateLimitRuleSet());
+                _patternCache = new ConcurrentDictionary<string, Regex>(StringComparer.Ordinal);
 
                 ConcurrentDictionary<string, FixedWindowRateLimiter> oldLimiters = _limiters;
                 _limiters = new ConcurrentDictionary<string, FixedWindowRateLimiter>(StringComparer.Ordinal);
@@ -230,7 +232,7 @@ public class DynamicRateLimitManager : BackgroundService
         }
     }
 
-    public static async Task<RateLimitRequestContext> BuildRequestContextAsync(HttpContext httpContext, CancellationToken cancellationToken)
+    public async Task<RateLimitRequestContext> BuildRequestContextAsync(HttpContext httpContext, CancellationToken cancellationToken)
     {
         string origin = httpContext.Request.Headers.Origin.FirstOrDefault() ?? string.Empty;
         string userId = httpContext.User?.Claims.FirstOrDefault(x => x.Type == System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
@@ -242,15 +244,21 @@ public class DynamicRateLimitManager : BackgroundService
             .ToList() ?? new List<string>();
         if (string.IsNullOrWhiteSpace(userId) && httpContext.Request.Headers.TryGetValue(ApiKey.ApiKeyHeaderName, out var apiKeyHeader))
         {
-            ApplicationUser? apiKeyUser = await new ApiKey().GetUserFromApiKey(apiKeyHeader.FirstOrDefault() ?? string.Empty);
-            if (apiKeyUser != null)
+            using IServiceScope? scope = _serviceScopeFactory?.CreateScope();
+            ApiKey? apiKeyService = scope?.ServiceProvider.GetService<ApiKey>();
+            UserStore? userStore = scope?.ServiceProvider.GetService<UserStore>();
+
+            if (apiKeyService != null && userStore != null)
             {
-                userId = apiKeyUser.Id;
-                UserStore userStore = new UserStore();
-                roles = (await userStore.GetRolesAsync(apiKeyUser, cancellationToken))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
-                    .ToList();
+                ApplicationUser? apiKeyUser = await apiKeyService.GetUserFromApiKey(apiKeyHeader.FirstOrDefault() ?? string.Empty);
+                if (apiKeyUser != null)
+                {
+                    userId = apiKeyUser.Id;
+                    roles = ((await userStore.GetRolesAsync(apiKeyUser, cancellationToken)) ?? Array.Empty<string>())
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+                }
             }
         }
 
@@ -263,7 +271,7 @@ public class DynamicRateLimitManager : BackgroundService
             RemoteIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? string.Empty,
             UserId = userId,
             UserRoles = roles,
-            IsAuthenticated = httpContext.User?.Identity?.IsAuthenticated == true,
+            IsAuthenticated = httpContext.User?.Identity?.IsAuthenticated == true || !string.IsNullOrWhiteSpace(userId),
             HasClientApiKey = httpContext.Request.Headers.ContainsKey(ClientApiKey.APIKeyHeaderName),
             HasUserApiKey = httpContext.Request.Headers.ContainsKey(ApiKey.ApiKeyHeaderName),
             IsWebPageRequest = IsBuiltInWebPageRequest(httpContext),
@@ -271,7 +279,7 @@ public class DynamicRateLimitManager : BackgroundService
         };
     }
 
-    public static RateLimitProfile? FindMatchingProfile(RateLimitRequestContext requestContext, RateLimitRuleSet rules)
+    public RateLimitProfile? FindMatchingProfile(RateLimitRequestContext requestContext, RateLimitRuleSet rules)
     {
         return rules.Profiles
             .Where(x => x.Enabled)
@@ -280,7 +288,7 @@ public class DynamicRateLimitManager : BackgroundService
             .FirstOrDefault(x => Matches(requestContext, x.Match));
     }
 
-    public static bool Matches(RateLimitRequestContext requestContext, RateLimitMatchCriteria criteria)
+    public bool Matches(RateLimitRequestContext requestContext, RateLimitMatchCriteria criteria)
     {
         if (!MatchesCollection(criteria.Methods, requestContext.Method))
         {
@@ -349,34 +357,30 @@ public class DynamicRateLimitManager : BackgroundService
         return true;
     }
 
-    public static bool IsBuiltInWebPageRequest(HttpContext httpContext)
+    public bool IsBuiltInWebPageRequest(HttpContext httpContext)
     {
-        if (string.Equals(httpContext.Request.Headers[WebRequestHeaderName].ToString(), "1", StringComparison.Ordinal))
+        string protectedCookie = httpContext.Request.Cookies[WebRequestCookieName] ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(protectedCookie) || _webRequestProtector == null)
         {
-            return true;
+            return false;
         }
 
-        if (string.Equals(httpContext.Request.Headers["Sec-Fetch-Site"].ToString(), "same-origin", StringComparison.OrdinalIgnoreCase))
+        try
         {
-            return true;
+            string payload = _webRequestProtector.Unprotect(protectedCookie);
+            if (DateTime.TryParse(payload, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out DateTime issuedUtc))
+            {
+                return issuedUtc >= DateTime.UtcNow.AddDays(-7);
+            }
         }
-
-        string? origin = httpContext.Request.Headers.Origin.FirstOrDefault();
-        if (Uri.TryCreate(origin, UriKind.Absolute, out Uri? originUri) && HostsMatch(originUri, httpContext.Request.Host.Host))
+        catch
         {
-            return true;
-        }
-
-        string? referer = httpContext.Request.Headers.Referer.FirstOrDefault();
-        if (Uri.TryCreate(referer, UriKind.Absolute, out Uri? refererUri) && HostsMatch(refererUri, httpContext.Request.Host.Host))
-        {
-            return true;
         }
 
         return false;
     }
 
-    public static bool MatchesPattern(string? input, string pattern)
+    public bool MatchesPattern(string? input, string pattern)
     {
         string safeInput = input ?? string.Empty;
         if (string.IsNullOrWhiteSpace(pattern))
@@ -384,11 +388,15 @@ public class DynamicRateLimitManager : BackgroundService
             return false;
         }
 
-        string regexPattern = "^" + Regex.Escape(pattern.Trim()).Replace("\\*", ".*") + "$";
-        return Regex.IsMatch(safeInput, regexPattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        Regex regex = _patternCache.GetOrAdd(pattern.Trim(), static cachedPattern =>
+        {
+            string regexPattern = "^" + Regex.Escape(cachedPattern).Replace("\\*", ".*") + "$";
+            return new Regex(regexPattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+        });
+        return regex.IsMatch(safeInput);
     }
 
-    private static bool MatchesCollection(List<string> patterns, string value)
+    private bool MatchesCollection(List<string> patterns, string value)
     {
         if (patterns.Count == 0)
         {
@@ -398,9 +406,23 @@ public class DynamicRateLimitManager : BackgroundService
         return patterns.Any(pattern => MatchesPattern(value, pattern));
     }
 
-    private static bool HostsMatch(Uri requestUri, string currentHost)
+    public void IssueWebRequestCookie(HttpContext httpContext)
     {
-        return string.Equals(requestUri.Host, currentHost, StringComparison.OrdinalIgnoreCase);
+        if (_webRequestProtector == null)
+        {
+            return;
+        }
+
+        string protectedValue = _webRequestProtector.Protect(DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+        httpContext.Response.Cookies.Append(WebRequestCookieName, protectedValue, new CookieOptions
+        {
+            HttpOnly = true,
+            IsEssential = true,
+            SameSite = SameSiteMode.Lax,
+            Secure = httpContext.Request.IsHttps,
+            Path = "/",
+            Expires = DateTimeOffset.UtcNow.AddDays(7)
+        });
     }
 
     private void EnsureRulesFileExists()
@@ -512,6 +534,42 @@ public class DynamicRateLimitManager : BackgroundService
         }
 
         return null;
+    }
+
+    private async Task<RateLimitDecision> AcquireFromLimiterAsync(string limiterKey, RateLimitProfile profile, CancellationToken cancellationToken)
+    {
+        for (int attempt = 0; attempt < 2; attempt++)
+        {
+            FixedWindowRateLimiter limiter = _limiters.GetOrAdd(limiterKey, _ => CreateLimiter(profile));
+            try
+            {
+                using RateLimitLease lease = await limiter.AcquireAsync(1, cancellationToken);
+                if (lease.IsAcquired)
+                {
+                    return new RateLimitDecision
+                    {
+                        Allowed = true,
+                        ProfileName = profile.Name
+                    };
+                }
+
+                return new RateLimitDecision
+                {
+                    Allowed = false,
+                    ProfileName = profile.Name,
+                    RetryAfter = TryGetRetryAfter(lease)
+                };
+            }
+            catch (ObjectDisposedException) when (attempt == 0)
+            {
+            }
+        }
+
+        return new RateLimitDecision
+        {
+            Allowed = false,
+            ProfileName = profile.Name
+        };
     }
 }
 

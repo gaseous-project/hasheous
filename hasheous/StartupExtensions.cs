@@ -330,9 +330,11 @@ public static class StartupExtensions
     {
         services.AddSingleton<Authentication.ApiKey.ApiKeyAuthorizationFilter>();
         services.AddSingleton<Authentication.ApiKey.IApiKeyValidator, Authentication.ApiKey.ApiKeyValidator>();
+        services.AddTransient<Authentication.ApiKey>();
         services.AddSingleton<Authentication.ClientApiKey.ClientApiKeyAuthorizationFilter>();
         services.AddSingleton<Authentication.ClientApiKey.IClientApiKeyValidator, Authentication.ClientApiKey.ClientApiKeyValidator>
         ();
+        services.AddTransient<Authentication.ClientApiKey>();
         services.AddSingleton<Authentication.TaskWorkerAPIKey.TaskWorkerAPIKeyAuthorizationFilter>();
         services.AddSingleton<Authentication.TaskWorkerAPIKey.ITaskWorkerAPIKeyValidator, Authentication.TaskWorkerAPIKey.TaskWorkerAPIKeyValidator>
         ();
@@ -365,6 +367,24 @@ public static class StartupExtensions
     {
         app.UseSwagger();
         app.UseSwaggerUI(options => { options.SwaggerEndpoint($"/swagger/v1/swagger.json", "v1.0"); });
+    }
+
+    /// <summary>
+    /// Issues a server-signed cookie to browser UI requests so subsequent same-site API calls can be identified.
+    /// </summary>
+    public static void UseHasheousWebRequestMarker(this WebApplication app)
+    {
+        app.Use(async (context, next) =>
+        {
+            if (!context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
+                && (HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method)))
+            {
+                DynamicRateLimitManager dynamicRateLimitManager = context.RequestServices.GetRequiredService<DynamicRateLimitManager>();
+                dynamicRateLimitManager.IssueWebRequestCookie(context);
+            }
+
+            await next();
+        });
     }
 
     /// <summary>
