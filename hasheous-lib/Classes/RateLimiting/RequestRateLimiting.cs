@@ -493,6 +493,12 @@ public class DynamicRateLimitManager : BackgroundService
             profile.FixedWindow.PermitLimit = Math.Max(1, profile.FixedWindow.PermitLimit);
             profile.FixedWindow.WindowSeconds = Math.Max(1, profile.FixedWindow.WindowSeconds);
             profile.FixedWindow.QueueLimit = Math.Max(0, profile.FixedWindow.QueueLimit);
+            profile.Match.Methods ??= new List<string>();
+            profile.Match.Paths ??= new List<string>();
+            profile.Match.Origins ??= new List<string>();
+            profile.Match.UserAgents ??= new List<string>();
+            profile.Match.RemoteIps ??= new List<string>();
+            profile.Match.UserRoles ??= new List<string>();
             profile.Match.Headers ??= new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         }
 

@@ -379,24 +379,30 @@ public static class StartupExtensions
             if (!context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
                 && (HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method)))
             {
-                // Modern browsers explicitly flag the origin of the request
-                string secFetchSite = context.Request.Headers["Sec-Fetch-Site"];
-                bool isSameOrigin = secFetchSite == "same-origin";
+                // Modern browsers set Sec-Fetch-Site on all fetches.
+                // "same-origin" = in-page navigation; "none" = top-level direct navigation
+                // (address bar, bookmark, external link). Both represent a legitimate browser
+                // request to serve a built-in page.
+                string secFetchSite = context.Request.Headers["Sec-Fetch-Site"].ToString();
+                bool issueMarker = secFetchSite == "same-origin" || secFetchSite == "none";
 
-                // Fallback check for older browsers using the Referer header
-                if (!isSameOrigin && context.Request.Headers.TryGetValue("Referer", out var referer))
+                // If Sec-Fetch-Site is absent (older browsers), fall back to the Referer header.
+                if (!issueMarker && string.IsNullOrEmpty(secFetchSite))
                 {
-                    if (Uri.TryCreate(referer, UriKind.Absolute, out var refererUri))
+                    if (context.Request.Headers.TryGetValue("Referer", out var referer)
+                        && Uri.TryCreate(referer, UriKind.Absolute, out var refererUri))
                     {
-                        // Verify the request actually came from hasheous.org
-                        if (Config.TrustedHosts != null && Config.TrustedHosts.Length > 0)
-                        {
-                            isSameOrigin = Config.TrustedHosts.Contains(refererUri.Host, StringComparer.OrdinalIgnoreCase);
-                        }
+                        issueMarker = Config.TrustedHosts.Contains(refererUri.Host, StringComparer.OrdinalIgnoreCase);
+                    }
+                    else
+                    {
+                        // No Sec-Fetch-Site and no Referer — could be a direct navigation on an
+                        // older browser. Issue the marker so built-in pages are not rate-limited.
+                        issueMarker = true;
                     }
                 }
 
-                if (isSameOrigin)
+                if (issueMarker)
                 {
                     DynamicRateLimitManager dynamicRateLimitManager = context.RequestServices.GetRequiredService<DynamicRateLimitManager>();
                     dynamicRateLimitManager.IssueWebRequestCookie(context);
