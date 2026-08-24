@@ -108,6 +108,7 @@ public class DynamicRateLimitManager : BackgroundService
     };
     private readonly TimeSpan _reloadInterval;
     private readonly string _rulesFilePath;
+    private Common.hashObject _hashObject = new();
     private readonly object _reloadLock = new();
     private readonly IDataProtector? _webRequestProtector;
     private readonly IServiceScopeFactory? _serviceScopeFactory;
@@ -212,17 +213,25 @@ public class DynamicRateLimitManager : BackgroundService
             {
                 EnsureRulesFileExists();
                 string rawRules = File.ReadAllText(_rulesFilePath);
+                Common.hashObject hashObject = new(_rulesFilePath);
                 RateLimitRuleSet? parsedRules = JsonSerializer.Deserialize<RateLimitRuleSet>(rawRules, SerializerOptions);
                 _rules = Sanitize(parsedRules ?? new RateLimitRuleSet());
                 _patternCache = new ConcurrentDictionary<string, Regex>(StringComparer.Ordinal);
 
                 ConcurrentDictionary<string, FixedWindowRateLimiter> oldLimiters = _limiters;
-                _limiters = new ConcurrentDictionary<string, FixedWindowRateLimiter>(StringComparer.Ordinal);
-                Interlocked.Increment(ref _rulesVersion);
+                var newLimiters = new ConcurrentDictionary<string, FixedWindowRateLimiter>(StringComparer.Ordinal);
 
-                foreach (FixedWindowRateLimiter limiter in oldLimiters.Values)
+                // check for if newLimiters is different from oldLimiters
+                if (!hashObject.Equals(_hashObject))
                 {
-                    limiter.Dispose();
+                    _hashObject = hashObject;
+                    _limiters = newLimiters;
+                    Interlocked.Increment(ref _rulesVersion);
+
+                    foreach (FixedWindowRateLimiter limiter in oldLimiters.Values)
+                    {
+                        limiter.Dispose();
+                    }
                 }
             }
             catch (Exception ex)
