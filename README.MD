@@ -35,7 +35,7 @@ The following projects are used by Hasheous
 ## Configuration File
 When Hasheous-Server is started for the first time, it creates a configuration file at ~/.hasheous-server/config.json if it doesn't exist. Some values can be filled in using environment variables (such as in the case of using docker).
 
-Rate limiter rules are stored separately at `~/.hasheous-server/rate-limit-rules.json` and are reloaded automatically every 5 minutes. See [`RATE_LIMITING.MD`](./RATE_LIMITING.MD).
+Rate limiter rules are stored separately at `~/.hasheous-server/rate-limit-rules.json` and are reloaded automatically every 5 minutes. See [`Rate Limiting`](./docs/Rate%20Limiting.md).
 
 ### DatabaseConfiguration
 | Attribute | Environment Variable |
@@ -92,7 +92,7 @@ When configuring OpenCollective OAuth linking, use this callback URL:
 
 ## Supporter Recognition
 
-Supporter recognition is documented in [`SUPPORTER_RECOGNITION.MD`](./SUPPORTER_RECOGNITION.MD).
+Supporter recognition is documented in [`Support Recognition`](./docs/Supporter%20Recognition.md).
 
 Active supporters receive the `Supporter` role when their linked OpenCollective account has made a payment within the last 30 days.
 
@@ -106,7 +106,7 @@ Dockerfile and docker-compose-build.yml files have been provided to make deploym
 5. Connect to the host on port 7157
 
 ## MCP Server
-Full MCP documentation: [`README-MCP.MD`](./README-MCP.MD)
+Full MCP documentation: [`MCP`](./docs/MCP.md)
 
 Hasheous includes a hosted MCP JSON-RPC endpoint at:
 
@@ -131,7 +131,7 @@ Currently exposed MCP tools:
 
 ## Rate Limiting
 
-Rate limiting is documented in [`RATE_LIMITING.MD`](./RATE_LIMITING.MD).
+Rate limiting is documented in [`Rate Limiting`](./docs/Rate%20Limiting.md).
 
 Highlights:
 
