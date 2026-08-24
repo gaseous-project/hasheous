@@ -31,6 +31,7 @@ builder.Services
     .AddHasheousUploadAndForwardingLimits()
     .AddHasheousSwagger()
     .AddHasheousRedis()
+    .AddHasheousRateLimiting()
     .AddHasheousCsrf()
     .AddHasheousIdentityAndAuth()
     .AddHasheousApiKeySupport()
@@ -46,6 +47,7 @@ await app.SeedRolesAndVerifiedEmailAsync();
 app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseHasheousWebRequestMarker();
 // app.UseDataObjectDetailMetaInjection();
 app.UseDefaultFiles();
 app.UseStaticFiles(new Microsoft.AspNetCore.Builder.StaticFileOptions

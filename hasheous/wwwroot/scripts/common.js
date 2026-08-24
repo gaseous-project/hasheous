@@ -13,6 +13,9 @@ async function ajaxCall(endpoint, method, successFunction, errorFunction, body) 
 
         dataType: 'json',
         contentType: 'application/json',
+        headers: {
+            'X-Hasheous-Web-Request': '1'
+        },
 
         // Function to call when to
         // request is ok
@@ -37,7 +40,8 @@ async function postData(url, method, body, returnResult = false) {
         method: method,
         headers: {
             'Content-Type': 'application/json',
-            'X-XSRF-TOKEN': token // header name must match your backend config
+            'X-XSRF-TOKEN': token, // header name must match your backend config
+            'X-Hasheous-Web-Request': '1'
         },
         credentials: 'include',
         body: JSON.stringify(body)
@@ -50,10 +54,31 @@ async function postData(url, method, body, returnResult = false) {
 
 async function fetchAntiforgeryToken() {
     const response = await fetch('/api/v1.0/account/antiforgery-token', {
+        headers: {
+            'X-Hasheous-Web-Request': '1'
+        },
         credentials: 'include' // ensures cookies are sent/received
     });
     const data = await response.json();
     return data.token;
+}
+
+if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = function (resource, options = {}) {
+        const requestUrl = typeof resource === 'string'
+            ? resource
+            : (resource && typeof resource.url === 'string' ? resource.url : '');
+        const isApiRequest = requestUrl.startsWith('/api/') || requestUrl.startsWith(window.location.origin + '/api/');
+
+        if (isApiRequest) {
+            const headers = new Headers(options.headers || (resource instanceof Request ? resource.headers : undefined) || {});
+            headers.set('X-Hasheous-Web-Request', '1');
+            options = { ...options, headers: headers };
+        }
+
+        return originalFetch(resource, options);
+    };
 }
 
 function getQueryString(stringName, type) {
