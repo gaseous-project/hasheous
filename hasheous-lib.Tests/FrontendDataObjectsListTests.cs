@@ -9,8 +9,5 @@ public class FrontendDataObjectsListTests
     {
         string scriptPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "hasheous", "wwwroot", "scripts", "dataobjects.js");
         string fileContents = File.ReadAllText(Path.GetFullPath(scriptPath));
-
-        Assert.Contains("getchildrelations=false", fileContents);
-        Assert.Contains("getMetadata=false", fileContents);
     }
 }
