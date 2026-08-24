@@ -389,7 +389,10 @@ public static class StartupExtensions
                     if (Uri.TryCreate(referer, UriKind.Absolute, out var refererUri))
                     {
                         // Verify the request actually came from hasheous.org
-                        isSameOrigin = Config.TrustedHosts.Contains(refererUri.Host, StringComparer.OrdinalIgnoreCase);
+                        if (Config.TrustedHosts != null && Config.TrustedHosts.Length > 0)
+                        {
+                            isSameOrigin = Config.TrustedHosts.Contains(refererUri.Host, StringComparer.OrdinalIgnoreCase);
+                        }
                     }
                 }
 
