@@ -222,7 +222,7 @@ public class DynamicRateLimitManager : BackgroundService
                 var newLimiters = new ConcurrentDictionary<string, FixedWindowRateLimiter>(StringComparer.Ordinal);
 
                 // check for if newLimiters is different from oldLimiters
-                if (!hashObject.Equals(_hashObject))
+                if (hashObject.sha1hash != _hashObject.sha1hash)
                 {
                     _hashObject = hashObject;
                     _limiters = newLimiters;
