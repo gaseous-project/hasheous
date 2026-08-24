@@ -480,8 +480,14 @@ public class DynamicRateLimitManager : BackgroundService
 
     private static RateLimitRuleSet Sanitize(RateLimitRuleSet rules)
     {
+        rules.Profiles ??= new List<RateLimitProfile>();
+
         foreach (RateLimitProfile profile in rules.Profiles)
         {
+            profile.Match ??= new RateLimitMatchCriteria();
+            profile.FixedWindow ??= new FixedWindowRateLimitSettings();
+            profile.PartitionBy ??= new List<string>();
+
             profile.Name = string.IsNullOrWhiteSpace(profile.Name) ? $"Profile-{Guid.NewGuid():N}" : profile.Name.Trim();
             profile.PartitionBy = profile.PartitionBy.Count == 0 ? new List<string> { "remote-ip" } : profile.PartitionBy;
             profile.FixedWindow.PermitLimit = Math.Max(1, profile.FixedWindow.PermitLimit);
