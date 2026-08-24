@@ -57,6 +57,14 @@ namespace Classes
             }
         }
 
+        public static string[] TrustedHosts
+        {
+            get
+            {
+                return _config.TrustedHosts;
+            }
+        }
+
         /// <summary>
         /// Gets the database configuration settings.
         /// </summary>
@@ -600,6 +608,11 @@ namespace Classes
             /// Gets or sets the Redis cache configuration settings.
             /// </summary>
             public Redis RedisConfiguration = new Redis();
+
+            /// <summary>
+            /// Gets or sets the host names to exempt from rate limiting
+            /// </summary>
+            public string[] TrustedHosts = Array.Empty<string>();
 
             /// <summary>
             /// Gets or sets the library configuration settings, including paths for metadata, uploads, and dumps.

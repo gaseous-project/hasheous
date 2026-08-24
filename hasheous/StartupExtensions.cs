@@ -1,6 +1,6 @@
 using System.Linq;
-using System.Net.Http.Headers;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Mail;
 using System.Reflection;
 using System.Security.Claims;
@@ -379,8 +379,25 @@ public static class StartupExtensions
             if (!context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
                 && (HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method)))
             {
-                DynamicRateLimitManager dynamicRateLimitManager = context.RequestServices.GetRequiredService<DynamicRateLimitManager>();
-                dynamicRateLimitManager.IssueWebRequestCookie(context);
+                // Modern browsers explicitly flag the origin of the request
+                string secFetchSite = context.Request.Headers["Sec-Fetch-Site"];
+                bool isSameOrigin = secFetchSite == "same-origin";
+
+                // Fallback check for older browsers using the Referer header
+                if (!isSameOrigin && context.Request.Headers.TryGetValue("Referer", out var referer))
+                {
+                    if (Uri.TryCreate(referer, UriKind.Absolute, out var refererUri))
+                    {
+                        // Verify the request actually came from hasheous.org
+                        isSameOrigin = Config.TrustedHosts.Contains(refererUri.Host, StringComparer.OrdinalIgnoreCase);
+                    }
+                }
+
+                if (isSameOrigin)
+                {
+                    DynamicRateLimitManager dynamicRateLimitManager = context.RequestServices.GetRequiredService<DynamicRateLimitManager>();
+                    dynamicRateLimitManager.IssueWebRequestCookie(context);
+                }
             }
 
             await next();
