@@ -9,7 +9,7 @@ namespace hasheous_server.Controllers.v1_0
     [Route("api/v{version:apiVersion}/[controller]")]
     [ApiVersion("1.0")]
     [Authorize(Roles = "Admin")]
-    [ApiExplorerSettings(IgnoreApi = false)]
+    [ApiExplorerSettings(IgnoreApi = true)]
     public class RateLimiterController : Controller
     {
         private readonly DynamicRateLimitManager _dynamicRateLimitManager;
