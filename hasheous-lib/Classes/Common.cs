@@ -1088,6 +1088,39 @@ namespace Classes
 			}
 		}
 
+		public static string GetContextRemoteIP(Microsoft.AspNetCore.Http.HttpContext httpContext)
+		{
+			string remoteIp = "";
+
+			if (httpContext.Request.Headers.ContainsKey("true-client-ip"))
+			{
+				// If behind a proxy, use the X-Forwarded-For header
+				remoteIp = httpContext.Request.Headers["true-client-ip"].ToString();
+			}
+			else if (httpContext.Request.Headers.ContainsKey("CF-Connecting-IPv6"))
+			{
+				// If behind a proxy, use the X-Forwarded-For header
+				remoteIp = httpContext.Request.Headers["CF-Connecting-IPv6"].ToString();
+			}
+			else if (httpContext.Request.Headers.ContainsKey("cf-connecting-ip"))
+			{
+				// If behind a proxy, use the X-Forwarded-For header
+				remoteIp = httpContext.Request.Headers["cf-connecting-ip"].ToString();
+			}
+			else if (httpContext.Request.Headers.ContainsKey("X-Forwarded-For"))
+			{
+				// If behind a proxy, use the X-Forwarded-For header
+				remoteIp = httpContext.Request.Headers["X-Forwarded-For"].ToString();
+			}
+			else if (httpContext.Connection.RemoteIpAddress != null)
+			{
+				// Otherwise, use the RemoteIpAddress from the connection
+				remoteIp = httpContext.Connection.RemoteIpAddress.ToString();
+			}
+
+			return remoteIp;
+		}
+
 		/// <summary>
 		/// Provides a way to set contextual data that flows with the call and 
 		/// async context of a test or invocation.
