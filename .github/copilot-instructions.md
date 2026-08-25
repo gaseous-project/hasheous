@@ -25,6 +25,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Submission voting/reporting is handled by `hasheous-lib/Classes/Submissions.cs`: `AddVote(...)` resolves the target object by `DataObjectId` or hash lookup, validates source-specific IDs before inserting/updating `MatchUserVotes`, and `TallyVotes()` aggregates votes into the metadata map only when the vote threshold is reached and the metadata is not locked by manual/admin overrides.
   - Supporter recognition uses linked provider accounts stored in `UserSupporterLinks`, grants the provider-agnostic `Supporter` role when a linked provider reports a payment within the configured active window, and currently syncs OpenCollective through `hasheous-lib/Classes/Supporters/SupporterRecognitionService.cs`.
   - Insights logging records request method, endpoint path, execution time, and status on `Insights_API_Requests`; aggregated hourly/daily/monthly tables must preserve `endpoint_address` and `method` so reports can rank the busiest endpoints and identify CPU hotspots.
+  - Remote IP resolution for both Insights and dynamic rate limiting is centralized in `Common.GetContextRemoteIP(HttpContext)`, which checks proxy/CDN headers (`true-client-ip`, `CF-Connecting-IPv6`, `cf-connecting-ip`, `X-Forwarded-For`) before falling back to `Connection.RemoteIpAddress`.
   - MCP is hosted on the public `hasheous` web API at `POST /api/v1/Mcp` (controller: `hasheous/Controllers/V1.0/McpController.cs`; shared processor: `hasheous-lib/Classes/Mcp/McpRequestProcessor.cs`).
   - MCP discovery is published at `GET /.well-known/mcp.json` (controller: `hasheous/Controllers/WellKnownController.cs`) and should point clients to the hosted MCP endpoint.
   - Redis (Valkey) provides caching if enabled (`Classes/RedisConnection`), otherwise an in-memory cache is used.
@@ -73,6 +74,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Data object admin task endpoints are exposed on `DataObjectsController` for moderators/admins:
     - `GET /api/v1/DataObjects/{ObjectType}/{Id}/Tasks` returns all task records for the object.
     - `GET /api/v1/DataObjects/{ObjectType}/{Id}/Tasks/{TaskId}?resetTask=true` returns a single task and optionally resets it.
+  - Rate limiter admin endpoint: `GET /api/v1/RateLimiter` (controller: `hasheous/Controllers/V1.0/RateLimiterController.cs`) is Admin-only and returns the currently loaded dynamic rules (`DynamicRateLimitManager.CurrentRules`). It is intentionally hidden from Swagger via `[ApiExplorerSettings(IgnoreApi = true)]`.
   - Submission/reporting routes are also admin/moderator scoped: `GET /api/v1/DataObjects/{ObjectType}/{Id}/SubmissionReport` returns the current match-submission summary, and user submit flows live under `hasheous/Controllers/V1.0/SubmissionsController.cs` via `POST /api/v1/Submissions/FixMatch`.
   - Swagger is enabled with custom schema IDs and API key security definitions.
   - MCP endpoint route: `POST /api/v1/Mcp` (JSON-RPC over HTTP). Keep MCP internet-facing endpoints in `hasheous` (not `service-orchestrator`).

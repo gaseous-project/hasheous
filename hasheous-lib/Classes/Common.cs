@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Data;
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -1086,6 +1087,54 @@ namespace Classes
 				// Remove child directories entirely when structure preservation is not required.
 				foreach (DirectoryInfo subDir in dir.GetDirectories()) subDir.Delete(true);
 			}
+		}
+
+		public static string GetContextRemoteIP(Microsoft.AspNetCore.Http.HttpContext httpContext)
+		{
+			string remoteIp = "";
+
+			if (httpContext.Request.Headers.ContainsKey("true-client-ip"))
+			{
+				// If behind a CloudFlare proxy, use the true-client-ip header
+				remoteIp = httpContext.Request.Headers["true-client-ip"].ToString();
+			}
+			else if (httpContext.Request.Headers.ContainsKey("CF-Connecting-IPv6"))
+			{
+				// If behind a CloudFlare proxy, use the CF-Connecting-IPv6 header
+				remoteIp = httpContext.Request.Headers["CF-Connecting-IPv6"].ToString();
+			}
+			else if (httpContext.Request.Headers.ContainsKey("cf-connecting-ip"))
+			{
+				// If behind a CloudFlare proxy, use the cf-connecting-ip header
+				remoteIp = httpContext.Request.Headers["cf-connecting-ip"].ToString();
+			}
+			else if (httpContext.Request.Headers.ContainsKey("X-Forwarded-For"))
+			{
+				// If behind a proxy, use the X-Forwarded-For header
+				string? forwardedFor = httpContext.Request.Headers["X-Forwarded-For"].ToString();
+				if (!String.IsNullOrEmpty(forwardedFor))
+				{
+					string ipAddress = forwardedFor.Split(',').FirstOrDefault()?.Trim();
+					if (!string.IsNullOrEmpty(ipAddress))
+					{
+						if (IPAddress.TryParse(ipAddress, out IPAddress? parsedIp))
+						{
+							remoteIp = parsedIp.ToString();
+						}
+						else
+						{
+							remoteIp = ipAddress; // Fallback to the raw value if parsing fails
+						}
+					}
+				}
+			}
+			else if (httpContext.Connection.RemoteIpAddress != null)
+			{
+				// Otherwise, use the RemoteIpAddress from the connection
+				remoteIp = httpContext.Connection.RemoteIpAddress.ToString();
+			}
+
+			return remoteIp;
 		}
 
 		/// <summary>
