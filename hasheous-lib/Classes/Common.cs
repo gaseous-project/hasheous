@@ -1125,7 +1125,6 @@ namespace Classes
 						{
 							remoteIp = ipAddress; // Fallback to the raw value if parsing fails
 						}
-						remoteIp = ipAddress;
 					}
 				}
 			}
