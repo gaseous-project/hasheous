@@ -222,7 +222,7 @@ namespace Classes.RateLimiting
                     ConcurrentDictionary<string, FixedWindowRateLimiter> oldLimiters = _limiters;
                     var newLimiters = new ConcurrentDictionary<string, FixedWindowRateLimiter>(StringComparer.Ordinal);
 
-                    // check for if newLimiters is different from oldLimiters
+                    // check if limiters need to be recreated based on the newly loaded rules
                     if (hashObject.sha1hash != _hashObject.sha1hash)
                     {
                         _hashObject = hashObject;
