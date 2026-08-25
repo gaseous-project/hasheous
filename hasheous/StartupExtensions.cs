@@ -1,6 +1,6 @@
 using System.Linq;
-using System.Net.Http.Headers;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Mail;
 using System.Reflection;
 using System.Security.Claims;
@@ -379,8 +379,34 @@ public static class StartupExtensions
             if (!context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
                 && (HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method)))
             {
-                DynamicRateLimitManager dynamicRateLimitManager = context.RequestServices.GetRequiredService<DynamicRateLimitManager>();
-                dynamicRateLimitManager.IssueWebRequestCookie(context);
+                // Modern browsers set Sec-Fetch-Site on all fetches.
+                // "same-origin" = in-page navigation; "none" = top-level direct navigation
+                // (address bar, bookmark, external link). Both represent a legitimate browser
+                // request to serve a built-in page.
+                string secFetchSite = context.Request.Headers["Sec-Fetch-Site"].ToString();
+                bool issueMarker = secFetchSite == "same-origin" || secFetchSite == "none";
+
+                // If Sec-Fetch-Site is absent (older browsers), fall back to the Referer header.
+                if (!issueMarker && string.IsNullOrEmpty(secFetchSite))
+                {
+                    if (context.Request.Headers.TryGetValue("Referer", out var referer)
+                        && Uri.TryCreate(referer, UriKind.Absolute, out var refererUri))
+                    {
+                        issueMarker = Config.TrustedHosts.Contains(refererUri.Host, StringComparer.OrdinalIgnoreCase);
+                    }
+                    else
+                    {
+                        // No Sec-Fetch-Site and no Referer — could be a direct navigation on an
+                        // older browser. Issue the marker so built-in pages are not rate-limited.
+                        issueMarker = true;
+                    }
+                }
+
+                if (issueMarker)
+                {
+                    DynamicRateLimitManager dynamicRateLimitManager = context.RequestServices.GetRequiredService<DynamicRateLimitManager>();
+                    dynamicRateLimitManager.IssueWebRequestCookie(context);
+                }
             }
 
             await next();

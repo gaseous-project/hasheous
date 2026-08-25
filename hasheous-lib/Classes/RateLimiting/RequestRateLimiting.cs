@@ -108,6 +108,7 @@ public class DynamicRateLimitManager : BackgroundService
     };
     private readonly TimeSpan _reloadInterval;
     private readonly string _rulesFilePath;
+    private Common.hashObject _hashObject = new();
     private readonly object _reloadLock = new();
     private readonly IDataProtector? _webRequestProtector;
     private readonly IServiceScopeFactory? _serviceScopeFactory;
@@ -212,17 +213,25 @@ public class DynamicRateLimitManager : BackgroundService
             {
                 EnsureRulesFileExists();
                 string rawRules = File.ReadAllText(_rulesFilePath);
+                Common.hashObject hashObject = new(_rulesFilePath);
                 RateLimitRuleSet? parsedRules = JsonSerializer.Deserialize<RateLimitRuleSet>(rawRules, SerializerOptions);
                 _rules = Sanitize(parsedRules ?? new RateLimitRuleSet());
                 _patternCache = new ConcurrentDictionary<string, Regex>(StringComparer.Ordinal);
 
                 ConcurrentDictionary<string, FixedWindowRateLimiter> oldLimiters = _limiters;
-                _limiters = new ConcurrentDictionary<string, FixedWindowRateLimiter>(StringComparer.Ordinal);
-                Interlocked.Increment(ref _rulesVersion);
+                var newLimiters = new ConcurrentDictionary<string, FixedWindowRateLimiter>(StringComparer.Ordinal);
 
-                foreach (FixedWindowRateLimiter limiter in oldLimiters.Values)
+                // check for if newLimiters is different from oldLimiters
+                if (hashObject.sha1hash != _hashObject.sha1hash)
                 {
-                    limiter.Dispose();
+                    _hashObject = hashObject;
+                    _limiters = newLimiters;
+                    Interlocked.Increment(ref _rulesVersion);
+
+                    foreach (FixedWindowRateLimiter limiter in oldLimiters.Values)
+                    {
+                        limiter.Dispose();
+                    }
                 }
             }
             catch (Exception ex)
@@ -471,13 +480,25 @@ public class DynamicRateLimitManager : BackgroundService
 
     private static RateLimitRuleSet Sanitize(RateLimitRuleSet rules)
     {
+        rules.Profiles ??= new List<RateLimitProfile>();
+
         foreach (RateLimitProfile profile in rules.Profiles)
         {
+            profile.Match ??= new RateLimitMatchCriteria();
+            profile.FixedWindow ??= new FixedWindowRateLimitSettings();
+            profile.PartitionBy ??= new List<string>();
+
             profile.Name = string.IsNullOrWhiteSpace(profile.Name) ? $"Profile-{Guid.NewGuid():N}" : profile.Name.Trim();
             profile.PartitionBy = profile.PartitionBy.Count == 0 ? new List<string> { "remote-ip" } : profile.PartitionBy;
             profile.FixedWindow.PermitLimit = Math.Max(1, profile.FixedWindow.PermitLimit);
             profile.FixedWindow.WindowSeconds = Math.Max(1, profile.FixedWindow.WindowSeconds);
             profile.FixedWindow.QueueLimit = Math.Max(0, profile.FixedWindow.QueueLimit);
+            profile.Match.Methods ??= new List<string>();
+            profile.Match.Paths ??= new List<string>();
+            profile.Match.Origins ??= new List<string>();
+            profile.Match.UserAgents ??= new List<string>();
+            profile.Match.RemoteIps ??= new List<string>();
+            profile.Match.UserRoles ??= new List<string>();
             profile.Match.Headers ??= new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         }
 
