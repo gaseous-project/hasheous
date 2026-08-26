@@ -23,7 +23,7 @@ namespace hasheous_server.Controllers.v1_0
         private const string zeroByteSHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
         private const string zeroByteCRC = "00000000";
         private const int MaxLookupPayloadBytes = 262_144;
-        private const int MaxLookupArrayItems = 50;
+        private const int MaxLookupArrayItems = 10;
 
         private static readonly JsonSerializerOptions HashLookupJsonOptions = new JsonSerializerOptions
         {
