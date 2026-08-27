@@ -235,7 +235,6 @@ namespace hasheous_server.Controllers.v1_0
         [Route("ByHash/crc/{crc}")]
         public async Task<IActionResult> LookupGet(string? md5, string? sha1, string? sha256, string? crc)
         {
-            //c convert the input to a list of HashLookupModel for consistency with the POST method and pass it to the LookupPost method
             var modelList = new List<HashLookupModel>
             {
                 new HashLookupModel { MD5 = md5, SHA1 = sha1, SHA256 = sha256, CRC = crc }
