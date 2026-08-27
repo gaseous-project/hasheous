@@ -23,7 +23,7 @@ namespace hasheous_server.Controllers.v1_0
         private const string zeroByteSHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
         private const string zeroByteCRC = "00000000";
         private const int MaxLookupPayloadBytes = 262_144;
-        private const int MaxLookupArrayItems = 50;
+        private const int MaxLookupArrayItems = 40;
 
         private static readonly JsonSerializerOptions HashLookupJsonOptions = new JsonSerializerOptions
         {
@@ -68,101 +68,106 @@ namespace hasheous_server.Controllers.v1_0
         [Route("ByHash")]
         public async Task<IActionResult> LookupPost(bool? returnAllSources = false, string? returnFields = "All", string? returnSources = null)
         {
-            try
-            {
-                List<gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType> returnSourcesList = new List<gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType>();
+            List<gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType> returnSourcesList = new List<gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType>();
 
-                if (returnSources != null)
+            if (returnSources != null)
+            {
+                string[] sources = returnSources.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                foreach (string source in sources)
                 {
-                    string[] sources = returnSources.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-                    foreach (string source in sources)
+                    if (Enum.TryParse<gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType>(source, true, out var sourceType))
                     {
-                        if (Enum.TryParse<gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType>(source, true, out var sourceType))
-                        {
-                            returnSourcesList.Add(sourceType);
-                        }
-                        else
-                        {
-                            Logging.Log(Logging.LogType.Warning, "Hash Lookup", $"Invalid source type provided: {source}");
-                            return BadRequest($"Invalid source type provided: {source}");
-                        }
+                        returnSourcesList.Add(sourceType);
+                    }
+                    else
+                    {
+                        Logging.Log(Logging.LogType.Warning, "Hash Lookup", $"Invalid source type provided: {source}");
+                        return BadRequest($"Invalid source type provided: {source}");
                     }
                 }
+            }
 
-                if (Request.ContentLength.HasValue && Request.ContentLength.Value > MaxLookupPayloadBytes)
-                {
-                    return StatusCode(StatusCodes.Status413PayloadTooLarge, $"Payload exceeds the maximum allowed size of {MaxLookupPayloadBytes / 1024}KB.");
-                }
+            if (Request.ContentLength.HasValue && Request.ContentLength.Value > MaxLookupPayloadBytes)
+            {
+                return StatusCode(StatusCodes.Status413PayloadTooLarge, $"Payload exceeds the maximum allowed size of {MaxLookupPayloadBytes / 1024}KB.");
+            }
 
-                // [{"crc": "12ec7f82"}, {"crc": "836a0187"}]
-                List<hasheous_server.Models.HashLookupModel> modelList = new List<hasheous_server.Models.HashLookupModel>();
-                JsonElement normalizedModel;
+            // [{"crc": "12ec7f82"}, {"crc": "836a0187"}]
+            List<hasheous_server.Models.HashLookupModel> modelList = new List<hasheous_server.Models.HashLookupModel>();
+            JsonElement normalizedModel;
 
-                if (Request.Body == null || (Request.ContentLength.HasValue && Request.ContentLength.Value == 0))
+            if (Request.Body == null || (Request.ContentLength.HasValue && Request.ContentLength.Value == 0))
+            {
+                return BadRequest("Invalid model payload. Provide a JSON object or array containing hash fields.");
+            }
+
+            try
+            {
+                using JsonDocument parsedBody = await JsonDocument.ParseAsync(Request.Body);
+                normalizedModel = parsedBody.RootElement.Clone();
+            }
+            catch (JsonException)
+            {
+                return BadRequest("Invalid model payload. Body must be valid JSON.");
+            }
+
+            // Some clients send JSON text as a quoted string (for example, "[{...}]").
+            // Parse the inner JSON so both raw and string-encoded JSON are accepted.
+            if (normalizedModel.ValueKind == JsonValueKind.String)
+            {
+                string? rawModelString = normalizedModel.GetString();
+                if (string.IsNullOrWhiteSpace(rawModelString))
                 {
                     return BadRequest("Invalid model payload. Provide a JSON object or array containing hash fields.");
                 }
 
                 try
                 {
-                    using JsonDocument parsedBody = await JsonDocument.ParseAsync(Request.Body);
-                    normalizedModel = parsedBody.RootElement.Clone();
+                    using JsonDocument parsedStringModel = JsonDocument.Parse(rawModelString);
+                    normalizedModel = parsedStringModel.RootElement.Clone();
                 }
                 catch (JsonException)
                 {
-                    return BadRequest("Invalid model payload. Body must be valid JSON.");
+                    return BadRequest("Invalid model payload. String body must contain valid JSON object or array text.");
                 }
+            }
 
-                // Some clients send JSON text as a quoted string (for example, "[{...}]").
-                // Parse the inner JSON so both raw and string-encoded JSON are accepted.
-                if (normalizedModel.ValueKind == JsonValueKind.String)
+            // Accept raw JSON object or array in request body and deserialize manually.
+            try
+            {
+                if (normalizedModel.ValueKind == JsonValueKind.Array)
                 {
-                    string? rawModelString = normalizedModel.GetString();
-                    if (string.IsNullOrWhiteSpace(rawModelString))
+                    modelList = JsonSerializer.Deserialize<List<hasheous_server.Models.HashLookupModel>>(normalizedModel, HashLookupJsonOptions) ?? new List<hasheous_server.Models.HashLookupModel>();
+                    if (modelList.Count > MaxLookupArrayItems)
                     {
-                        return BadRequest("Invalid model payload. Provide a JSON object or array containing hash fields.");
-                    }
-
-                    try
-                    {
-                        using JsonDocument parsedStringModel = JsonDocument.Parse(rawModelString);
-                        normalizedModel = parsedStringModel.RootElement.Clone();
-                    }
-                    catch (JsonException)
-                    {
-                        return BadRequest("Invalid model payload. String body must contain valid JSON object or array text.");
+                        return BadRequest($"Invalid model payload. A maximum of {MaxLookupArrayItems} hash items is allowed.");
                     }
                 }
-
-                // Accept raw JSON object or array in request body and deserialize manually.
-                try
+                else if (normalizedModel.ValueKind == JsonValueKind.Object)
                 {
-                    if (normalizedModel.ValueKind == JsonValueKind.Array)
+                    var deserializedModel = JsonSerializer.Deserialize<hasheous_server.Models.HashLookupModel>(normalizedModel, HashLookupJsonOptions);
+                    if (deserializedModel != null)
                     {
-                        modelList = JsonSerializer.Deserialize<List<hasheous_server.Models.HashLookupModel>>(normalizedModel, HashLookupJsonOptions) ?? new List<hasheous_server.Models.HashLookupModel>();
-                        if (modelList.Count > MaxLookupArrayItems)
-                        {
-                            return BadRequest($"Invalid model payload. A maximum of {MaxLookupArrayItems} hash items is allowed.");
-                        }
-                    }
-                    else if (normalizedModel.ValueKind == JsonValueKind.Object)
-                    {
-                        var deserializedModel = JsonSerializer.Deserialize<hasheous_server.Models.HashLookupModel>(normalizedModel, HashLookupJsonOptions);
-                        if (deserializedModel != null)
-                        {
-                            modelList.Add(deserializedModel);
-                        }
-                    }
-                    else
-                    {
-                        return BadRequest("Invalid model payload. Provide a JSON object or array containing hash fields.");
+                        modelList.Add(deserializedModel);
                     }
                 }
-                catch (JsonException)
+                else
                 {
-                    return BadRequest("Invalid model payload. Unable to deserialize request body into hash lookup model(s).");
+                    return BadRequest("Invalid model payload. Provide a JSON object or array containing hash fields.");
                 }
+            }
+            catch (JsonException)
+            {
+                return BadRequest("Invalid model payload. Unable to deserialize request body into hash lookup model(s).");
+            }
 
+            return await LookupPostInternal(modelList, returnAllSources, returnFields, returnSourcesList);
+        }
+
+        private async Task<IActionResult> LookupPostInternal(List<HashLookupModel> modelList, bool? returnAllSources, string? returnFields, List<gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType> returnSourcesList)
+        {
+            try
+            {
                 // Drop known zero-byte hashes before lookup to avoid unnecessary work.
                 modelList = modelList.Where(x => !IsKnownZeroByteHash(x)).ToList();
 
@@ -230,43 +235,13 @@ namespace hasheous_server.Controllers.v1_0
         [Route("ByHash/crc/{crc}")]
         public async Task<IActionResult> LookupGet(string? md5, string? sha1, string? sha256, string? crc)
         {
-            // fail on obvious zero byte hashes to avoid unnecessary lookups
-            if (md5 == zeroByteMD5 || sha1 == zeroByteSHA1 || sha256 == zeroByteSHA256 || crc == zeroByteCRC)
+            var modelList = new List<HashLookupModel>
             {
-                return BadRequest("Invalid hash provided. Zero-byte hashes are not allowed.");
-            }
+                new HashLookupModel { MD5 = md5, SHA1 = sha1, SHA256 = sha256, CRC = crc }
+            };
 
-            try
-            {
-                HashLookup hashLookup = new HashLookup(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), new List<hasheous_server.Models.HashLookupModel>
-                {
-                    new hasheous_server.Models.HashLookupModel
-                    {
-                        MD5 = md5,
-                        SHA1 = sha1,
-                        SHA256 = sha256,
-                        CRC = crc
-                    }
-                });
-                await hashLookup.PerformLookup();
-
-                if (hashLookup == null)
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    return Ok(hashLookup);
-                }
-            }
-            catch (HashLookup.HashNotFoundException)
-            {
-                return NotFound("The provided hash was not found in the signature database.");
-            }
-            catch
-            {
-                return NotFound();
-            }
+            // Call the LookupPost method with the constructed model list
+            return await LookupPostInternal(modelList, false, "All", new List<gaseous_signature_parser.models.RomSignatureObject.RomSignatureObject.Game.Rom.SignatureSourceType>());
         }
 
         /// <summary>

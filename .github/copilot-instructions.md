@@ -87,7 +87,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
     - `GET /api/v1/MetadataProxy/ScreenScraper/systemesListe.php` returns cached/platform metadata from ScreenScraper integration. Requires `X-Client-API-Key`.
     - `GET /api/v1/MetadataProxy/ScreenScraper/media{endpoint}.php` proxies/caches media and rejects traversal-like media IDs. Does NOT require `X-Client-API-Key`.
   - MCP lookups are intentionally public: the hosted MCP controller uses `[AllowAnonymous]` rather than API key auth.
-  - Hash lookup endpoints (`POST /api/v1/Lookup/ByHash`) enforce request payload limits: `MaxLookupPayloadBytes = 262_144` (256 KB) and `MaxLookupArrayItems = 50`. These are enforced via `[RequestSizeLimit]` and manual JSON array size validation before database queries run.
+  - Hash lookup endpoints (`POST /api/v1/Lookup/ByHash`) enforce request payload limits: `MaxLookupPayloadBytes = 262_144` (256 KB) and `MaxLookupArrayItems = 40`. These are enforced via `[RequestSizeLimit]` and manual JSON array size validation before database queries run.
   - Hash lookup responses use a layered caching model: the ASP.NET action is decorated with a short `[ResponseCache(CacheProfileName = "5Minute")]`, while expensive signature resolution is cached in Redis at the `SignatureManagement` layer. Keep the HTTP cache in place for repeated identical reads, and avoid forcing `All` metadata expansion on list/search callers when a minimal result payload is sufficient.
 
 - Auth & security
@@ -450,7 +450,7 @@ Additional example (rating boards):
 - For incremental async cleanup, update method signatures and call chains together in one change so no mixed sync/async regressions are introduced.
 
 ### Hash lookup request validation (current)
-- `POST /api/v1/Lookup/ByHash` now enforces request payload limits: `MaxLookupPayloadBytes = 262_144` (256 KB) via `[RequestSizeLimit]` and `MaxLookupArrayItems = 50` for the number of hash objects in the request body.
+- `POST /api/v1/Lookup/ByHash` now enforces request payload limits: `MaxLookupPayloadBytes = 262_144` (256 KB) via `[RequestSizeLimit]` and `MaxLookupArrayItems = 40` for the number of hash objects in the request body.
 - Zero-byte hashes are rejected with `400 Bad Request` for known hashes: MD5 `d41d8cd98f00b204e9800998ecf8427e`, SHA1 `da39a3ee5e6b4b0d3255bfef95601890afd80709`, SHA256 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`, CRC `00000000`.
 - Request body JSON parsing uses `JsonSerializerOptions` with `PropertyNameCaseInsensitive = true` to normalize input.
 - Validation occurs before any database lookups to fail fast on invalid input.
