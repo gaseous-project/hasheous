@@ -19,7 +19,7 @@
     <PackageReference Include="craftersmine.SteamGridDB.Net" Version="1.1.7" />
     <PackageReference Include="gaseous-signature-parser" Version="2.7.3" />
     <PackageReference Include="gaseous.IGDB" Version="1.0.6" />
-    <PackageReference Include="hasheous-client" Version="1.5.4" />
+    <PackageReference Include="hasheous-client" Version="1.5.5" />
     <PackageReference Include="HtmlAgilityPack" Version="1.13.0" />
     <PackageReference Include="Asp.Versioning.Mvc" Version="10.2.1" />
     <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" Version="10.2.1" />

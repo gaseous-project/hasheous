@@ -2,7 +2,8 @@ using System.Reflection;
 using Classes;
 using Classes.Metadata;
 using hasheous_server.Classes.MetadataLib;
-using IGDB.Models;
+// using IGDB.Models;
+using HasheousClient.Models.Metadata.IGDB;
 
 namespace Classes.Metadata.Utility
 {
@@ -52,6 +53,7 @@ namespace Classes.Metadata.Utility
             BuildTableFromType(typeof(GameVersionFeatureValue), Storage.TablePrefix.IGDB.ToString());
             BuildTableFromType(typeof(GameVideo), Storage.TablePrefix.IGDB.ToString());
             BuildTableFromType(typeof(Genre), Storage.TablePrefix.IGDB.ToString());
+            BuildTableFromType(typeof(ImageType), Storage.TablePrefix.IGDB.ToString());
             BuildTableFromType(typeof(InvolvedCompany), Storage.TablePrefix.IGDB.ToString());
             BuildTableFromType(typeof(Keyword), Storage.TablePrefix.IGDB.ToString());
             BuildTableFromType(typeof(Language), Storage.TablePrefix.IGDB.ToString());
