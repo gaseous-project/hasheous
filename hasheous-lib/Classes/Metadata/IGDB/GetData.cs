@@ -936,7 +936,8 @@ namespace hasheous_server.Classes.Metadata.IGDB
                 Endpoint = "artworks",
                 FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
                 {
-                    { "Game", new EndpointDataItem.FieldNameItem { TargetType = "Game" } }
+                    { "Game", new EndpointDataItem.FieldNameItem { TargetType = "Game" } },
+                    { "ImageType", new EndpointDataItem.FieldNameItem { TargetType = "ImageType" } }
                 }
             } },
             { "Character", new EndpointDataItem {
@@ -1027,7 +1028,8 @@ namespace hasheous_server.Classes.Metadata.IGDB
                 FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
                 {
                     { "Game", new EndpointDataItem.FieldNameItem { TargetType = "Game" } },
-                    { "GameLocalization", new EndpointDataItem.FieldNameItem { TargetType = "GameLocalization" } }
+                    { "GameLocalization", new EndpointDataItem.FieldNameItem { TargetType = "GameLocalization" } },
+                    { "ImageType", new EndpointDataItem.FieldNameItem { TargetType = "ImageType" } }
                 }
             } },
             { "DateFormat", new EndpointDataItem { Endpoint = "date_formats" } },
@@ -1173,6 +1175,7 @@ namespace hasheous_server.Classes.Metadata.IGDB
             } },
             { "Genre", new EndpointDataItem { Endpoint = "genres" } },
             { "Keyword", new EndpointDataItem { Endpoint = "keywords" } },
+            { "ImageType", new EndpointDataItem { Endpoint = "image_types" } },
             { "InvolvedCompany", new EndpointDataItem {
                 Endpoint = "involved_companies",
                 FieldNames = new Dictionary<string, EndpointDataItem.FieldNameItem>
