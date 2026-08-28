@@ -1,10 +1,5 @@
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Text.Json;
-using System.Xml;
-using Classes;
 using DATImport;
-using hasheous_server.Classes;
 
 namespace Generic
 {
@@ -25,19 +20,19 @@ namespace Generic
         /// <inheritdoc/>
         public async Task StageFiles()
         {
-            return; // No staging required for eXo metadata
+            return; // No staging required for Generic metadata
         }
 
         /// <inheritdoc/>
         public async Task ProcessFiles()
         {
-            return; // No processing required for eXo metadata
+            return; // No processing required for Generic metadata
         }
 
         /// <inheritdoc/>
         public async Task<bool> ValidateFiles()
         {
-            return true; // Always valid for eXo metadata
+            return true; // Always valid for Generic metadata
         }
     }
 }
