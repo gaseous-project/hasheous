@@ -303,6 +303,7 @@
     "service.exo.downloadmanager": "Refresh EXO Signatures",
     "service.mamearcade.downloadmanager": "Refresh MAME Arcade Signatures",
     "service.mamemess.downloadmanager": "Refresh MAME MESS Signatures",
+    "service.generic.downloadmanager": "Refresh Generic Signatures",
     "servicehourlymaintenance_frontend": "Frontend Hourly Maintenance",
     "servicehourlymaintenance": "Hourly Maintenance",
     "servicedailymaintenance": "Daily Maintenance",
