@@ -1078,7 +1078,7 @@ namespace hasheous_server.Classes
 
                         // insert a record for this metadata source
                         sql = "INSERT INTO DataObject_MetadataMap (DataObjectId, MetadataId, SourceId, MatchMethod, LastSearched, NextSearch) VALUES (@id, @metaid, @srcid, @method, @lastsearched, @nextsearch);";
-                        db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                        await db.ExecuteNonQueryAsync(sql, new Dictionary<string, object>{
                             { "id", DataObjectId },
                             { "metaid", "" },
                             { "srcid", (int)source },
@@ -1271,7 +1271,7 @@ namespace hasheous_server.Classes
                         { "lastsearched", DateTime.UtcNow.AddMonths(-3) },
                         { "nextsearch", DateTime.UtcNow.AddMonths(-1) }
                     };
-                            db.ExecuteNonQuery(sql, dbDict);
+                            await db.ExecuteNonQueryAsync(sql, dbDict);
                         }
                     }
 
@@ -1290,7 +1290,7 @@ namespace hasheous_server.Classes
                             { "write", true },
                             { "delete", true }
                         };
-                    db.ExecuteNonQuery(sql, dbDict);
+                    await db.ExecuteNonQueryAsync(sql, dbDict);
                     break;
 
                 default:
@@ -1312,7 +1312,7 @@ namespace hasheous_server.Classes
                 { "isblockedfrommatching", model.IsBlockedFromMatching }
             };
 
-            db.ExecuteNonQuery(sql, dbDict);
+            await db.ExecuteNonQueryAsync(sql, dbDict);
 
             // generate a cache key for this object id
             string cacheKey = DataObjectCacheKey(objectType, id);
@@ -3353,7 +3353,7 @@ namespace hasheous_server.Classes
             // This ensures that any dependencies on the source object are redirected to the target object during the merge operation.
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "UPDATE DataObject_Attributes SET AttributeRelation=@targetid WHERE AttributeRelation=@sourceid AND AttributeRelationType=@typeid;";
-            db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+            await db.ExecuteNonQueryAsync(sql, new Dictionary<string, object>{
                 { "targetid", targetObject.Id },
                 { "sourceid", sourceObject.Id },
                 { "typeid", sourceObject.ObjectType }

@@ -242,7 +242,7 @@ namespace GiantBomb
             // Add an index to the Name column
             string indexQuery = $"CREATE INDEX IF NOT EXISTS `idx_Platform_name` ON `{dbName}`.`Platform` (`name`); CREATE INDEX IF NOT EXISTS `idx_Platform_aliases` ON `{dbName}`.`Platform` (`aliases`);";
             Console.WriteLine($"Executing query: {indexQuery}");
-            await Task.Run(() => db.ExecuteNonQuery(indexQuery));
+            await Task.Run(async () => await db.ExecuteNonQueryAsync(indexQuery));
 
             // Add a Full Text Search index to the Name column
             // Check if the FULLTEXT index already exists before adding it
@@ -258,7 +258,7 @@ namespace GiantBomb
             if (!fullTextIndexExists)
             {
                 Console.WriteLine($"Executing query: {fullTextIndexQuery}");
-                await Task.Run(() => db.ExecuteNonQuery(fullTextIndexQuery));
+                await Task.Run(async () => await db.ExecuteNonQueryAsync(fullTextIndexQuery));
             }
             else
             {
