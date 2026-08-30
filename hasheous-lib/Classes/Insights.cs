@@ -122,7 +122,7 @@ namespace Classes.Insights
             // check if the query is cached
             if (Config.RedisConfiguration.Enabled)
             {
-                string? cachedData = await RedisConnection.GetDatabase(0).StringGetAsync(cacheKey);
+                string? cachedData = await RedisConnection.GetCacheItem<string>(cacheKey);
                 if (cachedData != null)
                 {
                     // if cached data is found, deserialize it and return
@@ -274,7 +274,7 @@ namespace Classes.Insights
             // cache the result
             if (Config.RedisConfiguration.Enabled)
             {
-                hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(cacheKey, Newtonsoft.Json.JsonConvert.SerializeObject(report), TimeSpan.FromMinutes(30));
+                hasheous.Classes.RedisConnection.SetCacheItem(cacheKey, report, TimeSpan.FromMinutes(30));
             }
 
             return report;
@@ -773,7 +773,7 @@ namespace Classes.Insights
                     // check the cache first
                     if (Config.RedisConfiguration.Enabled)
                     {
-                        string? cachedUserId = await hasheous.Classes.RedisConnection.GetDatabase(0).StringGetAsync("Insights:User:" + httpContext.User.Identity.Name);
+                        string? cachedUserId = await hasheous.Classes.RedisConnection.GetCacheItem<string>("Insights:User:" + httpContext.User.Identity.Name);
                         if (cachedUserId != null)
                         {
                             userId = cachedUserId;

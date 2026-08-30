@@ -203,7 +203,7 @@ namespace Classes
                 string publisherCacheKey = RedisConnection.GenerateKey("HashLookup", new { Type = DataObjects.DataObjectType.Company, Id = discoveredSignature.Game.PublisherId });
                 if (Config.RedisConfiguration.Enabled)
                 {
-                    string? cachedPublisher = await RedisConnection.GetDatabase(0).StringGetAsync(publisherCacheKey);
+                    string? cachedPublisher = await RedisConnection.GetCacheItem<string>(publisherCacheKey);
                     if (cachedPublisher != null && cachedPublisher != "")
                     {
                         // get the publisher from the cache
@@ -240,7 +240,7 @@ namespace Classes
                     // store the publisher in the cache for 7 days
                     if (Config.RedisConfiguration.Enabled && publisher != null)
                     {
-                        RedisConnection.GetDatabase(0).StringSet(publisherCacheKey, JsonConvert.SerializeObject(publisher), TimeSpan.FromHours(6));
+                        await RedisConnection.SetCacheItem<string>(publisherCacheKey, JsonConvert.SerializeObject(publisher), TimeSpan.FromHours(6));
                     }
                 }
             }
@@ -251,7 +251,7 @@ namespace Classes
             string platformCacheKey = RedisConnection.GenerateKey("HashLookup", new { Type = DataObjects.DataObjectType.Platform, Id = discoveredSignature.Game.SystemId });
             if (Config.RedisConfiguration.Enabled)
             {
-                string? cachedPlatform = await RedisConnection.GetDatabase(0).StringGetAsync(platformCacheKey);
+                string? cachedPlatform = await RedisConnection.GetCacheItem<string>(platformCacheKey);
                 if (cachedPlatform != null && cachedPlatform != "")
                 {
                     // get the platform from the cache
@@ -270,7 +270,7 @@ namespace Classes
                     // store the platform in the cache for 7 days
                     if (Config.RedisConfiguration.Enabled && platform != null)
                     {
-                        RedisConnection.GetDatabase(0).StringSet(platformCacheKey, JsonConvert.SerializeObject(platform), TimeSpan.FromHours(6));
+                        await RedisConnection.SetCacheItem<string>(platformCacheKey, JsonConvert.SerializeObject(platform), TimeSpan.FromHours(6));
                     }
                 }
             }
@@ -299,7 +299,7 @@ namespace Classes
             string gameCacheKey = RedisConnection.GenerateKey("HashLookup", new { Type = DataObjects.DataObjectType.Game, Id = discoveredSignature.Game.Id });
             if (Config.RedisConfiguration.Enabled)
             {
-                string? cachedGame = await RedisConnection.GetDatabase(0).StringGetAsync(gameCacheKey);
+                string? cachedGame = await RedisConnection.GetCacheItem<string>(gameCacheKey);
                 if (cachedGame != null && cachedGame != "")
                 {
                     // get the game from the cache
@@ -319,7 +319,7 @@ namespace Classes
                 // store the game in the cache for 6 hours
                 if (Config.RedisConfiguration.Enabled && game != null)
                 {
-                    RedisConnection.GetDatabase(0).StringSet(gameCacheKey, JsonConvert.SerializeObject(game), TimeSpan.FromHours(1));
+                    await RedisConnection.SetCacheItem<string>(gameCacheKey, JsonConvert.SerializeObject(game), TimeSpan.FromHours(1));
                 }
             }
 

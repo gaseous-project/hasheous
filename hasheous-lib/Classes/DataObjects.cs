@@ -1319,7 +1319,7 @@ namespace hasheous_server.Classes
             // purge redis cache of this object
             if (Config.RedisConfiguration.Enabled)
             {
-                RedisConnection.GetDatabase(0).KeyDelete(cacheKey);
+                await RedisConnection.GetDatabase(0).KeyDeleteAsync(cacheKey);
             }
 
             if (allowSearch)
@@ -1386,7 +1386,7 @@ namespace hasheous_server.Classes
             // purge redis cache of this object
             if (Config.RedisConfiguration.Enabled)
             {
-                RedisConnection.GetDatabase(0).KeyDelete(cacheKey);
+                await RedisConnection.GetDatabase(0).KeyDeleteAsync(cacheKey);
             }
 
             DataObjectItem EditedObject = await GetObjectStateForEdit(objectType, id);

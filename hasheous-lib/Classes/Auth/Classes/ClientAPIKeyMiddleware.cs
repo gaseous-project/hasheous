@@ -153,7 +153,7 @@ namespace Authentication
             // Otherwise, use a simple in-memory cache
             if (Config.RedisConfiguration.Enabled)
             {
-                string? cachedValue = await hasheous.Classes.RedisConnection.GetDatabase(0).StringGetAsync(keyName);
+                string? cachedValue = await hasheous.Classes.RedisConnection.GetCacheItem<string>(keyName);
                 if (cachedValue != null)
                 {
                     ClientApiKeyItem? cachedItem = Newtonsoft.Json.JsonConvert.DeserializeObject<ClientApiKeyItem>(cachedValue);
@@ -203,7 +203,7 @@ namespace Authentication
 
                 if (Config.RedisConfiguration.Enabled)
                 {
-                    await hasheous.Classes.RedisConnection.GetDatabase(0).StringSetAsync(keyName, serializedApiKey, TimeSpan.FromSeconds(CacheDuration));
+                    await hasheous.Classes.RedisConnection.SetCacheItem(keyName, serializedApiKey, TimeSpan.FromSeconds(CacheDuration));
                 }
                 else
                 {

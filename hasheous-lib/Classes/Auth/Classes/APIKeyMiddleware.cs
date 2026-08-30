@@ -137,7 +137,7 @@ namespace Authentication
             string cacheKey = ApiKeyCacheNamePrefix + ":" + apiKey;
             if (Config.RedisConfiguration.Enabled)
             {
-                string? cachedUser = await hasheous.Classes.RedisConnection.GetDatabase(0).StringGetAsync(cacheKey);
+                string? cachedUser = await hasheous.Classes.RedisConnection.GetCacheItem<string>(cacheKey);
                 if (cachedUser != null)
                 {
                     return Newtonsoft.Json.JsonConvert.DeserializeObject<ApplicationUser>(cachedUser);
@@ -172,7 +172,7 @@ namespace Authentication
             string serializedUser = Newtonsoft.Json.JsonConvert.SerializeObject(user);
             if (Config.RedisConfiguration.Enabled)
             {
-                await hasheous.Classes.RedisConnection.GetDatabase(0).StringSetAsync(cacheKey, serializedUser, TimeSpan.FromSeconds(CacheDuration));
+                await hasheous.Classes.RedisConnection.SetCacheItem(cacheKey, serializedUser, TimeSpan.FromSeconds(CacheDuration));
             }
             else
             {
