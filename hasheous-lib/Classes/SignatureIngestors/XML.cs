@@ -804,12 +804,29 @@ namespace XML
             if (cache.TryGetValue(key, out int existingId))
                 return existingId;
 
+            Dictionary<string, object> parameters = new Dictionary<string, object>
+            {
+                { parameterName, key }
+            };
+
+            // The cache is built per DAT file, so anything inserted while a
+            // previous file was processed is absent from it. Without this check
+            // the insert below runs unconditionally and the table collects a
+            // second row for a name it already holds.
+            DataTable existing = await Config.database.ExecuteCMDAsync(
+                $"SELECT `Id` FROM {tableName} WHERE `{columnName}` = @{parameterName} LIMIT 1;",
+                parameters);
+
+            if (existing.Rows.Count > 0)
+            {
+                int foundId = Convert.ToInt32(existing.Rows[0]["Id"]);
+                cache[key] = foundId;
+                return foundId;
+            }
+
             DataTable inserted = await Config.database.ExecuteCMDAsync(
                 $"INSERT INTO {tableName} (`{columnName}`) VALUES (@{parameterName}); SELECT CAST(LAST_INSERT_ID() AS SIGNED);",
-                new Dictionary<string, object>
-                {
-                    { parameterName, key }
-                });
+                parameters);
 
             int newId = Convert.ToInt32(inserted.Rows[0][0]);
             cache[key] = newId;
