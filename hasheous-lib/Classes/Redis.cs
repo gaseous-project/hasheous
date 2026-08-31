@@ -79,6 +79,70 @@ namespace hasheous.Classes
             return cacheKey;
         }
 
+        private static string GenerateInternalKey(string cacheKey)
+        {
+            // split the cache key into prefix and key
+            int separatorIndex = cacheKey.IndexOf(':');
+            var longPrefix = separatorIndex > 0 ? cacheKey.Substring(0, separatorIndex) : string.Empty;
+            var remainingKey = separatorIndex > 0 ? cacheKey.Substring(separatorIndex + 1) : cacheKey;
+            string shortPrefix = GetShortPrefix(longPrefix);
+
+            // convert the rest of the cache key to md5 hash to reduce the length of the key
+            string keyHash = "";
+            if (remainingKey.Length <= 32)
+            {
+                keyHash = remainingKey;
+            }
+            else
+            {
+                // Use MD5 to hash the remaining key for a consistent length
+                using (var md5 = System.Security.Cryptography.MD5.Create())
+                {
+                    byte[] inputBytes = System.Text.Encoding.UTF8.GetBytes(remainingKey);
+                    byte[] hashBytes = md5.ComputeHash(inputBytes);
+                    keyHash = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
+                }
+
+                using (var md5 = System.Security.Cryptography.MD5.Create())
+                {
+                    byte[] inputBytes = System.Text.Encoding.UTF8.GetBytes(remainingKey);
+                    byte[] hashBytes = md5.ComputeHash(inputBytes);
+
+                    // OPTIMISATION: Fast hex generation bypasses string.Replace and .ToLower allocations completely
+                    var hexBuilder = new StringBuilder(32);
+                    for (int i = 0; i < hashBytes.Length; i++)
+                    {
+                        hexBuilder.Append(hashBytes[i].ToString("x2"));
+                    }
+
+                    keyHash = hexBuilder.ToString();
+                }
+            }
+
+            return $"{shortPrefix}:{keyHash}";
+        }
+
+        private static string GetShortPrefix(string longPrefix)
+        {
+            if (longPrefix.Length > 2)
+            {
+                switch (longPrefix.ToLower())
+                {
+                    case "dataobject":
+                        return "do";
+                    case "lookup":
+                        return "lu";
+                    case "insightsreport":
+                        return "ir";
+                    case "romitem":
+                        return "ri";
+                    default:
+                        return longPrefix;
+                }
+            }
+            return longPrefix;
+        }
+
         /// <summary>
         /// Purges all keys across the server for the configured Redis instance.
         /// </summary>
@@ -108,8 +172,10 @@ namespace hasheous.Classes
                 throw new ArgumentNullException(nameof(prefix), "Prefix cannot be null or empty");
             }
 
+            var shortPrefix = GetShortPrefix(prefix);
+
             var server = Connection.GetServer(Config.RedisConfiguration.HostName + ":" + Config.RedisConfiguration.Port);
-            var keys = server.Keys(pattern: $"{prefix}:*");
+            var keys = server.Keys(pattern: $"{shortPrefix}:*");
 
             foreach (var key in keys)
             {
@@ -164,7 +230,8 @@ namespace hasheous.Classes
         {
             if (Config.RedisConfiguration.Enabled)
             {
-                return await Db.KeyExistsAsync(cacheKey);
+                string shortKey = GenerateInternalKey(cacheKey);
+                return await Db.KeyExistsAsync(shortKey);
             }
             return false;
         }
@@ -182,7 +249,8 @@ namespace hasheous.Classes
         {
             if (!Config.RedisConfiguration.Enabled) return default;
 
-            RedisValue cachedData = await Db.StringGetAsync(cacheKey);
+            string shortKey = GenerateInternalKey(cacheKey);
+            RedisValue cachedData = await Db.StringGetAsync(shortKey);
             if (!cachedData.HasValue) return default;
 
             // 1. Handle primitive types immediately
@@ -241,11 +309,13 @@ namespace hasheous.Classes
 
             if (!Config.RedisConfiguration.Enabled || data == null) return;
 
+            string shortKey = GenerateInternalKey(cacheKey);
+
             // 1. Primitive routing (Direct Plaintext Write)
             if (!ShouldSerialize<T>())
             {
                 string primitiveData = data?.ToString() ?? string.Empty;
-                await Db.StringSetAsync(cacheKey, primitiveData, expiry, false);
+                await Db.StringSetAsync(shortKey, primitiveData, expiry, false);
                 return;
             }
 
@@ -262,13 +332,13 @@ namespace hasheous.Classes
                 if (savingRatio <= 0.80)
                 {
                     // Storing a byte[] array forces Valkey to flag this key as a binary stream natively
-                    await Db.StringSetAsync(cacheKey, compressedBytes, expiry, false);
+                    await Db.StringSetAsync(shortKey, compressedBytes, expiry, false);
                     return;
                 }
             }
 
             // Fallback: If it fails character count or saving threshold, store as plain JSON string
-            await Db.StringSetAsync(cacheKey, serializedData, expiry, false);
+            await Db.StringSetAsync(shortKey, serializedData, expiry, false);
         }
         #endregion Cache Helpers
 
@@ -288,8 +358,8 @@ namespace hasheous.Classes
             byte[] rawBytes = Utf8Encoding.GetBytes(text);
 
             using var outputStream = new MemoryStream();
-            // CompressionLevel.Fastest delivers sub-millisecond execution times, optimal for cache layers
-            using (var compressStream = new BrotliStream(outputStream, CompressionLevel.Fastest))
+            // CompressionLevel.Optimal delivers the best compression ratio, suitable for cache layers
+            using (var compressStream = new BrotliStream(outputStream, CompressionLevel.Optimal))
             {
                 compressStream.Write(rawBytes, 0, rawBytes.Length);
             }
