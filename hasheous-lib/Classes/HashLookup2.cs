@@ -598,7 +598,7 @@ namespace Classes
                     }
                 }
 
-                RedisConnection.SetCacheItem<List<DataObjectItem>>(cacheKey, items, TimeSpan.FromHours(6));
+                await RedisConnection.SetCacheItem<List<DataObjectItem>>(cacheKey, items, TimeSpan.FromHours(6));
 
                 return items;
             }
