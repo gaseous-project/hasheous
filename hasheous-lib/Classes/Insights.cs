@@ -122,12 +122,11 @@ namespace Classes.Insights
             // check if the query is cached
             if (Config.RedisConfiguration.Enabled)
             {
-                string? cachedData = await RedisConnection.GetCacheItem<string>(cacheKey);
+                Dictionary<string, object>? cachedData = await RedisConnection.GetCacheItem<Dictionary<string, object>>(cacheKey);
                 if (cachedData != null)
                 {
-                    // if cached data is found, deserialize it and return
-                    var deserializedData = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(cachedData);
-                    return deserializedData ?? new Dictionary<string, object>();
+                    // if cached data is found, return it directly
+                    return cachedData;
                 }
             }
 
@@ -274,7 +273,7 @@ namespace Classes.Insights
             // cache the result
             if (Config.RedisConfiguration.Enabled)
             {
-                hasheous.Classes.RedisConnection.SetCacheItem(cacheKey, report, TimeSpan.FromMinutes(30));
+                await hasheous.Classes.RedisConnection.SetCacheItem<Dictionary<string, object>>(cacheKey, report, TimeSpan.FromMinutes(30));
             }
 
             return report;
@@ -793,7 +792,7 @@ namespace Classes.Insights
                             // Cache the user ID for future requests
                             if (Config.RedisConfiguration.Enabled)
                             {
-                                hasheous.Classes.RedisConnection.GetDatabase(0).StringSet("Insights:User:" + httpContext.User.Identity.Name, userId, TimeSpan.FromHours(1));
+                                await hasheous.Classes.RedisConnection.SetCacheItem<string>("Insights:User:" + httpContext.User.Identity.Name, userId, TimeSpan.FromHours(1));
                             }
                         }
                     }

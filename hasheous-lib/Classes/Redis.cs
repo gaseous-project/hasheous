@@ -1,3 +1,5 @@
+using System.IO.Compression;
+using System.Text;
 using Classes;
 using StackExchange.Redis;
 
@@ -115,6 +117,44 @@ namespace hasheous.Classes
             }
         }
 
+        #region Cache Helpers
+        private static IDatabase Db => RedisConnection.GetDatabase(0);
+
+        private static readonly Newtonsoft.Json.JsonSerializerSettings DeserialiseSettings = new Newtonsoft.Json.JsonSerializerSettings
+        {
+            TypeNameHandling = Newtonsoft.Json.TypeNameHandling.All,
+            TypeNameAssemblyFormatHandling = Newtonsoft.Json.TypeNameAssemblyFormatHandling.Simple,
+            MetadataPropertyHandling = Newtonsoft.Json.MetadataPropertyHandling.ReadAhead
+        };
+
+        private static readonly Newtonsoft.Json.JsonSerializerSettings SerialiseSettings = new Newtonsoft.Json.JsonSerializerSettings
+        {
+            TypeNameHandling = Newtonsoft.Json.TypeNameHandling.All,
+            TypeNameAssemblyFormatHandling = Newtonsoft.Json.TypeNameAssemblyFormatHandling.Simple,
+            NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore,
+            Formatting = Newtonsoft.Json.Formatting.None
+        };
+
+        private static bool ShouldSerialize<T>()
+        {
+            Type type = typeof(T);
+
+            // If it matches any of these primitive types, do NOT serialise/deserialise
+            if (type == typeof(string) ||
+                type == typeof(int) ||
+                type == typeof(long) ||
+                type == typeof(bool) ||
+                type == typeof(double) ||
+                type == typeof(uint) ||
+                type == typeof(ulong) ||
+                type == typeof(byte[]))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
         /// <summary>
         /// Checks whether a cache item exists for the provided <paramref name="cacheKey"/>.
         /// </summary>
@@ -124,7 +164,7 @@ namespace hasheous.Classes
         {
             if (Config.RedisConfiguration.Enabled)
             {
-                return await RedisConnection.GetDatabase(0).KeyExistsAsync(cacheKey);
+                return await Db.KeyExistsAsync(cacheKey);
             }
             return false;
         }
@@ -140,29 +180,46 @@ namespace hasheous.Classes
         /// </remarks>
         public async static Task<T?> GetCacheItem<T>(string cacheKey)
         {
-            // check redis cache first
-            if (Config.RedisConfiguration.Enabled)
+            if (!Config.RedisConfiguration.Enabled) return default;
+
+            RedisValue cachedData = await Db.StringGetAsync(cacheKey);
+            if (!cachedData.HasValue) return default;
+
+            // 1. Handle primitive types immediately
+            if (!ShouldSerialize<T>())
             {
-                if (await RedisConnection.GetDatabase(0).KeyExistsAsync(cacheKey))
+                string? fallbackString = cachedData.ToString();
+                if (string.IsNullOrEmpty(fallbackString)) return default;
+                return (T)Convert.ChangeType(fallbackString, typeof(T));
+            }
+
+            string jsonString;
+
+            // 2. AUTOMATIC FLAG DETECTION: Cast to byte[] to inspect the first byte
+            byte[] rawBuffer = (byte[])cachedData!;
+
+            if (rawBuffer != null && rawBuffer.Length > 0)
+            {
+                // 0x7B is the UTF-8 byte representation for the opening brace '{'
+                // 0x5B is the UTF-8 byte representation for an opening bracket '[' (for JSON arrays)
+                if (rawBuffer[0] == 0x7B || rawBuffer[0] == 0x5B)
                 {
-                    string? cachedData = await RedisConnection.GetDatabase(0).StringGetAsync(cacheKey);
-                    if (cachedData != null)
-                    {
-                        // if cached data is found, deserialize it and return
-                        var settings = new Newtonsoft.Json.JsonSerializerSettings
-                        {
-                            TypeNameHandling = Newtonsoft.Json.TypeNameHandling.All,
-                            TypeNameAssemblyFormatHandling = Newtonsoft.Json.TypeNameAssemblyFormatHandling.Simple
-                        };
-                        var deserializedData = Newtonsoft.Json.JsonConvert.DeserializeObject<T>(cachedData, settings);
-                        if (deserializedData != null)
-                        {
-                            return deserializedData;
-                        }
-                    }
+                    // It starts with '{' or '[', meaning it's raw, uncompressed text JSON
+                    jsonString = cachedData.ToString()!;
+                }
+                else
+                {
+                    // It's a binary stream -> Run it through decompression
+                    jsonString = DecompressToString(rawBuffer);
                 }
             }
-            return default(T);
+            else
+            {
+                return default;
+            }
+
+            if (string.IsNullOrEmpty(jsonString)) return default;
+            return (T?)Newtonsoft.Json.JsonConvert.DeserializeObject(jsonString, DeserialiseSettings);
         }
 
         /// <summary>
@@ -175,24 +232,90 @@ namespace hasheous.Classes
         /// <remarks>
         /// Serialization uses Newtonsoft.Json with <see cref="Newtonsoft.Json.TypeNameHandling.All"/> and ignores nulls.
         /// </remarks>
-        public async static Task SetCacheItem<T>(string cacheKey, T data, TimeSpan? expiry = null)
+        public async static Task SetCacheItem<T>(string cacheKey, T? data, TimeSpan? expiry = null)
         {
-            // if expiry is greater than 24 hours or null, set it to 24 hours to prevent stale data
             if (expiry == null || expiry > TimeSpan.FromHours(24))
             {
                 expiry = TimeSpan.FromHours(24);
             }
 
-            if (Config.RedisConfiguration.Enabled)
+            if (!Config.RedisConfiguration.Enabled || data == null) return;
+
+            // 1. Primitive routing (Direct Plaintext Write)
+            if (!ShouldSerialize<T>())
             {
-                var settings = new Newtonsoft.Json.JsonSerializerSettings
-                {
-                    TypeNameHandling = Newtonsoft.Json.TypeNameHandling.All,
-                    NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore
-                };
-                string serializedData = Newtonsoft.Json.JsonConvert.SerializeObject(data, settings);
-                await RedisConnection.GetDatabase(0).StringSetAsync(cacheKey, serializedData, expiry, false);
+                string primitiveData = data?.ToString() ?? string.Empty;
+                await Db.StringSetAsync(cacheKey, primitiveData, expiry, false);
+                return;
             }
+
+            // 2. Complex Object Serialization
+            string serializedData = Newtonsoft.Json.JsonConvert.SerializeObject(data, SerialiseSettings);
+
+            // THRESHOLD RULE A: Check if character count exceeds 1000
+            if (serializedData.Length > 1000)
+            {
+                byte[] compressedBytes = CompressString(serializedData);
+
+                // THRESHOLD RULE B: Check if compressed byte array is more than 20% smaller than raw text characters
+                double savingRatio = (double)compressedBytes.Length / serializedData.Length;
+                if (savingRatio <= 0.80)
+                {
+                    // Storing a byte[] array forces Valkey to flag this key as a binary stream natively
+                    await Db.StringSetAsync(cacheKey, compressedBytes, expiry, false);
+                    return;
+                }
+            }
+
+            // Fallback: If it fails character count or saving threshold, store as plain JSON string
+            await Db.StringSetAsync(cacheKey, serializedData, expiry, false);
         }
+        #endregion Cache Helpers
+
+        #region Compression Helpers
+        private static readonly UTF8Encoding Utf8Encoding = new UTF8Encoding(false);
+
+        /// <summary>
+        /// Compresses a plain text string into a Brotli-compressed binary byte array.
+        /// </summary>
+        /// <param name="text">The raw text payload (e.g., JSON string) to compress.</param>
+        /// <returns>A compressed byte array.</returns>
+        public static byte[] CompressString(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return Array.Empty<byte>();
+
+            byte[] rawBytes = Utf8Encoding.GetBytes(text);
+
+            using var outputStream = new MemoryStream();
+            // CompressionLevel.Fastest delivers sub-millisecond execution times, optimal for cache layers
+            using (var compressStream = new BrotliStream(outputStream, CompressionLevel.Fastest))
+            {
+                compressStream.Write(rawBytes, 0, rawBytes.Length);
+            }
+
+            return outputStream.ToArray();
+        }
+
+        /// <summary>
+        /// Decompresses a Brotli-compressed binary byte array back into a plain text string.
+        /// </summary>
+        /// <param name="compressedBytes">The binary payload retrieved from the cache store.</param>
+        /// <returns>The original uncompressed plain text string.</returns>
+        public static string DecompressToString(byte[] compressedBytes)
+        {
+            if (compressedBytes == null || compressedBytes.Length == 0)
+                return string.Empty;
+
+            using var inputStream = new MemoryStream(compressedBytes);
+            using var decompressStream = new BrotliStream(inputStream, CompressionMode.Decompress);
+            using var outputStream = new MemoryStream();
+
+            decompressStream.CopyTo(outputStream);
+
+            return Utf8Encoding.GetString(outputStream.ToArray());
+        }
+
+        #endregion Compression Helpers
     }
 }

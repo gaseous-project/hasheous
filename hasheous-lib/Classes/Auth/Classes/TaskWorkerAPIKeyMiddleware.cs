@@ -63,12 +63,10 @@ namespace Authentication
                 // check the cache first
                 if (Config.RedisConfiguration.Enabled)
                 {
-                    string? cachedValue = await hasheous.Classes.RedisConnection.GetCacheItem<string>(cacheKey);
-                    if (cachedValue != null)
+                    bool? cachedValue = await hasheous.Classes.RedisConnection.GetCacheItem<bool>(cacheKey);
+                    if (cachedValue.HasValue)
                     {
-                        bool cachedItem = Newtonsoft.Json.JsonConvert.DeserializeObject<bool>(cachedValue);
-
-                        return cachedItem;
+                        return cachedValue.Value;
                     }
                 }
 
@@ -91,7 +89,7 @@ namespace Authentication
                 // store in cache
                 if (Config.RedisConfiguration.Enabled)
                 {
-                    await hasheous.Classes.RedisConnection.SetCacheItem(cacheKey, Newtonsoft.Json.JsonConvert.SerializeObject(isValid), TimeSpan.FromSeconds(CacheDuration));
+                    await hasheous.Classes.RedisConnection.SetCacheItem<bool>(cacheKey, isValid, TimeSpan.FromSeconds(CacheDuration));
                 }
 
                 return isValid;
