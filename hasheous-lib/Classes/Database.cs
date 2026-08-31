@@ -597,7 +597,7 @@ namespace Classes
 				{
 					foreach (Dictionary<string, object> Parameter in Parameters)
 					{
-						using var cmd = buildcommand(conn, Parameter["sql"].ToString(), (Dictionary<string, object>)Parameter["values"], Timeout);
+						var cmd = buildcommand(conn, Parameter["sql"].ToString(), (Dictionary<string, object>)Parameter["values"], Timeout);
 						cmd.Transaction = transaction;
 
 						// Execute the command and capture results from SELECT queries
@@ -605,10 +605,8 @@ namespace Classes
 						{
 							// SELECT query - capture the result (overwrite previous results to get the last SELECT)
 							result = new DataTable();
-							using (var reader = await cmd.ExecuteReaderAsync())
-							{
-								result.Load(reader);
-							}
+							using var reader = await cmd.ExecuteReaderAsync();
+							result.Load(reader);
 						}
 						else
 						{
@@ -634,7 +632,7 @@ namespace Classes
 
 			private MySqlCommand buildcommand(MySqlConnection Conn, string SQL, Dictionary<string, object> Parameters, int Timeout)
 			{
-				using var cmd = new MySqlCommand();
+				var cmd = new MySqlCommand();
 				cmd.Connection = Conn;
 				cmd.CommandText = SQL;
 				cmd.CommandTimeout = Timeout;
