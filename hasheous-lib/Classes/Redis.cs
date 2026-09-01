@@ -17,6 +17,7 @@ namespace hasheous.Classes
     public class RedisConnection
     {
         private static Lazy<ConnectionMultiplexer> lazyConnection;
+        private const int PurgeBatchSize = 500;
 
         static RedisConnection()
         {
@@ -87,37 +88,13 @@ namespace hasheous.Classes
             var remainingKey = separatorIndex > 0 ? cacheKey.Substring(separatorIndex + 1) : cacheKey;
             string shortPrefix = GetShortPrefix(longPrefix);
 
-            // convert the rest of the cache key to md5 hash to reduce the length of the key
-            string keyHash = "";
             if (remainingKey.Length <= 32)
             {
-                keyHash = remainingKey;
+                return $"{shortPrefix}:{remainingKey}";
             }
-            else
-            {
-                // Use MD5 to hash the remaining key for a consistent length
-                using (var md5 = System.Security.Cryptography.MD5.Create())
-                {
-                    byte[] inputBytes = System.Text.Encoding.UTF8.GetBytes(remainingKey);
-                    byte[] hashBytes = md5.ComputeHash(inputBytes);
-                    keyHash = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
-                }
 
-                using (var md5 = System.Security.Cryptography.MD5.Create())
-                {
-                    byte[] inputBytes = System.Text.Encoding.UTF8.GetBytes(remainingKey);
-                    byte[] hashBytes = md5.ComputeHash(inputBytes);
-
-                    // OPTIMISATION: Fast hex generation bypasses string.Replace and .ToLower allocations completely
-                    var hexBuilder = new StringBuilder(32);
-                    for (int i = 0; i < hashBytes.Length; i++)
-                    {
-                        hexBuilder.Append(hashBytes[i].ToString("x2"));
-                    }
-
-                    keyHash = hexBuilder.ToString();
-                }
-            }
+            byte[] inputBytes = System.Text.Encoding.UTF8.GetBytes(remainingKey);
+            string keyHash = Convert.ToHexStringLower(System.Security.Cryptography.MD5.HashData(inputBytes));
 
             return $"{shortPrefix}:{keyHash}";
         }
@@ -130,12 +107,22 @@ namespace hasheous.Classes
                 {
                     case "dataobject":
                         return "do";
+                    case "dataobjectfromsignatureid":
+                        return "ds";
+                    case "gameitem":
+                        return "gi";
                     case "lookup":
                         return "lu";
+                    case "hashlookup":
+                        return "hl";
                     case "insightsreport":
                         return "ir";
+                    case "insights":
+                        return "in";
                     case "romitem":
                         return "ri";
+                    case "signature":
+                        return "sg";
                     default:
                         return longPrefix;
                 }
@@ -152,11 +139,21 @@ namespace hasheous.Classes
         public async static Task PurgeCache()
         {
             var server = Connection.GetServer(Config.RedisConfiguration.HostName + ":" + Config.RedisConfiguration.Port);
-            var keys = server.Keys();
+            List<RedisKey> keyBatch = new List<RedisKey>(PurgeBatchSize);
 
-            foreach (var key in keys)
+            foreach (RedisKey key in server.Keys(database: 0))
             {
-                await GetDatabase(0).KeyDeleteAsync(key);
+                keyBatch.Add(key);
+                if (keyBatch.Count == PurgeBatchSize)
+                {
+                    await Db.KeyDeleteAsync(keyBatch.ToArray());
+                    keyBatch.Clear();
+                }
+            }
+
+            if (keyBatch.Count > 0)
+            {
+                await Db.KeyDeleteAsync(keyBatch.ToArray());
             }
         }
 
@@ -175,16 +172,29 @@ namespace hasheous.Classes
             var shortPrefix = GetShortPrefix(prefix);
 
             var server = Connection.GetServer(Config.RedisConfiguration.HostName + ":" + Config.RedisConfiguration.Port);
-            var keys = server.Keys(pattern: $"{shortPrefix}:*");
+            List<RedisKey> keyBatch = new List<RedisKey>(PurgeBatchSize);
 
-            foreach (var key in keys)
+            foreach (RedisKey key in server.Keys(database: 0, pattern: $"{shortPrefix}:*"))
             {
-                await GetDatabase(0).KeyDeleteAsync(key);
+                keyBatch.Add(key);
+                if (keyBatch.Count == PurgeBatchSize)
+                {
+                    await Db.KeyDeleteAsync(keyBatch.ToArray());
+                    keyBatch.Clear();
+                }
+            }
+
+            if (keyBatch.Count > 0)
+            {
+                await Db.KeyDeleteAsync(keyBatch.ToArray());
             }
         }
 
         #region Cache Helpers
         private static IDatabase Db => RedisConnection.GetDatabase(0);
+        private static readonly byte[] CachePayloadMarker = "HRC"u8.ToArray();
+        private const byte PlainJsonPayloadFormat = 0;
+        private const byte BrotliPayloadFormat = 1;
 
         private static readonly Newtonsoft.Json.JsonSerializerSettings DeserialiseSettings = new Newtonsoft.Json.JsonSerializerSettings
         {
@@ -228,12 +238,20 @@ namespace hasheous.Classes
         /// <returns><c>true</c> if the key exists and Redis is enabled; otherwise <c>false</c>.</returns>
         public async static Task<bool> CacheItemExists(string cacheKey)
         {
-            if (Config.RedisConfiguration.Enabled)
+            try
             {
-                string shortKey = GenerateInternalKey(cacheKey);
-                return await Db.KeyExistsAsync(shortKey);
+                if (Config.RedisConfiguration.Enabled)
+                {
+                    string shortKey = GenerateInternalKey(cacheKey);
+                    return await Db.KeyExistsAsync(shortKey);
+                }
+                return false;
             }
-            return false;
+            catch (Exception ex)
+            {
+                Logging.Log(Logging.LogType.Warning, "Redis", $"Redis CacheItemExists failed for key '{cacheKey}': {ex.Message}", ex);
+                return false;
+            }
         }
 
         /// <summary>
@@ -253,7 +271,7 @@ namespace hasheous.Classes
 
                 string optimizedKey = GenerateInternalKey(cacheKey);
 
-                RedisValue cachedData = await Db.StringGetAsync(optimizedKey);
+                RedisValue? cachedData = await Db.StringGetAsync(optimizedKey);
                 if (!cachedData.HasValue) return default;
 
                 if (!ShouldSerialize<T>())
@@ -263,40 +281,22 @@ namespace hasheous.Classes
                     return (T)Convert.ChangeType(fallbackString, typeof(T));
                 }
 
-                string jsonString;
-
-                // FIX: Safely retrieve the absolute raw underlying bytes from StackExchange.Redis
-                // without allowing the driver to perform implicit character encoding coercions.
-                byte[] rawBuffer = cachedData;
-
-                if (rawBuffer == null || rawBuffer.Length == 0) return default;
-
-                // Direct check: If it starts with '{' (0x7B) or '[' (0x5B), it is DEFINITELY raw uncompressed text JSON
-                if (rawBuffer[0] == 0x7B || rawBuffer[0] == 0x5B)
+                byte[]? rawBuffer = cachedData;
+                if (rawBuffer == null || rawBuffer.Length == 0 || !HasCachePayloadMarker(rawBuffer))
                 {
-                    jsonString = Utf8Encoding.GetString(rawBuffer);
-                }
-                else
-                {
-                    // It's binary payload -> Process through Brotli pipeline safely
-                    try
-                    {
-                        using var inputStream = new MemoryStream(rawBuffer);
-                        using var decompressStream = new BrotliStream(inputStream, CompressionMode.Decompress);
-                        using var outputStream = new MemoryStream();
-
-                        await decompressStream.CopyToAsync(outputStream);
-                        jsonString = Utf8Encoding.GetString(outputStream.ToArray());
-                    }
-                    catch (Exception)
-                    {
-                        // Fail-safe fallback: If decompression crashes, fall back to string interpretation
-                        jsonString = cachedData.ToString()!;
-                    }
+                    await DeleteInvalidCacheItemAsync(optimizedKey, cacheKey, "it is unframed or empty");
+                    return default;
                 }
 
-                if (string.IsNullOrEmpty(jsonString)) return default;
-                return (T?)Newtonsoft.Json.JsonConvert.DeserializeObject(jsonString, DeserialiseSettings);
+                try
+                {
+                    return await DeserializeComplexCacheValue<T>(rawBuffer);
+                }
+                catch (Exception ex) when (ex is InvalidDataException or InvalidOperationException or Newtonsoft.Json.JsonException)
+                {
+                    await DeleteInvalidCacheItemAsync(optimizedKey, cacheKey, $"it could not be decoded: {ex.Message}");
+                    return default;
+                }
             }
             catch (Exception ex)
             {
@@ -337,26 +337,7 @@ namespace hasheous.Classes
                     return;
                 }
 
-                // 2. Complex Object Serialization
-                string serializedData = Newtonsoft.Json.JsonConvert.SerializeObject(data, SerialiseSettings);
-
-                // THRESHOLD RULE A: Check if character count exceeds 1000
-                if (serializedData.Length > 1000)
-                {
-                    byte[] compressedBytes = CompressString(serializedData);
-
-                    // THRESHOLD RULE B: Check if compressed byte array is more than 20% smaller than raw text characters
-                    double savingRatio = (double)compressedBytes.Length / serializedData.Length;
-                    if (savingRatio <= 0.80)
-                    {
-                        // Storing a byte[] array forces Valkey to flag this key as a binary stream natively
-                        await Db.StringSetAsync(shortKey, compressedBytes, expiry, false);
-                        return;
-                    }
-                }
-
-                // Fallback: If it fails character count or saving threshold, store as plain JSON string
-                await Db.StringSetAsync(shortKey, serializedData, expiry, false);
+                await Db.StringSetAsync(shortKey, SerializeComplexCacheValue(data), expiry, false);
             }
             catch (Exception ex)
             {
@@ -368,6 +349,114 @@ namespace hasheous.Classes
 
         #region Compression Helpers
         private static readonly UTF8Encoding Utf8Encoding = new UTF8Encoding(false);
+
+        private static bool HasCachePayloadMarker(byte[] payload)
+        {
+            return payload.Length > CachePayloadMarker.Length &&
+                payload.AsSpan(0, CachePayloadMarker.Length).SequenceEqual(CachePayloadMarker);
+        }
+
+        internal static bool IsPrimitiveCacheType<T>()
+        {
+            return !ShouldSerialize<T>();
+        }
+
+        internal static byte[] SerializeComplexCacheValue<T>(T data)
+        {
+            string serializedData = Newtonsoft.Json.JsonConvert.SerializeObject(data, SerialiseSettings);
+
+            if (serializedData.Length > 1000)
+            {
+                byte[]? compressedPayload = CreateCompressedCachePayload(serializedData);
+                if (compressedPayload != null)
+                {
+                    return compressedPayload;
+                }
+            }
+
+            return CreatePlainJsonCachePayload(serializedData);
+        }
+
+        internal static async Task<T?> DeserializeComplexCacheValue<T>(byte[] payload)
+        {
+            if (!HasCachePayloadMarker(payload))
+            {
+                throw new InvalidDataException("Redis cache payload is unframed.");
+            }
+
+            byte format = payload[CachePayloadMarker.Length];
+            byte[] value = payload[(CachePayloadMarker.Length + 1)..];
+            string jsonString = format switch
+            {
+                PlainJsonPayloadFormat => Utf8Encoding.GetString(value),
+                BrotliPayloadFormat => await DecompressToStringAsync(value),
+                _ => throw new InvalidDataException($"Unknown Redis cache payload format '{format}'.")
+            };
+
+            if (string.IsNullOrEmpty(jsonString))
+            {
+                throw new InvalidDataException("Redis cache payload is empty.");
+            }
+
+            return Newtonsoft.Json.JsonConvert.DeserializeObject<T>(jsonString, DeserialiseSettings);
+        }
+
+        private static async Task DeleteInvalidCacheItemAsync(string optimizedKey, string cacheKey, string reason)
+        {
+            try
+            {
+                bool deleted = await Db.KeyDeleteAsync(optimizedKey);
+                Logging.Log(Logging.LogType.Warning, "Redis", $"Deleted Redis cache item for key '{cacheKey}' because {reason}. Deleted: {deleted}.");
+            }
+            catch (Exception ex)
+            {
+                Logging.Log(Logging.LogType.Warning, "Redis", $"Could not delete invalid Redis cache item for key '{cacheKey}': {ex.Message}", ex);
+            }
+        }
+
+        private static byte[] CreateCachePayload(byte format, byte[] payload)
+        {
+            byte[] framedPayload = new byte[CachePayloadMarker.Length + 1 + payload.Length];
+            CachePayloadMarker.CopyTo(framedPayload, 0);
+            framedPayload[CachePayloadMarker.Length] = format;
+            payload.CopyTo(framedPayload, CachePayloadMarker.Length + 1);
+            return framedPayload;
+        }
+
+        private static byte[] CreatePlainJsonCachePayload(string payload)
+        {
+            int headerLength = CachePayloadMarker.Length + 1;
+            byte[] framedPayload = new byte[headerLength + Utf8Encoding.GetByteCount(payload)];
+            CachePayloadMarker.CopyTo(framedPayload, 0);
+            framedPayload[CachePayloadMarker.Length] = PlainJsonPayloadFormat;
+            Utf8Encoding.GetBytes(payload, 0, payload.Length, framedPayload, headerLength);
+            return framedPayload;
+        }
+
+        private static byte[]? CreateCompressedCachePayload(string payload)
+        {
+            byte[] rawBytes = Utf8Encoding.GetBytes(payload);
+            using var outputStream = new MemoryStream();
+            outputStream.Write(CachePayloadMarker);
+            outputStream.WriteByte(BrotliPayloadFormat);
+
+            using (var compressStream = new BrotliStream(outputStream, CompressionLevel.Optimal, leaveOpen: true))
+            {
+                compressStream.Write(rawBytes, 0, rawBytes.Length);
+            }
+
+            int compressedLength = checked((int)outputStream.Length - CachePayloadMarker.Length - 1);
+            return (double)compressedLength / payload.Length <= 0.80 ? outputStream.ToArray() : null;
+        }
+
+        private static async Task<string> DecompressToStringAsync(byte[] compressedBytes)
+        {
+            using var inputStream = new MemoryStream(compressedBytes);
+            using var decompressStream = new BrotliStream(inputStream, CompressionMode.Decompress);
+            using var outputStream = new MemoryStream();
+            await decompressStream.CopyToAsync(outputStream);
+            return Utf8Encoding.GetString(outputStream.ToArray());
+        }
 
         /// <summary>
         /// Compresses a plain text string into a Brotli-compressed binary byte array.
