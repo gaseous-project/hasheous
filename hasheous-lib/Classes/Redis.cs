@@ -247,47 +247,63 @@ namespace hasheous.Classes
         /// </remarks>
         public async static Task<T?> GetCacheItem<T>(string cacheKey)
         {
-            if (!Config.RedisConfiguration.Enabled) return default;
-
-            string shortKey = GenerateInternalKey(cacheKey);
-            RedisValue cachedData = await Db.StringGetAsync(shortKey);
-            if (!cachedData.HasValue) return default;
-
-            // 1. Handle primitive types immediately
-            if (!ShouldSerialize<T>())
+            try
             {
-                string? fallbackString = cachedData.ToString();
-                if (string.IsNullOrEmpty(fallbackString)) return default;
-                return (T)Convert.ChangeType(fallbackString, typeof(T));
-            }
+                if (!Config.RedisConfiguration.Enabled) return default;
 
-            string jsonString;
+                string optimizedKey = GenerateInternalKey(cacheKey);
 
-            // 2. AUTOMATIC FLAG DETECTION: Cast to byte[] to inspect the first byte
-            byte[] rawBuffer = (byte[])cachedData!;
+                RedisValue cachedData = await Db.StringGetAsync(optimizedKey);
+                if (!cachedData.HasValue) return default;
 
-            if (rawBuffer != null && rawBuffer.Length > 0)
-            {
-                // 0x7B is the UTF-8 byte representation for the opening brace '{'
-                // 0x5B is the UTF-8 byte representation for an opening bracket '[' (for JSON arrays)
+                if (!ShouldSerialize<T>())
+                {
+                    string? fallbackString = cachedData.ToString();
+                    if (string.IsNullOrEmpty(fallbackString)) return default;
+                    return (T)Convert.ChangeType(fallbackString, typeof(T));
+                }
+
+                string jsonString;
+
+                // FIX: Safely retrieve the absolute raw underlying bytes from StackExchange.Redis
+                // without allowing the driver to perform implicit character encoding coercions.
+                byte[] rawBuffer = cachedData;
+
+                if (rawBuffer == null || rawBuffer.Length == 0) return default;
+
+                // Direct check: If it starts with '{' (0x7B) or '[' (0x5B), it is DEFINITELY raw uncompressed text JSON
                 if (rawBuffer[0] == 0x7B || rawBuffer[0] == 0x5B)
                 {
-                    // It starts with '{' or '[', meaning it's raw, uncompressed text JSON
-                    jsonString = cachedData.ToString()!;
+                    jsonString = Utf8Encoding.GetString(rawBuffer);
                 }
                 else
                 {
-                    // It's a binary stream -> Run it through decompression
-                    jsonString = DecompressToString(rawBuffer);
+                    // It's binary payload -> Process through Brotli pipeline safely
+                    try
+                    {
+                        using var inputStream = new MemoryStream(rawBuffer);
+                        using var decompressStream = new BrotliStream(inputStream, CompressionMode.Decompress);
+                        using var outputStream = new MemoryStream();
+
+                        await decompressStream.CopyToAsync(outputStream);
+                        jsonString = Utf8Encoding.GetString(outputStream.ToArray());
+                    }
+                    catch (Exception)
+                    {
+                        // Fail-safe fallback: If decompression crashes, fall back to string interpretation
+                        jsonString = cachedData.ToString()!;
+                    }
                 }
+
+                if (string.IsNullOrEmpty(jsonString)) return default;
+                return (T?)Newtonsoft.Json.JsonConvert.DeserializeObject(jsonString, DeserialiseSettings);
             }
-            else
+            catch (Exception ex)
             {
+                // Log the exception for debugging purposes
+                Logging.Log(Logging.LogType.Warning, "Redis", $"Redis GetCacheItem<{typeof(T).Name}> failed for key '{cacheKey}': {ex.Message}", ex);
                 return default;
             }
-
-            if (string.IsNullOrEmpty(jsonString)) return default;
-            return (T?)Newtonsoft.Json.JsonConvert.DeserializeObject(jsonString, DeserialiseSettings);
         }
 
         /// <summary>
@@ -302,43 +318,51 @@ namespace hasheous.Classes
         /// </remarks>
         public async static Task SetCacheItem<T>(string cacheKey, T? data, TimeSpan? expiry = null)
         {
-            if (expiry == null || expiry > TimeSpan.FromHours(24))
+            try
             {
-                expiry = TimeSpan.FromHours(24);
-            }
-
-            if (!Config.RedisConfiguration.Enabled || data == null) return;
-
-            string shortKey = GenerateInternalKey(cacheKey);
-
-            // 1. Primitive routing (Direct Plaintext Write)
-            if (!ShouldSerialize<T>())
-            {
-                string primitiveData = data?.ToString() ?? string.Empty;
-                await Db.StringSetAsync(shortKey, primitiveData, expiry, false);
-                return;
-            }
-
-            // 2. Complex Object Serialization
-            string serializedData = Newtonsoft.Json.JsonConvert.SerializeObject(data, SerialiseSettings);
-
-            // THRESHOLD RULE A: Check if character count exceeds 1000
-            if (serializedData.Length > 1000)
-            {
-                byte[] compressedBytes = CompressString(serializedData);
-
-                // THRESHOLD RULE B: Check if compressed byte array is more than 20% smaller than raw text characters
-                double savingRatio = (double)compressedBytes.Length / serializedData.Length;
-                if (savingRatio <= 0.80)
+                if (expiry == null || expiry > TimeSpan.FromHours(24))
                 {
-                    // Storing a byte[] array forces Valkey to flag this key as a binary stream natively
-                    await Db.StringSetAsync(shortKey, compressedBytes, expiry, false);
+                    expiry = TimeSpan.FromHours(24);
+                }
+
+                if (!Config.RedisConfiguration.Enabled || data == null) return;
+
+                string shortKey = GenerateInternalKey(cacheKey);
+
+                // 1. Primitive routing (Direct Plaintext Write)
+                if (!ShouldSerialize<T>())
+                {
+                    string primitiveData = data?.ToString() ?? string.Empty;
+                    await Db.StringSetAsync(shortKey, primitiveData, expiry, false);
                     return;
                 }
-            }
 
-            // Fallback: If it fails character count or saving threshold, store as plain JSON string
-            await Db.StringSetAsync(shortKey, serializedData, expiry, false);
+                // 2. Complex Object Serialization
+                string serializedData = Newtonsoft.Json.JsonConvert.SerializeObject(data, SerialiseSettings);
+
+                // THRESHOLD RULE A: Check if character count exceeds 1000
+                if (serializedData.Length > 1000)
+                {
+                    byte[] compressedBytes = CompressString(serializedData);
+
+                    // THRESHOLD RULE B: Check if compressed byte array is more than 20% smaller than raw text characters
+                    double savingRatio = (double)compressedBytes.Length / serializedData.Length;
+                    if (savingRatio <= 0.80)
+                    {
+                        // Storing a byte[] array forces Valkey to flag this key as a binary stream natively
+                        await Db.StringSetAsync(shortKey, compressedBytes, expiry, false);
+                        return;
+                    }
+                }
+
+                // Fallback: If it fails character count or saving threshold, store as plain JSON string
+                await Db.StringSetAsync(shortKey, serializedData, expiry, false);
+            }
+            catch (Exception ex)
+            {
+                // Log the exception for debugging purposes
+                Logging.Log(Logging.LogType.Warning, "Redis", $"Redis SetCacheItem<{typeof(T).Name}> failed for key '{cacheKey}': {ex.Message}", ex);
+            }
         }
         #endregion Cache Helpers
 
