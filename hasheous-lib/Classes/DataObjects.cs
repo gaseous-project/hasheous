@@ -731,7 +731,7 @@ namespace hasheous_server.Classes
                 // purge redis cache of this object
                 if (Config.RedisConfiguration.Enabled)
                 {
-                    RedisConnection.GetDatabase(0).KeyDelete(cacheKey);
+                    Task.Run(async () => await RedisConnection.DeleteCacheItem(cacheKey));
                 }
             }
         }
@@ -1319,7 +1319,7 @@ namespace hasheous_server.Classes
             // purge redis cache of this object
             if (Config.RedisConfiguration.Enabled)
             {
-                await RedisConnection.GetDatabase(0).KeyDeleteAsync(cacheKey);
+                await RedisConnection.DeleteCacheItem(cacheKey);
             }
 
             if (allowSearch)
@@ -1346,7 +1346,7 @@ namespace hasheous_server.Classes
             if (Config.RedisConfiguration.Enabled)
             {
                 string cacheKey = DataObjectCacheKey(objectType, id);
-                RedisConnection.GetDatabase(0).KeyDelete(cacheKey);
+                Task.Run(async () => await RedisConnection.DeleteCacheItem(cacheKey));
             }
         }
 
@@ -1386,7 +1386,7 @@ namespace hasheous_server.Classes
             // purge redis cache of this object
             if (Config.RedisConfiguration.Enabled)
             {
-                await RedisConnection.GetDatabase(0).KeyDeleteAsync(cacheKey);
+                await RedisConnection.DeleteCacheItem(cacheKey);
             }
 
             DataObjectItem EditedObject = await GetObjectStateForEdit(objectType, id);

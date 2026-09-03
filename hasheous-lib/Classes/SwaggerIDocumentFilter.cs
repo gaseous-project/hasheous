@@ -29,8 +29,6 @@ public class IGDBMetadataDocumentFilter : IDocumentFilter
                 continue;
             }
 
-            Console.WriteLine($"Adding {type.FullName} to OpenAPI document...");
-
             // get the igdb endpoint for this type
             var method = typeof(hasheous_server.Classes.Metadata.IGDB.Metadata)
                 .GetMethod("GetEndpointData")

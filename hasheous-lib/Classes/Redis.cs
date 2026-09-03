@@ -35,14 +35,14 @@ namespace hasheous.Classes
         /// <remarks>
         /// Connection string is built from Config.RedisConfiguration.HostName and Config.RedisConfiguration.Port.
         /// </remarks>
-        public static ConnectionMultiplexer Connection => lazyConnection.Value;
+        private static ConnectionMultiplexer Connection => lazyConnection.Value;
 
         /// <summary>
         /// Retrieves an <see cref="IDatabase"/> reference for the given logical database index.
         /// </summary>
         /// <param name="db">The Redis logical database number. Use <c>-1</c> to select the default database.</param>
         /// <returns>An <see cref="IDatabase"/> for executing Redis commands.</returns>
-        public static IDatabase GetDatabase(int db = -1)
+        private static IDatabase GetDatabase(int db = -1)
         {
             return Connection.GetDatabase(db);
         }
@@ -190,6 +190,21 @@ namespace hasheous.Classes
             }
         }
 
+        public async static Task DeleteCacheItem(string cacheKey)
+        {
+            try
+            {
+                if (!Config.RedisConfiguration.Enabled) return;
+
+                string optimizedKey = GenerateInternalKey(cacheKey);
+                await Db.KeyDeleteAsync(optimizedKey);
+            }
+            catch (Exception ex)
+            {
+                Logging.Log(Logging.LogType.Warning, "Redis", $"Redis DeleteCacheItem failed for key '{cacheKey}': {ex.Message}", ex);
+            }
+        }
+
         #region Cache Helpers
         private static IDatabase Db => RedisConnection.GetDatabase(0);
         private static readonly byte[] CachePayloadMarker = "HRC"u8.ToArray();
@@ -312,7 +327,7 @@ namespace hasheous.Classes
         /// <typeparam name="T">The type of the data to cache.</typeparam>
         /// <param name="cacheKey">The full Redis key to write.</param>
         /// <param name="data">The data to serialize and store.</param>
-        /// <param name="expiry">Optional time-to-live for the key; if <c>null</c>, the key does not expire.</param>
+        /// <param name="expiry">Optional time-to-live for the key; if <c>null</c>, the key will expire after 24 hours.</param>
         /// <remarks>
         /// Serialization uses Newtonsoft.Json with <see cref="Newtonsoft.Json.TypeNameHandling.All"/> and ignores nulls.
         /// </remarks>
@@ -406,7 +421,6 @@ namespace hasheous.Classes
             try
             {
                 bool deleted = await Db.KeyDeleteAsync(optimizedKey);
-                Logging.Log(Logging.LogType.Warning, "Redis", $"Deleted Redis cache item for key '{cacheKey}' because {reason}. Deleted: {deleted}.");
             }
             catch (Exception ex)
             {

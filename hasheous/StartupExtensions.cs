@@ -594,15 +594,12 @@ public static class StartupExtensions
                     string cacheKey = $"PageCache:{id}";
                     if (Config.RedisConfiguration.Enabled)
                     {
-                        if (await hasheous.Classes.RedisConnection.CacheItemExists(cacheKey))
+                        string? cachedData = await hasheous.Classes.RedisConnection.GetCacheItem<string>(cacheKey);
+                        if (!string.IsNullOrEmpty(cachedData))
                         {
-                            string? cachedData = await hasheous.Classes.RedisConnection.GetCacheItem<string>(cacheKey);
-                            if (!string.IsNullOrEmpty(cachedData))
-                            {
-                                html = html.Replace("<!--OG_INJECT-->", cachedData);
-                                await context.Response.WriteAsync(html);
-                                return;
-                            }
+                            html = html.Replace("<!--OG_INJECT-->", cachedData);
+                            await context.Response.WriteAsync(html);
+                            return;
                         }
                     }
                     DataObjects dataObjects = new DataObjects();
