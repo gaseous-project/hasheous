@@ -299,7 +299,6 @@ namespace hasheous.Classes
                 byte[]? rawBuffer = cachedData;
                 if (rawBuffer == null || rawBuffer.Length == 0 || !HasCachePayloadMarker(rawBuffer))
                 {
-                    await DeleteInvalidCacheItemAsync(optimizedKey, cacheKey, "it is unframed or empty");
                     return default;
                 }
 
