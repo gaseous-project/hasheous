@@ -90,12 +90,10 @@ namespace hasheous_server.Controllers.v1_0
 
             string cacheKey = hasheous_server.Classes.DataObjects.DataObjectCacheKey(ObjectType, Id);
 
-            if (Config.RedisConfiguration.Enabled)
+            var cacheItem = await RedisConnection.GetCacheItem<Models.DataObjectItem>(cacheKey);
+            if (cacheItem != null)
             {
-                if (await RedisConnection.CacheItemExists(cacheKey))
-                {
-                    return Ok(await RedisConnection.GetCacheItem<Models.DataObjectItem>(cacheKey));
-                }
+                return Ok(cacheItem);
             }
 
             hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();

@@ -109,12 +109,10 @@ namespace hasheous_server.Controllers.v1_0
             // check cache first
             string cacheKey = RedisConnection.GenerateKey("MetadataProxy-IGDB", routeName + Id.ToString() + slug + expandColumns);
 
-            if (Config.RedisConfiguration.Enabled)
+            var cacheItem = await RedisConnection.GetCacheItem<Dictionary<string, object>>(cacheKey);
+            if (cacheItem != null)
             {
-                if (await RedisConnection.CacheItemExists(cacheKey))
-                {
-                    return Ok(await RedisConnection.GetCacheItem<Dictionary<string, object>>(cacheKey));
-                }
+                return Ok(cacheItem);
             }
 
             // define variable for slug response
@@ -354,9 +352,10 @@ namespace hasheous_server.Controllers.v1_0
             string cacheKey = RedisConnection.GenerateKey("MetadataProxy-IGDB", "Search-Platform" + SearchString);
             if (Config.RedisConfiguration.Enabled)
             {
-                if (await RedisConnection.CacheItemExists(cacheKey))
+                var cacheItem = await RedisConnection.GetCacheItem<List<HasheousClient.Models.Metadata.IGDB.Platform>>(cacheKey);
+                if (cacheItem != null)
                 {
-                    return Ok(await RedisConnection.GetCacheItem<List<HasheousClient.Models.Metadata.IGDB.Platform>>(cacheKey));
+                    return Ok(cacheItem);
                 }
             }
 
@@ -441,12 +440,10 @@ namespace hasheous_server.Controllers.v1_0
 
             // check cache first
             string cacheKey = RedisConnection.GenerateKey("MetadataProxy-IGDB", "Search-Platform-Game" + PlatformId.ToString() + SearchString);
-            if (Config.RedisConfiguration.Enabled)
+            var cacheItem = await RedisConnection.GetCacheItem<List<HasheousClient.Models.Metadata.IGDB.Game>>(cacheKey);
+            if (cacheItem != null)
             {
-                if (await RedisConnection.CacheItemExists(cacheKey))
-                {
-                    return Ok(await RedisConnection.GetCacheItem<List<HasheousClient.Models.Metadata.IGDB.Game>>(cacheKey));
-                }
+                return Ok(cacheItem);
             }
 
             if (Config.IGDB.UseDumps == true && Config.IGDB.DumpsAvailable == true)

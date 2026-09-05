@@ -80,56 +80,6 @@ namespace hasheous.Classes
             return cacheKey;
         }
 
-        private static string GenerateInternalKey(string cacheKey)
-        {
-            // split the cache key into prefix and key
-            int separatorIndex = cacheKey.IndexOf(':');
-            var longPrefix = separatorIndex > 0 ? cacheKey.Substring(0, separatorIndex) : string.Empty;
-            var remainingKey = separatorIndex > 0 ? cacheKey.Substring(separatorIndex + 1) : cacheKey;
-            string shortPrefix = GetShortPrefix(longPrefix);
-
-            if (remainingKey.Length <= 32)
-            {
-                return $"{shortPrefix}:{remainingKey}";
-            }
-
-            byte[] inputBytes = System.Text.Encoding.UTF8.GetBytes(remainingKey);
-            string keyHash = Convert.ToHexStringLower(System.Security.Cryptography.MD5.HashData(inputBytes));
-
-            return $"{shortPrefix}:{keyHash}";
-        }
-
-        private static string GetShortPrefix(string longPrefix)
-        {
-            if (longPrefix.Length > 2)
-            {
-                switch (longPrefix.ToLower())
-                {
-                    case "dataobject":
-                        return "do";
-                    case "dataobjectfromsignatureid":
-                        return "ds";
-                    case "gameitem":
-                        return "gi";
-                    case "lookup":
-                        return "lu";
-                    case "hashlookup":
-                        return "hl";
-                    case "insightsreport":
-                        return "ir";
-                    case "insights":
-                        return "in";
-                    case "romitem":
-                        return "ri";
-                    case "signature":
-                        return "sg";
-                    default:
-                        return longPrefix;
-                }
-            }
-            return longPrefix;
-        }
-
         /// <summary>
         /// Purges all keys across the server for the configured Redis instance.
         /// </summary>
@@ -169,7 +119,7 @@ namespace hasheous.Classes
                 throw new ArgumentNullException(nameof(prefix), "Prefix cannot be null or empty");
             }
 
-            var shortPrefix = GetShortPrefix(prefix);
+            var shortPrefix = new CacheKey(prefix).Prefix;
 
             var server = Connection.GetServer(Config.RedisConfiguration.HostName + ":" + Config.RedisConfiguration.Port);
             List<RedisKey> keyBatch = new List<RedisKey>(PurgeBatchSize);
@@ -196,7 +146,7 @@ namespace hasheous.Classes
             {
                 if (!Config.RedisConfiguration.Enabled) return;
 
-                string optimizedKey = GenerateInternalKey(cacheKey);
+                string optimizedKey = new CacheKey(cacheKey).InternalKey;
                 await Db.KeyDeleteAsync(optimizedKey);
             }
             catch (Exception ex)
@@ -257,7 +207,7 @@ namespace hasheous.Classes
             {
                 if (Config.RedisConfiguration.Enabled)
                 {
-                    string shortKey = GenerateInternalKey(cacheKey);
+                    string shortKey = new CacheKey(cacheKey).InternalKey;
                     return await Db.KeyExistsAsync(shortKey);
                 }
                 return false;
@@ -284,7 +234,7 @@ namespace hasheous.Classes
             {
                 if (!Config.RedisConfiguration.Enabled) return default;
 
-                string optimizedKey = GenerateInternalKey(cacheKey);
+                string optimizedKey = new CacheKey(cacheKey).InternalKey;
 
                 RedisValue? cachedData = await Db.StringGetAsync(optimizedKey);
                 if (!cachedData.HasValue) return default;
@@ -334,24 +284,23 @@ namespace hasheous.Classes
         {
             try
             {
-                if (expiry == null || expiry > TimeSpan.FromHours(24))
-                {
-                    expiry = TimeSpan.FromHours(24);
-                }
-
                 if (!Config.RedisConfiguration.Enabled || data == null) return;
 
-                string shortKey = GenerateInternalKey(cacheKey);
+                CacheKey key = new CacheKey(cacheKey);
+                if (expiry == null)
+                {
+                    expiry = key.TTL;
+                }
 
                 // 1. Primitive routing (Direct Plaintext Write)
                 if (!ShouldSerialize<T>())
                 {
                     string primitiveData = data?.ToString() ?? string.Empty;
-                    await Db.StringSetAsync(shortKey, primitiveData, expiry, false);
+                    await Db.StringSetAsync(key.InternalKey, primitiveData, expiry, false);
                     return;
                 }
 
-                await Db.StringSetAsync(shortKey, SerializeComplexCacheValue(data), expiry, false);
+                await Db.StringSetAsync(key.InternalKey, SerializeComplexCacheValue(data), expiry, false);
             }
             catch (Exception ex)
             {
@@ -513,5 +462,71 @@ namespace hasheous.Classes
         }
 
         #endregion Compression Helpers
+
+        #region Cache Policies
+        private readonly static Dictionary<string, CachePolicy> CachePolicies = new Dictionary<string, CachePolicy>
+        {
+            { "AttributeItems", new CachePolicy { ShortName = "ai", TTL = TimeSpan.FromMinutes(5) } },
+            { "DataObject", new CachePolicy { ShortName = "do", TTL = TimeSpan.FromHours(1) } },
+            { "DataObjectFromSignatureId", new CachePolicy { ShortName = "ds", TTL = TimeSpan.FromHours(1) } },
+            { "GameItem", new CachePolicy { ShortName = "gi", TTL = TimeSpan.FromHours(1) } },
+            { "Lookup", new CachePolicy { ShortName = "lu", TTL = TimeSpan.FromHours(1) } },
+            { "HashLookup", new CachePolicy { ShortName = "hl", TTL = TimeSpan.FromHours(1) } },
+            { "InsightsReport", new CachePolicy { ShortName = "ir", TTL = TimeSpan.FromHours(1) } },
+            { "Insights", new CachePolicy { ShortName = "in", TTL = TimeSpan.FromHours(1) } },
+            { "MetadataItem", new CachePolicy { ShortName = "mi", TTL = TimeSpan.FromHours(1) } },
+            { "RomItem", new CachePolicy { ShortName = "ri", TTL = TimeSpan.FromHours(1) } },
+            { "Signature", new CachePolicy { ShortName = "sg", TTL = TimeSpan.FromHours(1) } }
+        };
+
+        private class CachePolicy
+        {
+            public string ShortName { get; set; } = string.Empty;
+            public TimeSpan TTL { get; set; } = TimeSpan.Zero;
+        }
+
+        private class CacheKey
+        {
+            public CacheKey()
+            { }
+            public CacheKey(string cacheKey)
+            {
+                this.OriginalKey = cacheKey;
+
+                // split the cache key into prefix and key
+                int separatorIndex = cacheKey.IndexOf(':');
+                var longPrefix = separatorIndex > 0 ? cacheKey.Substring(0, separatorIndex) : string.Empty;
+                var remainingKey = separatorIndex > 0 ? cacheKey.Substring(separatorIndex + 1) : cacheKey;
+
+                if (!string.IsNullOrEmpty(longPrefix) && CachePolicies.TryGetValue(longPrefix, out CachePolicy? policy))
+                {
+                    this.TTL = policy.TTL;
+                    this.Prefix = policy.ShortName;
+                }
+                else
+                {
+                    this.TTL = TimeSpan.FromMinutes(5); // default TTL
+                    this.Prefix = longPrefix;
+                }
+
+                if (remainingKey.Length <= 32)
+                {
+                    this.InternalKey = $"{this.Prefix}:{remainingKey}";
+                }
+                else
+                {
+                    byte[] inputBytes = System.Text.Encoding.UTF8.GetBytes(remainingKey);
+                    string keyHash = Convert.ToHexStringLower(System.Security.Cryptography.MD5.HashData(inputBytes));
+
+                    this.InternalKey = $"{this.Prefix}:{keyHash}";
+                }
+            }
+
+            public string OriginalKey { get; set; } = string.Empty;
+            public string InternalKey { get; set; } = string.Empty;
+            public string Prefix { get; set; } = string.Empty;
+            public TimeSpan TTL { get; set; } = TimeSpan.Zero;
+        }
     }
+    #endregion Cache Policies
 }

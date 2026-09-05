@@ -299,7 +299,7 @@ namespace hasheous_server.Classes
         /// <returns>A string representing the Redis cache key.</returns>
         public static string DataObjectCacheKey(DataObjectType objectType, long objectId)
         {
-            return RedisConnection.GenerateKey("DataObject", objectType.ToString() + objectId.ToString());
+            return RedisConnection.GenerateKey($"DataObject:{objectId.ToString()}", objectType.ToString() + objectId.ToString());
         }
 
         public async Task<DataObjectsList> GetDataObjects(DataObjectType objectType, int pageNumber = 0, int pageSize = 0, string? search = null, bool GetChildRelations = false, bool GetMetadataMap = true, AttributeItem.AttributeName? filterAttribute = null, string? filterValue = null, ApplicationUser? user = null)
@@ -820,12 +820,20 @@ namespace hasheous_server.Classes
 
         public async Task<List<AttributeItem>> GetAttributes(long DataObjectId, bool GetChildRelations)
         {
+            string cacheKey = RedisConnection.GenerateKey("AttributeItems", DataObjectId.ToString() + GetChildRelations.ToString());
+
+            List<AttributeItem>? attributes = await RedisConnection.GetCacheItem<List<AttributeItem>>(cacheKey);
+            if (attributes != null)
+            {
+                return attributes;
+            }
+
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "SELECT * FROM DataObject_Attributes WHERE DataObjectId = @id";
             DataTable data = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>{
                 { "id", DataObjectId }
             });
-            List<AttributeItem> attributes = new List<AttributeItem>();
+            attributes = new List<AttributeItem>();
             foreach (DataRow dataRow in data.Rows)
             {
                 try
@@ -862,6 +870,7 @@ namespace hasheous_server.Classes
                 }
             }
 
+            await RedisConnection.SetCacheItem(cacheKey, attributes, new TimeSpan(0, 5, 0)); // cache for 5 minutes
             return attributes;
         }
 
