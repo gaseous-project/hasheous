@@ -22,10 +22,7 @@ namespace Classes.ProcessQueue
                 string cacheKey = RedisConnection.GenerateKey("InsightsReport", 0);
 
                 // delete existing cache entry if it exists
-                if (RedisConnection.GetDatabase(0).KeyExists(cacheKey))
-                {
-                    RedisConnection.GetDatabase(0).KeyDelete(cacheKey);
-                }
+                await RedisConnection.DeleteCacheItem(cacheKey);
 
                 // generate the report and cache it
                 _ = await Insights.Insights.GenerateInsightReport(0);
@@ -40,10 +37,7 @@ namespace Classes.ProcessQueue
                     cacheKey = RedisConnection.GenerateKey("InsightsReport", item.Id);
 
                     // delete existing cache entry if it exists
-                    if (RedisConnection.GetDatabase(0).KeyExists(cacheKey))
-                    {
-                        RedisConnection.GetDatabase(0).KeyDelete(cacheKey);
-                    }
+                    await RedisConnection.DeleteCacheItem(cacheKey);
 
                     // generate the report and cache it
                     _ = await Insights.Insights.GenerateInsightReport(item.Id);

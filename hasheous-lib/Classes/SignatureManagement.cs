@@ -43,11 +43,11 @@ namespace Classes
             // check if the query is cached
             if (Config.RedisConfiguration.Enabled)
             {
-                string? cachedData = await hasheous.Classes.RedisConnection.GetDatabase(0).StringGetAsync(cacheKey);
+                List<Signatures_Games_2>? cachedData = await RedisConnection.GetCacheItem<List<Signatures_Games_2>>(cacheKey);
                 if (cachedData != null)
                 {
-                    // if cached data is found, deserialize it and return
-                    return Newtonsoft.Json.JsonConvert.DeserializeObject<List<Signatures_Games_2>>(cachedData);
+                    // if cached data is found, return it directly
+                    return cachedData;
                 }
             }
 
@@ -250,7 +250,7 @@ namespace Classes
                 // cache the result
                 if (Config.RedisConfiguration.Enabled)
                 {
-                    hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(cacheKey, Newtonsoft.Json.JsonConvert.SerializeObject(GamesList), TimeSpan.FromDays(5));
+                    await hasheous.Classes.RedisConnection.SetCacheItem<List<Signatures_Games_2>>(cacheKey, GamesList, TimeSpan.FromDays(5));
                 }
 
                 return GamesList;
@@ -502,7 +502,7 @@ HAVING
 
             if (Config.RedisConfiguration.Enabled)
             {
-                await RedisConnection.SetCacheItem(cacheKey, gameItem);
+                await RedisConnection.SetCacheItem<Signatures_Games_2.GameItem>(cacheKey, gameItem);
             }
 
             return gameItem;
@@ -591,7 +591,7 @@ HAVING
             // cache the result
             if (Config.RedisConfiguration.Enabled)
             {
-                await RedisConnection.SetCacheItem(cacheKey, retVal);
+                await RedisConnection.SetCacheItem<Signatures_Games_2.RomItem>(cacheKey, retVal);
             }
 
             return retVal;
@@ -655,7 +655,7 @@ HAVING
             }
 
             // cache the result
-            await RedisConnection.SetCacheItem(cacheKey, returnDict);
+            await RedisConnection.SetCacheItem<Dictionary<string, string>>(cacheKey, returnDict);
 
             return returnDict;
         }

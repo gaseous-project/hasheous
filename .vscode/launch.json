@@ -45,7 +45,7 @@
             "program": "${workspaceFolder}/service-host/bin/Debug/net10.0/service-host.dll",
             "args": [
                 "--service",
-                "SignatureIngestor:MAMEArcade.DownloadManager"
+                "SyncSupporterStatus"
             ],
             "cwd": "${workspaceFolder}/service-host",
             "stopAtEntry": false

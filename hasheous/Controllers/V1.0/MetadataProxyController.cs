@@ -13,8 +13,8 @@ using hasheous.Classes;
 using hasheous_server.Classes.Metadata;
 using hasheous_server.Classes.Metadata.IGDB;
 using HasheousClient;
+using HasheousClient.Models.Metadata.IGDB;
 using IGDB;
-using IGDB.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TheGamesDB.SQL;
@@ -61,7 +61,7 @@ namespace hasheous_server.Controllers.v1_0
         /// </param>
         /// <param name="MetadataType">
         /// The type of metadata to fetch, e.g. "Game", "Artwork", etc.
-        /// This should match the class name in IGDB.Models namespace.
+        /// This should match the class name in HasheousClient.Models.Metadata.IGDB namespace.
         /// </param>
         /// <returns>
         /// The metadata object from IGDB
@@ -86,12 +86,12 @@ namespace hasheous_server.Controllers.v1_0
         [ApiExplorerSettings(IgnoreApi = true)]
         public async Task<IActionResult> GetMetadata(string MetadataType, long Id, string slug = "", string expandColumns = "")
         {
-            // check that MetadataType is a valid class in IGDB.Models
-            var igdbAssembly = typeof(IGDB.Models.Game).Assembly;
-            Type? metadataType = igdbAssembly.GetType($"IGDB.Models.{MetadataType}", false, true);
+            // check that MetadataType is a valid class in HasheousClient.Models.Metadata.IGDB
+            var igdbAssembly = typeof(HasheousClient.Models.Metadata.IGDB.Game).Assembly;
+            Type? metadataType = igdbAssembly.GetType($"HasheousClient.Models.Metadata.IGDB.{MetadataType}", false, true);
             if (metadataType == null)
             {
-                return BadRequest(new Dictionary<string, string> { { "Error", $"Metadata type '{MetadataType}' not found in IGDB.Models namespace." } });
+                return BadRequest(new Dictionary<string, string> { { "Error", $"Metadata type '{MetadataType}' not found in HasheousClient.Models.Metadata.IGDB namespace." } });
             }
 
             // If valid, continue with your logic (e.g., call _GetMetadata)
@@ -109,12 +109,10 @@ namespace hasheous_server.Controllers.v1_0
             // check cache first
             string cacheKey = RedisConnection.GenerateKey("MetadataProxy-IGDB", routeName + Id.ToString() + slug + expandColumns);
 
-            if (Config.RedisConfiguration.Enabled)
+            var cacheItem = await RedisConnection.GetCacheItem<Dictionary<string, object>>(cacheKey);
+            if (cacheItem != null)
             {
-                if (await RedisConnection.CacheItemExists(cacheKey))
-                {
-                    return Ok(await RedisConnection.GetCacheItem<Dictionary<string, object>>(cacheKey));
-                }
+                return Ok(cacheItem);
             }
 
             // define variable for slug response
@@ -128,10 +126,11 @@ namespace hasheous_server.Controllers.v1_0
             // define return value
             object? returnValue = null;
 
-            // look for a type named "IGDB.Models.{routeName}"
-            var igdbAssembly = typeof(IGDB.Models.Game).Assembly;
-            Type? metadataType = igdbAssembly.GetType($"IGDB.Models.{routeName}", false, true);
-            if (metadataType == null)
+            // look for a type named "HasheousClient.Models.Metadata.IGDB.{routeName}"
+            var igdbAssembly = typeof(HasheousClient.Models.Metadata.IGDB.Game).Assembly;
+            string typeName = $"HasheousClient.Models.Metadata.IGDB.{routeName}";
+            Type? metadataType = igdbAssembly.GetType(typeName, false, true);
+            if (metadataType == null || IGDBMetadataDocumentFilter.IGDBTypeFilter.Contains(typeName))
             {
                 return BadRequest(new Dictionary<string, string> { { "Error", $"Metadata type '{routeName}' not found." } });
             }
@@ -353,9 +352,10 @@ namespace hasheous_server.Controllers.v1_0
             string cacheKey = RedisConnection.GenerateKey("MetadataProxy-IGDB", "Search-Platform" + SearchString);
             if (Config.RedisConfiguration.Enabled)
             {
-                if (await RedisConnection.CacheItemExists(cacheKey))
+                var cacheItem = await RedisConnection.GetCacheItem<List<HasheousClient.Models.Metadata.IGDB.Platform>>(cacheKey);
+                if (cacheItem != null)
                 {
-                    return Ok(await RedisConnection.GetCacheItem<List<HasheousClient.Models.Metadata.IGDB.Platform>>(cacheKey));
+                    return Ok(cacheItem);
                 }
             }
 
@@ -440,12 +440,10 @@ namespace hasheous_server.Controllers.v1_0
 
             // check cache first
             string cacheKey = RedisConnection.GenerateKey("MetadataProxy-IGDB", "Search-Platform-Game" + PlatformId.ToString() + SearchString);
-            if (Config.RedisConfiguration.Enabled)
+            var cacheItem = await RedisConnection.GetCacheItem<List<HasheousClient.Models.Metadata.IGDB.Game>>(cacheKey);
+            if (cacheItem != null)
             {
-                if (await RedisConnection.CacheItemExists(cacheKey))
-                {
-                    return Ok(await RedisConnection.GetCacheItem<List<HasheousClient.Models.Metadata.IGDB.Game>>(cacheKey));
-                }
+                return Ok(cacheItem);
             }
 
             if (Config.IGDB.UseDumps == true && Config.IGDB.DumpsAvailable == true)

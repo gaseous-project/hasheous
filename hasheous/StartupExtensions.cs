@@ -594,7 +594,7 @@ public static class StartupExtensions
                     string cacheKey = $"PageCache:{id}";
                     if (Config.RedisConfiguration.Enabled)
                     {
-                        string? cachedData = await hasheous.Classes.RedisConnection.GetDatabase(0).StringGetAsync(cacheKey);
+                        string? cachedData = await hasheous.Classes.RedisConnection.GetCacheItem<string>(cacheKey);
                         if (!string.IsNullOrEmpty(cachedData))
                         {
                             html = html.Replace("<!--OG_INJECT-->", cachedData);
@@ -640,7 +640,7 @@ public static class StartupExtensions
 <link rel=""canonical"" href=""{canonical}"">";
                         if (Config.RedisConfiguration.Enabled)
                         {
-                            hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(cacheKey, og, TimeSpan.FromHours(1));
+                            await hasheous.Classes.RedisConnection.SetCacheItem(cacheKey, og, TimeSpan.FromHours(1));
                         }
                         html = html.Replace("<!--OG_INJECT-->", og);
                         context.Response.ContentType = "text/html; charset=utf-8";

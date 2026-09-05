@@ -228,7 +228,7 @@ namespace hasheous_server.Classes
                         {
                             // no existing vote - insert a new record
                             sql = "INSERT INTO MatchUserVotes (DataObjectId, UserId, MetadataSourceId, MetadataGameId) VALUES (@dataObjectId, @userId, @metadataSourceId, @metadataGameId)";
-                            db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                            await db.ExecuteNonQueryAsync(sql, new Dictionary<string, object>{
                                 { "dataObjectId", dataObjectId },
                                 { "userId", UserId },
                                 { "metadataSourceId", metadataMatch.Source },
@@ -241,7 +241,7 @@ namespace hasheous_server.Classes
                             if (data.Rows[0]["MetadataGameId"].ToString() != metadataMatch.GameId)
                             {
                                 sql = "UPDATE MatchUserVotes SET MetadataGameId = @metadataGameId WHERE UserId = @userId AND DataObjectId = @dataObjectId AND MetadataSourceId = @metadataSourceId";
-                                db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                                await db.ExecuteNonQueryAsync(sql, new Dictionary<string, object>{
                                     { "dataObjectId", dataObjectId },
                                     { "userId", UserId },
                                     { "metadataSourceId", metadataMatch.Source },
@@ -340,7 +340,7 @@ namespace hasheous_server.Classes
                 // this satisfies rule 3 with a NoMatch match method
                 Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
                 string sql = "INSERT INTO DataObject_MetadataMap (DataObjectId, MetadataId, SourceId, MatchMethod, WinningVoteCount, TotalVoteCount) VALUES (@dataobjectid, @metadataId, @sourceId, @matchmethod, @winningvotecount, @totalvotecount);";
-                db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                await db.ExecuteNonQueryAsync(sql, new Dictionary<string, object>{
                     { "dataobjectid", dataObject.Id },
                     { "metadataId", MetadataGameId },
                     { "sourceId", metadataSource },
@@ -380,7 +380,7 @@ namespace hasheous_server.Classes
                 // all rules satisfied, we can update the metadata item
                 Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
                 string sql = "UPDATE DataObject_MetadataMap SET MetadataId = @metadataId, MatchMethod = @matchmethod, WinningVoteCount = @winningvotecount, TotalVoteCount = @totalVoteCount WHERE DataObjectId = @dataobjectid AND SourceId = @sourceId;";
-                db.ExecuteNonQuery(sql, new Dictionary<string, object>
+                await db.ExecuteNonQueryAsync(sql, new Dictionary<string, object>
                 {
                     { "dataobjectid", dataObject.Id },
                     { "metadataId", MetadataGameId },
@@ -440,7 +440,7 @@ namespace hasheous_server.Classes
 
             // insert the archive observation
             sql = "INSERT INTO UserArchiveObservations (UserId, ArchiveMD5, ArchiveSHA1, ArchiveSHA256, ArchiveCRC32, ArchiveSize, ArchiveType, ContentMD5, ContentSHA1, ContentSHA256, ContentCRC32) VALUES (@userId, @archivemd5, @archivesha1, @archivesha256, @archivecrc, @archivesize, @archivetype, @contentmd5, @contentsha1, @contentsha256, @contentcrc);";
-            db.ExecuteNonQuery(sql, new Dictionary<string, object>
+            await db.ExecuteNonQueryAsync(sql, new Dictionary<string, object>
             {
                 { "userId", UserId },
                 { "archivemd5", model.Archive.MD5 },
