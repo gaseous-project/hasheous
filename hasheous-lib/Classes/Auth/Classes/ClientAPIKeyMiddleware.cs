@@ -151,24 +151,10 @@ namespace Authentication
 
             // Check if the API key is cached - use redis if available
             // Otherwise, use a simple in-memory cache
-            if (Config.RedisConfiguration.Enabled)
+            ClientApiKeyItem? cachedItem = await hasheous.Classes.RedisConnection.GetCacheItem<ClientApiKeyItem>(keyName);
+            if (cachedItem != null)
             {
-                ClientApiKeyItem? cachedItem = await hasheous.Classes.RedisConnection.GetCacheItem<ClientApiKeyItem>(keyName);
-                if (cachedItem != null)
-                {
-                    return cachedItem;
-                }
-            }
-            else
-            {
-                // In-memory cache
-                string? cachedValue = LookupCache.Get(APIKeyCacheNamePrefix, keyName);
-                if (cachedValue != null)
-                {
-                    ClientApiKeyItem? cachedItem = Newtonsoft.Json.JsonConvert.DeserializeObject<ClientApiKeyItem>(cachedValue);
-
-                    return cachedItem;
-                }
+                return cachedItem;
             }
 
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
@@ -197,15 +183,7 @@ namespace Authentication
             // Cache the API key for 5 minutes
             if (cachedApiKey != null)
             {
-                if (Config.RedisConfiguration.Enabled)
-                {
-                    await hasheous.Classes.RedisConnection.SetCacheItem<ClientApiKeyItem>(keyName, cachedApiKey, TimeSpan.FromSeconds(CacheDuration));
-                }
-                else
-                {
-                    string serializedApiKey = Newtonsoft.Json.JsonConvert.SerializeObject(cachedApiKey);
-                    LookupCache.Add(APIKeyCacheNamePrefix, keyName, serializedApiKey, CacheDuration);
-                }
+                await hasheous.Classes.RedisConnection.SetCacheItem<ClientApiKeyItem>(keyName, cachedApiKey, TimeSpan.FromSeconds(CacheDuration));
             }
 
             return cachedApiKey;

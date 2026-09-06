@@ -135,22 +135,10 @@ namespace Authentication
         public async Task<ApplicationUser?> GetUserFromApiKey(string apiKey)
         {
             string cacheKey = ApiKeyCacheNamePrefix + ":" + apiKey;
-            if (Config.RedisConfiguration.Enabled)
+            ApplicationUser? cachedUser = await hasheous.Classes.RedisConnection.GetCacheItem<ApplicationUser>(cacheKey);
+            if (cachedUser != null)
             {
-                ApplicationUser? cachedUser = await hasheous.Classes.RedisConnection.GetCacheItem<ApplicationUser>(cacheKey);
-                if (cachedUser != null)
-                {
-                    return cachedUser;
-                }
-            }
-            else
-            {
-                // In-memory cache lookup
-                string? cachedUser = LookupCache.Get(ApiKeyCacheNamePrefix, cacheKey);
-                if (cachedUser != null)
-                {
-                    return Newtonsoft.Json.JsonConvert.DeserializeObject<ApplicationUser>(cachedUser);
-                }
+                return cachedUser;
             }
 
             // If not cached, fetch from database
@@ -169,14 +157,9 @@ namespace Authentication
             }
 
             // Cache the user
-            if (Config.RedisConfiguration.Enabled)
+            if (user != null)
             {
                 await hasheous.Classes.RedisConnection.SetCacheItem<ApplicationUser>(cacheKey, user, TimeSpan.FromSeconds(CacheDuration));
-            }
-            else
-            {
-                string serializedUser = Newtonsoft.Json.JsonConvert.SerializeObject(user);
-                LookupCache.Add(ApiKeyCacheNamePrefix, cacheKey, serializedUser, CacheDuration);
             }
 
             return user;
