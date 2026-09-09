@@ -101,6 +101,7 @@ namespace Classes.RateLimiting
         public const string WebRequestHeaderName = "X-Hasheous-Web-Request";
         public const string WebRequestCookieName = "Hasheous.WebSession";
         private const string WebRequestCookiePurpose = "Hasheous.RateLimiting.WebRequestCookie";
+        private static readonly TimeSpan LimiterIdleRetention = TimeSpan.FromMinutes(15);
         private static readonly JsonSerializerOptions SerializerOptions = new JsonSerializerOptions
         {
             WriteIndented = true,
@@ -114,6 +115,7 @@ namespace Classes.RateLimiting
         private readonly IServiceScopeFactory? _serviceScopeFactory;
         private ConcurrentDictionary<string, Regex> _patternCache = new(StringComparer.Ordinal);
         private ConcurrentDictionary<string, FixedWindowRateLimiter> _limiters = new(StringComparer.Ordinal);
+        private ConcurrentDictionary<string, DateTime> _limiterLastUsed = new(StringComparer.Ordinal);
         private RateLimitRuleSet _rules = new();
         public RateLimitRuleSet CurrentRules => _rules;
         private long _rulesVersion = 1;
@@ -194,6 +196,7 @@ namespace Classes.RateLimiting
                     }
 
                     ReloadRules();
+                    RemoveInactiveLimiters(DateTime.UtcNow - LimiterIdleRetention);
                 }
                 catch (OperationCanceledException)
                 {
@@ -220,19 +223,24 @@ namespace Classes.RateLimiting
                     _patternCache = new ConcurrentDictionary<string, Regex>(StringComparer.Ordinal);
 
                     ConcurrentDictionary<string, FixedWindowRateLimiter> oldLimiters = _limiters;
+                    ConcurrentDictionary<string, DateTime> oldLimiterLastUsed = _limiterLastUsed;
                     var newLimiters = new ConcurrentDictionary<string, FixedWindowRateLimiter>(StringComparer.Ordinal);
+                    var newLimiterLastUsed = new ConcurrentDictionary<string, DateTime>(StringComparer.Ordinal);
 
                     // check if limiters need to be recreated based on the newly loaded rules
                     if (hashObject.sha1hash != _hashObject.sha1hash)
                     {
                         _hashObject = hashObject;
                         _limiters = newLimiters;
+                        _limiterLastUsed = newLimiterLastUsed;
                         Interlocked.Increment(ref _rulesVersion);
 
                         foreach (FixedWindowRateLimiter limiter in oldLimiters.Values)
                         {
                             limiter.Dispose();
                         }
+
+                        oldLimiterLastUsed.Clear();
 
                         Logging.Log(Logging.LogType.Information, "RateLimiter", $"Reloaded rate-limit rules from '{_rulesFilePath}'.");
                     }
@@ -564,7 +572,23 @@ namespace Classes.RateLimiting
         {
             for (int attempt = 0; attempt < 2; attempt++)
             {
-                FixedWindowRateLimiter limiter = _limiters.GetOrAdd(limiterKey, _ => CreateLimiter(profile));
+                ConcurrentDictionary<string, FixedWindowRateLimiter> limiters = _limiters;
+                FixedWindowRateLimiter limiter;
+                if (!limiters.TryGetValue(limiterKey, out limiter!))
+                {
+                    FixedWindowRateLimiter createdLimiter = CreateLimiter(profile);
+                    if (!limiters.TryAdd(limiterKey, createdLimiter))
+                    {
+                        createdLimiter.Dispose();
+                        limiter = limiters[limiterKey];
+                    }
+                    else
+                    {
+                        limiter = createdLimiter;
+                    }
+                }
+
+                _limiterLastUsed[limiterKey] = DateTime.UtcNow;
                 try
                 {
                     using RateLimitLease lease = await limiter.AcquireAsync(1, cancellationToken);
@@ -594,6 +618,22 @@ namespace Classes.RateLimiting
                 Allowed = false,
                 ProfileName = profile.Name
             };
+        }
+
+        private void RemoveInactiveLimiters(DateTime inactiveBefore)
+        {
+            foreach (KeyValuePair<string, DateTime> entry in _limiterLastUsed)
+            {
+                if (entry.Value >= inactiveBefore || !_limiterLastUsed.TryRemove(entry))
+                {
+                    continue;
+                }
+
+                if (_limiters.TryRemove(entry.Key, out FixedWindowRateLimiter? limiter))
+                {
+                    limiter.Dispose();
+                }
+            }
         }
     }
 

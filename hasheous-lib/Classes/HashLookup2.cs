@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Data;
 using System.Security.Cryptography.Xml;
 using System.Text.Json.Serialization;
@@ -15,6 +16,10 @@ namespace Classes
 {
     public class HashLookup
     {
+        private const int MaxConcurrentInteractiveMetadataSearches = 4;
+        private static readonly ConcurrentDictionary<(DataObjects.DataObjectType ObjectType, long Id), Lazy<Task>> QueuedInteractiveMetadataSearches = new();
+        private static readonly SemaphoreSlim InteractiveMetadataSearchWorkerSlots = new(MaxConcurrentInteractiveMetadataSearches, MaxConcurrentInteractiveMetadataSearches);
+
         public class HashNotFoundException : Exception
         {
             public HashNotFoundException()
@@ -113,6 +118,8 @@ namespace Classes
         /// <returns>A Task representing the asynchronous operation.</returns>
         public async Task PerformLookup(bool userInteractiveSession = false, bool applyMatchingBlocks = false)
         {
+            List<Task> queuedMetadataSearches = new List<Task>();
+
             // parse return fields
             HashSet<ValidFields> validFields = new HashSet<ValidFields>();
             if (returnFields == "All")
@@ -203,11 +210,11 @@ namespace Classes
                 string publisherCacheKey = RedisConnection.GenerateKey("HashLookup", new { Type = DataObjects.DataObjectType.Company, Id = discoveredSignature.Game.PublisherId });
                 if (Config.RedisConfiguration.Enabled)
                 {
-                    string? cachedPublisher = await RedisConnection.GetDatabase(0).StringGetAsync(publisherCacheKey);
-                    if (cachedPublisher != null && cachedPublisher != "")
+                    DataObjectItem? cachedPublisher = await RedisConnection.GetCacheItem<DataObjectItem>(publisherCacheKey);
+                    if (cachedPublisher != null)
                     {
                         // get the publisher from the cache
-                        publisher = JsonConvert.DeserializeObject<DataObjectItem>(cachedPublisher);
+                        publisher = cachedPublisher;
                     }
                 }
 
@@ -230,8 +237,15 @@ namespace Classes
                         // add signature mappinto to publisher
                         dataObjects.AddSignature(publisher.Id, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
 
-                        // force metadata search
-                        await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Company, publisher.Id, true);
+                        if (userInteractiveSession)
+                        {
+                            // Queue metadata search so concurrent lookups share the same work.
+                            queuedMetadataSearches.Add(QueueInteractiveMetadataSearch(dataObjects, DataObjects.DataObjectType.Company, publisher.Id));
+                        }
+                        else
+                        {
+                            await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Company, publisher.Id, true);
+                        }
 
                         // re-get the publisher
                         publisher = await dataObjects.GetDataObject(DataObjects.DataObjectType.Company, publisher.Id);
@@ -240,7 +254,7 @@ namespace Classes
                     // store the publisher in the cache for 7 days
                     if (Config.RedisConfiguration.Enabled && publisher != null)
                     {
-                        RedisConnection.GetDatabase(0).StringSet(publisherCacheKey, JsonConvert.SerializeObject(publisher), TimeSpan.FromHours(6));
+                        await RedisConnection.SetCacheItem<DataObjectItem>(publisherCacheKey, publisher, TimeSpan.FromHours(6));
                     }
                 }
             }
@@ -251,11 +265,11 @@ namespace Classes
             string platformCacheKey = RedisConnection.GenerateKey("HashLookup", new { Type = DataObjects.DataObjectType.Platform, Id = discoveredSignature.Game.SystemId });
             if (Config.RedisConfiguration.Enabled)
             {
-                string? cachedPlatform = await RedisConnection.GetDatabase(0).StringGetAsync(platformCacheKey);
-                if (cachedPlatform != null && cachedPlatform != "")
+                DataObjectItem? cachedPlatform = await RedisConnection.GetCacheItem<DataObjectItem>(platformCacheKey);
+                if (cachedPlatform != null)
                 {
                     // get the platform from the cache
-                    platform = JsonConvert.DeserializeObject<DataObjectItem>(cachedPlatform);
+                    platform = cachedPlatform;
                 }
             }
 
@@ -270,7 +284,7 @@ namespace Classes
                     // store the platform in the cache for 7 days
                     if (Config.RedisConfiguration.Enabled && platform != null)
                     {
-                        RedisConnection.GetDatabase(0).StringSet(platformCacheKey, JsonConvert.SerializeObject(platform), TimeSpan.FromHours(6));
+                        await RedisConnection.SetCacheItem<DataObjectItem>(platformCacheKey, platform, TimeSpan.FromHours(6));
                     }
                 }
             }
@@ -286,8 +300,15 @@ namespace Classes
                 // add signature mapping to platform
                 dataObjects.AddSignature(platform.Id, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId);
 
-                // force metadata search
-                await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Platform, platform.Id, true);
+                if (userInteractiveSession)
+                {
+                    // Queue metadata search so concurrent lookups share the same work.
+                    queuedMetadataSearches.Add(QueueInteractiveMetadataSearch(dataObjects, DataObjects.DataObjectType.Platform, platform.Id));
+                }
+                else
+                {
+                    await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Platform, platform.Id, true);
+                }
 
                 // re-get the platform
                 platform = await dataObjects.GetDataObject(DataObjects.DataObjectType.Platform, platform.Id);
@@ -299,11 +320,11 @@ namespace Classes
             string gameCacheKey = RedisConnection.GenerateKey("HashLookup", new { Type = DataObjects.DataObjectType.Game, Id = discoveredSignature.Game.Id });
             if (Config.RedisConfiguration.Enabled)
             {
-                string? cachedGame = await RedisConnection.GetDatabase(0).StringGetAsync(gameCacheKey);
-                if (cachedGame != null && cachedGame != "")
+                DataObjectItem? cachedGame = await RedisConnection.GetCacheItem<DataObjectItem>(gameCacheKey);
+                if (cachedGame != null)
                 {
                     // get the game from the cache
-                    game = JsonConvert.DeserializeObject<DataObjectItem>(cachedGame);
+                    game = cachedGame;
                 }
             }
 
@@ -319,7 +340,7 @@ namespace Classes
                 // store the game in the cache for 6 hours
                 if (Config.RedisConfiguration.Enabled && game != null)
                 {
-                    RedisConnection.GetDatabase(0).StringSet(gameCacheKey, JsonConvert.SerializeObject(game), TimeSpan.FromHours(1));
+                    await RedisConnection.SetCacheItem<DataObjectItem>(gameCacheKey, game, TimeSpan.FromHours(1));
                 }
             }
 
@@ -426,11 +447,7 @@ namespace Classes
                 // force metadata search
                 if (userInteractiveSession)
                 {
-                    // Run with timeout for interactive sessions
-                    await Task.WhenAny(
-                        dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Game, game.Id, true),
-                        Task.Delay(TimeSpan.FromSeconds(4))
-                    );
+                    queuedMetadataSearches.Add(QueueInteractiveMetadataSearch(dataObjects, DataObjects.DataObjectType.Game, game.Id));
                 }
                 else
                 {
@@ -549,6 +566,59 @@ namespace Classes
                     }
                 }
             }
+
+            if (userInteractiveSession && queuedMetadataSearches.Count > 0)
+            {
+                // Give every search created by this request a shared four-second window to complete.
+                await Task.WhenAny(Task.WhenAll(queuedMetadataSearches), Task.Delay(TimeSpan.FromSeconds(4)));
+            }
+        }
+
+        private static Task QueueInteractiveMetadataSearch(DataObjects dataObjects, DataObjects.DataObjectType objectType, long id)
+        {
+            Lazy<Task> pendingSearch = new(
+                () => RunQueuedInteractiveMetadataSearch(dataObjects, objectType, id),
+                LazyThreadSafetyMode.ExecutionAndPublication);
+            var searchKey = (objectType, id);
+            Lazy<Task> queuedSearch = QueuedInteractiveMetadataSearches.GetOrAdd(searchKey, pendingSearch);
+            Task metadataSearchTask = queuedSearch.Value;
+
+            if (ReferenceEquals(queuedSearch, pendingSearch))
+            {
+                _ = ObserveQueuedMetadataSearch(searchKey, queuedSearch, metadataSearchTask);
+            }
+
+            return metadataSearchTask;
+        }
+
+        private static async Task RunQueuedInteractiveMetadataSearch(DataObjects dataObjects, DataObjects.DataObjectType objectType, long id)
+        {
+            await InteractiveMetadataSearchWorkerSlots.WaitAsync();
+            try
+            {
+                await dataObjects.DataObjectMetadataSearch(objectType, id, true);
+            }
+            finally
+            {
+                InteractiveMetadataSearchWorkerSlots.Release();
+            }
+        }
+
+        private static async Task ObserveQueuedMetadataSearch((DataObjects.DataObjectType ObjectType, long Id) searchKey, Lazy<Task> queuedSearch, Task metadataSearchTask)
+        {
+            try
+            {
+                await metadataSearchTask;
+            }
+            catch (Exception ex)
+            {
+                Logging.Log(Logging.LogType.Warning, "Hash Lookup", $"Queued metadata search failed for {searchKey.ObjectType} {searchKey.Id}: {ex.Message}", ex);
+            }
+            finally
+            {
+                ((ICollection<KeyValuePair<(DataObjects.DataObjectType ObjectType, long Id), Lazy<Task>>>)QueuedInteractiveMetadataSearches)
+                    .Remove(new KeyValuePair<(DataObjects.DataObjectType ObjectType, long Id), Lazy<Task>>(searchKey, queuedSearch));
+            }
         }
 
         /// <summary>
@@ -560,6 +630,17 @@ namespace Classes
         /// <returns>Null if not found; otherwise returns a DataObjectItem of type objectType</returns>
         private async Task<List<DataObjectItem>?> GetDataObjectFromSignatureId(Database db, DataObjects.DataObjectType objectType, long sigId)
         {
+            string cacheKey = RedisConnection.GenerateKey("DataObjectFromSignatureId", new { Type = objectType, SigId = sigId });
+            if (Config.RedisConfiguration.Enabled)
+            {
+                List<DataObjectItem>? cachedData = await RedisConnection.GetCacheItem<List<DataObjectItem>>(cacheKey);
+                if (cachedData != null)
+                {
+                    // get the data from the cache
+                    return cachedData;
+                }
+            }
+
             string sql = @"
                 SELECT 
                     DataObjectId 
@@ -586,6 +667,8 @@ namespace Classes
                         items.Add(item);
                     }
                 }
+
+                await RedisConnection.SetCacheItem<List<DataObjectItem>>(cacheKey, items, TimeSpan.FromHours(6));
 
                 return items;
             }

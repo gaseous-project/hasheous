@@ -62,6 +62,8 @@ namespace BackgroundMetadataMatcher
             InProgress = 6
         }
 
+        private static HttpClient client = new HttpClient();
+
         public async Task GetGamesWithoutArtwork()
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
@@ -166,21 +168,18 @@ namespace BackgroundMetadataMatcher
                                                             Directory.CreateDirectory(Path.GetDirectoryName(CoverPath));
                                                         }
 
-                                                        using (var client = new System.Net.Http.HttpClient())
-                                                        {
-                                                            Uri coverUri = new Uri("https://images.igdb.com/igdb/image/upload/t_original/" + cover.ImageId + ".jpg");
+                                                        Uri coverUri = new Uri("https://images.igdb.com/igdb/image/upload/t_original/" + cover.ImageId + ".jpg");
 
-                                                            var response = await client.GetAsync(coverUri);
-                                                            if (response.IsSuccessStatusCode)
-                                                            {
-                                                                var imageBytes = await response.Content.ReadAsByteArrayAsync();
-                                                                await File.WriteAllBytesAsync(CoverPath, imageBytes);
-                                                            }
-                                                            else
-                                                            {
-                                                                Logging.Log(Logging.LogType.Warning, "Background Metadata Matcher", "Failed to download cover image for game: " + game.Name);
-                                                                return;
-                                                            }
+                                                        var response = await client.GetAsync(coverUri);
+                                                        if (response.IsSuccessStatusCode)
+                                                        {
+                                                            var imageBytes = await response.Content.ReadAsByteArrayAsync();
+                                                            await File.WriteAllBytesAsync(CoverPath, imageBytes);
+                                                        }
+                                                        else
+                                                        {
+                                                            Logging.Log(Logging.LogType.Warning, "Background Metadata Matcher", "Failed to download cover image for game: " + game.Name);
+                                                            return;
                                                         }
                                                     }
 

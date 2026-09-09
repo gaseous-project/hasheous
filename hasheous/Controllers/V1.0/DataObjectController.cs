@@ -90,12 +90,10 @@ namespace hasheous_server.Controllers.v1_0
 
             string cacheKey = hasheous_server.Classes.DataObjects.DataObjectCacheKey(ObjectType, Id);
 
-            if (Config.RedisConfiguration.Enabled)
+            var cacheItem = await RedisConnection.GetCacheItem<Models.DataObjectItem>(cacheKey);
+            if (cacheItem != null)
             {
-                if (await RedisConnection.CacheItemExists(cacheKey))
-                {
-                    return Ok(await RedisConnection.GetCacheItem<Models.DataObjectItem>(cacheKey));
-                }
+                return Ok(cacheItem);
             }
 
             hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
@@ -142,7 +140,7 @@ namespace hasheous_server.Controllers.v1_0
                     // cache any non-app object
                     if (Config.RedisConfiguration.Enabled)
                     {
-                        await RedisConnection.SetCacheItem(cacheKey, DataObject);
+                        await RedisConnection.SetCacheItem<Models.DataObjectItem>(cacheKey, DataObject);
                     }
                 }
 
@@ -161,7 +159,7 @@ namespace hasheous_server.Controllers.v1_0
             var user = await _userManager.GetUserAsync(User);
             DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
 
-            if (dataObjectPermission.CheckAsync(user, ObjectType, DataObjectPermission.PermissionType.Create).Result)
+            if (await dataObjectPermission.CheckAsync(user, ObjectType, DataObjectPermission.PermissionType.Create))
             {
                 hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
@@ -194,7 +192,7 @@ namespace hasheous_server.Controllers.v1_0
             var user = await _userManager.GetUserAsync(User);
             DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
 
-            if (dataObjectPermission.CheckAsync(user, ObjectType, DataObjectPermission.PermissionType.Delete, Id).Result)
+            if (await dataObjectPermission.CheckAsync(user, ObjectType, DataObjectPermission.PermissionType.Delete, Id))
             {
                 hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
@@ -228,7 +226,7 @@ namespace hasheous_server.Controllers.v1_0
             var user = await _userManager.GetUserAsync(User);
             DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
 
-            if (dataObjectPermission.CheckAsync(user, ObjectType, DataObjectPermission.PermissionType.Update, Id).Result)
+            if (await dataObjectPermission.CheckAsync(user, ObjectType, DataObjectPermission.PermissionType.Update, Id))
             {
                 hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
@@ -264,7 +262,7 @@ namespace hasheous_server.Controllers.v1_0
                 var user = await _userManager.GetUserAsync(User);
                 DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
 
-                if (dataObjectPermission.CheckAsync(user, ObjectType, DataObjectPermission.PermissionType.Update, Id).Result)
+                if (await dataObjectPermission.CheckAsync(user, ObjectType, DataObjectPermission.PermissionType.Update, Id))
                 {
                     hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
@@ -322,7 +320,7 @@ namespace hasheous_server.Controllers.v1_0
             var user = await _userManager.GetUserAsync(User);
             DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
 
-            if (dataObjectPermission.CheckAsync(user, ObjectType, DataObjectPermission.PermissionType.Update, Id).Result)
+            if (await dataObjectPermission.CheckAsync(user, ObjectType, DataObjectPermission.PermissionType.Update, Id))
             {
                 hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
@@ -356,7 +354,7 @@ namespace hasheous_server.Controllers.v1_0
             var user = await _userManager.GetUserAsync(User);
             DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
 
-            if (dataObjectPermission.CheckAsync(user, ObjectType, DataObjectPermission.PermissionType.Update, Id).Result)
+            if (await dataObjectPermission.CheckAsync(user, ObjectType, DataObjectPermission.PermissionType.Update, Id))
             {
                 hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
@@ -734,7 +732,7 @@ namespace hasheous_server.Controllers.v1_0
 
             DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
 
-            if (dataObjectPermission.CheckAsync(user, DataObjects.DataObjectType.App, DataObjectPermission.PermissionType.Update, Id).Result)
+            if (await dataObjectPermission.CheckAsync(user, DataObjects.DataObjectType.App, DataObjectPermission.PermissionType.Update, Id))
             {
                 Authentication.ClientApiKey clientApiKey = new Authentication.ClientApiKey();
 
@@ -758,7 +756,7 @@ namespace hasheous_server.Controllers.v1_0
 
             DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
 
-            if (dataObjectPermission.CheckAsync(user, DataObjects.DataObjectType.App, DataObjectPermission.PermissionType.Update, Id).Result)
+            if (await dataObjectPermission.CheckAsync(user, DataObjects.DataObjectType.App, DataObjectPermission.PermissionType.Update, Id))
             {
                 Authentication.ClientApiKey clientApiKey = new Authentication.ClientApiKey();
 
@@ -782,7 +780,7 @@ namespace hasheous_server.Controllers.v1_0
 
             DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
 
-            if (dataObjectPermission.CheckAsync(user, DataObjects.DataObjectType.App, DataObjectPermission.PermissionType.Update, Id).Result)
+            if (await dataObjectPermission.CheckAsync(user, DataObjects.DataObjectType.App, DataObjectPermission.PermissionType.Update, Id))
             {
                 Authentication.ClientApiKey clientApiKey = new Authentication.ClientApiKey();
 

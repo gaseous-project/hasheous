@@ -28,7 +28,10 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Remote IP resolution for both Insights and dynamic rate limiting is centralized in `Common.GetContextRemoteIP(HttpContext)`, which checks proxy/CDN headers (`true-client-ip`, `CF-Connecting-IPv6`, `cf-connecting-ip`, `X-Forwarded-For`) before falling back to `Connection.RemoteIpAddress`.
   - MCP is hosted on the public `hasheous` web API at `POST /api/v1/Mcp` (controller: `hasheous/Controllers/V1.0/McpController.cs`; shared processor: `hasheous-lib/Classes/Mcp/McpRequestProcessor.cs`).
   - MCP discovery is published at `GET /.well-known/mcp.json` (controller: `hasheous/Controllers/WellKnownController.cs`) and should point clients to the hosted MCP endpoint.
-  - Redis (Valkey) provides caching if enabled (`Classes/RedisConnection`), otherwise an in-memory cache is used.
+  - Redis (Valkey) provides caching if enabled (`Classes/RedisConnection`), otherwise an in-memory cache is used. `RedisConnection` shortens generated internal keys by preserving their logical prefix and MD5-hashing long key payloads.
+  - Redis complex values are explicitly framed as `HRC` plus a one-byte format marker: `0` for UTF-8 JSON and `1` for Brotli-compressed JSON. Never infer a complex cache format from payload bytes. Primitive cache types (`string`, integer types currently supported by `RedisConnection`, `bool`, `double`, and `byte[]`) retain their direct handling; do not introduce byte-array caching without implementing a correct binary read/write path.
+  - Cache reads fail open. Once a complex entry has been successfully read from Redis, delete and warning-log it when it is unframed, empty, uses an unknown format marker, cannot decompress, or cannot deserialize; return a cache miss so the caller can recreate it. Do not attempt deletion after a Redis communication failure, since the existing value must remain available when connectivity is restored.
+  - `PurgeCache()` and `PurgeCache(prefix)` run against Redis database `0` and must remain compatible with the normal non-admin multiplexer. Do not use `FlushDatabaseAsync` unless `AllowAdmin` is explicitly enabled; enumerate keys and call `KeyDeleteAsync(RedisKey[])` in bounded batches (currently 500) instead of issuing one deletion command per key.
   - Metadata file caching now supports optional S3-compatible object storage fallback (including MinIO) via shared helpers in `hasheous-lib/Classes/S3StorageTools.cs` and `hasheous-lib/Classes/StorageFallbackResolver.cs`.
   - Metadata proxy image and bundle routes use local-disk first, then S3 fallback, and fail open: if S3 is unavailable they fall back to existing provider fetch/build behavior without surfacing S3 errors to clients.
   - Metadata proxy redirect handling is centralized in `MetadataProxyController.ResolveRedirectFlag(bool? redirect)` so route methods do not implement per-endpoint redirect date logic.
@@ -122,6 +125,8 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
 - Caching
   - Use `hasheous.Classes.RedisConnection.GenerateKey(prefix, keyObj)` and `PurgeCache(prefix)`. Redis enabled when `Config.RedisConfiguration.Enabled`.
   - When caching admin/moderation lists or other high-read low-churn data, keep TTLs short and explicitly invalidate on writes that change the result set.
+  - For ordinary cache reads, call `GetCacheItem<T>()` directly and use a `null`/default result as the miss signal to avoid an `EXISTS` plus `GET` round trip. Keep `CacheItemExists()` only where callers deliberately cache `null`-equivalent state and need to distinguish presence from a miss.
+  - Redis serialization and framing behavior is covered by `hasheous-lib.Tests/RedisConnectionTests.cs`; extend those tests for any new primitive type, payload format, compression rule, or invalidation behavior.
 
 - Background jobs
   - Add/adjust scheduled tasks in `service-orchestrator/Program.cs` under `QueueProcessor.QueueItems` (e.g., `FetchIGDBMetadata`, timings are minutes).
