@@ -290,36 +290,40 @@ namespace hasheous_server.Classes.Tasks.Clients
                 }
             }
 
-            // Select and assign candidate tasks in a single statement (UPDATE ... JOIN ... RETURNING) so the
+            // Select and assign candidate tasks in a single statement (UPDATE ... WHERE id IN (subquery) ... RETURNING) so the
             // expensive filter/join/order-by is only evaluated once per request instead of twice (SELECT then UPDATE).
+            // MariaDB does not support RETURNING on multi-table (JOIN) UPDATEs, so the match set must stay a subquery
+            // rather than a JOIN target for the UPDATE to remain single-table.
             // FOR UPDATE SKIP LOCKED on the derived table still prevents race conditions between concurrent clients.
             // Selects: unassigned pending tasks (status=0, client_id IS NULL) OR tasks assigned to this client in Assigned/InProgress status (status=10/20, client_id=@client_id)
             DateTime now = DateTime.UtcNow;
 
-            string updateSql = @"UPDATE Task_Queue tq
-                JOIN (
-                    SELECT tq2.id
-                    FROM Task_Queue tq2
-                    LEFT JOIN Task_Queue_Capabilities tqc ON tq2.id = tqc.task_queue_id
-                    WHERE ((tq2.status = 0 AND tq2.client_id IS NULL) OR ((tq2.status = 10 OR tq2.status = 20) AND tq2.client_id = @client_id))
-                    AND NOT EXISTS (
-                        SELECT 1 
-                        FROM Task_Queue_Capabilities tqc_required
-                        WHERE tqc_required.task_queue_id = tq2.id
-                        AND tqc_required.capability_id NOT IN (" + string.Join(", ", client.Capabilities.Select(c => ((int)c).ToString())) + @")
-                    )
-                    GROUP BY tq2.id
-                    ORDER BY tq2.create_time ASC
-                    LIMIT " + numberOfTasks + @"
-                    FOR UPDATE SKIP LOCKED
-                ) AS matched ON tq.id = matched.id
-                SET tq.client_id = @client_id,
-                    tq.status = @status,
-                    tq.start_time = @start_time,
-                    tq.completion_time = @completion_time,
-                    tq.result = '',
-                    tq.error_message = ''
-                RETURNING tq.id AS id, tq.create_time AS create_time, tq.dataobjectid AS dataobjectid, tq.task_name AS task_name, tq.status AS status, tq.client_id AS client_id, tq.parameters AS parameters, tq.result AS result, tq.error_message AS error_message, tq.start_time AS start_time, tq.completion_time AS completion_time;";
+            string updateSql = @"UPDATE Task_Queue
+                SET client_id = @client_id,
+                    status = @status,
+                    start_time = @start_time,
+                    completion_time = @completion_time,
+                    result = '',
+                    error_message = ''
+                WHERE id IN (
+                    SELECT id FROM (
+                        SELECT tq2.id
+                        FROM Task_Queue tq2
+                        LEFT JOIN Task_Queue_Capabilities tqc ON tq2.id = tqc.task_queue_id
+                        WHERE ((tq2.status = 0 AND tq2.client_id IS NULL) OR ((tq2.status = 10 OR tq2.status = 20) AND tq2.client_id = @client_id))
+                        AND NOT EXISTS (
+                            SELECT 1 
+                            FROM Task_Queue_Capabilities tqc_required
+                            WHERE tqc_required.task_queue_id = tq2.id
+                            AND tqc_required.capability_id NOT IN (" + string.Join(", ", client.Capabilities.Select(c => ((int)c).ToString())) + @")
+                        )
+                        GROUP BY tq2.id
+                        ORDER BY tq2.create_time ASC
+                        LIMIT " + numberOfTasks + @"
+                        FOR UPDATE SKIP LOCKED
+                    ) AS matched
+                )
+                RETURNING id, create_time, dataobjectid, task_name, status, client_id, parameters, result, error_message, start_time, completion_time;";
 
             var transactionCommands = new List<Database.SQLTransactionItem>
             {
