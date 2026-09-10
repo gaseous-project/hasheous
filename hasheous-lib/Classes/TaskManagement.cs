@@ -290,65 +290,39 @@ namespace hasheous_server.Classes.Tasks.Clients
                 }
             }
 
-            // Use a transaction with SELECT FOR UPDATE SKIP LOCKED to prevent race conditions
-            // when multiple clients request jobs simultaneously.
-            // The FOR UPDATE SKIP LOCKED ensures that each concurrent client gets a different task.
+            // Select and assign candidate tasks in a single statement (UPDATE ... JOIN ... RETURNING) so the
+            // expensive filter/join/order-by is only evaluated once per request instead of twice (SELECT then UPDATE).
+            // FOR UPDATE SKIP LOCKED on the derived table still prevents race conditions between concurrent clients.
             // Selects: unassigned pending tasks (status=0, client_id IS NULL) OR tasks assigned to this client in Assigned/InProgress status (status=10/20, client_id=@client_id)
             DateTime now = DateTime.UtcNow;
 
-            // Step 1: SELECT with FOR UPDATE SKIP LOCKED (locks the row)
-            // Step 2: UPDATE the locked row to assign it
-            // Both must happen in the same transaction!
-            string selectSql = @"SELECT tq.id AS id, tq.create_time AS create_time, tq.dataobjectid AS dataobjectid, tq.task_name AS task_name, tq.status AS status, tq.client_id AS client_id, tq.parameters AS parameters, tq.result AS result, tq.error_message AS error_message, tq.start_time AS start_time, tq.completion_time AS completion_time
-                FROM Task_Queue tq
-                LEFT JOIN Task_Queue_Capabilities tqc ON tq.id = tqc.task_queue_id
-                WHERE ((tq.status = 0 AND tq.client_id IS NULL) OR ((tq.status = 10 OR tq.status = 20) AND tq.client_id = @client_id))
-                AND NOT EXISTS (
-                    SELECT 1 
-                    FROM Task_Queue_Capabilities tqc_required
-                    WHERE tqc_required.task_queue_id = tq.id
-                    AND tqc_required.capability_id NOT IN (" + string.Join(", ", client.Capabilities.Select(c => ((int)c).ToString())) + @")
-                )
-                GROUP BY tq.id
-                ORDER BY tq.create_time ASC
-                LIMIT " + numberOfTasks + @"
-                FOR UPDATE SKIP LOCKED;";
+            string updateSql = @"UPDATE Task_Queue tq
+                JOIN (
+                    SELECT tq2.id
+                    FROM Task_Queue tq2
+                    LEFT JOIN Task_Queue_Capabilities tqc ON tq2.id = tqc.task_queue_id
+                    WHERE ((tq2.status = 0 AND tq2.client_id IS NULL) OR ((tq2.status = 10 OR tq2.status = 20) AND tq2.client_id = @client_id))
+                    AND NOT EXISTS (
+                        SELECT 1 
+                        FROM Task_Queue_Capabilities tqc_required
+                        WHERE tqc_required.task_queue_id = tq2.id
+                        AND tqc_required.capability_id NOT IN (" + string.Join(", ", client.Capabilities.Select(c => ((int)c).ToString())) + @")
+                    )
+                    GROUP BY tq2.id
+                    ORDER BY tq2.create_time ASC
+                    LIMIT " + numberOfTasks + @"
+                    FOR UPDATE SKIP LOCKED
+                ) AS matched ON tq.id = matched.id
+                SET tq.client_id = @client_id,
+                    tq.status = @status,
+                    tq.start_time = @start_time,
+                    tq.completion_time = @completion_time,
+                    tq.result = '',
+                    tq.error_message = ''
+                RETURNING tq.id AS id, tq.create_time AS create_time, tq.dataobjectid AS dataobjectid, tq.task_name AS task_name, tq.status AS status, tq.client_id AS client_id, tq.parameters AS parameters, tq.result AS result, tq.error_message AS error_message, tq.start_time AS start_time, tq.completion_time AS completion_time;";
 
-            // UPDATE using the same logic to identify the task
-            // This ensures we're updating the same row that the SELECT would return
-            string updateSql = @"UPDATE Task_Queue 
-                SET client_id = @client_id, 
-                    status = @status, 
-                    start_time = @start_time,
-                    completion_time = @completion_time,
-                    result = '',
-                    error_message = ''
-                WHERE id IN (
-                    SELECT id FROM (
-                        SELECT tq.id
-                        FROM Task_Queue tq
-                        LEFT JOIN Task_Queue_Capabilities tqc ON tq.id = tqc.task_queue_id
-                        WHERE ((tq.status = 0 AND tq.client_id IS NULL) OR ((tq.status = 10 OR tq.status = 20) AND tq.client_id = @client_id))
-                        AND NOT EXISTS (
-                            SELECT 1 
-                            FROM Task_Queue_Capabilities tqc_required
-                            WHERE tqc_required.task_queue_id = tq.id
-                            AND tqc_required.capability_id NOT IN (" + string.Join(", ", client.Capabilities.Select(c => ((int)c).ToString())) + @")
-                        )
-                        GROUP BY tq.id
-                        ORDER BY tq.create_time ASC
-                        LIMIT " + numberOfTasks + @"
-                        FOR UPDATE SKIP LOCKED
-                    ) AS subquery
-                );";
-
-            // Execute both in transaction: SELECT first to lock the row, then UPDATE
             var transactionCommands = new List<Database.SQLTransactionItem>
             {
-                new Database.SQLTransactionItem(selectSql, new Dictionary<string, object>
-                {
-                    { "@client_id", client.Id }
-                }),
                 new Database.SQLTransactionItem(updateSql, new Dictionary<string, object>
                 {
                     { "@client_id", client.Id },
@@ -358,7 +332,6 @@ namespace hasheous_server.Classes.Tasks.Clients
                 })
             };
 
-            // Execute transaction with SELECT first, then UPDATE
             DataTable dt = await db.ExecuteTransactionCMDAsync(transactionCommands);
 
             if (dt.Rows.Count == 0)
