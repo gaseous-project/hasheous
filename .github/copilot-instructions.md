@@ -120,7 +120,10 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Recent migration note: `hasheous-1039.sql` adds `IsBlockedFromMatching` BOOLEAN column to `DataObject` table (default 0) to allow excluding objects from automatic matching.
   - Recent migration note: `hasheous-1040.sql` adds `endpoint_address` and `method` columns to the aggregated `Insights_API_Requests_*` tables so the busiest-endpoints report can aggregate and rank hot routes without re-reading raw request logs.
   - Recent migration note: `hasheous-1041.sql` adds a composite index on `Task_Queue` (`task_name`, `status`) to support the task progress summary aggregation used by the task dashboard.
+  - Recent migration note: `hasheous-1042.sql` adds the `UserSupporterLinks` table for provider-linked supporter accounts (see Supporter Recognition).
+  - Recent migration note: `hasheous-1043.sql` adds a composite index on `Task_Queue` (`status`, `client_id`, `create_time`) to support the `ClientGetTask` polling query (see Background jobs: task worker polling).
   - Embedded migration & support file manifest names now start with `hasheous_lib.Schema.` or `hasheous_lib.Support.`. After adding a file, ensure Build Action = EmbeddedResource and verify with `Assembly.GetExecutingAssembly().GetManifestResourceNames()` if debugging mismatches.
+  - `Database.ExecuteTransactionCMDAsync`/`ExecuteTransactionCMD` capture a result set from any statement in the list that is a `SELECT` or that ends with a MariaDB `RETURNING` clause (detected via `CommandProducesResultSet(...)` in `hasheous-lib/Classes/Database.cs`). Prefer a single `UPDATE ... JOIN (...) ... RETURNING ...` statement over separate lock-then-update queries when you need to both mutate and read back the affected rows atomically — this avoids evaluating the same filter/join twice per call.
 
 - Caching
   - Use `hasheous.Classes.RedisConnection.GenerateKey(prefix, keyObj)` and `PurgeCache(prefix)`. Redis enabled when `Config.RedisConfiguration.Enabled`.
@@ -139,6 +142,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Metadata search tasks are launched concurrently per metadata source. The per-run `jobId` must be unique, the bounded return guard is controlled by `maxWaitSeconds` (currently 4), and `finalise()` must wait until every launched task has completed before running.
   - Guard behavior details: lock acquisition uses create-new semantics (`FileMode.CreateNew`) and keeps the lock handle open for the full search duration; lock-file collisions cause immediate skip/return.
   - Stale lock policy: existing lock files are treated as valid for up to 1 hour; older lock files are deleted and lock acquisition is retried. For `id == null`, the lock key uses `all` (for example: `Game_all_MetadataSearchInProgress.flag`).
+  - Task worker polling: `ClientManagement.ClientGetTask(...)` (backing `GET`/POST task-worker endpoints in `TaskWorkerController`) assigns pending/re-claimable `Task_Queue` rows to a polling client using a single `UPDATE Task_Queue tq JOIN (SELECT ... FOR UPDATE SKIP LOCKED) ... RETURNING ...` statement instead of a separate `SELECT` + `UPDATE`. Keep it this way — running the capability/status filter twice per poll is the main cause of Kestrel command-timeout errors under concurrent client polling. Rely on the `idx_task_queue_status_client_createtime` index (`status`, `client_id`, `create_time`) added in `hasheous-1043.sql` when extending this query.
 
 - JSON & serialization
   - System.Text.Json and Newtonsoft are both configured: enums-as-strings, nulls ignored, max depth 64, indented output (Newtonsoft).
