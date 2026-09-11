@@ -181,8 +181,25 @@ namespace hasheous_server.Controllers.v1_0
                     return BadRequest("Invalid model payload. Provide at least one hash field (MD5, SHA1, SHA256, CRC).");
                 }
 
+                // generate a redis cache key from the inputs
+                string redisCacheKey = hasheous.Classes.RedisConnection.GenerateKey("HashLookup", new { modelList, returnAllSources, returnFields, returnSourcesList });
+                if (Config.RedisConfiguration.Enabled)
+                {
+                    var cachedResult = await hasheous.Classes.RedisConnection.GetCacheItem<HashLookup>(redisCacheKey);
+                    if (cachedResult != null)
+                    {
+                        return Ok(cachedResult);
+                    }
+                }
+
                 HashLookup hashLookup = new HashLookup(new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString), modelList, returnAllSources, returnFields, returnSourcesList);
                 await hashLookup.PerformLookup(true, true);
+
+                // cache all responses - null or successful
+                if (Config.RedisConfiguration.Enabled)
+                {
+                    await hasheous.Classes.RedisConnection.SetCacheItem<HashLookup>(redisCacheKey, hashLookup, TimeSpan.FromHours(1));
+                }
 
                 if (hashLookup == null)
                 {

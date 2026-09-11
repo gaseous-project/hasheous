@@ -155,7 +155,7 @@ namespace Classes
                     if (applyMatchingBlocks)
                     {
                         long sigId = sig.Game.Id != null ? long.Parse(sig.Game.Id) : 0;
-                        var dataObject = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Game, sigId);
+                        var dataObject = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Game, sigId, false, true, false);
                         if (dataObject != null && dataObject.Any(d => d.IsBlockedFromMatching == true))
                         {
                             rawSignatures.Remove(sig);
@@ -229,7 +229,7 @@ namespace Classes
             if (game == null)
             {
                 // redis is not enabled, so we will not use the cache
-                var games = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Game, long.Parse(discoveredSignature.Game.Id));
+                var games = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Game, long.Parse(discoveredSignature.Game.Id), false, true, false);
                 if (games != null && games.Count > 0)
                 {
                     game = games.FirstOrDefault();
@@ -493,7 +493,7 @@ namespace Classes
                 if (publisher == null)
                 {
                     // redis is not enabled, so we will not use the cache
-                    var publishers = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
+                    var publishers = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId, false, true, false);
                     if (publishers != null && publishers.Count > 0)
                     {
                         publisher = publishers.FirstOrDefault();
@@ -552,7 +552,7 @@ namespace Classes
             if (platform == null)
             {
                 // redis is not enabled, so we will not use the cache
-                var platforms = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId);
+                var platforms = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId, false, true, false);
                 if (platforms != null && platforms.Count > 0)
                 {
                     platform = platforms.FirstOrDefault();
@@ -646,7 +646,7 @@ namespace Classes
         /// <param name="objectType">The type of the object to retrieve</param>
         /// <param name="sigId">The signature id to search for</param>
         /// <returns>Null if not found; otherwise returns a DataObjectItem of type objectType</returns>
-        private async Task<List<DataObjectItem>?> GetDataObjectFromSignatureId(Database db, DataObjects.DataObjectType objectType, long sigId)
+        private async Task<List<DataObjectItem>?> GetDataObjectFromSignatureId(Database db, DataObjects.DataObjectType objectType, long sigId, bool getChildRelations = false, bool getMetadata = false, bool getSignatureData = false)
         {
             string cacheKey = RedisConnection.GenerateKey("DataObjectFromSignatureId", new { Type = objectType, SigId = sigId });
             if (Config.RedisConfiguration.Enabled)
@@ -679,7 +679,7 @@ namespace Classes
                 List<DataObjectItem> items = new List<DataObjectItem>();
                 foreach (DataRow row in data.Rows)
                 {
-                    DataObjectItem? item = await dataObject.GetDataObject(objectType, (long)row[0]);
+                    DataObjectItem? item = await dataObject.GetDataObject(objectType, (long)row[0], getChildRelations, getMetadata, getSignatureData);
                     if (item != null)
                     {
                         items.Add(item);
