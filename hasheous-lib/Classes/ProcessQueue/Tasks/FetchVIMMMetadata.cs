@@ -23,7 +23,7 @@ namespace Classes.ProcessQueue
             DataObjectsList Platforms = new DataObjectsList();
 
             // get VIMMSLair manual metadata for each platform
-            Platforms = dataObjects.GetDataObjects(DataObjects.DataObjectType.Platform).Result;
+            Platforms = await dataObjects.GetDataObjects(DataObjects.DataObjectType.Platform);
             foreach (DataObjectItem Platform in Platforms.Objects)
             {
                 AttributeItem? VIMMPlatformName = Platform.Attributes != null

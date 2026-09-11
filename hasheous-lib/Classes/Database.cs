@@ -254,27 +254,43 @@ namespace Classes
 		public int ExecuteNonQuery(string Command)
 		{
 			Dictionary<string, object> dbDict = new Dictionary<string, object>();
-			return _ExecuteNonQuery(Command, dbDict, 30, "");
+			return _ExecuteNonQueryAsync(Command, dbDict, 30, "").Result;
+		}
+
+		public async Task<int> ExecuteNonQueryAsync(string Command)
+		{
+			Dictionary<string, object> dbDict = new Dictionary<string, object>();
+			return await _ExecuteNonQueryAsync(Command, dbDict, 30, "");
 		}
 
 		public int ExecuteNonQuery(string Command, Dictionary<string, object> Parameters)
 		{
-			return _ExecuteNonQuery(Command, Parameters, 30, "");
+			return _ExecuteNonQueryAsync(Command, Parameters, 30, "").Result;
+		}
+
+		public async Task<int> ExecuteNonQueryAsync(string Command, Dictionary<string, object> Parameters)
+		{
+			return await _ExecuteNonQueryAsync(Command, Parameters, 30, "");
 		}
 
 		public int ExecuteNonQuery(string Command, Dictionary<string, object> Parameters, int Timeout = 30, string ConnectionString = "")
 		{
-			return _ExecuteNonQuery(Command, Parameters, Timeout, ConnectionString);
+			return _ExecuteNonQueryAsync(Command, Parameters, Timeout, ConnectionString).Result;
 		}
 
-		private int _ExecuteNonQuery(string Command, Dictionary<string, object> Parameters, int Timeout = 30, string ConnectionString = "")
+		public async Task<int> ExecuteNonQueryAsync(string Command, Dictionary<string, object> Parameters, int Timeout = 30, string ConnectionString = "")
+		{
+			return await _ExecuteNonQueryAsync(Command, Parameters, Timeout, ConnectionString);
+		}
+
+		private async Task<int> _ExecuteNonQueryAsync(string Command, Dictionary<string, object> Parameters, int Timeout = 30, string ConnectionString = "")
 		{
 			if (ConnectionString == "") { ConnectionString = _ConnectionString; }
 			switch (_ConnectorType)
 			{
 				case databaseType.MySql:
 					MySQLServerConnector conn = new MySQLServerConnector(ConnectionString);
-					return (int)conn.ExecNonQuery(Command, Parameters, Timeout);
+					return await conn.ExecNonQueryAsync(Command, Parameters, Timeout);
 				default:
 					return 0;
 			}
@@ -391,10 +407,10 @@ namespace Classes
 				DataTable RetTable = new DataTable();
 
 				Logging.Log(Logging.LogType.Debug, "Database", "Connecting to database", null, true);
-				MySqlConnection conn = new MySqlConnection(DBConn);
-				conn.Open();
+				using MySqlConnection conn = new MySqlConnection(DBConn);
+				await conn.OpenAsync();
 
-				MySqlCommand cmd = new MySqlCommand
+				using MySqlCommand cmd = new MySqlCommand
 				{
 					Connection = conn,
 					CommandText = SQL,
@@ -414,15 +430,20 @@ namespace Classes
 						string dictValues = string.Join(";", Parameters.Select(x => string.Join("=", x.Key, x.Value)));
 						Logging.Log(Logging.LogType.Debug, "Database", "Parameters: " + dictValues, null, true);
 					}
-					RetTable.Load(await cmd.ExecuteReaderAsync());
+
+					using var reader = await cmd.ExecuteReaderAsync();
+					RetTable.Load(reader);
 				}
 				catch (Exception ex)
 				{
 					Logging.Log(Logging.LogType.Critical, "Database", "Error while executing '" + SQL + "'", ex);
 				}
+				finally
+				{
 
-				Logging.Log(Logging.LogType.Debug, "Database", "Closing database connection", null, true);
-				conn.Close();
+					Logging.Log(Logging.LogType.Debug, "Database", "Closing database connection", null, true);
+					await conn.CloseAsync();
+				}
 
 				return RetTable;
 			}
@@ -432,10 +453,10 @@ namespace Classes
 				int result = 0;
 
 				Logging.Log(Logging.LogType.Debug, "Database", "Connecting to database", null, true);
-				MySqlConnection conn = new MySqlConnection(DBConn);
+				using MySqlConnection conn = new MySqlConnection(DBConn);
 				conn.Open();
 
-				MySqlCommand cmd = new MySqlCommand
+				using MySqlCommand cmd = new MySqlCommand
 				{
 					Connection = conn,
 					CommandText = SQL,
@@ -455,6 +476,7 @@ namespace Classes
 						string dictValues = string.Join(";", Parameters.Select(x => string.Join("=", x.Key, x.Value)));
 						Logging.Log(Logging.LogType.Debug, "Database", "Parameters: " + dictValues, null, true);
 					}
+
 					result = cmd.ExecuteNonQuery();
 				}
 				catch (Exception ex)
@@ -463,16 +485,64 @@ namespace Classes
 					Trace.WriteLine("Error executing " + SQL);
 					Trace.WriteLine("Full exception: " + ex.ToString());
 				}
+				finally
+				{
+					Logging.Log(Logging.LogType.Debug, "Database", "Closing database connection", null, true);
+					conn.Close();
+				}
 
-				Logging.Log(Logging.LogType.Debug, "Database", "Closing database connection", null, true);
-				conn.Close();
+				return result;
+			}
+
+			public async Task<int> ExecNonQueryAsync(string SQL, Dictionary<string, object> Parameters, int Timeout)
+			{
+				int result = 0;
+
+				Logging.Log(Logging.LogType.Debug, "Database", "Connecting to database", null, true);
+				using MySqlConnection conn = new MySqlConnection(DBConn);
+				await conn.OpenAsync();
+
+				using MySqlCommand cmd = new MySqlCommand
+				{
+					Connection = conn,
+					CommandText = SQL,
+					CommandTimeout = Timeout
+				};
+
+				foreach (string Parameter in Parameters.Keys)
+				{
+					cmd.Parameters.AddWithValue(Parameter, Parameters[Parameter]);
+				}
+
+				try
+				{
+					Logging.Log(Logging.LogType.Debug, "Database", "Executing sql: '" + SQL + "'", null, true);
+					if (Parameters.Count > 0)
+					{
+						string dictValues = string.Join(";", Parameters.Select(x => string.Join("=", x.Key, x.Value)));
+						Logging.Log(Logging.LogType.Debug, "Database", "Parameters: " + dictValues, null, true);
+					}
+
+					result = await cmd.ExecuteNonQueryAsync();
+				}
+				catch (Exception ex)
+				{
+					Logging.Log(Logging.LogType.Critical, "Database", "Error while executing '" + SQL + "'", ex);
+					Trace.WriteLine("Error executing " + SQL);
+					Trace.WriteLine("Full exception: " + ex.ToString());
+				}
+				finally
+				{
+					Logging.Log(Logging.LogType.Debug, "Database", "Closing database connection", null, true);
+					await conn.CloseAsync();
+				}
 
 				return result;
 			}
 
 			public DataTable TransactionExecCMD(List<Dictionary<string, object>> Parameters, int Timeout)
 			{
-				var conn = new MySqlConnection(DBConn);
+				using var conn = new MySqlConnection(DBConn);
 				conn.Open();
 				var transaction = conn.BeginTransaction();
 				DataTable result = new DataTable();
@@ -481,13 +551,13 @@ namespace Classes
 				{
 					foreach (Dictionary<string, object> Parameter in Parameters)
 					{
-						var cmd = buildcommand(conn, Parameter["sql"].ToString(), (Dictionary<string, object>)Parameter["values"], Timeout);
+						using var cmd = buildcommand(conn, Parameter["sql"].ToString(), (Dictionary<string, object>)Parameter["values"], Timeout);
 						cmd.Transaction = transaction;
 
-						// Execute the command and capture results from SELECT queries
-						if (Parameter["sql"].ToString()?.Trim().StartsWith("SELECT", StringComparison.OrdinalIgnoreCase) == true)
+						// Execute the command and capture results from SELECT queries or statements with a RETURNING clause
+						if (CommandProducesResultSet(Parameter["sql"].ToString()))
 						{
-							// SELECT query - capture the result (overwrite previous results to get the last SELECT)
+							// SELECT/RETURNING query - capture the result (overwrite previous results to get the last one)
 							result = new DataTable();
 							using (var reader = cmd.ExecuteReader())
 							{
@@ -518,9 +588,9 @@ namespace Classes
 
 			public async Task<DataTable> TransactionExecCMDAsync(List<Dictionary<string, object>> Parameters, int Timeout)
 			{
-				var conn = new MySqlConnection(DBConn);
+				using var conn = new MySqlConnection(DBConn);
 				await conn.OpenAsync();
-				var transaction = await conn.BeginTransactionAsync();
+				using var transaction = await conn.BeginTransactionAsync();
 				DataTable result = new DataTable();
 
 				try
@@ -530,15 +600,13 @@ namespace Classes
 						var cmd = buildcommand(conn, Parameter["sql"].ToString(), (Dictionary<string, object>)Parameter["values"], Timeout);
 						cmd.Transaction = transaction;
 
-						// Execute the command and capture results from SELECT queries
-						if (Parameter["sql"].ToString()?.Trim().StartsWith("SELECT", StringComparison.OrdinalIgnoreCase) == true)
+						// Execute the command and capture results from SELECT queries or statements with a RETURNING clause
+						if (CommandProducesResultSet(Parameter["sql"].ToString()))
 						{
-							// SELECT query - capture the result (overwrite previous results to get the last SELECT)
+							// SELECT/RETURNING query - capture the result (overwrite previous results to get the last one)
 							result = new DataTable();
-							using (var reader = await cmd.ExecuteReaderAsync())
-							{
-								result.Load(reader);
-							}
+							using var reader = await cmd.ExecuteReaderAsync();
+							result.Load(reader);
 						}
 						else
 						{
@@ -560,6 +628,15 @@ namespace Classes
 				}
 
 				return result;
+			}
+
+			// Detects whether a SQL statement returns a result set: SELECT statements, or MariaDB INSERT/UPDATE/DELETE ... RETURNING statements.
+			private static bool CommandProducesResultSet(string? sql)
+			{
+				string trimmed = sql?.Trim() ?? string.Empty;
+				return trimmed.StartsWith("SELECT", StringComparison.OrdinalIgnoreCase)
+					|| trimmed.EndsWith("RETURNING", StringComparison.OrdinalIgnoreCase)
+					|| System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"\bRETURNING\b\s*[\w*,\s.`]+;?\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 			}
 
 			private MySqlCommand buildcommand(MySqlConnection Conn, string SQL, Dictionary<string, object> Parameters, int Timeout)

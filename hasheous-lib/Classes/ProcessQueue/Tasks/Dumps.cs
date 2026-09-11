@@ -180,11 +180,8 @@ namespace Classes.ProcessQueue
                                     else
                                     {
                                         string platformCacheKey = RedisConnection.GenerateKey("Dumps", "Platform_" + platformItem.Id.ToString());
-                                        if (await RedisConnection.CacheItemExists(platformCacheKey))
-                                        {
-                                            platformDataObject = await RedisConnection.GetCacheItem<DataObjectItem>(platformCacheKey);
-                                        }
-                                        else
+                                        platformDataObject = await RedisConnection.GetCacheItem<DataObjectItem>(platformCacheKey);
+                                        if (platformDataObject == null)
                                         {
                                             platformDataObject = await dataObjects.GetDataObject(DataObjects.DataObjectType.Platform, platformItem.Id);
                                             if (platformDataObject != null)

@@ -5,6 +5,14 @@ using Swashbuckle.AspNetCore.SwaggerGen;
 
 public class IGDBMetadataDocumentFilter : IDocumentFilter
 {
+    public static List<string> IGDBTypeFilter = new List<string>
+    {
+        "HasheousClient.Models.Metadata.IGDB.ITools",
+        "HasheousClient.Models.Metadata.IGDB.IHasChecksum",
+        "HasheousClient.Models.Metadata.IGDB.IIdentifier",
+        "HasheousClient.Models.Metadata.IGDB.ITimestamps"
+    };
+
     public void Apply(OpenApiDocument openApiDocument, DocumentFilterContext context)
     {
         if (openApiDocument == null)
@@ -13,10 +21,14 @@ public class IGDBMetadataDocumentFilter : IDocumentFilter
         }
 
         // loop all classes in IGDB.Models namespace and add them to the document
-        var igdbAssembly = typeof(IGDB.Models.Game).Assembly;
         var hasheousAssembly = typeof(HasheousClient.Models.Metadata.IGDB.Game).Assembly;
-        foreach (var type in igdbAssembly.GetTypes().Where(t => t.Namespace != null && t.Namespace.StartsWith("IGDB.Models") && t.IsClass))
+        foreach (var type in hasheousAssembly.GetTypes().Where(t => t.Namespace != null && t.Namespace.StartsWith("HasheousClient.Models.Metadata.IGDB") && !t.Namespace.StartsWith("HasheousClient.Models.Metadata.IGDB.Override") && t.IsClass))
         {
+            if (IGDBTypeFilter.Contains(type.ReflectedType?.FullName ?? type.FullName))
+            {
+                continue;
+            }
+
             // get the igdb endpoint for this type
             var method = typeof(hasheous_server.Classes.Metadata.IGDB.Metadata)
                 .GetMethod("GetEndpointData")
@@ -90,13 +102,7 @@ public class IGDBMetadataDocumentFilter : IDocumentFilter
                     { type.Name, new OpenApiSchema { Type = JsonSchemaType.Object, Description = $"An instance of {type.Name}." } }
                 };
 
-                // create new object of type, and serialize it to get the properties
-                var hasheousType = hasheousAssembly.GetType($"HasheousClient.Models.Metadata.IGDB.{type.Name}");
-                if (hasheousType == null)
-                {
-                    hasheousType = type;
-                }
-                var instance = Activator.CreateInstance(hasheousType);
+                var instance = Activator.CreateInstance(type);
                 List<string> example = new List<string>();
                 if (instance != null)
                 {

@@ -145,7 +145,7 @@ ORDER BY u.NormalizedEmail, u.Email;",
 
             if (Config.RedisConfiguration.Enabled)
             {
-                await RedisConnection.SetCacheItem(cacheKey, users, TimeSpan.FromMinutes(5));
+                await RedisConnection.SetCacheItem<List<UserViewModel>>(cacheKey, users, TimeSpan.FromMinutes(5));
             }
 
             return Ok(users);

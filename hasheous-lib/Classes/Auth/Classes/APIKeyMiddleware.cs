@@ -135,22 +135,10 @@ namespace Authentication
         public async Task<ApplicationUser?> GetUserFromApiKey(string apiKey)
         {
             string cacheKey = ApiKeyCacheNamePrefix + ":" + apiKey;
-            if (Config.RedisConfiguration.Enabled)
+            ApplicationUser? cachedUser = await hasheous.Classes.RedisConnection.GetCacheItem<ApplicationUser>(cacheKey);
+            if (cachedUser != null)
             {
-                string? cachedUser = await hasheous.Classes.RedisConnection.GetDatabase(0).StringGetAsync(cacheKey);
-                if (cachedUser != null)
-                {
-                    return Newtonsoft.Json.JsonConvert.DeserializeObject<ApplicationUser>(cachedUser);
-                }
-            }
-            else
-            {
-                // In-memory cache lookup
-                string? cachedUser = LookupCache.Get(ApiKeyCacheNamePrefix, cacheKey);
-                if (cachedUser != null)
-                {
-                    return Newtonsoft.Json.JsonConvert.DeserializeObject<ApplicationUser>(cachedUser);
-                }
+                return cachedUser;
             }
 
             // If not cached, fetch from database
@@ -169,14 +157,9 @@ namespace Authentication
             }
 
             // Cache the user
-            string serializedUser = Newtonsoft.Json.JsonConvert.SerializeObject(user);
-            if (Config.RedisConfiguration.Enabled)
+            if (user != null)
             {
-                await hasheous.Classes.RedisConnection.GetDatabase(0).StringSetAsync(cacheKey, serializedUser, TimeSpan.FromSeconds(CacheDuration));
-            }
-            else
-            {
-                LookupCache.Add(ApiKeyCacheNamePrefix, cacheKey, serializedUser, CacheDuration);
+                await hasheous.Classes.RedisConnection.SetCacheItem<ApplicationUser>(cacheKey, user, TimeSpan.FromSeconds(CacheDuration));
             }
 
             return user;

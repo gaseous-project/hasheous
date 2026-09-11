@@ -88,9 +88,9 @@ namespace hasheous_server.Controllers.v1_0
                 var result = await ClientManagement.RegisterClient(apiKey, clientName, clientVersion, capabilities, publicId);
                 return Ok(result);
             }
-            catch
+            catch (Exception ex)
             {
-                return BadRequest();
+                return BadRequest(ex.Message);
             }
         }
 
