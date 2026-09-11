@@ -220,15 +220,70 @@ namespace hasheous.Classes
         }
 
         /// <summary>
+        /// Retrieves and deserializes a cache item known to be a value type (e.g., <c>bool</c>, <c>int</c>) stored under <paramref name="cacheKey"/>.
+        /// </summary>
+        /// <typeparam name="T">The struct type of the cached data.</typeparam>
+        /// <param name="cacheKey">The full Redis key to read.</param>
+        /// <returns>The deserialized value if present; otherwise <c>null</c>, distinguishing a cache miss from a cached default value (e.g., <c>false</c>).</returns>
+        /// <remarks>
+        /// Use this overload instead of <see cref="GetCacheItem{T}(string)"/> for value types: since <typeparamref name="T"/> is
+        /// constrained to <c>struct</c>, the return type is a genuine <see cref="Nullable{T}"/>, so a miss is not ambiguous with a
+        /// cached default value.
+        /// </remarks>
+        public async static Task<T?> GetCacheItemValue<T>(string cacheKey) where T : struct
+        {
+            try
+            {
+                if (!Config.RedisConfiguration.Enabled) return null;
+
+                string optimizedKey = new CacheKey(cacheKey).InternalKey;
+
+                RedisValue? cachedData = await Db.StringGetAsync(optimizedKey);
+                if (!cachedData.HasValue) return null;
+
+                if (!ShouldSerialize<T>())
+                {
+                    string? fallbackString = cachedData.ToString();
+                    if (string.IsNullOrEmpty(fallbackString)) return null;
+                    return (T)Convert.ChangeType(fallbackString, typeof(T));
+                }
+
+                byte[]? rawBuffer = cachedData;
+                if (rawBuffer == null || rawBuffer.Length == 0 || !HasCachePayloadMarker(rawBuffer))
+                {
+                    return null;
+                }
+
+                try
+                {
+                    return await DeserializeComplexCacheValue<T>(rawBuffer);
+                }
+                catch (Exception ex) when (ex is InvalidDataException or InvalidOperationException or Newtonsoft.Json.JsonException)
+                {
+                    await DeleteInvalidCacheItemAsync(optimizedKey, cacheKey, $"it could not be decoded: {ex.Message}");
+                    return null;
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log the exception for debugging purposes
+                Logging.Log(Logging.LogType.Warning, "Redis", $"Redis GetCacheItemValue<{typeof(T).Name}> failed for key '{cacheKey}': {ex.Message}", ex);
+                return null;
+            }
+        }
+
+        /// <summary>
         /// Retrieves and deserializes a cache item stored under <paramref name="cacheKey"/>.
         /// </summary>
-        /// <typeparam name="T">The expected type of the cached data.</typeparam>
+        /// <typeparam name="T">The expected reference type of the cached data.</typeparam>
         /// <param name="cacheKey">The full Redis key to read.</param>
-        /// <returns>The deserialized value if present; otherwise <c>default(T)</c>.</returns>
+        /// <returns>The deserialized value if present; otherwise <c>null</c>.</returns>
         /// <remarks>
         /// Uses Newtonsoft.Json with <see cref="Newtonsoft.Json.TypeNameHandling.All"/> to preserve type information.
+        /// For value types (e.g., <c>bool</c>, <c>int</c>), use <see cref="GetCacheItemValue{T}(string)"/> instead, since an
+        /// unconstrained <c>T?</c> cannot represent "not found" separately from a cached default value.
         /// </remarks>
-        public async static Task<T?> GetCacheItem<T>(string cacheKey)
+        public async static Task<T?> GetCacheItem<T>(string cacheKey) where T : class
         {
             try
             {
