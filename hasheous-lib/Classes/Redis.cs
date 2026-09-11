@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.IO.Compression;
 using System.Text;
 using Classes;
@@ -238,25 +239,27 @@ namespace hasheous.Classes
 
                 string optimizedKey = new CacheKey(cacheKey).InternalKey;
 
-                RedisValue? cachedData = await Db.StringGetAsync(optimizedKey);
-                if (!cachedData.HasValue) return null;
-
                 if (!ShouldSerialize<T>())
                 {
+                    RedisValue cachedData = await Db.StringGetAsync(optimizedKey);
+                    if (!cachedData.HasValue) return null;
+
                     string? fallbackString = cachedData.ToString();
                     if (string.IsNullOrEmpty(fallbackString)) return null;
                     return (T)Convert.ChangeType(fallbackString, typeof(T));
                 }
 
-                byte[]? rawBuffer = cachedData;
-                if (rawBuffer == null || rawBuffer.Length == 0 || !HasCachePayloadMarker(rawBuffer))
+                // Lease<byte> rents its backing array from ArrayPool instead of allocating a
+                // new array per read, which matters for large cached payloads under load.
+                using Lease<byte>? lease = await Db.StringGetLeaseAsync(optimizedKey);
+                if (lease == null || lease.Length == 0 || !HasCachePayloadMarker(lease.Span))
                 {
                     return null;
                 }
 
                 try
                 {
-                    return await DeserializeComplexCacheValue<T>(rawBuffer);
+                    return DeserializeComplexCacheValue<T>(lease.Memory);
                 }
                 catch (Exception ex) when (ex is InvalidDataException or InvalidOperationException or Newtonsoft.Json.JsonException)
                 {
@@ -291,25 +294,27 @@ namespace hasheous.Classes
 
                 string optimizedKey = new CacheKey(cacheKey).InternalKey;
 
-                RedisValue? cachedData = await Db.StringGetAsync(optimizedKey);
-                if (!cachedData.HasValue) return default;
-
                 if (!ShouldSerialize<T>())
                 {
+                    RedisValue cachedData = await Db.StringGetAsync(optimizedKey);
+                    if (!cachedData.HasValue) return default;
+
                     string? fallbackString = cachedData.ToString();
                     if (string.IsNullOrEmpty(fallbackString)) return default;
                     return (T)Convert.ChangeType(fallbackString, typeof(T));
                 }
 
-                byte[]? rawBuffer = cachedData;
-                if (rawBuffer == null || rawBuffer.Length == 0 || !HasCachePayloadMarker(rawBuffer))
+                // Lease<byte> rents its backing array from ArrayPool instead of allocating a
+                // new array per read, which matters for large cached payloads under load.
+                using Lease<byte>? lease = await Db.StringGetLeaseAsync(optimizedKey);
+                if (lease == null || lease.Length == 0 || !HasCachePayloadMarker(lease.Span))
                 {
                     return default;
                 }
 
                 try
                 {
-                    return await DeserializeComplexCacheValue<T>(rawBuffer);
+                    return DeserializeComplexCacheValue<T>(lease.Memory);
                 }
                 catch (Exception ex) when (ex is InvalidDataException or InvalidOperationException or Newtonsoft.Json.JsonException)
                 {
@@ -368,10 +373,10 @@ namespace hasheous.Classes
         #region Compression Helpers
         private static readonly UTF8Encoding Utf8Encoding = new UTF8Encoding(false);
 
-        private static bool HasCachePayloadMarker(byte[] payload)
+        private static bool HasCachePayloadMarker(ReadOnlySpan<byte> payload)
         {
             return payload.Length > CachePayloadMarker.Length &&
-                payload.AsSpan(0, CachePayloadMarker.Length).SequenceEqual(CachePayloadMarker);
+                payload[..CachePayloadMarker.Length].SequenceEqual(CachePayloadMarker);
         }
 
         internal static bool IsPrimitiveCacheType<T>()
@@ -379,35 +384,57 @@ namespace hasheous.Classes
             return !ShouldSerialize<T>();
         }
 
+        /// <summary>
+        /// Serializes and frames a value for storage. The raw UTF-8 and (when used) compressed
+        /// intermediate buffers are rented from <see cref="ArrayPool{Byte}"/> rather than allocated,
+        /// so only the final right-sized payload is a genuine heap allocation.
+        /// </summary>
         internal static byte[] SerializeComplexCacheValue<T>(T data)
         {
             string serializedData = Newtonsoft.Json.JsonConvert.SerializeObject(data, SerialiseSettings);
 
-            if (serializedData.Length > 1000)
+            int rawByteCount = Utf8Encoding.GetByteCount(serializedData);
+            byte[] rawBuffer = ArrayPool<byte>.Shared.Rent(rawByteCount);
+            try
             {
-                byte[]? compressedPayload = CreateCompressedCachePayload(serializedData);
-                if (compressedPayload != null)
-                {
-                    return compressedPayload;
-                }
-            }
+                int rawLength = Utf8Encoding.GetBytes(serializedData, 0, serializedData.Length, rawBuffer, 0);
+                ReadOnlySpan<byte> rawSpan = rawBuffer.AsSpan(0, rawLength);
 
-            return CreatePlainJsonCachePayload(serializedData);
+                if (rawLength > 1000)
+                {
+                    byte[]? compressedPayload = CreateCompressedCachePayload(rawSpan);
+                    if (compressedPayload != null)
+                    {
+                        return compressedPayload;
+                    }
+                }
+
+                return CreatePlainJsonCachePayload(rawSpan);
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(rawBuffer);
+            }
         }
 
-        internal static async Task<T?> DeserializeComplexCacheValue<T>(byte[] payload)
+        /// <summary>
+        /// Deserializes a framed cache payload. Decompression uses a pooled, growable buffer
+        /// instead of a <see cref="MemoryStream"/> so large values do not double-buffer on the heap.
+        /// </summary>
+        internal static T? DeserializeComplexCacheValue<T>(ReadOnlyMemory<byte> payload)
         {
-            if (!HasCachePayloadMarker(payload))
+            ReadOnlySpan<byte> span = payload.Span;
+            if (!HasCachePayloadMarker(span))
             {
                 throw new InvalidDataException("Redis cache payload is unframed.");
             }
 
-            byte format = payload[CachePayloadMarker.Length];
-            byte[] value = payload[(CachePayloadMarker.Length + 1)..];
+            byte format = span[CachePayloadMarker.Length];
+            ReadOnlySpan<byte> value = span[(CachePayloadMarker.Length + 1)..];
             string jsonString = format switch
             {
                 PlainJsonPayloadFormat => Utf8Encoding.GetString(value),
-                BrotliPayloadFormat => await DecompressToStringAsync(value),
+                BrotliPayloadFormat => DecompressSpanToString(value),
                 _ => throw new InvalidDataException($"Unknown Redis cache payload format '{format}'.")
             };
 
@@ -431,48 +458,79 @@ namespace hasheous.Classes
             }
         }
 
-        private static byte[] CreateCachePayload(byte format, byte[] payload)
-        {
-            byte[] framedPayload = new byte[CachePayloadMarker.Length + 1 + payload.Length];
-            CachePayloadMarker.CopyTo(framedPayload, 0);
-            framedPayload[CachePayloadMarker.Length] = format;
-            payload.CopyTo(framedPayload, CachePayloadMarker.Length + 1);
-            return framedPayload;
-        }
-
-        private static byte[] CreatePlainJsonCachePayload(string payload)
+        private static byte[] CreatePlainJsonCachePayload(ReadOnlySpan<byte> payload)
         {
             int headerLength = CachePayloadMarker.Length + 1;
-            byte[] framedPayload = new byte[headerLength + Utf8Encoding.GetByteCount(payload)];
-            CachePayloadMarker.CopyTo(framedPayload, 0);
+            byte[] framedPayload = new byte[headerLength + payload.Length];
+            CachePayloadMarker.CopyTo(framedPayload);
             framedPayload[CachePayloadMarker.Length] = PlainJsonPayloadFormat;
-            Utf8Encoding.GetBytes(payload, 0, payload.Length, framedPayload, headerLength);
+            payload.CopyTo(framedPayload.AsSpan(headerLength));
             return framedPayload;
         }
 
-        private static byte[]? CreateCompressedCachePayload(string payload)
+        // Brotli quality 4 / window 22 mirrors the previous BrotliStream(CompressionLevel.Optimal) behavior.
+        private const int BrotliQuality = 4;
+        private const int BrotliWindow = 22;
+
+        private static byte[]? CreateCompressedCachePayload(ReadOnlySpan<byte> rawSpan)
         {
-            byte[] rawBytes = Utf8Encoding.GetBytes(payload);
-            using var outputStream = new MemoryStream();
-            outputStream.Write(CachePayloadMarker);
-            outputStream.WriteByte(BrotliPayloadFormat);
-
-            using (var compressStream = new BrotliStream(outputStream, CompressionLevel.Optimal, leaveOpen: true))
+            int headerLength = CachePayloadMarker.Length + 1;
+            int maxCompressedLength = BrotliEncoder.GetMaxCompressedLength(rawSpan.Length);
+            byte[] rented = ArrayPool<byte>.Shared.Rent(headerLength + maxCompressedLength);
+            try
             {
-                compressStream.Write(rawBytes, 0, rawBytes.Length);
-            }
+                if (!BrotliEncoder.TryCompress(rawSpan, rented.AsSpan(headerLength), out int written, BrotliQuality, BrotliWindow))
+                {
+                    return null;
+                }
 
-            int compressedLength = checked((int)outputStream.Length - CachePayloadMarker.Length - 1);
-            return (double)compressedLength / payload.Length <= 0.80 ? outputStream.ToArray() : null;
+                if ((double)written / rawSpan.Length > 0.80)
+                {
+                    return null;
+                }
+
+                int totalLength = headerLength + written;
+                byte[] framedPayload = new byte[totalLength];
+                CachePayloadMarker.CopyTo(framedPayload);
+                framedPayload[CachePayloadMarker.Length] = BrotliPayloadFormat;
+                rented.AsSpan(headerLength, written).CopyTo(framedPayload.AsSpan(headerLength));
+                return framedPayload;
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(rented);
+            }
         }
 
-        private static async Task<string> DecompressToStringAsync(byte[] compressedBytes)
+        // Decompresses into a pooled, doubling buffer instead of a growable MemoryStream so large
+        // payloads don't hold two large buffers (stream + ToArray copy) on the heap at once.
+        private static string DecompressSpanToString(ReadOnlySpan<byte> compressedBytes)
         {
-            using var inputStream = new MemoryStream(compressedBytes);
-            using var decompressStream = new BrotliStream(inputStream, CompressionMode.Decompress);
-            using var outputStream = new MemoryStream();
-            await decompressStream.CopyToAsync(outputStream);
-            return Utf8Encoding.GetString(outputStream.ToArray());
+            const int maxBufferSize = 512 * 1024 * 1024; // safety cap
+            int bufferSize = Math.Clamp(compressedBytes.Length * 4, 4096, maxBufferSize);
+
+            while (true)
+            {
+                byte[] rented = ArrayPool<byte>.Shared.Rent(bufferSize);
+                try
+                {
+                    if (BrotliDecoder.TryDecompress(compressedBytes, rented, out int written))
+                    {
+                        return Utf8Encoding.GetString(rented, 0, written);
+                    }
+                }
+                finally
+                {
+                    ArrayPool<byte>.Shared.Return(rented);
+                }
+
+                if (bufferSize >= maxBufferSize)
+                {
+                    throw new InvalidDataException("Redis cache payload exceeded maximum decompression size.");
+                }
+
+                bufferSize = (int)Math.Min((long)bufferSize * 2, maxBufferSize);
+            }
         }
 
         /// <summary>
@@ -486,15 +544,21 @@ namespace hasheous.Classes
                 return Array.Empty<byte>();
 
             byte[] rawBytes = Utf8Encoding.GetBytes(text);
-
-            using var outputStream = new MemoryStream();
-            // CompressionLevel.Optimal delivers the best compression ratio, suitable for cache layers
-            using (var compressStream = new BrotliStream(outputStream, CompressionLevel.Optimal))
+            int maxCompressedLength = BrotliEncoder.GetMaxCompressedLength(rawBytes.Length);
+            byte[] rented = ArrayPool<byte>.Shared.Rent(maxCompressedLength);
+            try
             {
-                compressStream.Write(rawBytes, 0, rawBytes.Length);
-            }
+                if (!BrotliEncoder.TryCompress(rawBytes, rented, out int written, BrotliQuality, BrotliWindow))
+                {
+                    throw new InvalidOperationException("Brotli compression failed.");
+                }
 
-            return outputStream.ToArray();
+                return rented.AsSpan(0, written).ToArray();
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(rented);
+            }
         }
 
         /// <summary>
@@ -507,13 +571,7 @@ namespace hasheous.Classes
             if (compressedBytes == null || compressedBytes.Length == 0)
                 return string.Empty;
 
-            using var inputStream = new MemoryStream(compressedBytes);
-            using var decompressStream = new BrotliStream(inputStream, CompressionMode.Decompress);
-            using var outputStream = new MemoryStream();
-
-            decompressStream.CopyTo(outputStream);
-
-            return Utf8Encoding.GetString(outputStream.ToArray());
+            return DecompressSpanToString(compressedBytes);
         }
 
         #endregion Compression Helpers

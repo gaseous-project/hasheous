@@ -155,7 +155,7 @@ namespace Classes
                     if (applyMatchingBlocks)
                     {
                         long sigId = sig.Game.Id != null ? long.Parse(sig.Game.Id) : 0;
-                        var dataObject = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Game, sigId);
+                        var dataObject = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Game, sigId, false, true, false);
                         if (dataObject != null && dataObject.Any(d => d.IsBlockedFromMatching == true))
                         {
                             rawSignatures.Remove(sig);
@@ -202,117 +202,15 @@ namespace Classes
             // compile metadata
             DataObjects dataObjects = new DataObjects();
 
+            var publisherTask = ResolvePublisherAsync(discoveredSignature, dataObjects, userInteractiveSession, queuedMetadataSearches);
+            var platformTask = ResolvePlatformAsync(discoveredSignature, dataObjects, userInteractiveSession, queuedMetadataSearches);
+            await Task.WhenAll(publisherTask, platformTask);
+
             // publisher
-            DataObjectItem? publisher = null;
-            if (discoveredSignature.Game != null && (discoveredSignature.Game.PublisherId != 0 || discoveredSignature.Game.Publisher != null && discoveredSignature.Game.Publisher != ""))
-            {
-                // if redis is enabled, check if the publisher exists in the cache
-                string publisherCacheKey = RedisConnection.GenerateKey("HashLookup", new { Type = DataObjects.DataObjectType.Company, Id = discoveredSignature.Game.PublisherId });
-                if (Config.RedisConfiguration.Enabled)
-                {
-                    DataObjectItem? cachedPublisher = await RedisConnection.GetCacheItem<DataObjectItem>(publisherCacheKey);
-                    if (cachedPublisher != null)
-                    {
-                        // get the publisher from the cache
-                        publisher = cachedPublisher;
-                    }
-                }
-
-                if (publisher == null)
-                {
-                    // redis is not enabled, so we will not use the cache
-                    var publishers = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
-                    if (publishers != null && publishers.Count > 0)
-                    {
-                        publisher = publishers.FirstOrDefault();
-                    }
-                    if (publisher == null && this.ForceSearch)
-                    {
-                        // no returned publisher! create one
-                        publisher = await dataObjects.NewDataObject(DataObjects.DataObjectType.Company, new DataObjectItemModel
-                        {
-                            Name = discoveredSignature.Game.Publisher
-                        }, allowSearch: false);
-
-                        // add signature mappinto to publisher
-                        dataObjects.AddSignature(publisher.Id, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
-
-                        if (userInteractiveSession)
-                        {
-                            // Queue metadata search so concurrent lookups share the same work.
-                            queuedMetadataSearches.Add(QueueInteractiveMetadataSearch(dataObjects, DataObjects.DataObjectType.Company, publisher.Id));
-                        }
-                        else
-                        {
-                            await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Company, publisher.Id, true);
-                        }
-
-                        // re-get the publisher
-                        publisher = await dataObjects.GetDataObject(DataObjects.DataObjectType.Company, publisher.Id);
-                    }
-
-                    // store the publisher in the cache for 7 days
-                    if (Config.RedisConfiguration.Enabled && publisher != null)
-                    {
-                        await RedisConnection.SetCacheItem<DataObjectItem>(publisherCacheKey, publisher, TimeSpan.FromHours(6));
-                    }
-                }
-            }
+            DataObjectItem? publisher = await publisherTask;
 
             // platform
-            DataObjectItem? platform = null;
-            // if redis is enabled, check if the platform exists in the cache
-            string platformCacheKey = RedisConnection.GenerateKey("HashLookup", new { Type = DataObjects.DataObjectType.Platform, Id = discoveredSignature.Game.SystemId });
-            if (Config.RedisConfiguration.Enabled)
-            {
-                DataObjectItem? cachedPlatform = await RedisConnection.GetCacheItem<DataObjectItem>(platformCacheKey);
-                if (cachedPlatform != null)
-                {
-                    // get the platform from the cache
-                    platform = cachedPlatform;
-                }
-            }
-
-            if (platform == null)
-            {
-                // redis is not enabled, so we will not use the cache
-                var platforms = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId);
-                if (platforms != null && platforms.Count > 0)
-                {
-                    platform = platforms.FirstOrDefault();
-
-                    // store the platform in the cache for 7 days
-                    if (Config.RedisConfiguration.Enabled && platform != null)
-                    {
-                        await RedisConnection.SetCacheItem<DataObjectItem>(platformCacheKey, platform, TimeSpan.FromHours(6));
-                    }
-                }
-            }
-
-            if (platform == null && this.ForceSearch)
-            {
-                // no returned platform! create one
-                platform = await dataObjects.NewDataObject(DataObjects.DataObjectType.Platform, new DataObjectItemModel
-                {
-                    Name = discoveredSignature.Game.System
-                }, allowSearch: false);
-
-                // add signature mapping to platform
-                dataObjects.AddSignature(platform.Id, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId);
-
-                if (userInteractiveSession)
-                {
-                    // Queue metadata search so concurrent lookups share the same work.
-                    queuedMetadataSearches.Add(QueueInteractiveMetadataSearch(dataObjects, DataObjects.DataObjectType.Platform, platform.Id));
-                }
-                else
-                {
-                    await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Platform, platform.Id, true);
-                }
-
-                // re-get the platform
-                platform = await dataObjects.GetDataObject(DataObjects.DataObjectType.Platform, platform.Id);
-            }
+            DataObjectItem? platform = await platformTask;
 
             // game
             DataObjectItem? game = null;
@@ -331,7 +229,7 @@ namespace Classes
             if (game == null)
             {
                 // redis is not enabled, so we will not use the cache
-                var games = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Game, long.Parse(discoveredSignature.Game.Id));
+                var games = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Game, long.Parse(discoveredSignature.Game.Id), false, true, false);
                 if (games != null && games.Count > 0)
                 {
                     game = games.FirstOrDefault();
@@ -574,6 +472,126 @@ namespace Classes
             }
         }
 
+        private async Task<DataObjectItem?> ResolvePublisherAsync(Signatures_Games_2 discoveredSignature, DataObjects dataObjects, bool userInteractiveSession, List<Task> queuedMetadataSearches)
+        {
+            DataObjectItem? publisher = null;
+
+            if (discoveredSignature.Game != null && (discoveredSignature.Game.PublisherId != 0 || discoveredSignature.Game.Publisher != null && discoveredSignature.Game.Publisher != ""))
+            {
+                // if redis is enabled, check if the publisher exists in the cache
+                string publisherCacheKey = RedisConnection.GenerateKey("HashLookup", new { Type = DataObjects.DataObjectType.Company, Id = discoveredSignature.Game.PublisherId });
+                if (Config.RedisConfiguration.Enabled)
+                {
+                    DataObjectItem? cachedPublisher = await RedisConnection.GetCacheItem<DataObjectItem>(publisherCacheKey);
+                    if (cachedPublisher != null)
+                    {
+                        // get the publisher from the cache
+                        publisher = cachedPublisher;
+                    }
+                }
+
+                if (publisher == null)
+                {
+                    // redis is not enabled, so we will not use the cache
+                    var publishers = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId, false, true, false);
+                    if (publishers != null && publishers.Count > 0)
+                    {
+                        publisher = publishers.FirstOrDefault();
+                    }
+                    if (publisher == null && this.ForceSearch)
+                    {
+                        // no returned publisher! create one
+                        publisher = await dataObjects.NewDataObject(DataObjects.DataObjectType.Company, new DataObjectItemModel
+                        {
+                            Name = discoveredSignature.Game.Publisher
+                        }, allowSearch: false);
+
+                        // add signature mappinto to publisher
+                        dataObjects.AddSignature(publisher.Id, DataObjects.DataObjectType.Company, discoveredSignature.Game.PublisherId);
+
+                        if (userInteractiveSession)
+                        {
+                            // Queue metadata search so concurrent lookups share the same work.
+                            queuedMetadataSearches.Add(QueueInteractiveMetadataSearch(dataObjects, DataObjects.DataObjectType.Company, publisher.Id));
+                        }
+                        else
+                        {
+                            await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Company, publisher.Id, true);
+                        }
+
+                        // re-get the publisher
+                        publisher = await dataObjects.GetDataObject(DataObjects.DataObjectType.Company, publisher.Id);
+                    }
+
+                    if (Config.RedisConfiguration.Enabled && publisher != null)
+                    {
+                        await RedisConnection.SetCacheItem<DataObjectItem>(publisherCacheKey, publisher, TimeSpan.FromHours(6));
+                    }
+                }
+            }
+
+            return publisher;
+        }
+
+        private async Task<DataObjectItem?> ResolvePlatformAsync(Signatures_Games_2 discoveredSignature, DataObjects dataObjects, bool userInteractiveSession, List<Task> queuedMetadataSearches)
+        {
+            DataObjectItem? platform = null;
+
+            // if redis is enabled, check if the platform exists in the cache
+            string platformCacheKey = RedisConnection.GenerateKey("HashLookup", new { Type = DataObjects.DataObjectType.Platform, Id = discoveredSignature.Game.SystemId });
+            if (Config.RedisConfiguration.Enabled)
+            {
+                DataObjectItem? cachedPlatform = await RedisConnection.GetCacheItem<DataObjectItem>(platformCacheKey);
+                if (cachedPlatform != null)
+                {
+                    // get the platform from the cache
+                    platform = cachedPlatform;
+                }
+            }
+
+            if (platform == null)
+            {
+                // redis is not enabled, so we will not use the cache
+                var platforms = await GetDataObjectFromSignatureId(db, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId, false, true, false);
+                if (platforms != null && platforms.Count > 0)
+                {
+                    platform = platforms.FirstOrDefault();
+
+                    if (Config.RedisConfiguration.Enabled && platform != null)
+                    {
+                        await RedisConnection.SetCacheItem<DataObjectItem>(platformCacheKey, platform, TimeSpan.FromHours(6));
+                    }
+                }
+            }
+
+            if (platform == null && this.ForceSearch)
+            {
+                // no returned platform! create one
+                platform = await dataObjects.NewDataObject(DataObjects.DataObjectType.Platform, new DataObjectItemModel
+                {
+                    Name = discoveredSignature.Game.System
+                }, allowSearch: false);
+
+                // add signature mapping to platform
+                dataObjects.AddSignature(platform.Id, DataObjects.DataObjectType.Platform, discoveredSignature.Game.SystemId);
+
+                if (userInteractiveSession)
+                {
+                    // Queue metadata search so concurrent lookups share the same work.
+                    queuedMetadataSearches.Add(QueueInteractiveMetadataSearch(dataObjects, DataObjects.DataObjectType.Platform, platform.Id));
+                }
+                else
+                {
+                    await dataObjects.DataObjectMetadataSearch(DataObjects.DataObjectType.Platform, platform.Id, true);
+                }
+
+                // re-get the platform
+                platform = await dataObjects.GetDataObject(DataObjects.DataObjectType.Platform, platform.Id);
+            }
+
+            return platform;
+        }
+
         private static Task QueueInteractiveMetadataSearch(DataObjects dataObjects, DataObjects.DataObjectType objectType, long id)
         {
             Lazy<Task> pendingSearch = new(
@@ -628,7 +646,7 @@ namespace Classes
         /// <param name="objectType">The type of the object to retrieve</param>
         /// <param name="sigId">The signature id to search for</param>
         /// <returns>Null if not found; otherwise returns a DataObjectItem of type objectType</returns>
-        private async Task<List<DataObjectItem>?> GetDataObjectFromSignatureId(Database db, DataObjects.DataObjectType objectType, long sigId)
+        private async Task<List<DataObjectItem>?> GetDataObjectFromSignatureId(Database db, DataObjects.DataObjectType objectType, long sigId, bool getChildRelations = false, bool getMetadata = false, bool getSignatureData = false)
         {
             string cacheKey = RedisConnection.GenerateKey("DataObjectFromSignatureId", new { Type = objectType, SigId = sigId });
             if (Config.RedisConfiguration.Enabled)
@@ -661,7 +679,7 @@ namespace Classes
                 List<DataObjectItem> items = new List<DataObjectItem>();
                 foreach (DataRow row in data.Rows)
                 {
-                    DataObjectItem? item = await dataObject.GetDataObject(objectType, (long)row[0]);
+                    DataObjectItem? item = await dataObject.GetDataObject(objectType, (long)row[0], getChildRelations, getMetadata, getSignatureData);
                     if (item != null)
                     {
                         items.Add(item);

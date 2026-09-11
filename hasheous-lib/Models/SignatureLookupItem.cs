@@ -9,6 +9,11 @@ namespace hasheous_server.Models
 
         public class SignatureResult
         {
+            public SignatureResult()
+            {
+
+            }
+
             public SignatureResult(Signatures_Games_2 RawSignature)
             {
                 this.Game = RawSignature.Game;

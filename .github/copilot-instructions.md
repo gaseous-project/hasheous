@@ -2,6 +2,8 @@
 
 Use this to get productive fast. Follow the existing patterns in this repo over generic .NET advice.
 
+- Always update this file in the same change when repository behavior, architecture, configuration, routing, authentication, migrations, background jobs, Docker, dependencies, APIs, or other cross-cutting development guidance changes. Keep the instructions current before considering the work complete.
+
 - Repo layout
   - `hasheous/` .NET 10 web API + static UI; public endpoints and Swagger.
   - `service-orchestrator/` .NET 10 API hosting background orchestration and scheduled jobs.
@@ -265,7 +267,7 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 
 ## Maintenance
 - A PR guard (`.github/workflows/copilot-instructions-guard.yml`) fails when architecture/config files change without updating this file; it prints hints via `.github/scripts/copilot-instructions-help.sh`.
-  - Update this file when: resource namespace conventions change (e.g., `hasheous_lib.*` migration), new cross-cutting utilities like `ComputeObjectPropertyHash` are added, queue coordination semantics are modified, MCP routing/tooling/auth changes, DataObject model or lookup behavior changes, or major framework/dependency updates occur (e.g., .NET version bumps, Swagger/OpenAPI package upgrades).
+  - Always update this file when: resource namespace conventions change (e.g., `hasheous_lib.*` migration), new cross-cutting utilities like `ComputeObjectPropertyHash` are added, queue coordination semantics are modified, MCP routing/tooling/auth changes, DataObject model or lookup behavior changes, or major framework/dependency updates occur (e.g., .NET version bumps, Swagger/OpenAPI package upgrades). This applies to every repository change that alters or documents project behavior; do not defer the update.
 
 ## API key usage examples
 - User API key (header `X-API-Key`):
@@ -420,7 +422,7 @@ Additional example (rating boards):
 - Config and secrets: never hardcode secrets; use env vars or `~/.hasheous-server/config.json` fields updated via `Config`.
 - Swagger/docs: keep XML summaries up to date; include response types, cache profile notes, and examples (see `LookupController`).
 - Build/run checks: ensure the solution builds and the API boots locally; prefer the VS Code `watch` task for quick verification.
-- Update this guide when changing routing, auth, migrations, orchestrator queue, docker, or README. The PR guard will fail otherwise and prints hints.
+- Always update this guide when changing routing, auth, migrations, orchestrator queue, Docker, README, or any other repository behavior or contributor guidance. The PR guard will fail otherwise and prints hints.
 - UI/static: for changes under `wwwroot/`, include before/after screenshots if relevant.
   - Localization: move all user-visible text to `wwwroot/localisation/en.json` and use `data-lang` attributes or `lang.getLang()` calls.
   - CSS: use CSS variables (`--warning-color`, `--valid-color`, `--invalid-color`) and semantic class names instead of inline styles.
