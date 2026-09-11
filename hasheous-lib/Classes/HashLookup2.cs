@@ -207,10 +207,10 @@ namespace Classes
             await Task.WhenAll(publisherTask, platformTask);
 
             // publisher
-            DataObjectItem? publisher = publisherTask.Result;
+            DataObjectItem? publisher = await publisherTask;
 
             // platform
-            DataObjectItem? platform = platformTask.Result;
+            DataObjectItem? platform = await platformTask;
 
             // game
             DataObjectItem? game = null;
