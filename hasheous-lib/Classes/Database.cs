@@ -554,10 +554,10 @@ namespace Classes
 						using var cmd = buildcommand(conn, Parameter["sql"].ToString(), (Dictionary<string, object>)Parameter["values"], Timeout);
 						cmd.Transaction = transaction;
 
-						// Execute the command and capture results from SELECT queries
-						if (Parameter["sql"].ToString()?.Trim().StartsWith("SELECT", StringComparison.OrdinalIgnoreCase) == true)
+						// Execute the command and capture results from SELECT queries or statements with a RETURNING clause
+						if (CommandProducesResultSet(Parameter["sql"].ToString()))
 						{
-							// SELECT query - capture the result (overwrite previous results to get the last SELECT)
+							// SELECT/RETURNING query - capture the result (overwrite previous results to get the last one)
 							result = new DataTable();
 							using (var reader = cmd.ExecuteReader())
 							{
@@ -600,10 +600,10 @@ namespace Classes
 						var cmd = buildcommand(conn, Parameter["sql"].ToString(), (Dictionary<string, object>)Parameter["values"], Timeout);
 						cmd.Transaction = transaction;
 
-						// Execute the command and capture results from SELECT queries
-						if (Parameter["sql"].ToString()?.Trim().StartsWith("SELECT", StringComparison.OrdinalIgnoreCase) == true)
+						// Execute the command and capture results from SELECT queries or statements with a RETURNING clause
+						if (CommandProducesResultSet(Parameter["sql"].ToString()))
 						{
-							// SELECT query - capture the result (overwrite previous results to get the last SELECT)
+							// SELECT/RETURNING query - capture the result (overwrite previous results to get the last one)
 							result = new DataTable();
 							using var reader = await cmd.ExecuteReaderAsync();
 							result.Load(reader);
@@ -628,6 +628,15 @@ namespace Classes
 				}
 
 				return result;
+			}
+
+			// Detects whether a SQL statement returns a result set: SELECT statements, or MariaDB INSERT/UPDATE/DELETE ... RETURNING statements.
+			private static bool CommandProducesResultSet(string? sql)
+			{
+				string trimmed = sql?.Trim() ?? string.Empty;
+				return trimmed.StartsWith("SELECT", StringComparison.OrdinalIgnoreCase)
+					|| trimmed.EndsWith("RETURNING", StringComparison.OrdinalIgnoreCase)
+					|| System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"\bRETURNING\b\s*[\w*,\s.`]+;?\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 			}
 
 			private MySqlCommand buildcommand(MySqlConnection Conn, string SQL, Dictionary<string, object> Parameters, int Timeout)

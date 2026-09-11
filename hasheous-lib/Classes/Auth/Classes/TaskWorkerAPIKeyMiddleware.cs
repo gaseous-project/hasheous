@@ -63,7 +63,7 @@ namespace Authentication
                 // check the cache first
                 if (Config.RedisConfiguration.Enabled)
                 {
-                    bool? cachedValue = await hasheous.Classes.RedisConnection.GetCacheItem<bool>(cacheKey);
+                    bool? cachedValue = await hasheous.Classes.RedisConnection.GetCacheItemValue<bool>(cacheKey);
                     if (cachedValue.HasValue)
                     {
                         return cachedValue.Value;
