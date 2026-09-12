@@ -30,6 +30,11 @@ namespace XML
 
         private const int MaxConcurrentImportWorkers = 4;
 
+        // Serialises GetOrCreateEntityIdAsync. The import workers share one
+        // ImportLookupCache, and its Dictionary is not thread safe, so without
+        // this they both race to insert the same name and corrupt the dictionary.
+        private static readonly SemaphoreSlim EntityLookupLock = new SemaphoreSlim(1, 1);
+
         /// <summary>
         /// Imports signature data from XML/DAT files into the database.
         /// </summary>
@@ -801,19 +806,43 @@ namespace XML
             if (string.IsNullOrWhiteSpace(key))
                 return 0;
 
-            if (cache.TryGetValue(key, out int existingId))
-                return existingId;
+            await EntityLookupLock.WaitAsync();
+            try
+            {
+                if (cache.TryGetValue(key, out int existingId))
+                    return existingId;
 
-            DataTable inserted = await Config.database.ExecuteCMDAsync(
-                $"INSERT INTO {tableName} (`{columnName}`) VALUES (@{parameterName}); SELECT CAST(LAST_INSERT_ID() AS SIGNED);",
-                new Dictionary<string, object>
+                Dictionary<string, object> parameters = new Dictionary<string, object>
                 {
                     { parameterName, key }
-                });
+                };
 
-            int newId = Convert.ToInt32(inserted.Rows[0][0]);
-            cache[key] = newId;
-            return newId;
+                // The cache is built per DAT file, so a row inserted while an
+                // earlier file was processed is absent from it. Look in the table
+                // before inserting, or that row is added a second time.
+                DataTable existing = await Config.database.ExecuteCMDAsync(
+                    $"SELECT `Id` FROM {tableName} WHERE `{columnName}` = @{parameterName} LIMIT 1;",
+                    parameters);
+
+                if (existing.Rows.Count > 0)
+                {
+                    int foundId = Convert.ToInt32(existing.Rows[0]["Id"]);
+                    cache[key] = foundId;
+                    return foundId;
+                }
+
+                DataTable inserted = await Config.database.ExecuteCMDAsync(
+                    $"INSERT INTO {tableName} (`{columnName}`) VALUES (@{parameterName}); SELECT CAST(LAST_INSERT_ID() AS SIGNED);",
+                    parameters);
+
+                int newId = Convert.ToInt32(inserted.Rows[0][0]);
+                cache[key] = newId;
+                return newId;
+            }
+            finally
+            {
+                EntityLookupLock.Release();
+            }
         }
     }
 }
