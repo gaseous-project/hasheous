@@ -2156,7 +2156,8 @@ namespace hasheous_server.Classes
         private static List<BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod> dontSearchMatchMethods = [
             BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Manual,
             BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin,
-            BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Voted
+            BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Voted,
+            BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NonAutomatic
         ];
 
         // get all metadata sources
@@ -2446,6 +2447,12 @@ namespace hasheous_server.Classes
                     {
                         metadata = metadataFromItem;
                     }
+                }
+
+                // breakout early if the match method is a don't search type
+                if (metadata.MatchMethod != null && dontSearchMatchMethods.Contains((BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod)metadata.MatchMethod))
+                {
+                    continue;
                 }
 
                 // create the search task for this metadata source
