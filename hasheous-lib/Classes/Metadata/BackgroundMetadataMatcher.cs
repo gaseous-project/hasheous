@@ -59,7 +59,12 @@ namespace BackgroundMetadataMatcher
             /// <summary>
             /// Match is in progress - this is used to prevent multiple matches from being made at the same time
             /// </summary>
-            InProgress = 6
+            InProgress = 6,
+
+            /// <summary>
+            /// Non-automatic matches are subject to change
+            /// </summary>
+            NonAutomatic = 7
         }
 
         private static HttpClient client = new HttpClient();

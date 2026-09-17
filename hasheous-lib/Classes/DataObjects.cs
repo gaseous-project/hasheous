@@ -1695,6 +1695,14 @@ namespace hasheous_server.Classes
                         .GroupBy(metadataItem => metadataItem.Source)
                         .ToDictionary(group => group.Key, group => group.First());
 
+                    List<BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod?> validMatchMethods = new List<BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod?>
+                    {
+                        BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
+                        BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic,
+                        BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.AutomaticTooManyMatches,
+                        BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NonAutomatic
+                    };
+
                     foreach (DataObjectItem.MetadataItem newMetadataItem in model.Metadata)
                     {
                         // skip none
@@ -1773,14 +1781,27 @@ namespace hasheous_server.Classes
                         }
 
                         BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod? matchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin;
+
                         if (trustModelMetadataSearchType == true)
                         {
-                            matchMethod = newMetadataItem.MatchMethod;
+                            if (validMatchMethods.Contains(newMetadataItem.MatchMethod))
+                            {
+                                matchMethod = newMetadataItem.MatchMethod;
+                            }
+                            else
+                            {
+                                matchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin;
+                            }
+                        }
+
+                        if (matchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic && String.IsNullOrWhiteSpace(newMetadataId))
+                        {
+                            matchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch;
                         }
 
                         if (existingMetadataBySource.TryGetValue(newMetadataItem.Source, out DataObjectItem.MetadataItem? existingMetadataItem))
                         {
-                            if (newMetadataId.ToString() != existingMetadataItem.Id)
+                            if (newMetadataId.ToString() != existingMetadataItem.Id || matchMethod != existingMetadataItem.MatchMethod)
                             {
                                 metadataChangeDetected = true;
 
@@ -1814,11 +1835,7 @@ namespace hasheous_server.Classes
                         if (trustModelMetadataSearchType == true)
                         {
                             // update next search field if match method is NoMatch or Automatic
-                            if (new List<BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod?>{
-                                BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
-                                BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic,
-                                BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.AutomaticTooManyMatches
-                            }.Contains(matchMethod))
+                            if (validMatchMethods.Contains(matchMethod))
                             {
                                 // update next search regardless of changes
                                 sql = "UPDATE DataObject_MetadataMap SET LastSearched=@lastsearched, NextSearch=@nextsearch WHERE DataObjectId=@id AND SourceId=@source;";
