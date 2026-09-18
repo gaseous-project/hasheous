@@ -51,7 +51,12 @@ document.getElementById('dataObjectSave').addEventListener("click", function (e)
         let manualRadioButton = document.getElementById('metadatamap' + source + '_manual');
 
         if (noChangeRadioButton.checked) {
-            // nothing to do for no change
+            // Preserve the existing mapping so the server does not treat it as removed.
+            metadata.push({
+                id: metadataInput.getAttribute('data-id-original') || '',
+                source: source,
+                matchMethod: metadataInput.getAttribute('data-matchmethod-original') || ''
+            });
             continue;
         }
 
