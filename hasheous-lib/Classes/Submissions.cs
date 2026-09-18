@@ -363,7 +363,7 @@ namespace hasheous_server.Classes
             // check the winning vote count
             // if the winning vote count is less than 3, then we do not update the metadata item
             // unless the match method is set to NoMatch, in which case we allow the update
-            if (metadataItem.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch || WinningVoteCount >= 3)
+            if (metadataItem.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch || metadataItem.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NonAutomatic || WinningVoteCount >= 3)
             {
                 // update the metadata item
                 // if Update is true, then we update the existing record
