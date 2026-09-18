@@ -1784,20 +1784,20 @@ namespace hasheous_server.Classes
 
                         if (trustModelMetadataSearchType == true)
                         {
-if (existingMetadataBySource.TryGetValue(newMetadataItem.Source, out DataObjectItem.MetadataItem? unchangedMetadataItem)
-    && newMetadataId == unchangedMetadataItem.Id
-    && newMetadataItem.MatchMethod == unchangedMetadataItem.MatchMethod)
-{
-    matchMethod = unchangedMetadataItem.MatchMethod;
-}
-else if (validMatchMethods.Contains(newMetadataItem.MatchMethod))
-{
-    matchMethod = newMetadataItem.MatchMethod;
-}
-else
-{
-    matchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin;
-}
+                            if (existingMetadataBySource.TryGetValue(newMetadataItem.Source, out DataObjectItem.MetadataItem? unchangedMetadataItem)
+                                && newMetadataId == unchangedMetadataItem.Id
+                                && newMetadataItem.MatchMethod == unchangedMetadataItem.MatchMethod)
+                            {
+                                matchMethod = unchangedMetadataItem.MatchMethod;
+                            }
+                            else if (validMatchMethods.Contains(newMetadataItem.MatchMethod))
+                            {
+                                matchMethod = newMetadataItem.MatchMethod;
+                            }
+                            else
+                            {
+                                matchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin;
+                            }
                         }
 
                         if (matchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic && String.IsNullOrWhiteSpace(newMetadataId))
@@ -2158,7 +2158,7 @@ else
             }
         }
 
-        // do not search for metadata if the matchmethod is Manual, ManualByAdmin, or Voted
+        // do not search for metadata if the matchmethod is Manual, ManualByAdmin, Voted, or NonAutomatic
         private static List<BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod> dontSearchMatchMethods = [
             BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Manual,
             BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin,
