@@ -1784,14 +1784,20 @@ namespace hasheous_server.Classes
 
                         if (trustModelMetadataSearchType == true)
                         {
-                            if (validMatchMethods.Contains(newMetadataItem.MatchMethod))
-                            {
-                                matchMethod = newMetadataItem.MatchMethod;
-                            }
-                            else
-                            {
-                                matchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin;
-                            }
+if (existingMetadataBySource.TryGetValue(newMetadataItem.Source, out DataObjectItem.MetadataItem? unchangedMetadataItem)
+    && newMetadataId == unchangedMetadataItem.Id
+    && newMetadataItem.MatchMethod == unchangedMetadataItem.MatchMethod)
+{
+    matchMethod = unchangedMetadataItem.MatchMethod;
+}
+else if (validMatchMethods.Contains(newMetadataItem.MatchMethod))
+{
+    matchMethod = newMetadataItem.MatchMethod;
+}
+else
+{
+    matchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin;
+}
                         }
 
                         if (matchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic && String.IsNullOrWhiteSpace(newMetadataId))
