@@ -44,9 +44,29 @@ document.getElementById('dataObjectSave').addEventListener("click", function (e)
             source = '';
         }
 
-        let matchMethod = metadataInput.getAttribute('data-matchmethod');
-        if (matchMethod == undefined) {
-            matchMethod = '';
+        // get radio button state
+        let noChangeRadioButton = document.getElementById('metadatamap' + source + '_nochange');
+        let automaticRadioButton = document.getElementById('metadatamap' + source + '_automatic');
+        let nonAutomaticRadioButton = document.getElementById('metadatamap' + source + '_nonautomatic');
+        let manualRadioButton = document.getElementById('metadatamap' + source + '_manual');
+
+        if (noChangeRadioButton.checked) {
+            // Preserve the existing mapping so the server does not treat it as removed.
+            metadata.push({
+                id: metadataInput.getAttribute('data-id-original') || '',
+                source: source,
+                matchMethod: metadataInput.getAttribute('data-matchmethod-original') || ''
+            });
+            continue;
+        }
+
+        let matchMethod;
+        if (automaticRadioButton.checked) {
+            matchMethod = 'Automatic';
+        } else if (nonAutomaticRadioButton.checked) {
+            matchMethod = 'NonAutomatic';
+        } else if (manualRadioButton.checked) {
+            matchMethod = 'Manual';
         }
 
         metadata.push(newMetadataObject(source, matchMethod, metadataInput));
@@ -556,11 +576,76 @@ async function loadData() {
 
             let metadataValueCell = document.createElement('td');
             metadataValueCell.classList.add('tablecell');
-            metadataValueCell.innerHTML = dataObject.metadata[i].id;
+            metadataValueCell.innerHTML = lang.getLang(dataObject.metadata[i].matchMethod) + '<br />' + dataObject.metadata[i].id;
             metadataRow.appendChild(metadataValueCell);
 
             let metadataInputCell = document.createElement('td');
             metadataInputCell.classList.add('tablecell');
+
+            let metadataNoChangeDiv = document.createElement('div');
+
+            let metadataNoChangeRadioButton = document.createElement('input');
+            metadataNoChangeRadioButton.id = 'metadatamap' + dataObject.metadata[i].source.toLowerCase() + '_nochange';
+            metadataNoChangeRadioButton.type = 'radio';
+            metadataNoChangeRadioButton.name = 'metadatamap' + dataObject.metadata[i].source.toLowerCase();
+            metadataNoChangeRadioButton.value = 'nochange';
+            metadataNoChangeRadioButton.setAttribute('checked', 'checked');
+            metadataNoChangeDiv.appendChild(metadataNoChangeRadioButton);
+
+            let metadataNoChangeLabel = document.createElement('label');
+            metadataNoChangeLabel.innerHTML = lang.getLang('nochange');
+            metadataNoChangeLabel.setAttribute('for', metadataNoChangeRadioButton.id);
+            metadataNoChangeDiv.appendChild(metadataNoChangeLabel);
+
+            metadataInputCell.appendChild(metadataNoChangeDiv);
+
+            let metadataAutomaticDiv = document.createElement('div');
+
+            let metadataAutomaticRadioButton = document.createElement('input');
+            metadataAutomaticRadioButton.id = 'metadatamap' + dataObject.metadata[i].source.toLowerCase() + '_automatic';
+            metadataAutomaticRadioButton.type = 'radio';
+            metadataAutomaticRadioButton.name = 'metadatamap' + dataObject.metadata[i].source.toLowerCase();
+            metadataAutomaticRadioButton.value = 'automatic';
+            metadataAutomaticDiv.appendChild(metadataAutomaticRadioButton);
+
+            let metadataAutomaticLabel = document.createElement('label');
+            metadataAutomaticLabel.innerHTML = lang.getLang('automatic');
+            metadataAutomaticLabel.setAttribute('for', metadataAutomaticRadioButton.id);
+            metadataAutomaticDiv.appendChild(metadataAutomaticLabel);
+
+            metadataInputCell.appendChild(metadataAutomaticDiv);
+
+            let metadataNonAutomaticDiv = document.createElement('div');
+
+            let metadataNonAutomaticRadioButton = document.createElement('input');
+            metadataNonAutomaticRadioButton.id = 'metadatamap' + dataObject.metadata[i].source.toLowerCase() + '_nonautomatic';
+            metadataNonAutomaticRadioButton.type = 'radio';
+            metadataNonAutomaticRadioButton.name = 'metadatamap' + dataObject.metadata[i].source.toLowerCase();
+            metadataNonAutomaticRadioButton.value = 'nonautomatic';
+            metadataNonAutomaticDiv.appendChild(metadataNonAutomaticRadioButton);
+
+            let metadataNonAutomaticLabel = document.createElement('label');
+            metadataNonAutomaticLabel.innerHTML = lang.getLang('nonautomatic');
+            metadataNonAutomaticLabel.setAttribute('for', metadataNonAutomaticRadioButton.id);
+            metadataNonAutomaticDiv.appendChild(metadataNonAutomaticLabel);
+
+            metadataInputCell.appendChild(metadataNonAutomaticDiv);
+
+            let metadataManualDiv = document.createElement('div');
+
+            let metadataManualRadioButton = document.createElement('input');
+            metadataManualRadioButton.id = 'metadatamap' + dataObject.metadata[i].source.toLowerCase() + '_manual';
+            metadataManualRadioButton.type = 'radio';
+            metadataManualRadioButton.name = 'metadatamap' + dataObject.metadata[i].source.toLowerCase();
+            metadataManualRadioButton.value = 'manual';
+            metadataManualDiv.appendChild(metadataManualRadioButton);
+
+            let metadataManualLabel = document.createElement('label');
+            metadataManualLabel.innerHTML = lang.getLang('manual');
+            metadataManualLabel.setAttribute('for', metadataManualRadioButton.id);
+            metadataManualDiv.appendChild(metadataManualLabel);
+
+            metadataInputCell.appendChild(metadataManualDiv);
 
             let metadataInput = document.createElement('input');
             metadataInput.type = 'text';
@@ -568,7 +653,9 @@ async function loadData() {
             metadataInput.id = 'metadatamap' + dataObject.metadata[i].source.toLowerCase();
             metadataInput.name = 'metadatamap';
             metadataInput.setAttribute('data-source', dataObject.metadata[i].source.toLowerCase());
+            metadataInput.setAttribute('data-id-original', dataObject.metadata[i].id);
             metadataInput.setAttribute('data-matchmethod', dataObject.metadata[i].matchMethod);
+            metadataInput.setAttribute('data-matchmethod-original', dataObject.metadata[i].matchMethod);
             metadataInput.value = dataObject.metadata[i].id;
             metadataInputCell.appendChild(metadataInput);
 

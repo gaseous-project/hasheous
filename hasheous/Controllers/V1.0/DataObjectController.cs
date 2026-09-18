@@ -266,7 +266,7 @@ namespace hasheous_server.Controllers.v1_0
                 {
                     hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
-                    Models.DataObjectItem? DataObject = await DataObjects.EditDataObject(ObjectType, Id, model);
+                    Models.DataObjectItem? DataObject = await DataObjects.EditDataObject(ObjectType, Id, model, true);
 
                     if (DataObject == null)
                     {

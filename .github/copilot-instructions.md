@@ -230,6 +230,13 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 - Use case: allows moderators/admins to block problematic games from being auto-matched (e.g., for duplicate/incorrect mappings) while keeping the object in the system.
 - Database: `DataObject.IsBlockedFromMatching` persists the blocking state; backend enforces the block during lookups when the flag is enabled.
 
+### Metadata match method controls (new behavior)
+- `BackgroundMetadataMatcher.MatchMethod.NonAutomatic` is a persisted mapping state that keeps the current metadata mapping but prevents background metadata searches from replacing it.
+- `NonAutomatic` is accepted by the trusted edit/save path alongside `NoMatch`, `Automatic`, and `AutomaticTooManyMatches`; unsupported client values fall back to `ManualByAdmin`.
+- Community submission tallying may update mappings marked `NonAutomatic` without requiring three winning votes, matching the `NoMatch` exception. Manual, admin-manual, and voted mappings retain their protected behavior.
+- The data-object edit UI presents `No Change`, `Automatic Match`, `Disable Automatic Match`, and `Manual` choices per metadata source. `No Change` leaves the existing mapping and match method untouched.
+- When `Automatic` is selected without a metadata id, normalize the mapping to `NoMatch`. The controller passes `trustModelMetadataSearchType = true` to `EditDataObject(...)` so explicit match-method choices are validated and persisted.
+
 - Correlation & logging
   - Middleware sets `CallContext` values (CorrelationId, CallingProcess, CallingUser); orchestrator also returns `x-correlation-id` header.
 
