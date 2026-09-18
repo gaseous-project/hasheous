@@ -131,6 +131,7 @@ namespace BackgroundMetadataMatcher
                     {
                         if (
                             metadata.MatchMethod == MatchMethod.Automatic ||
+                            metadata.MatchMethod == MatchMethod.NonAutomatic ||
                             metadata.MatchMethod == MatchMethod.Manual ||
                             metadata.MatchMethod == MatchMethod.ManualByAdmin ||
                             metadata.MatchMethod == MatchMethod.Voted
