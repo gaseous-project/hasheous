@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Amazon.S3.Model;
 using hasheous_server.Classes;
 using Microsoft.AspNetCore.Http;
 using Newtonsoft.Json;
@@ -282,10 +283,12 @@ namespace Classes
                 var (fl, bl) = await RunLocalMaintenanceAsync(sourceKey, tier1Config);
                 filesLocal += fl;
                 bytesLocal += bl;
-            }
 
-            // Run Tier 2 (S3) maintenance (placeholder for now)
-            // S3 lifecycle policies can be configured instead
+                // Run Tier 2 (S3) maintenance for the same source prefix.
+                var (filesS3ForSource, bytesS3ForSource) = await RunS3MaintenanceAsync(sourceKey, tier2Config, cancellationToken);
+                filesS3 += filesS3ForSource;
+                bytesS3 += bytesS3ForSource;
+            }
 
             return (filesLocal, filesS3, bytesLocal, bytesS3);
         }
@@ -369,6 +372,71 @@ namespace Classes
             }
 
             return (filesDeleted, bytesFreed);
+        }
+
+        /// <summary>
+        /// Runs age-based and size-based cleanup for one S3 cache prefix.
+        /// </summary>
+        private static async Task<(long FilesDeleted, long BytesFreed)> RunS3MaintenanceAsync(
+            string sourceKey,
+            CacheTierConfiguration tierConfig,
+            CancellationToken cancellationToken)
+        {
+            if (!Config.S3StorageConfiguration.Enabled || string.IsNullOrWhiteSpace(Config.S3StorageConfiguration.DefaultBucket))
+            {
+                return (0, 0);
+            }
+
+            try
+            {
+                S3StorageTools storageTools = new S3StorageTools();
+                string bucketName = Config.S3StorageConfiguration.DefaultBucket;
+                List<S3Object> objects = await storageTools.ListObjectsAsync(bucketName, $"{sourceKey}/", cancellationToken);
+                HashSet<string> keysToDelete = new HashSet<string>(StringComparer.Ordinal);
+
+                if (tierConfig.MaxAgeDays.HasValue)
+                {
+                    DateTime cutoffDate = DateTime.UtcNow.AddDays(-tierConfig.MaxAgeDays.Value);
+                    foreach (S3Object s3Object in objects.Where(item => item.LastModified < cutoffDate))
+                    {
+                        keysToDelete.Add(s3Object.Key);
+                    }
+                }
+
+                long remainingSize = objects
+                    .Where(item => !keysToDelete.Contains(item.Key))
+                    .Sum(item => item.Size ?? 0);
+
+                if (remainingSize > tierConfig.MaxSizeBytes)
+                {
+                    foreach (S3Object s3Object in objects
+                        .Where(item => !keysToDelete.Contains(item.Key))
+                        .OrderBy(item => item.LastModified))
+                    {
+                        if (remainingSize <= tierConfig.MaxSizeBytes)
+                        {
+                            break;
+                        }
+
+                        keysToDelete.Add(s3Object.Key);
+                        remainingSize -= s3Object.Size ?? 0;
+                    }
+                }
+
+                List<string> deletedKeys = await storageTools.DeleteObjectsAsync(bucketName, keysToDelete, cancellationToken);
+                Dictionary<string, long> sizesByKey = objects.ToDictionary(item => item.Key, item => item.Size ?? 0, StringComparer.Ordinal);
+                long bytesFreed = deletedKeys.Sum(key => sizesByKey.TryGetValue(key, out long size) ? size : 0);
+                return (deletedKeys.Count, bytesFreed);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Logging.Log(Logging.LogType.Warning, "ProxyCacheManager", $"RunS3MaintenanceAsync failed for {sourceKey}: {ex.Message}");
+                return (0, 0);
+            }
         }
 
         // ===== HELPERS =====
