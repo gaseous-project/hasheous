@@ -796,6 +796,27 @@ namespace XML
                 if (!string.IsNullOrWhiteSpace(normalizedValue) && idsByValue.TryGetValue(normalizedValue, out int existingIdByValue))
                     return existingIdByValue;
 
+                // the process-wide cache is loaded once, so check the table directly in case another
+                // process/ingest run inserted this row after the cache was populated
+                DataTable existing = await Config.database.ExecuteCMDAsync(
+                    $"SELECT `Id` FROM {tableName} WHERE `Code` = @code OR `Value` = @name LIMIT 1;",
+                    new Dictionary<string, object>
+                    {
+                        { "code", normalizedCode },
+                        { "name", normalizedValue }
+                    });
+
+                if (existing.Rows.Count > 0)
+                {
+                    int foundId = Convert.ToInt32(existing.Rows[0]["Id"]);
+                    if (!string.IsNullOrWhiteSpace(normalizedCode))
+                        idsByCode[normalizedCode] = foundId;
+                    if (!string.IsNullOrWhiteSpace(normalizedValue))
+                        idsByValue[normalizedValue] = foundId;
+
+                    return foundId;
+                }
+
                 DataTable inserted = await Config.database.ExecuteCMDAsync(
                     $"INSERT INTO {tableName} (`Code`, `Value`) VALUES (@code, @name); SELECT CAST(LAST_INSERT_ID() AS SIGNED);",
                     new Dictionary<string, object>
