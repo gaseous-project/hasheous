@@ -757,7 +757,7 @@ namespace XML
 
         private static async Task LoadLookupTableAsync(string tableName, string firstColumn, string? secondColumn, ConcurrentDictionary<string, int> firstCache, ConcurrentDictionary<string, int>? secondCache)
         {
-            string columns = secondColumn == null ? $"`Id`, `{firstColumn}" : $"`Id`, `{firstColumn}`, `{secondColumn}`";
+            string columns = secondColumn == null ? $"`Id`, `{firstColumn}`" : $"`Id`, `{firstColumn}`, `{secondColumn}`";
             DataTable rows = await Config.database.ExecuteCMDAsync($"SELECT {columns} FROM {tableName};");
             foreach (DataRow row in rows.Rows)
             {
