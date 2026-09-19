@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Data;
 using System.IO;
 using System.Net;
@@ -20,15 +21,75 @@ namespace XML
     {
         private sealed class ImportLookupCache
         {
-            public Dictionary<string, int> CountryIdsByCode { get; } = new(StringComparer.OrdinalIgnoreCase);
-            public Dictionary<string, int> CountryIdsByValue { get; } = new(StringComparer.OrdinalIgnoreCase);
-            public Dictionary<string, int> LanguageIdsByCode { get; } = new(StringComparer.OrdinalIgnoreCase);
-            public Dictionary<string, int> LanguageIdsByValue { get; } = new(StringComparer.OrdinalIgnoreCase);
-            public Dictionary<string, int> PlatformIds { get; } = new(StringComparer.OrdinalIgnoreCase);
-            public Dictionary<string, int> PublisherIds { get; } = new(StringComparer.OrdinalIgnoreCase);
+            public ConcurrentDictionary<string, int> CountryIdsByCode { get; } = GlobalCountryIdsByCode;
+            public ConcurrentDictionary<string, int> CountryIdsByValue { get; } = GlobalCountryIdsByValue;
+            public ConcurrentDictionary<string, int> LanguageIdsByCode { get; } = GlobalLanguageIdsByCode;
+            public ConcurrentDictionary<string, int> LanguageIdsByValue { get; } = GlobalLanguageIdsByValue;
+            public ConcurrentDictionary<string, int> PlatformIds { get; } = GlobalPlatformIds;
+            public ConcurrentDictionary<string, int> PublisherIds { get; } = GlobalPublisherIds;
         }
 
         private const int MaxConcurrentImportWorkers = 4;
+
+        private static readonly ConcurrentDictionary<string, int> GlobalCountryIdsByCode = new(StringComparer.OrdinalIgnoreCase);
+        private static readonly ConcurrentDictionary<string, int> GlobalCountryIdsByValue = new(StringComparer.OrdinalIgnoreCase);
+        private static readonly ConcurrentDictionary<string, int> GlobalLanguageIdsByCode = new(StringComparer.OrdinalIgnoreCase);
+        private static readonly ConcurrentDictionary<string, int> GlobalLanguageIdsByValue = new(StringComparer.OrdinalIgnoreCase);
+        private static readonly ConcurrentDictionary<string, int> GlobalPlatformIds = new(StringComparer.OrdinalIgnoreCase);
+        private static readonly ConcurrentDictionary<string, int> GlobalPublisherIds = new(StringComparer.OrdinalIgnoreCase);
+        private static readonly SemaphoreSlim LookupCacheLoadLock = new SemaphoreSlim(1, 1);
+        private static bool _lookupCacheLoaded;
+
+        // Serializes cache-miss database mutations shared by the import workers within this process.
+        private static readonly SemaphoreSlim EntityLookupLock = new SemaphoreSlim(1, 1);
+
+        // MySQL GET_LOCK/RELEASE_LOCK wrapper: closes the check-then-insert race across separate
+        // ingestion processes (orchestrator + service-host) sharing the same database, since
+        // EntityLookupLock only serializes workers within a single process.
+        private sealed class MySqlNamedLock : IAsyncDisposable
+        {
+            private readonly MySqlConnection _connection;
+            private readonly string _lockName;
+
+            private MySqlNamedLock(MySqlConnection connection, string lockName)
+            {
+                _connection = connection;
+                _lockName = lockName;
+            }
+
+            public static async Task<MySqlNamedLock> AcquireAsync(string connectionString, string lockName, int timeoutSeconds = 30)
+            {
+                MySqlConnection connection = new MySqlConnection(connectionString);
+                await connection.OpenAsync();
+
+                using MySqlCommand acquireCmd = new MySqlCommand("SELECT GET_LOCK(@name, @timeout);", connection);
+                acquireCmd.Parameters.AddWithValue("@name", lockName);
+                acquireCmd.Parameters.AddWithValue("@timeout", timeoutSeconds);
+
+                object? result = await acquireCmd.ExecuteScalarAsync();
+                if (result == null || result == DBNull.Value || Convert.ToInt32(result) != 1)
+                {
+                    await connection.DisposeAsync();
+                    throw new TimeoutException($"Timed out waiting for distributed lock '{lockName}'.");
+                }
+
+                return new MySqlNamedLock(connection, lockName);
+            }
+
+            public async ValueTask DisposeAsync()
+            {
+                try
+                {
+                    using MySqlCommand releaseCmd = new MySqlCommand("SELECT RELEASE_LOCK(@name);", _connection);
+                    releaseCmd.Parameters.AddWithValue("@name", _lockName);
+                    await releaseCmd.ExecuteScalarAsync();
+                }
+                finally
+                {
+                    await _connection.DisposeAsync();
+                }
+            }
+        }
 
         /// <summary>
         /// Imports signature data from XML/DAT files into the database.
@@ -719,54 +780,50 @@ namespace XML
 
         private static async Task<ImportLookupCache> LoadImportLookupCacheAsync()
         {
-            ImportLookupCache cache = new ImportLookupCache();
-
-            DataTable countries = await Config.database.ExecuteCMDAsync("SELECT `Id`, `Code`, `Value` FROM Country;");
-            foreach (DataRow row in countries.Rows)
+            if (!Volatile.Read(ref _lookupCacheLoaded))
             {
-                int id = Convert.ToInt32(row["Id"]);
-                string code = Convert.ToString(Common.ReturnValueIfNull(row["Code"], "")) ?? "";
-                string value = Convert.ToString(Common.ReturnValueIfNull(row["Value"], "")) ?? "";
-
-                if (!string.IsNullOrWhiteSpace(code) && !cache.CountryIdsByCode.ContainsKey(code))
-                    cache.CountryIdsByCode[code] = id;
-                if (!string.IsNullOrWhiteSpace(value) && !cache.CountryIdsByValue.ContainsKey(value))
-                    cache.CountryIdsByValue[value] = id;
+                await LookupCacheLoadLock.WaitAsync();
+                try
+                {
+                    if (!Volatile.Read(ref _lookupCacheLoaded))
+                    {
+                        await LoadLookupTableAsync("Country", "Code", "Value", GlobalCountryIdsByCode, GlobalCountryIdsByValue);
+                        await LoadLookupTableAsync("Language", "Code", "Value", GlobalLanguageIdsByCode, GlobalLanguageIdsByValue);
+                        await LoadLookupTableAsync("Signatures_Platforms", "Platform", null, GlobalPlatformIds, null);
+                        await LoadLookupTableAsync("Signatures_Publishers", "Publisher", null, GlobalPublisherIds, null);
+                        Volatile.Write(ref _lookupCacheLoaded, true);
+                    }
+                }
+                finally
+                {
+                    LookupCacheLoadLock.Release();
+                }
             }
 
-            DataTable languages = await Config.database.ExecuteCMDAsync("SELECT `Id`, `Code`, `Value` FROM Language;");
-            foreach (DataRow row in languages.Rows)
-            {
-                int id = Convert.ToInt32(row["Id"]);
-                string code = Convert.ToString(Common.ReturnValueIfNull(row["Code"], "")) ?? "";
-                string value = Convert.ToString(Common.ReturnValueIfNull(row["Value"], "")) ?? "";
-
-                if (!string.IsNullOrWhiteSpace(code) && !cache.LanguageIdsByCode.ContainsKey(code))
-                    cache.LanguageIdsByCode[code] = id;
-                if (!string.IsNullOrWhiteSpace(value) && !cache.LanguageIdsByValue.ContainsKey(value))
-                    cache.LanguageIdsByValue[value] = id;
-            }
-
-            DataTable platforms = await Config.database.ExecuteCMDAsync("SELECT `Id`, `Platform` FROM Signatures_Platforms;");
-            foreach (DataRow row in platforms.Rows)
-            {
-                string platform = Convert.ToString(Common.ReturnValueIfNull(row["Platform"], "")) ?? "";
-                if (!string.IsNullOrWhiteSpace(platform) && !cache.PlatformIds.ContainsKey(platform))
-                    cache.PlatformIds[platform] = Convert.ToInt32(row["Id"]);
-            }
-
-            DataTable publishers = await Config.database.ExecuteCMDAsync("SELECT `Id`, `Publisher` FROM Signatures_Publishers;");
-            foreach (DataRow row in publishers.Rows)
-            {
-                string publisher = Convert.ToString(Common.ReturnValueIfNull(row["Publisher"], "")) ?? "";
-                if (!string.IsNullOrWhiteSpace(publisher) && !cache.PublisherIds.ContainsKey(publisher))
-                    cache.PublisherIds[publisher] = Convert.ToInt32(row["Id"]);
-            }
-
-            return cache;
+            return new ImportLookupCache();
         }
 
-        private static async Task<int> ResolveLookupIdAsync(string tableName, string? code, string? value, Dictionary<string, int> idsByCode, Dictionary<string, int> idsByValue)
+        private static async Task LoadLookupTableAsync(string tableName, string firstColumn, string? secondColumn, ConcurrentDictionary<string, int> firstCache, ConcurrentDictionary<string, int>? secondCache)
+        {
+            string columns = secondColumn == null ? $"`Id`, `{firstColumn}`" : $"`Id`, `{firstColumn}`, `{secondColumn}`";
+            DataTable rows = await Config.database.ExecuteCMDAsync($"SELECT {columns} FROM {tableName};");
+            foreach (DataRow row in rows.Rows)
+            {
+                int id = Convert.ToInt32(row["Id"]);
+                string firstValue = Convert.ToString(Common.ReturnValueIfNull(row[firstColumn], "")) ?? "";
+                if (!string.IsNullOrWhiteSpace(firstValue))
+                    firstCache.TryAdd(firstValue, id);
+
+                if (secondColumn != null && secondCache != null)
+                {
+                    string secondValue = Convert.ToString(Common.ReturnValueIfNull(row[secondColumn], "")) ?? "";
+                    if (!string.IsNullOrWhiteSpace(secondValue))
+                        secondCache.TryAdd(secondValue, id);
+                }
+            }
+        }
+
+        private static async Task<int> ResolveLookupIdAsync(string tableName, string? code, string? value, ConcurrentDictionary<string, int> idsByCode, ConcurrentDictionary<string, int> idsByValue)
         {
             string normalizedCode = (code ?? string.Empty).Trim();
             string normalizedValue = (value ?? string.Empty).Trim();
@@ -779,41 +836,103 @@ namespace XML
 
             Logging.Log(Logging.LogType.Warning, "Signature Ingest", $"Unable to locate {tableName.ToLowerInvariant()} id for {normalizedCode}");
 
-            DataTable inserted = await Config.database.ExecuteCMDAsync(
-                $"INSERT INTO {tableName} (`Code`, `Value`) VALUES (@code, @name); SELECT CAST(LAST_INSERT_ID() AS SIGNED);",
-                new Dictionary<string, object>
+            await EntityLookupLock.WaitAsync();
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(normalizedCode) && idsByCode.TryGetValue(normalizedCode, out int existingIdByCode))
+                    return existingIdByCode;
+                if (!string.IsNullOrWhiteSpace(normalizedValue) && idsByValue.TryGetValue(normalizedValue, out int existingIdByValue))
+                    return existingIdByValue;
+
+                await using MySqlNamedLock distributedLock = await MySqlNamedLock.AcquireAsync(Config.database.ConnectionString, $"hasheous_siglookup_{tableName}");
+
+                // the process-wide cache is loaded once, so check the table directly in case another
+                // process/ingest run inserted this row after the cache was populated
+                DataTable existing = await Config.database.ExecuteCMDAsync(
+                    $"SELECT `Id` FROM {tableName} WHERE `Code` = @code OR `Value` = @name LIMIT 1;",
+                    new Dictionary<string, object>
+                    {
+                        { "code", normalizedCode },
+                        { "name", normalizedValue }
+                    });
+
+                if (existing.Rows.Count > 0)
                 {
-                    { "code", normalizedCode },
-                    { "name", normalizedValue }
-                });
+                    int foundId = Convert.ToInt32(existing.Rows[0]["Id"]);
+                    if (!string.IsNullOrWhiteSpace(normalizedCode))
+                        idsByCode[normalizedCode] = foundId;
+                    if (!string.IsNullOrWhiteSpace(normalizedValue))
+                        idsByValue[normalizedValue] = foundId;
 
-            int newId = Convert.ToInt32(inserted.Rows[0][0]);
-            if (!string.IsNullOrWhiteSpace(normalizedCode))
-                idsByCode[normalizedCode] = newId;
-            if (!string.IsNullOrWhiteSpace(normalizedValue))
-                idsByValue[normalizedValue] = newId;
+                    return foundId;
+                }
 
-            return newId;
+                DataTable inserted = await Config.database.ExecuteCMDAsync(
+                    $"INSERT INTO {tableName} (`Code`, `Value`) VALUES (@code, @name); SELECT CAST(LAST_INSERT_ID() AS SIGNED);",
+                    new Dictionary<string, object>
+                    {
+                        { "code", normalizedCode },
+                        { "name", normalizedValue }
+                    });
+
+                int newId = Convert.ToInt32(inserted.Rows[0][0]);
+                if (!string.IsNullOrWhiteSpace(normalizedCode))
+                    idsByCode[normalizedCode] = newId;
+                if (!string.IsNullOrWhiteSpace(normalizedValue))
+                    idsByValue[normalizedValue] = newId;
+
+                return newId;
+            }
+            finally
+            {
+                EntityLookupLock.Release();
+            }
         }
 
-        private static async Task<int> GetOrCreateEntityIdAsync(Dictionary<string, int> cache, string key, string tableName, string columnName, string parameterName)
+        private static async Task<int> GetOrCreateEntityIdAsync(ConcurrentDictionary<string, int> cache, string key, string tableName, string columnName, string parameterName)
         {
             if (string.IsNullOrWhiteSpace(key))
                 return 0;
 
-            if (cache.TryGetValue(key, out int existingId))
-                return existingId;
+            await EntityLookupLock.WaitAsync();
+            try
+            {
+                if (cache.TryGetValue(key, out int existingId))
+                    return existingId;
 
-            DataTable inserted = await Config.database.ExecuteCMDAsync(
-                $"INSERT INTO {tableName} (`{columnName}`) VALUES (@{parameterName}); SELECT CAST(LAST_INSERT_ID() AS SIGNED);",
-                new Dictionary<string, object>
+                await using MySqlNamedLock distributedLock = await MySqlNamedLock.AcquireAsync(Config.database.ConnectionString, $"hasheous_siglookup_{tableName}");
+
+                Dictionary<string, object> parameters = new Dictionary<string, object>
                 {
                     { parameterName, key }
-                });
+                };
 
-            int newId = Convert.ToInt32(inserted.Rows[0][0]);
-            cache[key] = newId;
-            return newId;
+                // The cache is built per DAT file, so a row inserted while an
+                // earlier file was processed is absent from it. Look in the table
+                // before inserting, or that row is added a second time.
+                DataTable existing = await Config.database.ExecuteCMDAsync(
+                    $"SELECT `Id` FROM {tableName} WHERE `{columnName}` = @{parameterName} LIMIT 1;",
+                    parameters);
+
+                if (existing.Rows.Count > 0)
+                {
+                    int foundId = Convert.ToInt32(existing.Rows[0]["Id"]);
+                    cache[key] = foundId;
+                    return foundId;
+                }
+
+                DataTable inserted = await Config.database.ExecuteCMDAsync(
+                    $"INSERT INTO {tableName} (`{columnName}`) VALUES (@{parameterName}); SELECT CAST(LAST_INSERT_ID() AS SIGNED);",
+                    parameters);
+
+                int newId = Convert.ToInt32(inserted.Rows[0][0]);
+                cache[key] = newId;
+                return newId;
+            }
+            finally
+            {
+                EntityLookupLock.Release();
+            }
         }
     }
 }
