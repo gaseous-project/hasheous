@@ -40,8 +40,56 @@ namespace XML
         private static readonly SemaphoreSlim LookupCacheLoadLock = new SemaphoreSlim(1, 1);
         private static bool _lookupCacheLoaded;
 
-        // Serializes cache-miss database mutations shared by the import workers.
+        // Serializes cache-miss database mutations shared by the import workers within this process.
         private static readonly SemaphoreSlim EntityLookupLock = new SemaphoreSlim(1, 1);
+
+        // MySQL GET_LOCK/RELEASE_LOCK wrapper: closes the check-then-insert race across separate
+        // ingestion processes (orchestrator + service-host) sharing the same database, since
+        // EntityLookupLock only serializes workers within a single process.
+        private sealed class MySqlNamedLock : IAsyncDisposable
+        {
+            private readonly MySqlConnection _connection;
+            private readonly string _lockName;
+
+            private MySqlNamedLock(MySqlConnection connection, string lockName)
+            {
+                _connection = connection;
+                _lockName = lockName;
+            }
+
+            public static async Task<MySqlNamedLock> AcquireAsync(string connectionString, string lockName, int timeoutSeconds = 30)
+            {
+                MySqlConnection connection = new MySqlConnection(connectionString);
+                await connection.OpenAsync();
+
+                using MySqlCommand acquireCmd = new MySqlCommand("SELECT GET_LOCK(@name, @timeout);", connection);
+                acquireCmd.Parameters.AddWithValue("@name", lockName);
+                acquireCmd.Parameters.AddWithValue("@timeout", timeoutSeconds);
+
+                object? result = await acquireCmd.ExecuteScalarAsync();
+                if (result == null || result == DBNull.Value || Convert.ToInt32(result) != 1)
+                {
+                    await connection.DisposeAsync();
+                    throw new TimeoutException($"Timed out waiting for distributed lock '{lockName}'.");
+                }
+
+                return new MySqlNamedLock(connection, lockName);
+            }
+
+            public async ValueTask DisposeAsync()
+            {
+                try
+                {
+                    using MySqlCommand releaseCmd = new MySqlCommand("SELECT RELEASE_LOCK(@name);", _connection);
+                    releaseCmd.Parameters.AddWithValue("@name", _lockName);
+                    await releaseCmd.ExecuteScalarAsync();
+                }
+                finally
+                {
+                    await _connection.DisposeAsync();
+                }
+            }
+        }
 
         /// <summary>
         /// Imports signature data from XML/DAT files into the database.
@@ -796,6 +844,8 @@ namespace XML
                 if (!string.IsNullOrWhiteSpace(normalizedValue) && idsByValue.TryGetValue(normalizedValue, out int existingIdByValue))
                     return existingIdByValue;
 
+                await using MySqlNamedLock distributedLock = await MySqlNamedLock.AcquireAsync(Config.database.ConnectionString, $"hasheous_siglookup_{tableName}");
+
                 // the process-wide cache is loaded once, so check the table directly in case another
                 // process/ingest run inserted this row after the cache was populated
                 DataTable existing = await Config.database.ExecuteCMDAsync(
@@ -849,6 +899,8 @@ namespace XML
             {
                 if (cache.TryGetValue(key, out int existingId))
                     return existingId;
+
+                await using MySqlNamedLock distributedLock = await MySqlNamedLock.AcquireAsync(Config.database.ConnectionString, $"hasheous_siglookup_{tableName}");
 
                 Dictionary<string, object> parameters = new Dictionary<string, object>
                 {
