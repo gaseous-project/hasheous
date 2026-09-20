@@ -1024,6 +1024,17 @@ namespace Classes
                 }
 
                 /// <summary>
+                /// Gets the directory path for HackHash metadata within the library metadata directory.
+                /// </summary>
+                public string LibraryMetadataDirectory_HackHash
+                {
+                    get
+                    {
+                        return Path.Combine(LibraryMetadataDirectory, "HackHash");
+                    }
+                }
+
+                /// <summary>
                 /// Gets the directory path for TOSEC metadata within the library metadata directory.
                 /// </summary>
                 public string LibraryMetadataDirectory_TOSEC

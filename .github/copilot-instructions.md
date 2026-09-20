@@ -63,6 +63,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
     - `Media`: local tier defaults to size-only retention; S3 tier defaults to 2-year max age.
     - `Bundles`: local and S3 tiers default to 90-day max age.
     - `MinFreeDiskSpaceBytes` on local tiers triggers eviction even when size is under target if disk free space is low.
+    - S3 Tier 2 maintenance lists objects under each source prefix, removes objects older than `MaxAgeDays`, then evicts oldest remaining objects when the prefix exceeds `MaxSizeBytes`. Set `MaxAgeDays` to `null` and `MaxSizeBytes` to a sufficiently large positive value to disable policy cleanup.
   - S3 env vars: `s3enabled`, `s3region`, `s3serviceurl`, `s3accesskey`, `s3secretkey`, `s3sessiontoken`, `s3forcepathstyle`.
   - Supporter recognition env vars: `opencollectiveclientid`, `opencollectiveclientsecret`, `opencollectiveapitoken`, `opencollectivecollectiveslug`.
   - For MinIO and similar S3-compatible endpoints, use host-only `ServiceUrl` (for example `https://s3.mrgtech.net`) and typically set `ForcePathStyle = true`.
