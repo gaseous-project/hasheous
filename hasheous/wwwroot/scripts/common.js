@@ -678,6 +678,7 @@ let signatureSources = {
     11: "MAMERedump",
     12: "TotalDOSCollection",
     13: "eXo",
+    14: "HackHash",
     98: "ScreenScraper"
 }
 
