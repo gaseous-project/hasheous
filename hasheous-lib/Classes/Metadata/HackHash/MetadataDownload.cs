@@ -50,12 +50,10 @@ namespace HackHash
                 Logging.Log(Logging.LogType.Warning, "HackHash", $"Datfile zip not found at {tempDir}, skipping extraction.");
                 return;
             }
-            using (var archive = System.IO.Compression.ZipFile.OpenRead(downloadPath))
+            Classes.PathSecurity.ExtractZipSafely(downloadPath, extractDir, renameOnCollision: true, onSkippedEntry: (entryName) =>
             {
-                foreach (var entry in archive.Entries)
-                {
-                    await entry.ExtractToFileAsync(System.IO.Path.Combine(extractDir, entry.Name));
-                }
+                Logging.Log(Logging.LogType.Warning, "HackHash", $"Skipped potentially unsafe zip entry: {entryName}");
+            });
             }
 
             // move extracted files to processing directory
