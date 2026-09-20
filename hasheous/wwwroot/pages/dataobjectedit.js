@@ -468,7 +468,7 @@ async function loadData() {
 
     }
     $(signatureElement).select2({
-        minimumInputLength: 3,
+        minimumInputLength: 2,
         closeOnSelect: false,
         templateResult: signatureSelectionFormatter,
         ajax: {
@@ -803,7 +803,7 @@ function GetSuggestedSignatures() {
         "name": searchName.value
     };
 
-    if (searchName.value.length > 3) {
+    if (searchName.value.length > 2) {
         // get search results
         postData(
             url,
