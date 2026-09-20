@@ -405,7 +405,7 @@ namespace Classes
 
                 long remainingSize = objects
                     .Where(item => !keysToDelete.Contains(item.Key))
-                    .Sum(item => item.Size ?? 0);
+                    .Sum(item => item.Size);
 
                 if (remainingSize > tierConfig.MaxSizeBytes)
                 {
