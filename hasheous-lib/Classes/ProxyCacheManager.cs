@@ -280,11 +280,13 @@ namespace Classes
             // Run Tier 1 (local disk) maintenance
             foreach (string sourceKey in sourceKeys)
             {
+                Logging.Log(Logging.LogType.Information, "ProxyCacheManager", $"Running local maintenance for source key: {sourceKey}");
                 var (fl, bl) = await RunLocalMaintenanceAsync(sourceKey, tier1Config);
                 filesLocal += fl;
                 bytesLocal += bl;
 
                 // Run Tier 2 (S3) maintenance for the same source prefix.
+                Logging.Log(Logging.LogType.Information, "ProxyCacheManager", $"Running S3 maintenance for source key: {sourceKey}");
                 var (filesS3ForSource, bytesS3ForSource) = await RunS3MaintenanceAsync(sourceKey, tier2Config, cancellationToken);
                 filesS3 += filesS3ForSource;
                 bytesS3 += bytesS3ForSource;
@@ -403,7 +405,7 @@ namespace Classes
                     }
                 }
 
-                long remainingSize = objects
+                long? remainingSize = objects
                     .Where(item => !keysToDelete.Contains(item.Key))
                     .Sum(item => item.Size);
 

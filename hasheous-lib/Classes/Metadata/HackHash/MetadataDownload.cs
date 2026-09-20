@@ -54,7 +54,6 @@ namespace HackHash
             {
                 Logging.Log(Logging.LogType.Warning, "HackHash", $"Skipped potentially unsafe zip entry: {entryName}");
             });
-            }
 
             // move extracted files to processing directory
             string hackhashProcessingDir = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesDirectory, "HackHash");
