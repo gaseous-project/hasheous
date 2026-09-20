@@ -13,6 +13,7 @@
     --signature-source-color-screenscraper: #0000ff;
     --signature-source-color-totaldoscollection: #ff69b4;
     --signature-source-color-exo: #008a55;
+    --signature-source-color-hackhash: #4a4a6a;
     --signature-source-color-generic: #7f00ff;
 }
 
@@ -70,6 +71,10 @@
 
 .color-exo {
     background-color: var(--signature-source-color-exo);
+}
+
+.color-hackhash {
+    background-color: var(--signature-source-color-hackhash);
 }
 
 .color-generic {
