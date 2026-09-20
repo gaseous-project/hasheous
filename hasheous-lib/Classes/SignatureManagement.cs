@@ -325,10 +325,10 @@ HAVING
             {
                 if (model.Name != null)
                 {
-                    if (model.Name.Length < 3)
+                    if (model.Name.Length < 2)
                     {
                         // search name too short - throw an error
-                        throw new SignatureBadSearchCriteriaException("Name search field must be 3 characters or longer");
+                        throw new SignatureBadSearchCriteriaException("Name search field must be 2 characters or longer");
                     }
                 }
                 else if (model.Ids != null)
@@ -401,7 +401,7 @@ HAVING
             string? whereClause_Name = null;
             if (model.Name != null)
             {
-                if (model.Name.Length >= 3)
+                if (model.Name.Length >= 2)
                 {
                     // whereNameField is set by every branch of the search type switch above
                     whereClause_Name = BuildNameSearchPredicate(whereNameField!, model.Name, dbDict, "name");
