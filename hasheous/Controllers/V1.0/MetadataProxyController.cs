@@ -2155,8 +2155,14 @@ namespace hasheous_server.Controllers.v1_0
                             gameData["Images"] = new List<Dictionary<string, object>>();
                             foreach (var image in gameImages)
                             {
+                                if (String.IsNullOrEmpty(image["FileName"]?.ToString()))
+                                {
+                                    continue;
+                                }
+
                                 ((List<Dictionary<string, object>>)gameData["Images"]).Add(image);
-                                var mediaFileResponse = await GetLaunchBoxImage(image["FileName"].ToString());
+                                string mediaFileName = image["FileName"].ToString();
+                                var mediaFileResponse = await GetLaunchBoxImage(mediaFileName);
 
                                 if (mediaFileResponse is NotFoundObjectResult)
                                 {
@@ -2166,7 +2172,7 @@ namespace hasheous_server.Controllers.v1_0
 
                                 if (mediaFileResponse is FileResult mediaFileData)
                                 {
-                                    await _AddFileToBundle(tempWorkingDir, "Images", mediaFileData, image["FileName"].ToString());
+                                    await _AddFileToBundle(tempWorkingDir, "Images", mediaFileData, mediaFileName);
                                 }
                             }
                         }
