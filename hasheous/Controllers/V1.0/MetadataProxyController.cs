@@ -2202,7 +2202,7 @@ namespace hasheous_server.Controllers.v1_0
                             try
                             {
                                 StorageFallbackResolver resolver = new StorageFallbackResolver();
-                                await resolver.UploadLocalFileToS3Async(bundleFilePath, Config.S3StorageConfiguration.DefaultBucket, $"Bundles/{fileName}", overwrite: false);
+                                await resolver.UploadLocalFileToS3Async(bundleFilePath, Config.S3StorageConfiguration.DefaultBucket, $"Bundles/{fileName}", overwrite: forcerebuild);
                             }
                             catch (Exception ex)
                             {
