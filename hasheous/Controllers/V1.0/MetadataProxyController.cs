@@ -1555,25 +1555,55 @@ namespace hasheous_server.Controllers.v1_0
         [Route("LaunchBox/{resourceType}")]
         public async Task<IActionResult> GetLaunchBoxResources(LaunchBoxResourceType resourceType, int pageNumber = 1, int pageSize = 50)
         {
-            string idField = "Id";
-            switch (resourceType)
+            if (pageNumber < 1 || pageSize < 1 || pageSize > 100)
             {
-                case LaunchBoxResourceType.Game:
-                    idField = "DatabaseID";
-                    break;
+                return BadRequest("Invalid pagination parameters.");
             }
 
-            string sql = $"SELECT * FROM `launchbox`.`{resourceType}` ORDER BY `{idField}` LIMIT @offset, @pageSize";
-            var result = await Config.database.ExecuteCMDDictAsync(sql, new Dictionary<string, object>
-            {
-                { "offset", (pageNumber - 1) * pageSize },
-                { "pageSize", pageSize }
-            });
-            if (result == null || result.Count == 0)
+            var result = await GetLaunchBoxResourcesInternal(resourceType, pageNumber, pageSize);
+            if (result == null)
             {
                 return NotFound();
             }
             return Ok(result);
+        }
+
+        private async Task<List<Dictionary<string, object>>?> GetLaunchBoxResourcesInternal(LaunchBoxResourceType resourceType, int pageNumber, int pageSize, long? id = null)
+        {
+            string idField = "Id";
+            switch (resourceType)
+            {
+                case LaunchBoxResourceType.Game:
+                case LaunchBoxResourceType.GameAlternateName:
+                case LaunchBoxResourceType.GameImage:
+                    idField = "DatabaseID";
+                    break;
+                case LaunchBoxResourceType.PlatformAlternateName:
+                    idField = "Name";
+                    break;
+            }
+
+            string sql;
+            Dictionary<string, object> parameters = new Dictionary<string, object>
+            {
+                { "offset", (pageNumber - 1) * pageSize },
+                { "pageSize", pageSize }
+            };
+            if (id.HasValue)
+            {
+                sql = $"SELECT * FROM `launchbox`.`{resourceType}` WHERE `{idField}` = @id ORDER BY `{idField}` LIMIT @offset, @pageSize";
+                parameters.Add("id", id.Value);
+            }
+            else
+            {
+                sql = $"SELECT * FROM `launchbox`.`{resourceType}` ORDER BY `{idField}` LIMIT @offset, @pageSize";
+            }
+            var result = await Config.database.ExecuteCMDDictAsync(sql, parameters);
+            if (result == null || result.Count == 0)
+            {
+                return null;
+            }
+            return result;
         }
 
         /// <summary>
@@ -1594,6 +1624,21 @@ namespace hasheous_server.Controllers.v1_0
                 return BadRequest("Invalid ID");
             }
 
+            var result = await GetLaunchBoxResourceInternal(resourceType, id);
+            if (result == null)
+            {
+                return NotFound();
+            }
+            return Ok(result);
+        }
+
+        private async Task<Dictionary<string, object>?> GetLaunchBoxResourceInternal(LaunchBoxResourceType resourceType, string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                return null;
+            }
+
             string idField = "Id";
             switch (resourceType)
             {
@@ -1604,20 +1649,50 @@ namespace hasheous_server.Controllers.v1_0
 
             string sql = $"SELECT * FROM `launchbox`.`{resourceType}` WHERE `{idField}` = @id";
 
-            // Execute the SQL query and return the result
             var result = await Config.database.ExecuteCMDDictAsync(sql, new Dictionary<string, object> { { "id", id } });
             if (result == null || result.Count == 0)
             {
-                return NotFound();
+                return null;
             }
-            return Ok(result[0]);
+            return result[0];
+        }
+
+        private async Task<object?> ExpandLaunchBoxResource(LaunchBoxResourceType Resource, string SubResourceId)
+        {
+            var subResourceData = await GetLaunchBoxResourceInternal(Resource, SubResourceId.ToString());
+            if (subResourceData != null)
+            {
+                switch (Resource)
+                {
+                    case LaunchBoxResourceType.GameImage:
+                        subResourceData["Region"] = await ExpandLaunchBoxResource(LaunchBoxResourceType.Region, subResourceData["Region"]?.ToString() ?? string.Empty) ?? string.Empty;
+                        subResourceData["Type"] = await ExpandLaunchBoxResource(LaunchBoxResourceType.ImageType, subResourceData["Type"]?.ToString() ?? string.Empty) ?? string.Empty;
+                        break;
+                    case LaunchBoxResourceType.Platform:
+                        subResourceData["Developer"] = await ExpandLaunchBoxResource(LaunchBoxResourceType.Company, subResourceData["Developer"]?.ToString() ?? string.Empty) ?? string.Empty;
+                        subResourceData["Manufacturer"] = await ExpandLaunchBoxResource(LaunchBoxResourceType.Company, subResourceData["Manufacturer"]?.ToString() ?? string.Empty) ?? string.Empty;
+                        subResourceData["Category"] = await ExpandLaunchBoxResource(LaunchBoxResourceType.PlatformCategory, subResourceData["Category"]?.ToString() ?? string.Empty) ?? string.Empty;
+                        if (!String.IsNullOrEmpty(subResourceData["Id"].ToString()) && long.TryParse(subResourceData["Id"].ToString(), out long platformId))
+                        {
+                            var altNames = await GetLaunchBoxResourcesInternal(LaunchBoxResourceType.PlatformAlternateName, 1, 50, platformId);
+                            subResourceData["AlternateNames"] = altNames ?? new List<Dictionary<string, object>>();
+                        }
+                        break;
+                }
+
+                return subResourceData;
+            }
+
+            return SubResourceId;
         }
 
         [MapToApiVersion("1.0")]
         [HttpGet]
+        [NoClientApiKeyNeeded()]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [Route("LaunchBox/Images/{fileName}")]
+        [ResponseCache(CacheProfileName = "7Days")]
         public async Task<IActionResult> GetLaunchBoxImage(string fileName, bool? redirect = null)
         {
             // ensure the file name doesn't contain invalid characters
@@ -1754,7 +1829,7 @@ namespace hasheous_server.Controllers.v1_0
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [Route("Bundles/{MetadataSourceName}/{GameID}.bundle")]
-        public async Task<IActionResult> GetMetadataBundle(string MetadataSourceName, string GameID, bool? redirect = null)
+        public async Task<IActionResult> GetMetadataBundle(string MetadataSourceName, string GameID, bool? redirect = null, bool forcerebuild = false)
         {
             // validate GameID
             GameID = System.Uri.UnescapeDataString(GameID);
@@ -1768,7 +1843,7 @@ namespace hasheous_server.Controllers.v1_0
             }
 
             // validate MetadataSourceName
-            var validSources = new List<string> { "IGDB", "TheGamesDB", "Screenscraper" };
+            var validSources = new List<string> { "IGDB", "TheGamesDB", "Screenscraper", "LaunchBox" };
             if (!validSources.Contains(MetadataSourceName))
             {
                 return BadRequest("Invalid metadata source. Valid sources are: " + string.Join(", ", validSources));
@@ -1796,11 +1871,27 @@ namespace hasheous_server.Controllers.v1_0
                 }
             }
 
-            if (System.IO.File.Exists(bundleFilePath))
+            if (forcerebuild == false)
             {
-                // check the file age
-                fileInfo = new FileInfo(bundleFilePath);
-                if ((DateTime.Now - fileInfo.LastWriteTime).TotalDays <= Config.MetadataConfiguration.MetadataBundle_MaxAgeInDays)
+                if (System.IO.File.Exists(bundleFilePath))
+                {
+                    // check the file age
+                    fileInfo = new FileInfo(bundleFilePath);
+                    if ((DateTime.Now - fileInfo.LastWriteTime).TotalDays <= Config.MetadataConfiguration.MetadataBundle_MaxAgeInDays)
+                    {
+                        // Try to resolve from cache (local or S3 fallback)
+                        var cachedStream = await ProxyCacheManager.ResolveReadAsync("Bundles", resourcePath, CachePolicyType.Bundles, "application/octet-stream");
+                        if (cachedStream != null)
+                        {
+                            return FileWithManagedStream(cachedStream, "application/octet-stream", fileName);
+                        }
+
+                        // Rebuild if the existing bundle cannot be served.
+                        buildNewBundle = true;
+                    }
+                }
+
+                if (buildNewBundle && !System.IO.File.Exists(bundleFilePath))
                 {
                     // Try to resolve from cache (local or S3 fallback)
                     var cachedStream = await ProxyCacheManager.ResolveReadAsync("Bundles", resourcePath, CachePolicyType.Bundles, "application/octet-stream");
@@ -1808,19 +1899,6 @@ namespace hasheous_server.Controllers.v1_0
                     {
                         return FileWithManagedStream(cachedStream, "application/octet-stream", fileName);
                     }
-
-                    // Rebuild if the existing bundle cannot be served.
-                    buildNewBundle = true;
-                }
-            }
-
-            if (buildNewBundle && !System.IO.File.Exists(bundleFilePath))
-            {
-                // Try to resolve from cache (local or S3 fallback)
-                var cachedStream = await ProxyCacheManager.ResolveReadAsync("Bundles", resourcePath, CachePolicyType.Bundles, "application/octet-stream");
-                if (cachedStream != null)
-                {
-                    return FileWithManagedStream(cachedStream, "application/octet-stream", fileName);
                 }
             }
 
@@ -2035,6 +2113,62 @@ namespace hasheous_server.Controllers.v1_0
                         {
                             return BadRequest();
                         }
+                        break;
+
+                    case "LaunchBox":
+                        // handle LaunchBox metadata
+                        var gameData = await GetLaunchBoxResourceInternal(LaunchBoxResourceType.Game, GameID);
+                        if (gameData == null)
+                        {
+                            return NotFound();
+                        }
+
+                        // populate the response with LaunchBox game data
+                        gameData["Developer"] = await ExpandLaunchBoxResource(LaunchBoxResourceType.Company, gameData["Developer"]?.ToString() ?? string.Empty) ?? string.Empty;
+                        gameData["ESRB"] = await ExpandLaunchBoxResource(LaunchBoxResourceType.ESRB, gameData["ESRB"]?.ToString() ?? string.Empty) ?? string.Empty;
+                        gameData["Platform"] = await ExpandLaunchBoxResource(LaunchBoxResourceType.Platform, gameData["Platform"]?.ToString() ?? string.Empty) ?? string.Empty;
+                        gameData["Publisher"] = await ExpandLaunchBoxResource(LaunchBoxResourceType.Company, gameData["Publisher"]?.ToString() ?? string.Empty) ?? string.Empty;
+                        gameData["ReleaseType"] = await ExpandLaunchBoxResource(LaunchBoxResourceType.ReleaseType, gameData["ReleaseType"]?.ToString() ?? string.Empty) ?? string.Empty;
+                        var gameAlternateNames = await GetLaunchBoxResourcesInternal(LaunchBoxResourceType.GameAlternateName, 1, 50, long.Parse(GameID));
+                        if (gameAlternateNames != null)
+                        {
+                            gameData["AlternateNames"] = new List<Dictionary<string, object>>();
+                            foreach (var alternateName in gameAlternateNames)
+                            {
+                                var expandedAlternateName = alternateName;
+                                if (alternateName.ContainsKey("Region") && alternateName["Region"] != null)
+                                {
+                                    expandedAlternateName["Region"] = await ExpandLaunchBoxResource(LaunchBoxResourceType.Region, alternateName["Region"]?.ToString() ?? string.Empty) ?? alternateName["Region"];
+                                }
+                                ((List<Dictionary<string, object>>)gameData["AlternateNames"]).Add(expandedAlternateName);
+                            }
+                        }
+                        var gameImages = await GetLaunchBoxResourcesInternal(LaunchBoxResourceType.GameImage, 1, 100, long.Parse(GameID));
+                        if (gameImages != null)
+                        {
+                            gameData["Images"] = new List<Dictionary<string, object>>();
+                            foreach (var image in gameImages)
+                            {
+                                ((List<Dictionary<string, object>>)gameData["Images"]).Add(image);
+                                var mediaFileResponse = await GetLaunchBoxImage(image["FileName"].ToString());
+
+                                if (mediaFileResponse is NotFoundObjectResult)
+                                {
+                                    // skip if media not found
+                                    continue;
+                                }
+
+                                if (mediaFileResponse is FileResult mediaFileData)
+                                {
+                                    await _AddFileToBundle(tempWorkingDir, "Images", mediaFileData, image["FileName"].ToString());
+                                }
+                            }
+                        }
+
+                        // convert the metadata to json and save it to the bundle
+                        var jsonMetadata = Newtonsoft.Json.JsonConvert.SerializeObject(gameData);
+                        await _AddMetadataToBundle(tempWorkingDir, "Game", jsonMetadata);
+
                         break;
                 }
 
