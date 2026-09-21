@@ -1449,6 +1449,7 @@ namespace hasheous_server.Controllers.v1_0
 
             string mimeType = "image/png";
             string extension = "jpg"; // default extension
+            string mediaTypeDirectory = "Images";
             switch (mediaItem.format?.ToLower())
             {
                 case "jpg":
@@ -1471,10 +1472,12 @@ namespace hasheous_server.Controllers.v1_0
                 case "pdf":
                     mimeType = "application/pdf";
                     extension = "pdf";
+                    mediaTypeDirectory = "Documents";
                     break;
                 case "mp4":
                     mimeType = "video/mp4";
                     extension = "mp4";
+                    mediaTypeDirectory = "Videos";
                     break;
                 case "svg":
                     mimeType = "image/svg+xml";
@@ -1486,7 +1489,7 @@ namespace hasheous_server.Controllers.v1_0
                     break;
             }
 
-            string resourcePath = $"Images/{systemeid}/{jeuid}/{media}.{extension}";
+            string resourcePath = $"{mediaTypeDirectory}/{systemeid}/{jeuid}/{media}.{extension}";
             string url = Classes.MetadataLib.MetadataScreenScraper.ssMedia.Endpoint(jeuid, systemeid, media, null);
 
             string serviceName = "Screenscraper";
@@ -1536,6 +1539,199 @@ namespace hasheous_server.Controllers.v1_0
             }
         }
         #endregion ScreenScraper
+
+        #region LaunchBox
+        /// <summary>
+        /// Retrieves a paginated list of LaunchBox resources based on the specified resource type.
+        /// </summary>
+        /// <param name="resourceType">The type of LaunchBox resource to retrieve.</param>
+        /// <param name="pageNumber">The page number for pagination.</param>
+        /// <param name="pageSize">The number of items per page.</param>
+        /// <returns>A paginated list of LaunchBox resources.</returns>
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(typeof(List<Dictionary<string, object>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [Route("LaunchBox/{resourceType}")]
+        public async Task<IActionResult> GetLaunchBoxResources(LaunchBoxResourceType resourceType, int pageNumber = 1, int pageSize = 50)
+        {
+            string idField = "Id";
+            switch (resourceType)
+            {
+                case LaunchBoxResourceType.Game:
+                    idField = "DatabaseID";
+                    break;
+            }
+
+            string sql = $"SELECT * FROM `launchbox`.`{resourceType}` ORDER BY `{idField}` LIMIT @offset, @pageSize";
+            var result = await Config.database.ExecuteCMDDictAsync(sql, new Dictionary<string, object>
+            {
+                { "offset", (pageNumber - 1) * pageSize },
+                { "pageSize", pageSize }
+            });
+            if (result == null || result.Count == 0)
+            {
+                return NotFound();
+            }
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Retrieves a specific LaunchBox resource based on the specified resource type and ID.
+        /// </summary>
+        /// <param name="resourceType">The type of LaunchBox resource to retrieve.</param>
+        /// <param name="id">The ID of the LaunchBox resource to retrieve.</param>
+        /// <returns>The requested LaunchBox resource if found; otherwise, a 404 Not Found response.</returns>
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(typeof(Dictionary<string, object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [Route("LaunchBox/{resourceType}/{id}")]
+        public async Task<IActionResult> GetLaunchBoxResource(LaunchBoxResourceType resourceType, string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                return BadRequest("Invalid ID");
+            }
+
+            string idField = "Id";
+            switch (resourceType)
+            {
+                case LaunchBoxResourceType.Game:
+                    idField = "DatabaseID";
+                    break;
+            }
+
+            string sql = $"SELECT * FROM `launchbox`.`{resourceType}` WHERE `{idField}` = @id";
+
+            // Execute the SQL query and return the result
+            var result = await Config.database.ExecuteCMDDictAsync(sql, new Dictionary<string, object> { { "id", id } });
+            if (result == null || result.Count == 0)
+            {
+                return NotFound();
+            }
+            return Ok(result[0]);
+        }
+
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [Route("LaunchBox/Images/{fileName}")]
+        public async Task<IActionResult> GetLaunchBoxImage(string fileName, bool? redirect = null)
+        {
+            // ensure the file name doesn't contain invalid characters
+            if (string.IsNullOrWhiteSpace(fileName) || fileName.Contains("..") || fileName.Contains("\\") || fileName.Contains("/"))
+            {
+                return BadRequest("Invalid file name");
+            }
+
+            string mimeType = "image/png";
+            string extension = "jpg"; // default extension
+            switch (Path.GetExtension(fileName)?.ToLower())
+            {
+                case "jpg":
+                case "jpeg":
+                    mimeType = "image/jpeg";
+                    extension = "jpg";
+                    break;
+                case "gif":
+                    mimeType = "image/gif";
+                    extension = "gif";
+                    break;
+                case "bmp":
+                    mimeType = "image/bmp";
+                    extension = "bmp";
+                    break;
+                case "tiff":
+                    mimeType = "image/tiff";
+                    extension = "tiff";
+                    break;
+                case "pdf":
+                    mimeType = "application/pdf";
+                    extension = "pdf";
+                    break;
+                case "mp4":
+                    mimeType = "video/mp4";
+                    extension = "mp4";
+                    break;
+                case "svg":
+                    mimeType = "image/svg+xml";
+                    extension = "svg";
+                    break;
+                default:
+                    mimeType = "image/png";
+                    extension = "png";
+                    break;
+            }
+
+            string resourcePath = $"Images/{fileName}";
+            string url = $"https://images.launchbox-app.com/{fileName}";
+
+            string serviceName = "LaunchBox";
+
+            bool useRedirect = ResolveRedirectFlag(redirect);
+            if (useRedirect)
+            {
+                // redirect to s3
+                var redirectResponse = await HandleRedirect(serviceName, resourcePath);
+                if (redirectResponse != null)
+                {
+                    return redirectResponse;
+                }
+            }
+
+            try
+            {
+                // Try to resolve from cache (local or S3 fallback)
+                var cachedStream = await ProxyCacheManager.ResolveReadAsync(serviceName, resourcePath, CachePolicyType.Media, mimeType);
+                if (cachedStream != null)
+                {
+                    return FileWithManagedStream(cachedStream, mimeType);
+                }
+
+                // Download and cache the image
+                var fileStream = await ProxyCacheManager.DownloadAndCacheAsync(url, serviceName, resourcePath, CachePolicyType.Media, mimeType, HttpContext);
+                if (fileStream.ContentStream != null)
+                {
+                    if (fileStream.ContentStream.ContentLength.HasValue && fileStream.ContentStream.ContentLength.Value <= 7)
+                    {
+                        await fileStream.ContentStream.DisposeAsync();
+
+                        if (System.IO.File.Exists(fileStream.LocalFilePath))
+                        {
+                            System.IO.File.Delete(fileStream.LocalFilePath);
+                        }
+                        return NotFound("Media not found for the specified game and system.");
+                    }
+                    return FileWithManagedStream(fileStream.ContentStream, mimeType);
+                }
+
+                return NotFound();
+            }
+            catch
+            {
+                return NotFound();
+            }
+        }
+
+        public enum LaunchBoxResourceType
+        {
+            Company,
+            Emulator,
+            EmulatorPlatform,
+            ESRB,
+            Game,
+            GameAlternateName,
+            GameImage,
+            ImageType,
+            Platform,
+            PlatformAlternateName,
+            PlatformCategory,
+            Region,
+            ReleaseType
+        }
+        #endregion LaunchBox
 
         #region MetadataBundles
         /// <summary>
