@@ -278,6 +278,7 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 - A PR guard (`.github/workflows/copilot-instructions-guard.yml`) fails when architecture/config files change without updating this file; it prints hints via `.github/scripts/copilot-instructions-help.sh`.
   - Always update this file when: resource namespace conventions change (e.g., `hasheous_lib.*` migration), new cross-cutting utilities like `ComputeObjectPropertyHash` are added, queue coordination semantics are modified, MCP routing/tooling/auth changes, DataObject model or lookup behavior changes, or major framework/dependency updates occur (e.g., .NET version bumps, Swagger/OpenAPI package upgrades). This applies to every repository change that alters or documents project behavior; do not defer the update.
 - Current repo workflow note: when adding or changing a background job or metadata source, update the orchestrator schedule, the shared queue dispatcher, and the service-host task wiring in the same change. Do not leave one side of the task chain resolving the work while the other still expects the old entry or blocked dependency set.
+- Schema, cache, and API-contract changes are cross-cutting: when a change alters persisted tables, Redis/cache keys, or response payloads, update the matching controller/service logic, any UI callers, and relevant docs/examples in the same PR so the contract remains coherent across the stack.
 
 ## API key usage examples
 - User API key (header `X-API-Key`):
