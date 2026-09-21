@@ -1829,8 +1829,14 @@ namespace hasheous_server.Controllers.v1_0
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [Route("Bundles/{MetadataSourceName}/{GameID}.bundle")]
-        public async Task<IActionResult> GetMetadataBundle(string MetadataSourceName, string GameID, bool? redirect = null, bool forcerebuild = false)
+        public async Task<IActionResult> GetMetadataBundle(string MetadataSourceName, string GameID, bool? redirect = null)
         {
+            // force rebuild only exists for debug purposes and should not be used in production
+            bool forcerebuild = false;
+#if DEBUG
+            forcerebuild = true;
+#endif
+
             // validate GameID
             GameID = System.Uri.UnescapeDataString(GameID);
             if (GameID.Contains("..") || GameID.Contains("\\"))
