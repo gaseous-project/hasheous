@@ -1555,7 +1555,7 @@ namespace hasheous_server.Controllers.v1_0
         [Route("LaunchBox/{resourceType}")]
         public async Task<IActionResult> GetLaunchBoxResources(LaunchBoxResourceType resourceType, int pageNumber = 1, int pageSize = 50)
         {
-            if (pageNumber < 1 || pageSize < 1 || pageSize > 100)
+            if (pageNumber < 1 || pageNumber >= 2000000000 || pageSize < 1 || pageSize > 100)
             {
                 return BadRequest("Invalid pagination parameters.");
             }
