@@ -768,7 +768,7 @@ namespace hasheous_server.Controllers.v1_0
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [Route("app/{Id}/ClientApiKeys")]
-        public async Task<IActionResult> NewClientApiKey(long Id, string Name, DateTime? Expires)
+        public async Task<IActionResult> NewClientApiKey(long Id, string Name, DateTime? Expires, bool AgreeToTerms)
         {
             var user = await _userManager.GetUserAsync(User);
 
@@ -776,6 +776,11 @@ namespace hasheous_server.Controllers.v1_0
 
             if (await dataObjectPermission.CheckAsync(user, DataObjects.DataObjectType.App, DataObjectPermission.PermissionType.Update, Id))
             {
+                if (!AgreeToTerms)
+                {
+                    return BadRequest("You must agree to the terms before creating a client API key.");
+                }
+
                 Authentication.ClientApiKey clientApiKey = new Authentication.ClientApiKey();
 
                 return Ok(clientApiKey.CreateApiKey(Id, Name, Expires));

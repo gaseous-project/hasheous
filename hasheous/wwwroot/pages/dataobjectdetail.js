@@ -834,6 +834,11 @@ function renderContent() {
                 let createClientAPIKeyBtn = document.getElementById('dataObjectClientAPIKeyCreate');
                 createClientAPIKeyBtn.disabled = true;
                 createClientAPIKeyBtn.addEventListener("click", function (e) {
+                    if (clientAPIAgreementCheckbox.checked === false) {
+                        alert('You must agree to the client API key usage terms before creating a key.');
+                        return;
+                    }
+
                     // create client api key model
                     let clientAPIKeyUrl = '/api/v1/DataObjects/app/' + getQueryString('id', 'int') + '/ClientAPIKeys' + '?name=' + encodeURIComponent(document.getElementById('dataObjectClientAPIKeyName').value);
 
