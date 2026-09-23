@@ -154,15 +154,16 @@ namespace hasheous_server.Controllers.v1_0
 
         [MapToApiVersion("1.0")]
         [HttpPost]
-        [Authorize()]
+        [Authorize(Roles = "Admin,Moderator,Member")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [Route("{ObjectType}")]
         public async Task<IActionResult> NewDataObject(Classes.DataObjects.DataObjectType ObjectType, Models.DataObjectItemModel model)
         {
             // check role - all users can create apps but only moderators and admins can create platforms and games
-            if (ObjectType != Classes.DataObjects.DataObjectType.App && !User.IsInRole("Admin") && !User.IsInRole("Moderator"))
+            if ((ObjectType == Classes.DataObjects.DataObjectType.App && !User.IsInRole("Member")) ||
+            (ObjectType != Classes.DataObjects.DataObjectType.App && !User.IsInRole("Moderator") && !User.IsInRole("Admin")))
             {
-                return Unauthorized();
+                return Forbid();
             }
 
             // check permission
@@ -192,16 +193,17 @@ namespace hasheous_server.Controllers.v1_0
 
         [MapToApiVersion("1.0")]
         [HttpDelete]
-        [Authorize()]
+        [Authorize(Roles = "Admin,Moderator,Member")]
         [Route("{ObjectType}/{Id}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> DeleteDataObject(Classes.DataObjects.DataObjectType ObjectType, long Id)
         {
             // check role - all users can delete apps (so long as they have permission on the object) but only moderators and admins can delete platforms and games
-            if (ObjectType != Classes.DataObjects.DataObjectType.App && !User.IsInRole("Admin") && !User.IsInRole("Moderator"))
+            if ((ObjectType == Classes.DataObjects.DataObjectType.App && !User.IsInRole("Member")) ||
+            (ObjectType != Classes.DataObjects.DataObjectType.App && !User.IsInRole("Moderator") && !User.IsInRole("Admin")))
             {
-                return Unauthorized();
+                return Forbid();
             }
 
             // check permission
