@@ -90,10 +90,14 @@ namespace hasheous_server.Controllers.v1_0
 
             string cacheKey = hasheous_server.Classes.DataObjects.DataObjectCacheKey(ObjectType, Id);
 
-            var cacheItem = await RedisConnection.GetCacheItem<Models.DataObjectItem>(cacheKey);
-            if (cacheItem != null)
+            // bypass cache for apps
+            if (ObjectType != Classes.DataObjects.DataObjectType.App)
             {
-                return Ok(cacheItem);
+                var cacheItem = await RedisConnection.GetCacheItem<Models.DataObjectItem>(cacheKey);
+                if (cacheItem != null)
+                {
+                    return Ok(cacheItem);
+                }
             }
 
             hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
@@ -150,11 +154,17 @@ namespace hasheous_server.Controllers.v1_0
 
         [MapToApiVersion("1.0")]
         [HttpPost]
-        [Authorize(Roles = "Admin,Moderator")]
+        [Authorize()]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [Route("{ObjectType}")]
         public async Task<IActionResult> NewDataObject(Classes.DataObjects.DataObjectType ObjectType, Models.DataObjectItemModel model)
         {
+            // check role - all users can create apps but only moderators and admins can create platforms and games
+            if (ObjectType != Classes.DataObjects.DataObjectType.App && !User.IsInRole("Admin") && !User.IsInRole("Moderator"))
+            {
+                return Unauthorized();
+            }
+
             // check permission
             var user = await _userManager.GetUserAsync(User);
             DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
@@ -182,12 +192,18 @@ namespace hasheous_server.Controllers.v1_0
 
         [MapToApiVersion("1.0")]
         [HttpDelete]
-        [Authorize(Roles = "Admin,Moderator")]
+        [Authorize()]
         [Route("{ObjectType}/{Id}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> DeleteDataObject(Classes.DataObjects.DataObjectType ObjectType, long Id)
         {
+            // check role - all users can delete apps (so long as they have permission on the object) but only moderators and admins can delete platforms and games
+            if (ObjectType != Classes.DataObjects.DataObjectType.App && !User.IsInRole("Admin") && !User.IsInRole("Moderator"))
+            {
+                return Unauthorized();
+            }
+
             // check permission
             var user = await _userManager.GetUserAsync(User);
             DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
