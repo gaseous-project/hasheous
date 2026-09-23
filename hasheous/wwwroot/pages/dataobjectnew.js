@@ -7,7 +7,7 @@ setPageTitle("newcompany");
 let mustRedirect = true;
 if (userProfile != null) {
     if (userProfile.Roles != null) {
-        if (userProfile.Roles.includes('Admin') || userProfile.Roles.includes('Moderator')) {
+        if (userProfile.Roles.includes('Admin') || userProfile.Roles.includes('Moderator') || (pageType === 'app' && userProfile.Roles.includes('Member'))) {
             mustRedirect = false;
         }
     }

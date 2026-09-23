@@ -828,11 +828,19 @@ function renderContent() {
             if (dataObject.permissions.includes('Update')) {
                 document.getElementById('dataObjectClientAPIKeysSection').style.display = '';
 
+                let clientAPIAgreementCheckbox = document.getElementById('dataObjectClientAPIKeyUsage');
+
                 // set up the create client api key button
                 let createClientAPIKeyBtn = document.getElementById('dataObjectClientAPIKeyCreate');
+                createClientAPIKeyBtn.disabled = true;
                 createClientAPIKeyBtn.addEventListener("click", function (e) {
+                    if (clientAPIAgreementCheckbox.checked === false) {
+                        alert(lang.getLang('clientapiagreewarn'));
+                        return;
+                    }
+
                     // create client api key model
-                    let clientAPIKeyUrl = '/api/v1/DataObjects/app/' + getQueryString('id', 'int') + '/ClientAPIKeys' + '?name=' + encodeURIComponent(document.getElementById('dataObjectClientAPIKeyName').value);
+                    let clientAPIKeyUrl = '/api/v1/DataObjects/app/' + getQueryString('id', 'int') + '/ClientAPIKeys' + '?name=' + encodeURIComponent(document.getElementById('dataObjectClientAPIKeyName').value) + '&agreeToTerms=' + clientAPIAgreementCheckbox.checked;
 
                     if (
                         document.getElementById('dataObjectClientAPIKeyExpiresCustom').checked == true &&
@@ -854,11 +862,19 @@ function renderContent() {
 
                                 document.getElementById('dataObjectClientAPIKeysResponse').innerHTML = lang.getLang('clientapikeyresponse', [value.key]);
 
+                                clientAPIAgreementCheckbox.checked = false;
+                                createClientAPIKeyBtn.disabled = true;
+
                                 GetApiKeys();
                             } else {
                                 throw new Error('Failed to create client API key');
                             }
                         });
+                });
+
+                // set up the client API agreement checkbox
+                clientAPIAgreementCheckbox.addEventListener("change", function (e) {
+                    createClientAPIKeyBtn.disabled = !clientAPIAgreementCheckbox.checked;
                 });
 
                 GetApiKeys();

@@ -445,6 +445,7 @@ namespace hasheous_server.Classes
                     data.Rows[i],
                     GetChildRelations,
                     GetMetadataMap,
+                    false,
                     false
                 );
 
@@ -552,6 +553,7 @@ namespace hasheous_server.Classes
                     data.Rows[i],
                     true,
                     false,
+                    false,
                     false
                 );
 
@@ -593,7 +595,7 @@ namespace hasheous_server.Classes
             }
         }
 
-        public async Task<Models.DataObjectItem?> GetDataObject(DataObjectType objectType, long id, bool GetChildRelations = true, bool GetMetadata = true, bool GetSignatureData = true)
+        public async Task<Models.DataObjectItem?> GetDataObject(DataObjectType objectType, long id, bool GetChildRelations = true, bool GetMetadata = true, bool GetSignatureData = true, bool BypassCache = false)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "SELECT * FROM DataObject WHERE ObjectType=@objecttype AND Id=@id;";
@@ -606,7 +608,7 @@ namespace hasheous_server.Classes
 
             if (data.Rows.Count > 0)
             {
-                DataObjectItem item = await BuildDataObject(objectType, id, data.Rows[0], GetChildRelations, GetMetadata, GetSignatureData);
+                DataObjectItem item = await BuildDataObject(objectType, id, data.Rows[0], GetChildRelations, GetMetadata, GetSignatureData, BypassCache);
 
                 return item;
             }
@@ -736,10 +738,10 @@ namespace hasheous_server.Classes
             }
         }
 
-        private async Task<Models.DataObjectItem> BuildDataObject(DataObjectType ObjectType, long id, DataRow row, bool GetChildRelations = false, bool GetMetadata = true, bool GetSignatureData = true)
+        private async Task<Models.DataObjectItem> BuildDataObject(DataObjectType ObjectType, long id, DataRow row, bool GetChildRelations = false, bool GetMetadata = true, bool GetSignatureData = true, bool BypassCache = false)
         {
             // get attributes
-            List<AttributeItem> attributes = await GetAttributes(id, GetChildRelations);
+            List<AttributeItem> attributes = await GetAttributes(id, GetChildRelations, BypassCache);
 
             // get signature items
             List<Dictionary<string, object>> signatureItems = new List<Dictionary<string, object>>();
@@ -818,14 +820,18 @@ namespace hasheous_server.Classes
             return item;
         }
 
-        public async Task<List<AttributeItem>> GetAttributes(long DataObjectId, bool GetChildRelations)
+        public async Task<List<AttributeItem>> GetAttributes(long DataObjectId, bool GetChildRelations, bool BypassCache = false)
         {
             string cacheKey = RedisConnection.GenerateKey("AttributeItems", DataObjectId.ToString() + GetChildRelations.ToString());
 
-            List<AttributeItem>? attributes = await RedisConnection.GetCacheItem<List<AttributeItem>>(cacheKey);
-            if (attributes != null)
+            List<AttributeItem>? attributes = null;
+            if (!BypassCache)
             {
-                return attributes;
+                attributes = await RedisConnection.GetCacheItem<List<AttributeItem>>(cacheKey);
+                if (attributes != null)
+                {
+                    return attributes;
+                }
             }
 
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
@@ -2036,7 +2042,7 @@ namespace hasheous_server.Classes
                 }
             }
 
-            return await GetDataObject(objectType, id);
+            return await GetDataObject(objectType, id, BypassCache: true);
         }
 
         /// <summary>

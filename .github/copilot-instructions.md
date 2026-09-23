@@ -448,6 +448,14 @@ Additional example (rating boards):
 - Current prompt guidance no longer gives Wikipedia priority context instructions.
 - Description prompts now explicitly require plain description output with no added title headings.
 
+## Current repo conventions
+- Public metadata/media endpoints should stay anonymous when they are cache-first and non-user-sensitive; use `[Authentication.ClientApiKey.NoClientApiKeyNeededAttribute]` and keep any custom API-key auth filters aware of the public exemption logic.
+- Background metadata searches must remain concurrent per source: use unique per-run `jobId` values, keep the wait guard short, and only finalise after all child tasks finish instead of serialising the work behind a single provider call.
+- Task worker polling depends on the `Task_Queue` status/client/start-time index and the `UPDATE ... WHERE id IN (SELECT ... FOR UPDATE SKIP LOCKED)` + equality `SELECT` pattern; changing those fields without keeping the same transaction shape can trigger command timeouts under concurrent client polling.
+- When adding or updating a metadata source, include the orchestrator schedule, the shared queue dispatcher, the service-host wiring, UI source colors/localisation, and any public route/auth changes in the same change so the stack remains coherent.
+- Members may create Apps. Deleting an App remains limited to callers with its ACL `Delete` permission.
+- `POST /api/v1/DataObjects/app/{Id}/ClientApiKeys` requires `AgreeToTerms=true` before creating a client API key.
+
 ## .NET 10 and dependencies
 - Framework: .NET 10.0. Target framework set in `Directory.Build.props` and applied to all projects.
 - API versioning: `Asp.Versioning.Mvc` + `Asp.Versioning.Mvc.ApiExplorer` 10.x (replacing old `Microsoft.AspNetCore.Mvc.Versioning` packages).
