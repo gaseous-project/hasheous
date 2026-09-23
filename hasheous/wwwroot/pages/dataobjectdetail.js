@@ -835,12 +835,12 @@ function renderContent() {
                 createClientAPIKeyBtn.disabled = true;
                 createClientAPIKeyBtn.addEventListener("click", function (e) {
                     if (clientAPIAgreementCheckbox.checked === false) {
-                        alert('You must agree to the client API key usage terms before creating a key.');
+                        alert(lang.getLang('clientapiagreewarn'));
                         return;
                     }
 
                     // create client api key model
-                    let clientAPIKeyUrl = '/api/v1/DataObjects/app/' + getQueryString('id', 'int') + '/ClientAPIKeys' + '?name=' + encodeURIComponent(document.getElementById('dataObjectClientAPIKeyName').value);
+                    let clientAPIKeyUrl = '/api/v1/DataObjects/app/' + getQueryString('id', 'int') + '/ClientAPIKeys' + '?name=' + encodeURIComponent(document.getElementById('dataObjectClientAPIKeyName').value) + '&agreeToTerms=' + clientAPIAgreementCheckbox.checked;
 
                     if (
                         document.getElementById('dataObjectClientAPIKeyExpiresCustom').checked == true &&
