@@ -65,8 +65,6 @@ namespace hasheous_server.Classes.MetadataLib
                     }
                     break;
                 case DataObjects.DataObjectType.Game:
-                    bool searchComplete = false;
-
                     // needs to have a platformId option provided to search properly
                     if (options == null || !options.ContainsKey("platformId"))
                     {
@@ -77,68 +75,11 @@ namespace hasheous_server.Classes.MetadataLib
                     {
                         throw new ArgumentException("Platform ID must be of type long for IGDB game search.");
                     }
-                    long platformId = (long)options["platformId"];
 
-                    foreach (string candidate in searchCandidates)
+                    DataObjects.MatchItem? gameMatch = FindGameMatch(searchCandidates, (long)options["platformId"]);
+                    if (gameMatch != null)
                     {
-                        foreach (Games.SearchType searchType in Enum.GetValues(typeof(Games.SearchType)))
-                        {
-                            IGDB.Models.Game[] games = Games.SearchForGame(candidate, platformId, searchType);
-
-                            // check for matches
-                            if (games != null)
-                            {
-                                if (games.Length == 1)
-                                {
-                                    // exact match found
-                                    var idVal = games[0].Id;
-                                    if (!idVal.HasValue)
-                                    {
-                                        // should not happen, but just in case
-                                        continue;
-                                    }
-                                    long gameId = idVal.Value;
-
-                                    DataObjectSearchResults = new hasheous_server.Classes.DataObjects.MatchItem
-                                    {
-                                        MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic,
-                                        MetadataId = gameId.ToString()
-                                    };
-                                    searchComplete = true;
-                                    break;
-                                }
-                                else if (games.Length > 1)
-                                {
-                                    // multiple matches found - high likelyhood of sequels and other variants - try and narrow it down a bit more
-                                    foreach (var game in games)
-                                    {
-                                        var idVal = game.Id;
-                                        if (!idVal.HasValue)
-                                        {
-                                            // should not happen, but just in case
-                                            continue;
-                                        }
-                                        long gameId = idVal.Value;
-
-                                        // check for exact name match
-                                        if (string.Equals(game.Name, candidate, StringComparison.OrdinalIgnoreCase))
-                                        {
-                                            DataObjectSearchResults = new hasheous_server.Classes.DataObjects.MatchItem
-                                            {
-                                                MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic,
-                                                MetadataId = gameId.ToString()
-                                            };
-                                            searchComplete = true;
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                            if (searchComplete)
-                            {
-                                break;
-                            }
-                        }
+                        DataObjectSearchResults = gameMatch;
                     }
 
                     break;
@@ -152,6 +93,75 @@ namespace hasheous_server.Classes.MetadataLib
             }
 
             return DataObjectSearchResults;
+        }
+
+        /// <summary>
+        /// Searches IGDB for a game, working through the candidates from most to least specific and,
+        /// for each candidate, from the most to least precise search type. A result is only accepted
+        /// when its name is a confident match for the candidate, so a lone result from a fuzzy or
+        /// relevance-ranked search is no longer treated as an exact match.
+        /// </summary>
+        private static DataObjects.MatchItem? FindGameMatch(List<string> searchCandidates, long platformId)
+        {
+            foreach (string candidate in searchCandidates)
+            {
+                foreach (Games.SearchType searchType in Enum.GetValues(typeof(Games.SearchType)))
+                {
+                    IGDB.Models.Game[] games = Games.SearchForGame(candidate, platformId, searchType);
+
+                    IGDB.Models.Game? match = SelectBestGameMatch(candidate, games);
+                    if (match?.Id != null)
+                    {
+                        return new DataObjects.MatchItem
+                        {
+                            MatchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic,
+                            MetadataId = match.Id.Value.ToString()
+                        };
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Picks the strongest confident name match from a set of IGDB search results, preferring the
+        /// highest score and, on a tie, the shortest title.
+        /// </summary>
+        private static IGDB.Models.Game? SelectBestGameMatch(string candidate, IGDB.Models.Game[]? games)
+        {
+            IGDB.Models.Game? bestGame = null;
+            int bestScore = int.MinValue;
+            int bestNameLength = int.MaxValue;
+
+            if (games == null)
+            {
+                return null;
+            }
+
+            foreach (IGDB.Models.Game game in games)
+            {
+                if (game == null || game.Id == null || string.IsNullOrWhiteSpace(game.Name))
+                {
+                    continue;
+                }
+
+                int score = Common.GetNumberAwareNameMatchScore(candidate, game.Name);
+                if (score == int.MinValue)
+                {
+                    continue;
+                }
+
+                int nameLength = game.Name.Length;
+                if (score > bestScore || (score == bestScore && nameLength < bestNameLength))
+                {
+                    bestScore = score;
+                    bestNameLength = nameLength;
+                    bestGame = game;
+                }
+            }
+
+            return bestGame;
         }
     }
 }
