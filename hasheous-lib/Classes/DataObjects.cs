@@ -1989,6 +1989,11 @@ namespace hasheous_server.Classes
         // get all metadata sources
         private static MetadataSources[] allMetadataSources = (MetadataSources[])Enum.GetValues(typeof(MetadataSources));
 
+        // metadata sources that have no platform records, so games can be searched without the platform being mapped to the source
+        private static readonly HashSet<MetadataSources> sourcesWithoutPlatformMetadata = [
+            MetadataSources.HowLongToBeat
+        ];
+
         // Tokens commonly found in titles/platform names that should not be interpreted as Roman numerals.
         private static readonly List<string> RomanConversionAcronymExclusions = new List<string>
         {
@@ -2010,7 +2015,8 @@ namespace hasheous_server.Classes
                 MetadataSources.SteamGridDb,
                 MetadataSources.LaunchBox,
                 MetadataSources.Wikipedia,
-                MetadataSources.ScreenScraper
+                MetadataSources.ScreenScraper,
+                MetadataSources.HowLongToBeat
             ];
 
             // set now time
@@ -2193,7 +2199,12 @@ namespace hasheous_server.Classes
 
                 // if item type is game, search platformItem for an metadata source that equals metadataSource - if not found, skip
                 DataObjectItem.MetadataItem? platformMetadata = null;
-                if (item.ObjectType == DataObjectType.Game && itemPlatform != null)
+                if (item.ObjectType == DataObjectType.Game && itemPlatform != null && sourcesWithoutPlatformMetadata.Contains(metadataSource))
+                {
+                    // no platform id to pass - supply the platform name so the provider can use it to disambiguate results
+                    searchOptions.Add("platformName", itemPlatform.Name);
+                }
+                else if (item.ObjectType == DataObjectType.Game && itemPlatform != null)
                 {
                     if (itemPlatform != null && itemPlatform.Metadata != null && itemPlatform.Metadata.Count > 0)
                     {

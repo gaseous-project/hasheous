@@ -190,6 +190,20 @@ namespace hasheous_server.Classes
                             }
                             break;
 
+                        case Communications.MetadataSources.HowLongToBeat:
+                            // id must be a long number
+                            if (long.TryParse(metadataMatch.GameId, out _))
+                            {
+                                AllowInsert = true;
+                                matchedId = metadataMatch.GameId; // keep the original ID for these sources
+                                responseStatus[Communications.MetadataSources.HowLongToBeat] = "OK";
+                            }
+                            else
+                            {
+                                responseStatus[Communications.MetadataSources.HowLongToBeat] = $"{System.Net.WebUtility.HtmlEncode(metadataMatch.GameId)} - Not Found";
+                            }
+                            break;
+
                         case Communications.MetadataSources.Wikipedia:
                             // url must be a valid Wikipedia URL
                             url = metadataMatch.GameId;

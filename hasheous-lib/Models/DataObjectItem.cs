@@ -283,6 +283,18 @@ namespace hasheous_server.Models
                             Template = "https://gamesdb.launchbox-app.com/games/dbid/{0}"
                         }
                     }
+                },
+                {
+                    Communications.MetadataSources.HowLongToBeat,
+                    new List<LinkTemplateItem>
+                    {
+                        new LinkTemplateItem
+                        {
+                            Source = Communications.MetadataSources.HowLongToBeat,
+                            ObjectType = DataObjects.DataObjectType.Game,
+                            Template = "https://howlongtobeat.com/game/{0}"
+                        }
+                    }
                 }
             };
 

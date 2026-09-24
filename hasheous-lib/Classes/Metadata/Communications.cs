@@ -216,7 +216,12 @@ namespace hasheous_server.Classes.Metadata
             /// <summary>
             /// LaunchBox - queries LaunchBox Metadata.xml file for metadata
             /// </summary>
-            LaunchBox
+            LaunchBox,
+
+            /// <summary>
+            /// HowLongToBeat - queries HowLongToBeat service for metadata
+            /// </summary>
+            HowLongToBeat
         }
 
         /// <summary>
