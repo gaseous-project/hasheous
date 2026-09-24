@@ -51,7 +51,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Development mode disables client API key requirement by setting `Config.RequireClientAPIKey = false` in `hasheous/StartupExtensions.cs` (`ConfigureDevelopmentModeAsync`) and enables developer exception page.
   - GiantBomb: set `gbapikey` env var (or update config.json) to enable GiantBomb metadata ingestion & proxy; optional `BaseURL` override (defaults to `https://www.giantbomb.com/`).
   - SteamGridDB: set `sgdbapikey` env var (or update config.json -> `SteamGridDBConfiguration.APIKey`) to enable SteamGridDB metadata matching.
-  - HowLongToBeat: enabled by default; set `hltbenabled=false` env var (or config.json -> `HowLongToBeatConfiguration.Enabled`) to disable HowLongToBeat metadata matching.
+  - HowLongToBeat: disabled by default (opt-in, as it is an unofficial and heavily throttled API); set `hltbenabled=true` env var (or config.json -> `HowLongToBeatConfiguration.Enabled`) to enable HowLongToBeat metadata matching.
 
 - API versioning & routing
   - Framework now uses `Asp.Versioning.Mvc` (via `Asp.Versioning.Mvc.ApiExplorer` 10.x). Project-level `global using Asp.Versioning;` makes attributes like `[ApiVersion("1.0")]` and `[MapToApiVersion("1.0")]` available without per-file imports.
@@ -315,7 +315,7 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 - Games only. HowLongToBeat has no platform ids, so it is listed in `sourcesWithoutPlatformMetadata` in `DataObjects._DataObjectMetadataSearch_Apply`: games are searched without a platform mapping and the Hasheous platform name is passed as the `platformName` search option.
 - API is unofficial: the search endpoint path is scraped from the site's `/_next/static/chunks/*.js` (fallback `api/search/site`), and a token from `{searchPath}/init?t=<ms>` is sent as `x-auth-token` (plus `x-hp-key`/`x-hp-val` when the init response includes them). The token is bound to client IP + user agent, so a single static `HttpClient` is reused. On 403/404 the session is rediscovered once; 429 throws `MetadataRateLimitException`. Requests are serialized and throttled (1.5s minimum interval).
 - Matching (`MetadataHowLongToBeat.SelectBestMatch`): results scored with `Common.GetStrongNameMatchScore(...)` against name and aliases (`>= 8` required), ties broken by platform match (`IsPlatformMatch`), then base game over hack/mod/DLC, then completion count.
-- Link template: `https://howlongtobeat.com/game/{id}`. Manual submissions require a numeric id.
+- Link template: `https://howlongtobeat.com/game/{id}`. Manual submissions require a positive integer id (no sign/whitespace), stored normalised.
 
 ## Common cache prefixes
 - `HashLookup`: entity details resolved during lookups (publisher/platform/game).

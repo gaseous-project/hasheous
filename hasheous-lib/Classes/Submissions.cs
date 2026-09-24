@@ -191,11 +191,11 @@ namespace hasheous_server.Classes
                             break;
 
                         case Communications.MetadataSources.HowLongToBeat:
-                            // id must be a long number
-                            if (long.TryParse(metadataMatch.GameId, out _))
+                            // id must be a positive whole number (no signs or whitespace)
+                            if (long.TryParse(metadataMatch.GameId, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out long hltbGameId) && hltbGameId > 0)
                             {
                                 AllowInsert = true;
-                                matchedId = metadataMatch.GameId; // keep the original ID for these sources
+                                matchedId = hltbGameId.ToString(System.Globalization.CultureInfo.InvariantCulture); // store the normalised ID
                                 responseStatus[Communications.MetadataSources.HowLongToBeat] = "OK";
                             }
                             else

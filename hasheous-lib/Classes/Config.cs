@@ -1521,13 +1521,14 @@ namespace Classes
                         }
                         else
                         {
-                            return true;
+                            // opt-in: HowLongToBeat is an unofficial API and requests are heavily throttled
+                            return false;
                         }
                     }
                 }
 
                 /// <summary>
-                /// Gets or sets a value indicating whether HowLongToBeat metadata matching is enabled.
+                /// Gets or sets a value indicating whether HowLongToBeat metadata matching is enabled. Disabled by default.
                 /// </summary>
                 public bool Enabled = _DefaultEnabled;
             }
