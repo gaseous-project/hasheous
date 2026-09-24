@@ -176,6 +176,17 @@ namespace Classes
         }
 
         /// <summary>
+        /// Gets the HowLongToBeat configuration settings.
+        /// </summary>
+        public static ConfigFile.HowLongToBeat HowLongToBeatConfiguration
+        {
+            get
+            {
+                return _config.HowLongToBeatConfiguration;
+            }
+        }
+
+        /// <summary>
         /// Gets the S3 storage configuration settings.
         /// </summary>
         public static ConfigFile.S3Storage S3StorageConfiguration
@@ -654,6 +665,11 @@ namespace Classes
             /// Gets or sets the SteamGridDB configuration settings.
             /// </summary>
             public SteamGridDB SteamGridDBConfiguration = new SteamGridDB();
+
+            /// <summary>
+            /// Gets or sets the HowLongToBeat configuration settings.
+            /// </summary>
+            public HowLongToBeat HowLongToBeatConfiguration = new HowLongToBeat();
 
             /// <summary>
             /// Gets or sets the S3 storage configuration settings.
@@ -1538,6 +1554,34 @@ namespace Classes
                 /// Gets or sets the API key used for authenticating requests to the SteamGridDB service.
                 /// </summary>
                 public string APIKey = _DefaultAPIKey;
+            }
+
+            /// <summary>
+            /// Represents the HowLongToBeat configuration settings.
+            /// </summary>
+            public class HowLongToBeat
+            {
+                private static bool _DefaultEnabled
+                {
+                    get
+                    {
+                        string? envVar = Environment.GetEnvironmentVariable("hltbenabled");
+                        if (!String.IsNullOrEmpty(envVar))
+                        {
+                            return bool.Parse(envVar);
+                        }
+                        else
+                        {
+                            // opt-in: HowLongToBeat is an unofficial API and requests are heavily throttled
+                            return false;
+                        }
+                    }
+                }
+
+                /// <summary>
+                /// Gets or sets a value indicating whether HowLongToBeat metadata matching is enabled. Disabled by default.
+                /// </summary>
+                public bool Enabled = _DefaultEnabled;
             }
 
             /// <summary>
