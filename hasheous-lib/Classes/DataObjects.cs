@@ -2543,8 +2543,9 @@ namespace hasheous_server.Classes
                                         };
                                     }
                                 }
-                                catch (Exception ex)
+                                catch (Exception ex) when (ex is not MetadataLib.MetadataRateLimitException)
                                 {
+                                    // rate limit exceptions fall through to the outer handler so the provider's RetryAfter is honoured
                                     Logging.Log(Logging.LogType.Warning, "Metadata Match", $"{processedObjectCount} / {objectTotalCount} - Error searching {metadataSource} for metadata for {item.ObjectType} {item.Name}", ex);
                                 }
 
