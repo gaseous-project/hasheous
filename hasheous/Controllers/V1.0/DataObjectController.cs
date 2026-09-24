@@ -90,11 +90,13 @@ namespace hasheous_server.Controllers.v1_0
 
             string cacheKey = hasheous_server.Classes.DataObjects.DataObjectCacheKey(ObjectType, Id);
 
-            if (Config.RedisConfiguration.Enabled)
+            // bypass cache for apps
+            if (ObjectType != Classes.DataObjects.DataObjectType.App)
             {
-                if (await RedisConnection.CacheItemExists(cacheKey))
+                var cacheItem = await RedisConnection.GetCacheItem<Models.DataObjectItem>(cacheKey);
+                if (cacheItem != null)
                 {
-                    return Ok(await RedisConnection.GetCacheItem<Models.DataObjectItem>(cacheKey));
+                    return Ok(cacheItem);
                 }
             }
 
@@ -142,7 +144,7 @@ namespace hasheous_server.Controllers.v1_0
                     // cache any non-app object
                     if (Config.RedisConfiguration.Enabled)
                     {
-                        await RedisConnection.SetCacheItem(cacheKey, DataObject);
+                        await RedisConnection.SetCacheItem<Models.DataObjectItem>(cacheKey, DataObject);
                     }
                 }
 
@@ -152,16 +154,23 @@ namespace hasheous_server.Controllers.v1_0
 
         [MapToApiVersion("1.0")]
         [HttpPost]
-        [Authorize(Roles = "Admin,Moderator")]
+        [Authorize(Roles = "Admin,Moderator,Member")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [Route("{ObjectType}")]
         public async Task<IActionResult> NewDataObject(Classes.DataObjects.DataObjectType ObjectType, Models.DataObjectItemModel model)
         {
+            // check role - all users can create apps but only moderators and admins can create platforms and games
+            if ((ObjectType == Classes.DataObjects.DataObjectType.App && !User.IsInRole("Member")) ||
+            (ObjectType != Classes.DataObjects.DataObjectType.App && !User.IsInRole("Moderator") && !User.IsInRole("Admin")))
+            {
+                return Forbid();
+            }
+
             // check permission
             var user = await _userManager.GetUserAsync(User);
             DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
 
-            if (dataObjectPermission.CheckAsync(user, ObjectType, DataObjectPermission.PermissionType.Create).Result)
+            if (await dataObjectPermission.CheckAsync(user, ObjectType, DataObjectPermission.PermissionType.Create))
             {
                 hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
@@ -184,17 +193,24 @@ namespace hasheous_server.Controllers.v1_0
 
         [MapToApiVersion("1.0")]
         [HttpDelete]
-        [Authorize(Roles = "Admin,Moderator")]
+        [Authorize(Roles = "Admin,Moderator,Member")]
         [Route("{ObjectType}/{Id}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> DeleteDataObject(Classes.DataObjects.DataObjectType ObjectType, long Id)
         {
+            // check role - all users can delete apps (so long as they have permission on the object) but only moderators and admins can delete platforms and games
+            if ((ObjectType == Classes.DataObjects.DataObjectType.App && !User.IsInRole("Member")) ||
+            (ObjectType != Classes.DataObjects.DataObjectType.App && !User.IsInRole("Moderator") && !User.IsInRole("Admin")))
+            {
+                return Forbid();
+            }
+
             // check permission
             var user = await _userManager.GetUserAsync(User);
             DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
 
-            if (dataObjectPermission.CheckAsync(user, ObjectType, DataObjectPermission.PermissionType.Delete, Id).Result)
+            if (await dataObjectPermission.CheckAsync(user, ObjectType, DataObjectPermission.PermissionType.Delete, Id))
             {
                 hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
@@ -228,7 +244,7 @@ namespace hasheous_server.Controllers.v1_0
             var user = await _userManager.GetUserAsync(User);
             DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
 
-            if (dataObjectPermission.CheckAsync(user, ObjectType, DataObjectPermission.PermissionType.Update, Id).Result)
+            if (await dataObjectPermission.CheckAsync(user, ObjectType, DataObjectPermission.PermissionType.Update, Id))
             {
                 hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
@@ -264,11 +280,11 @@ namespace hasheous_server.Controllers.v1_0
                 var user = await _userManager.GetUserAsync(User);
                 DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
 
-                if (dataObjectPermission.CheckAsync(user, ObjectType, DataObjectPermission.PermissionType.Update, Id).Result)
+                if (await dataObjectPermission.CheckAsync(user, ObjectType, DataObjectPermission.PermissionType.Update, Id))
                 {
                     hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
-                    Models.DataObjectItem? DataObject = await DataObjects.EditDataObject(ObjectType, Id, model);
+                    Models.DataObjectItem? DataObject = await DataObjects.EditDataObject(ObjectType, Id, model, true);
 
                     if (DataObject == null)
                     {
@@ -322,7 +338,7 @@ namespace hasheous_server.Controllers.v1_0
             var user = await _userManager.GetUserAsync(User);
             DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
 
-            if (dataObjectPermission.CheckAsync(user, ObjectType, DataObjectPermission.PermissionType.Update, Id).Result)
+            if (await dataObjectPermission.CheckAsync(user, ObjectType, DataObjectPermission.PermissionType.Update, Id))
             {
                 hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
@@ -356,7 +372,7 @@ namespace hasheous_server.Controllers.v1_0
             var user = await _userManager.GetUserAsync(User);
             DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
 
-            if (dataObjectPermission.CheckAsync(user, ObjectType, DataObjectPermission.PermissionType.Update, Id).Result)
+            if (await dataObjectPermission.CheckAsync(user, ObjectType, DataObjectPermission.PermissionType.Update, Id))
             {
                 hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
 
@@ -508,6 +524,27 @@ namespace hasheous_server.Controllers.v1_0
         }
 
         [MapToApiVersion("1.0")]
+        [HttpGet]
+        [Authorize(Roles = "Admin,Moderator")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [Route("{ObjectType}/{Id}/SubmissionReport")]
+        public async Task<IActionResult> GetDataObjectSubmissionReport(Classes.DataObjects.DataObjectType ObjectType, long Id)
+        {
+            hasheous_server.Classes.DataObjects DataObjects = new Classes.DataObjects();
+
+            Models.DataObjectItem? DataObject = await DataObjects.GetDataObject(ObjectType, Id, false, false, false);
+
+            if (DataObject == null)
+            {
+                return NotFound();
+            }
+            else
+            {
+                return Ok(await Submissions.GenerateSubmissionReport(Id));
+            }
+        }
+
+        [MapToApiVersion("1.0")]
         [HttpPost]
         [Authorize(Roles = "Admin,Moderator")]
         [ProducesResponseType(StatusCodes.Status200OK)]
@@ -606,7 +643,7 @@ namespace hasheous_server.Controllers.v1_0
                         return BadRequest("The target object must be of the same type as the source object.");
                     }
 
-                    var result = DataObjects.MergeObjects(DataObject, TargetDataObject, Commit);
+                    var result = await DataObjects.MergeObjects(DataObject, TargetDataObject, Commit);
                     return Ok(result);
                 }
             }
@@ -713,7 +750,7 @@ namespace hasheous_server.Controllers.v1_0
 
             DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
 
-            if (dataObjectPermission.CheckAsync(user, DataObjects.DataObjectType.App, DataObjectPermission.PermissionType.Update, Id).Result)
+            if (await dataObjectPermission.CheckAsync(user, DataObjects.DataObjectType.App, DataObjectPermission.PermissionType.Update, Id))
             {
                 Authentication.ClientApiKey clientApiKey = new Authentication.ClientApiKey();
 
@@ -731,14 +768,19 @@ namespace hasheous_server.Controllers.v1_0
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [Route("app/{Id}/ClientApiKeys")]
-        public async Task<IActionResult> NewClientApiKey(long Id, string Name, DateTime? Expires)
+        public async Task<IActionResult> NewClientApiKey(long Id, string Name, DateTime? Expires, bool AgreeToTerms)
         {
             var user = await _userManager.GetUserAsync(User);
 
             DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
 
-            if (dataObjectPermission.CheckAsync(user, DataObjects.DataObjectType.App, DataObjectPermission.PermissionType.Update, Id).Result)
+            if (await dataObjectPermission.CheckAsync(user, DataObjects.DataObjectType.App, DataObjectPermission.PermissionType.Update, Id))
             {
+                if (!AgreeToTerms)
+                {
+                    return BadRequest("You must agree to the terms before creating a client API key.");
+                }
+
                 Authentication.ClientApiKey clientApiKey = new Authentication.ClientApiKey();
 
                 return Ok(clientApiKey.CreateApiKey(Id, Name, Expires));
@@ -761,7 +803,7 @@ namespace hasheous_server.Controllers.v1_0
 
             DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
 
-            if (dataObjectPermission.CheckAsync(user, DataObjects.DataObjectType.App, DataObjectPermission.PermissionType.Update, Id).Result)
+            if (await dataObjectPermission.CheckAsync(user, DataObjects.DataObjectType.App, DataObjectPermission.PermissionType.Update, Id))
             {
                 Authentication.ClientApiKey clientApiKey = new Authentication.ClientApiKey();
 

@@ -47,6 +47,25 @@ namespace Classes
         }
 
         /// <summary>
+        /// Gets the path to the standalone rate limiter rules file.
+        /// </summary>
+        public static string RateLimitRulesFilePath
+        {
+            get
+            {
+                return Path.Combine(ConfigurationPath, "rate-limit-rules.json");
+            }
+        }
+
+        public static string[] TrustedHosts
+        {
+            get
+            {
+                return _config.TrustedHosts;
+            }
+        }
+
+        /// <summary>
         /// Gets the database configuration settings.
         /// </summary>
         public static ConfigFile.Database DatabaseConfiguration
@@ -175,6 +194,17 @@ namespace Classes
             get
             {
                 return _config.S3StorageConfiguration;
+            }
+        }
+
+        /// <summary>
+        /// Gets the supporter recognition configuration settings.
+        /// </summary>
+        public static ConfigFile.SupporterRecognition SupporterRecognitionConfiguration
+        {
+            get
+            {
+                return _config.SupporterRecognitionConfiguration;
             }
         }
 
@@ -591,6 +621,11 @@ namespace Classes
             public Redis RedisConfiguration = new Redis();
 
             /// <summary>
+            /// Gets or sets the host names to exempt from rate limiting
+            /// </summary>
+            public string[] TrustedHosts = Array.Empty<string>();
+
+            /// <summary>
             /// Gets or sets the library configuration settings, including paths for metadata, uploads, and dumps.
             /// </summary>
             [JsonIgnore]
@@ -640,6 +675,11 @@ namespace Classes
             /// Gets or sets the S3 storage configuration settings.
             /// </summary>
             public S3Storage S3StorageConfiguration = new S3Storage();
+
+            /// <summary>
+            /// Gets or sets the supporter recognition configuration settings.
+            /// </summary>
+            public SupporterRecognition SupporterRecognitionConfiguration = new SupporterRecognition();
 
             /// <summary>
             /// Gets or sets the social authentication configuration settings.
@@ -996,6 +1036,17 @@ namespace Classes
                     get
                     {
                         return Path.Combine(LibraryMetadataDirectory, "Redump");
+                    }
+                }
+
+                /// <summary>
+                /// Gets the directory path for HackHash metadata within the library metadata directory.
+                /// </summary>
+                public string LibraryMetadataDirectory_HackHash
+                {
+                    get
+                    {
+                        return Path.Combine(LibraryMetadataDirectory, "HackHash");
                     }
                 }
 
@@ -1818,6 +1869,95 @@ namespace Classes
                     get
                     {
                         return !String.IsNullOrEmpty(MicrosoftClientId) && !String.IsNullOrEmpty(MicrosoftClientSecret);
+                    }
+                }
+            }
+
+            /// <summary>
+            /// Represents the supporter recognition configuration settings.
+            /// </summary>
+            public class SupporterRecognition
+            {
+                private static string _OpenCollectiveClientId
+                {
+                    get
+                    {
+                        return Environment.GetEnvironmentVariable("opencollectiveclientid") ?? "";
+                    }
+                }
+
+                private static string _OpenCollectiveClientSecret
+                {
+                    get
+                    {
+                        return Environment.GetEnvironmentVariable("opencollectiveclientsecret") ?? "";
+                    }
+                }
+
+                private static string _OpenCollectiveApiToken
+                {
+                    get
+                    {
+                        return Environment.GetEnvironmentVariable("opencollectiveapitoken") ?? "";
+                    }
+                }
+
+                private static string _OpenCollectiveCollectiveSlug
+                {
+                    get
+                    {
+                        return Environment.GetEnvironmentVariable("opencollectivecollectiveslug") ?? "";
+                    }
+                }
+
+                /// <summary>
+                /// Gets or sets the number of days after a payment during which supporter recognition remains active.
+                /// </summary>
+                public int ActiveContributionDays = 30;
+
+                /// <summary>
+                /// Gets or sets the OpenCollective OAuth client identifier used for account linking.
+                /// </summary>
+                public string OpenCollectiveClientId = _OpenCollectiveClientId;
+
+                /// <summary>
+                /// Gets or sets the OpenCollective OAuth client secret used for account linking.
+                /// </summary>
+                public string OpenCollectiveClientSecret = _OpenCollectiveClientSecret;
+
+                /// <summary>
+                /// Gets or sets the OpenCollective API token used for supporter synchronization.
+                /// </summary>
+                public string OpenCollectiveApiToken = _OpenCollectiveApiToken;
+
+                /// <summary>
+                /// Gets or sets the OpenCollective collective slug whose transactions should be evaluated.
+                /// </summary>
+                public string OpenCollectiveCollectiveSlug = _OpenCollectiveCollectiveSlug;
+
+                /// <summary>
+                /// Gets a value indicating whether OpenCollective account linking is enabled.
+                /// </summary>
+                [JsonIgnore]
+                public bool OpenCollectiveLinkEnabled
+                {
+                    get
+                    {
+                        return !string.IsNullOrWhiteSpace(OpenCollectiveClientId)
+                            && !string.IsNullOrWhiteSpace(OpenCollectiveClientSecret);
+                    }
+                }
+
+                /// <summary>
+                /// Gets a value indicating whether OpenCollective supporter synchronization is enabled.
+                /// </summary>
+                [JsonIgnore]
+                public bool OpenCollectiveSyncEnabled
+                {
+                    get
+                    {
+                        return !string.IsNullOrWhiteSpace(OpenCollectiveApiToken)
+                            && !string.IsNullOrWhiteSpace(OpenCollectiveCollectiveSlug);
                     }
                 }
             }

@@ -356,7 +356,7 @@ function createDataObjectsTable(pageNumber, pageSize, objectType, filterByPlatfo
         filterString = '&filterAttribute=Platform&filterValue=' + filterByPlatformId;
     }
 
-    fetch('/api/v1/DataObjects/' + objectType + '?pageSize=' + pageSize + '&pageNumber=' + pageNumber + '&getchildrelations=true' + filterString + '&getMetadata=true', {
+    fetch('/api/v1/DataObjects/' + objectType + '?pageSize=' + pageSize + '&pageNumber=' + pageNumber + '&getchildrelations=true' + filterString + '&getMetadata=false', {
         method: 'GET'
     }).then(response => {
         if (!response.ok) {
@@ -458,14 +458,15 @@ function createDataObjectsTable(pageNumber, pageSize, objectType, filterByPlatfo
             columns,
             'id',
             true,
-            function (id) {
-                window.location = '/index.html?page=dataobjectdetail&type=' + objectType + '&id=' + id;
-            },
+            null,
             success.count,
             success.pageNumber,
             success.totalPages,
             function (p) {
                 createDataObjectsTable(p, pageSize, objectType, filterByPlatformId);
+            },
+            function (id) {
+                return dataObjectDetailUrl(objectType, id);
             }
         );
         let tableTarget = document.getElementById('dataObjectTable');

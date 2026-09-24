@@ -39,6 +39,18 @@ namespace Classes
                 throw new Exception("Invalid search model");
             }
 
+            string cacheKey = RedisConnection.GenerateKey("Signature", models);
+            // check if the query is cached
+            if (Config.RedisConfiguration.Enabled)
+            {
+                List<Signatures_Games_2>? cachedData = await RedisConnection.GetCacheItem<List<Signatures_Games_2>>(cacheKey);
+                if (cachedData != null)
+                {
+                    // if cached data is found, return it directly
+                    return cachedData;
+                }
+            }
+
             // check the archive observations for the provided hashes
             HashLookupModel firstModel = models[0];
             HashLookupModel? observedHashes = await GetObservedArchiveHashesAsync(firstModel);
@@ -49,18 +61,8 @@ namespace Classes
                 firstModel.SHA1 = observedHashes.SHA1;
                 firstModel.SHA256 = observedHashes.SHA256;
                 firstModel.CRC = observedHashes.CRC;
-            }
 
-            string cacheKey = RedisConnection.GenerateKey("Signature", models);
-            // check if the query is cached
-            if (Config.RedisConfiguration.Enabled)
-            {
-                string? cachedData = await hasheous.Classes.RedisConnection.GetDatabase(0).StringGetAsync(cacheKey);
-                if (cachedData != null)
-                {
-                    // if cached data is found, deserialize it and return
-                    return Newtonsoft.Json.JsonConvert.DeserializeObject<List<Signatures_Games_2>>(cachedData);
-                }
+                models = new List<HashLookupModel> { firstModel };
             }
 
             Dictionary<string, object> dbDict = new Dictionary<string, object>(models.Count * 4);
@@ -248,7 +250,7 @@ namespace Classes
                 // cache the result
                 if (Config.RedisConfiguration.Enabled)
                 {
-                    hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(cacheKey, Newtonsoft.Json.JsonConvert.SerializeObject(GamesList), TimeSpan.FromDays(5));
+                    await hasheous.Classes.RedisConnection.SetCacheItem<List<Signatures_Games_2>>(cacheKey, GamesList, TimeSpan.FromDays(5));
                 }
 
                 return GamesList;
@@ -323,10 +325,10 @@ HAVING
             {
                 if (model.Name != null)
                 {
-                    if (model.Name.Length < 3)
+                    if (model.Name.Length < 2)
                     {
                         // search name too short - throw an error
-                        throw new SignatureBadSearchCriteriaException("Name search field must be 3 characters or longer");
+                        throw new SignatureBadSearchCriteriaException("Name search field must be 2 characters or longer");
                     }
                 }
                 else if (model.Ids != null)
@@ -399,16 +401,19 @@ HAVING
             string? whereClause_Name = null;
             if (model.Name != null)
             {
-                if (model.Name.Length >= 3)
+                if (model.Name.Length >= 2)
                 {
-                    string fullTextNameQuery = BuildFullTextBooleanPrefixQuery(model.Name);
-                    whereClause_Name = "MATCH(`" + whereNameField + "`) AGAINST(@name IN BOOLEAN MODE)";
-                    dbDict.Add("name", fullTextNameQuery);
+                    // whereNameField is set by every branch of the search type switch above
+                    whereClause_Name = BuildNameSearchPredicate(whereNameField!, model.Name, dbDict, "name");
                 }
             }
 
             // attach where clauses
-            sql += " WHERE ";
+            if (whereClause_Ids != null || whereClause_Name != null)
+            {
+                sql += " WHERE ";
+            }
+
             if (whereClause_Ids != null)
             {
                 sql += whereClause_Ids;
@@ -497,7 +502,7 @@ HAVING
 
             if (Config.RedisConfiguration.Enabled)
             {
-                await RedisConnection.SetCacheItem(cacheKey, gameItem);
+                await RedisConnection.SetCacheItem<Signatures_Games_2.GameItem>(cacheKey, gameItem);
             }
 
             return gameItem;
@@ -586,7 +591,7 @@ HAVING
             // cache the result
             if (Config.RedisConfiguration.Enabled)
             {
-                await RedisConnection.SetCacheItem(cacheKey, retVal);
+                await RedisConnection.SetCacheItem<Signatures_Games_2.RomItem>(cacheKey, retVal);
             }
 
             return retVal;
@@ -650,7 +655,7 @@ HAVING
             }
 
             // cache the result
-            await RedisConnection.SetCacheItem(cacheKey, returnDict);
+            await RedisConnection.SetCacheItem<Dictionary<string, string>>(cacheKey, returnDict);
 
             return returnDict;
         }

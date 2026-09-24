@@ -1,5 +1,7 @@
 <h1 id="dataObject_object_name"></h1>
 
+<p id="dataObject_object_isBlockedFromMatching" data-lang="isblockedfrommatching" style="display: none;"></p>
+
 <table class="page_detail_box">
     <tr id="dataObjectLogo" style="display: none;">
         <td colspan="2" id="dataObjectLogoBox">
@@ -185,6 +187,17 @@
                         <label for="dataObjectClientAPIKeyExpiresCustom">
                             <input type="datetime-local" id="dataObjectClientAPIKeyExpires" />
                         </label>
+                    </td>
+                </tr>
+                <tr style="vertical-align: top;">
+                    <td>
+                        <span data-lang="appkeyusageheader"></span>
+                    </td>
+                    <td>
+                        <input type="checkbox" id="dataObjectClientAPIKeyUsage" />
+                    </td>
+                    <td colspan="2">
+                        <label for="dataObjectClientAPIKeyUsage"><span data-lang="appkeyusage"></span></label>
                     </td>
                 </tr>
                 <tr>

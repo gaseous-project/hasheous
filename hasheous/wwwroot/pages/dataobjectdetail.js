@@ -203,6 +203,12 @@ function renderContent() {
     document.getElementById('page_date_box_createdDate').innerHTML = moment(dataObject.createdDate + 'Z').format('lll');
     document.getElementById('page_date_box_updatedDate').innerHTML = moment(dataObject.updatedDate + 'Z').format('lll');
 
+    if (dataObject.isBlockedFromMatching) {
+        document.getElementById('dataObject_object_isBlockedFromMatching').style.display = '';
+    } else {
+        document.getElementById('dataObject_object_isBlockedFromMatching').style.display = 'none';
+    }
+
     let mergeIntoSelector = document.getElementById('dataObjectMergeSelect');
     $(mergeIntoSelector).select2({
         minimumInputLength: 3,
@@ -263,7 +269,7 @@ function renderContent() {
 
                 let descBody = document.createElement('span');
                 descBody.classList.add('descriptionspan');
-                descBody.innerHTML = dataObject.attributes[i].value;
+                descBody.textContent = dataObject.attributes[i].value;
                 descriptionElement.appendChild(descBody);
 
                 break;
@@ -272,13 +278,12 @@ function renderContent() {
                 document.getElementById('dataObjectAIDescriptionSection').style.display = '';
 
                 // render AI description - content is markdown
-                let markdownText = dataObject.attributes[i].value;
-                // convert markdown to HTML using marked
-                let htmlContent = marked.parse(markdownText);
+                const markdownText = dataObject.attributes[i].value;
+                const safeHtml = renderSafeMarkdown(markdownText);
 
                 let aiDescBody = document.createElement('span');
                 aiDescBody.classList.add('descriptionspan');
-                aiDescBody.innerHTML = htmlContent;
+                aiDescBody.innerHTML = safeHtml;
                 aiDescriptionElement.appendChild(aiDescBody);
 
                 break;
@@ -823,11 +828,19 @@ function renderContent() {
             if (dataObject.permissions.includes('Update')) {
                 document.getElementById('dataObjectClientAPIKeysSection').style.display = '';
 
+                let clientAPIAgreementCheckbox = document.getElementById('dataObjectClientAPIKeyUsage');
+
                 // set up the create client api key button
                 let createClientAPIKeyBtn = document.getElementById('dataObjectClientAPIKeyCreate');
+                createClientAPIKeyBtn.disabled = true;
                 createClientAPIKeyBtn.addEventListener("click", function (e) {
+                    if (clientAPIAgreementCheckbox.checked === false) {
+                        alert(lang.getLang('clientapiagreewarn'));
+                        return;
+                    }
+
                     // create client api key model
-                    let clientAPIKeyUrl = '/api/v1/DataObjects/app/' + getQueryString('id', 'int') + '/ClientAPIKeys' + '?name=' + encodeURIComponent(document.getElementById('dataObjectClientAPIKeyName').value);
+                    let clientAPIKeyUrl = '/api/v1/DataObjects/app/' + getQueryString('id', 'int') + '/ClientAPIKeys' + '?name=' + encodeURIComponent(document.getElementById('dataObjectClientAPIKeyName').value) + '&agreeToTerms=' + clientAPIAgreementCheckbox.checked;
 
                     if (
                         document.getElementById('dataObjectClientAPIKeyExpiresCustom').checked == true &&
@@ -849,11 +862,19 @@ function renderContent() {
 
                                 document.getElementById('dataObjectClientAPIKeysResponse').innerHTML = lang.getLang('clientapikeyresponse', [value.key]);
 
+                                clientAPIAgreementCheckbox.checked = false;
+                                createClientAPIKeyBtn.disabled = true;
+
                                 GetApiKeys();
                             } else {
                                 throw new Error('Failed to create client API key');
                             }
                         });
+                });
+
+                // set up the client API agreement checkbox
+                clientAPIAgreementCheckbox.addEventListener("change", function (e) {
+                    createClientAPIKeyBtn.disabled = !clientAPIAgreementCheckbox.checked;
                 });
 
                 GetApiKeys();

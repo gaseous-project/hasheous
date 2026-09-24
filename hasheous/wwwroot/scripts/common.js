@@ -13,6 +13,9 @@ async function ajaxCall(endpoint, method, successFunction, errorFunction, body) 
 
         dataType: 'json',
         contentType: 'application/json',
+        headers: {
+            'X-Hasheous-Web-Request': '1'
+        },
 
         // Function to call when to
         // request is ok
@@ -37,7 +40,8 @@ async function postData(url, method, body, returnResult = false) {
         method: method,
         headers: {
             'Content-Type': 'application/json',
-            'X-XSRF-TOKEN': token // header name must match your backend config
+            'X-XSRF-TOKEN': token, // header name must match your backend config
+            'X-Hasheous-Web-Request': '1'
         },
         credentials: 'include',
         body: JSON.stringify(body)
@@ -50,10 +54,31 @@ async function postData(url, method, body, returnResult = false) {
 
 async function fetchAntiforgeryToken() {
     const response = await fetch('/api/v1.0/account/antiforgery-token', {
+        headers: {
+            'X-Hasheous-Web-Request': '1'
+        },
         credentials: 'include' // ensures cookies are sent/received
     });
     const data = await response.json();
     return data.token;
+}
+
+if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = function (resource, options = {}) {
+        const requestUrl = typeof resource === 'string'
+            ? resource
+            : (resource && typeof resource.url === 'string' ? resource.url : '');
+        const isApiRequest = requestUrl.startsWith('/api/') || requestUrl.startsWith(window.location.origin + '/api/');
+
+        if (isApiRequest) {
+            const headers = new Headers(options.headers || (resource instanceof Request ? resource.headers : undefined) || {});
+            headers.set('X-Hasheous-Web-Request', '1');
+            options = { ...options, headers: headers };
+        }
+
+        return originalFetch(resource, options);
+    };
 }
 
 function getQueryString(stringName, type) {
@@ -118,6 +143,87 @@ function formatBytes(bytes, decimals = 2) {
 }
 
 /**
+ * Checks whether a URL-like value is safe to use in HTML attributes such as href or src.
+ * This blocks dangerous schemes that can execute script or load unsafe content.
+ *
+ * @param {string|undefined|null} value The candidate URL value.
+ * @returns {boolean} True when the value is non-empty and does not use a blocked scheme.
+ */
+function isSafeUrl(value) {
+    if (typeof value !== 'string') {
+        return false;
+    }
+
+    const trimmedValue = value.trim();
+    if (!trimmedValue) {
+        return false;
+    }
+
+    const normalizedValue = trimmedValue.replace(/[\u0000-\u001F\u007F]/g, '');
+    if (/^(javascript|vbscript|data|file):/i.test(normalizedValue)) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Converts markdown into sanitized HTML for safe display in the UI.
+ * The generated HTML is cleaned before insertion to prevent script execution,
+ * inline event handlers, and unsafe URL schemes from surviving the render step.
+ *
+ * @param {string|undefined|null} markdownText The markdown content to render.
+ * @returns {string} Sanitized HTML suitable for insertion into the page.
+ */
+function renderSafeMarkdown(markdownText) {
+    const rawMarkdown = markdownText == null ? '' : String(markdownText);
+    if (!rawMarkdown.trim()) {
+        return '';
+    }
+
+    // marked.parse() is intentionally used here because the source content is markdown, not raw HTML.
+    const parsedHtml = typeof marked !== 'undefined' && typeof marked.parse === 'function'
+        ? marked.parse(rawMarkdown)
+        : rawMarkdown;
+
+    // Work on a detached DOM fragment so the original page is not modified while we clean it.
+    const sanitizedRoot = document.createElement('div');
+    sanitizedRoot.innerHTML = String(parsedHtml);
+
+    // Remove active elements that can execute code or load unexpected content.
+    sanitizedRoot.querySelectorAll('script, iframe, object, embed, svg, math, base, meta, link, style, template').forEach(node => node.remove());
+
+    // Strip inline event handlers and blocked URL-bearing attributes from all nodes.
+    sanitizedRoot.querySelectorAll('*').forEach(node => {
+        Array.from(node.attributes).forEach(attribute => {
+            const attributeName = attribute.name.toLowerCase();
+            const attributeValue = (attribute.value || '').trim();
+
+            if (attributeName.startsWith('on') || attributeName === 'srcdoc' || attributeName === 'style') {
+                node.removeAttribute(attribute.name);
+                return;
+            }
+
+            if (['href', 'src', 'xlink:href', 'action', 'formaction', 'background', 'poster'].includes(attributeName) && !isSafeUrl(attributeValue)) {
+                node.removeAttribute(attribute.name);
+            }
+        });
+    });
+
+    return sanitizedRoot.innerHTML;
+}
+
+/**
+ * Builds the URL of a data object's detail page.
+ * @param {*} pageType The data object type (game, platform, company, app, ...)
+ * @param {*} id The data object id
+ * @returns The detail page URL
+ */
+function dataObjectDetailUrl(pageType, id) {
+    return '/index.html?page=dataobjectdetail&type=' + encodeURIComponent(pageType) + '&id=' + encodeURIComponent(id);
+}
+
+/**
  * Generates an HTML table from a dataset.
  */
 class generateTable {
@@ -136,9 +242,10 @@ class generateTable {
      * @param {*} pageNumber The current page number
      * @param {*} pageCount The total number of pages
      * @param {*} pagingCallback A callback function to call when a page is changed
+     * @param {*} rowLinkCallback A callback function returning the URL a row points at - rows built this way are real links, so they can be opened in a new tab, bookmarked, or copied
      * @returns 
      */
-    constructor(dataSet, columns, indexColumn, hideIndex, rowClickCallback, recordCount, pageNumber, pageCount, pagingCallback) {
+    constructor(dataSet, columns, indexColumn, hideIndex, rowClickCallback, recordCount, pageNumber, pageCount, pagingCallback, rowLinkCallback) {
         this.resultSet = dataSet;
 
         if (hideIndex == undefined) {
@@ -195,6 +302,8 @@ class generateTable {
             for (let i = 0; i < this.resultSet.length; i++) {
                 let dataRow = document.createElement('tr');
                 let rowId = null;
+                let rowHref = null;
+                let rowCells = [];
 
                 for (let x = 0; x < columns.length; x++) {
                     let cellDetails;
@@ -292,7 +401,7 @@ class generateTable {
                             cellName = columns[x].split(":")[0];
                         }
                         cell.setAttribute('media-selector', 'cell_' + cellName.toLowerCase());
-                        cell.appendChild(cellContent);
+                        rowCells.push({ cell: cell, content: cellContent });
                         dataRow.appendChild(cell);
                     }
 
@@ -302,12 +411,46 @@ class generateTable {
                     }
                 }
 
+                if (rowId != null && rowLinkCallback) {
+                    rowHref = rowLinkCallback(rowId, this.resultSet);
+                }
+
+                for (let c = 0; c < rowCells.length; c++) {
+                    // a cell that is already a link (the "link" column type) keeps its own
+                    // anchor - nesting one inside the row link would be invalid markup
+                    let cellHasLink = rowCells[c].content.tagName === 'A' ||
+                        (rowCells[c].content.querySelector && rowCells[c].content.querySelector('a') != null);
+
+                    if (rowHref && !cellHasLink) {
+                        let cellLink = document.createElement('a');
+                        cellLink.href = rowHref;
+                        cellLink.classList.add('tablecelllink');
+                        cellLink.appendChild(rowCells[c].content);
+                        rowCells[c].cell.appendChild(cellLink);
+                    } else {
+                        rowCells[c].cell.appendChild(rowCells[c].content);
+                    }
+                }
+
                 if (rowId != null) {
                     if (rowClickCallback) {
                         dataRow.classList.add('tablerowhighlight');
                         let clickbackResultSet = this.resultSet;
                         dataRow.addEventListener("click", function () {
                             rowClickCallback(rowId, clickbackResultSet);
+                        }, false);
+                    } else if (rowHref) {
+                        dataRow.classList.add('tablerowhighlight');
+                        dataRow.addEventListener("click", function (ev) {
+                            // clicks on the anchors themselves are the browser's to handle, so
+                            // modified clicks (new tab, new window, download) keep working
+                            if (ev.target.closest('a')) {
+                                return;
+                            }
+                            if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) {
+                                return;
+                            }
+                            window.location = rowHref;
                         }, false);
                     }
                 }
@@ -535,6 +678,7 @@ let signatureSources = {
     11: "MAMERedump",
     12: "TotalDOSCollection",
     13: "eXo",
+    14: "HackHash",
     98: "ScreenScraper"
 }
 

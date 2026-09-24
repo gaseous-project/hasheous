@@ -122,12 +122,11 @@ namespace Classes.Insights
             // check if the query is cached
             if (Config.RedisConfiguration.Enabled)
             {
-                string? cachedData = await RedisConnection.GetDatabase(0).StringGetAsync(cacheKey);
+                Dictionary<string, object>? cachedData = await RedisConnection.GetCacheItem<Dictionary<string, object>>(cacheKey);
                 if (cachedData != null)
                 {
-                    // if cached data is found, deserialize it and return
-                    var deserializedData = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(cachedData);
-                    return deserializedData ?? new Dictionary<string, object>();
+                    // if cached data is found, return it directly
+                    return cachedData;
                 }
             }
 
@@ -172,6 +171,25 @@ namespace Classes.Insights
                 report["total_requests"] = 0;
                 report["average_response_time"] = 0;
             }
+
+            // get busiest endpoints for the last 30 days
+            sql = @"
+                SELECT 
+                    endpoint_address,
+                    `method`,
+                    SUM(total_requests) AS total_requests,
+                    ROUND(AVG(average_execution_time_ms), 2) AS average_response_time_ms,
+                    MAX(average_execution_time_ms) AS max_response_time_ms
+                FROM
+                    Insights_API_Requests_Daily
+                WHERE
+                    event_datetime >= @startdate AND event_datetime <= @enddate
+                        " + appWhereClause + @"
+                GROUP BY endpoint_address, `method`
+                ORDER BY total_requests DESC, average_response_time_ms DESC
+                LIMIT 10;";
+            DataTable busiestEndpointsTable = await db.ExecuteCMDAsync(sql, dbDict, 90);
+            report["busiest_endpoints"] = BuildBusiestEndpoints(busiestEndpointsTable);
 
             // load countries into a dictionary for mapping
             sql = "SELECT Code, Value FROM Country;";
@@ -255,10 +273,33 @@ namespace Classes.Insights
             // cache the result
             if (Config.RedisConfiguration.Enabled)
             {
-                hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(cacheKey, Newtonsoft.Json.JsonConvert.SerializeObject(report), TimeSpan.FromMinutes(30));
+                await hasheous.Classes.RedisConnection.SetCacheItem<Dictionary<string, object>>(cacheKey, report, TimeSpan.FromMinutes(30));
             }
 
             return report;
+        }
+
+        /// <summary>
+        /// Transforms the aggregated endpoint summary rows into a consistent report payload used by the API reports.
+        /// </summary>
+        /// <param name="busiestEndpointsTable">The aggregated endpoint query data.</param>
+        /// <returns>A list of endpoint summaries ordered by request volume.</returns>
+        public static List<Dictionary<string, object>> BuildBusiestEndpoints(DataTable busiestEndpointsTable)
+        {
+            List<Dictionary<string, object>> busiestEndpoints = new List<Dictionary<string, object>>();
+            foreach (DataRow row in busiestEndpointsTable.Rows)
+            {
+                busiestEndpoints.Add(new Dictionary<string, object>
+                {
+                    { "method", row.IsNull("method") ? "UNKNOWN" : row["method"].ToString()! },
+                    { "endpoint", row.IsNull("endpoint_address") ? "unknown" : row["endpoint_address"].ToString()! },
+                    { "total_requests", row.IsNull("total_requests") ? 0L : Convert.ToInt64(row["total_requests"]) },
+                    { "average_response_time_ms", row.IsNull("average_response_time_ms") ? 0m : Convert.ToDecimal(row["average_response_time_ms"]) },
+                    { "max_response_time_ms", row.IsNull("max_response_time_ms") ? 0m : Convert.ToDecimal(row["max_response_time_ms"]) }
+                });
+            }
+
+            return busiestEndpoints;
         }
 
         /// <summary>
@@ -309,11 +350,13 @@ namespace Classes.Insights
                         country, 
                         client_id, 
                         client_apikey_id, 
-                        COUNT(*) AS total_requests, 
+                        endpoint_address,
+                        `method`,
+                        SUM(1) AS total_requests, 
                         AVG(execution_time_ms) AS average_response_time 
                     FROM Insights_API_Requests 
                     WHERE event_datetime >= @hourStart AND event_datetime < @hourEnd 
-                    GROUP BY insightType, remote_ip, user_id, country, client_id, client_apikey_id;";
+                    GROUP BY insightType, remote_ip, user_id, country, client_id, client_apikey_id, endpoint_address, `method`;";
                 Dictionary<string, object> aggregateParams = new Dictionary<string, object>
                 {
                     { "hourStart", hourStart },
@@ -325,9 +368,9 @@ namespace Classes.Insights
                 {
                     string insertSql = @"
                         INSERT INTO Insights_API_Requests_Hourly
-                            (event_datetime, insightType, remote_ip, user_id, country, client_id, client_apikey_id, total_requests, average_execution_time_ms)
+                            (event_datetime, insightType, remote_ip, user_id, country, client_id, client_apikey_id, endpoint_address, `method`, total_requests, average_execution_time_ms)
                         VALUES
-                            (@hourStart, @insightType, @remote_ip, @user_id, @country, @client_id, @client_apikey_id, @total_requests, @average_response_time);";
+                            (@hourStart, @insightType, @remote_ip, @user_id, @country, @client_id, @client_apikey_id, @endpoint_address, @method, @total_requests, @average_response_time);";
                     Dictionary<string, object> insertParams = new Dictionary<string, object>
                     {
                         { "@hourStart", hourStart },
@@ -337,6 +380,8 @@ namespace Classes.Insights
                         { "@country", row["country"] },
                         { "@client_id", row["client_id"] },
                         { "@client_apikey_id", row["client_apikey_id"] },
+                        { "@endpoint_address", row["endpoint_address"] ?? "/unknown" },
+                        { "@method", row["method"] ?? "UNKNOWN" },
                         { "@total_requests", row["total_requests"] },
                         { "@average_response_time", row["average_response_time"] }
                     };
@@ -412,6 +457,8 @@ namespace Classes.Insights
                         country, 
                         client_id, 
                         client_apikey_id, 
+                        endpoint_address,
+                        `method`,
                         SUM(total_requests) AS total_requests, 
                         AVG(average_execution_time_ms) AS average_response_time 
                     FROM 
@@ -419,7 +466,7 @@ namespace Classes.Insights
                     WHERE 
                         event_datetime >= @dayStart 
                         AND event_datetime < @dayEnd 
-                    GROUP BY insightType, remote_ip, user_id, country, client_id, client_apikey_id;";
+                    GROUP BY insightType, remote_ip, user_id, country, client_id, client_apikey_id, endpoint_address, `method`;";
                 Dictionary<string, object> aggregateParams = new Dictionary<string, object>
                 {
                     { "dayStart", dayStart },
@@ -431,9 +478,9 @@ namespace Classes.Insights
                 {
                     string insertSql = @"
                         INSERT INTO Insights_API_Requests_Daily
-                            (event_datetime, insightType, remote_ip, user_id, country, client_id, client_apikey_id, total_requests, average_execution_time_ms)
+                            (event_datetime, insightType, remote_ip, user_id, country, client_id, client_apikey_id, endpoint_address, `method`, total_requests, average_execution_time_ms)
                         VALUES
-                            (@dayStart, @insightType, @remote_ip, @user_id, @country, @client_id, @client_apikey_id, @total_requests, @average_response_time);";
+                            (@dayStart, @insightType, @remote_ip, @user_id, @country, @client_id, @client_apikey_id, @endpoint_address, @method, @total_requests, @average_response_time);";
                     Dictionary<string, object> insertParams = new Dictionary<string, object>
                     {
                         { "@dayStart", dayStart },
@@ -443,6 +490,8 @@ namespace Classes.Insights
                         { "@country", row["country"] },
                         { "@client_id", row["client_id"] },
                         { "@client_apikey_id", row["client_apikey_id"] },
+                        { "@endpoint_address", row["endpoint_address"] ?? "/unknown" },
+                        { "@method", row["method"] ?? "UNKNOWN" },
                         { "@total_requests", row["total_requests"] },
                         { "@average_response_time", row["average_response_time"] }
                     };
@@ -511,6 +560,8 @@ namespace Classes.Insights
                         country, 
                         client_id, 
                         client_apikey_id, 
+                        endpoint_address,
+                        `method`,
                         SUM(total_requests) AS total_requests, 
                         AVG(average_execution_time_ms) AS average_response_time 
                     FROM 
@@ -518,7 +569,7 @@ namespace Classes.Insights
                     WHERE 
                         event_datetime >= @monthStart 
                         AND event_datetime < @monthEnd 
-                    GROUP BY insightType, remote_ip, user_id, country, client_id, client_apikey_id;";
+                    GROUP BY insightType, remote_ip, user_id, country, client_id, client_apikey_id, endpoint_address, `method`;";
                 Dictionary<string, object> aggregateParams = new Dictionary<string, object>
                 {
                     { "monthStart", monthStart },
@@ -530,9 +581,9 @@ namespace Classes.Insights
                 {
                     string insertSql = @"
                         INSERT INTO Insights_API_Requests_Monthly
-                            (event_datetime, insightType, remote_ip, user_id, country, client_id, client_apikey_id, total_requests, average_execution_time_ms)
+                            (event_datetime, insightType, remote_ip, user_id, country, client_id, client_apikey_id, endpoint_address, `method`, total_requests, average_execution_time_ms)
                         VALUES
-                            (@monthStart, @insightType, @remote_ip, @user_id, @country, @client_id, @client_apikey_id, @total_requests, @average_response_time);";
+                            (@monthStart, @insightType, @remote_ip, @user_id, @country, @client_id, @client_apikey_id, @endpoint_address, @method, @total_requests, @average_response_time);";
                     Dictionary<string, object> insertParams = new Dictionary<string, object>
                     {
                         { "@monthStart", monthStart },
@@ -542,6 +593,8 @@ namespace Classes.Insights
                         { "@country", row["country"] },
                         { "@client_id", row["client_id"] },
                         { "@client_apikey_id", row["client_apikey_id"] },
+                        { "@endpoint_address", row["endpoint_address"] ?? "/unknown" },
+                        { "@method", row["method"] ?? "UNKNOWN" },
                         { "@total_requests", row["total_requests"] },
                         { "@average_response_time", row["average_response_time"] }
                     };
@@ -635,30 +688,9 @@ namespace Classes.Insights
                 // If the user has opted out of storing IP addresses, set it to "unknown"
                 remoteIp = "unknown";
             }
-            else if (httpContext.Request.Headers.ContainsKey("true-client-ip"))
+            else
             {
-                // If behind a proxy, use the X-Forwarded-For header
-                remoteIp = httpContext.Request.Headers["true-client-ip"].ToString();
-            }
-            else if (httpContext.Request.Headers.ContainsKey("CF-Connecting-IPv6"))
-            {
-                // If behind a proxy, use the X-Forwarded-For header
-                remoteIp = httpContext.Request.Headers["CF-Connecting-IPv6"].ToString();
-            }
-            else if (httpContext.Request.Headers.ContainsKey("cf-connecting-ip"))
-            {
-                // If behind a proxy, use the X-Forwarded-For header
-                remoteIp = httpContext.Request.Headers["cf-connecting-ip"].ToString();
-            }
-            else if (httpContext.Request.Headers.ContainsKey("X-Forwarded-For"))
-            {
-                // If behind a proxy, use the X-Forwarded-For header
-                remoteIp = httpContext.Request.Headers["X-Forwarded-For"].ToString();
-            }
-            else if (httpContext.Connection.RemoteIpAddress != null)
-            {
-                // Otherwise, use the RemoteIpAddress from the connection
-                remoteIp = httpContext.Connection.RemoteIpAddress.ToString();
+                remoteIp = Common.GetContextRemoteIP(httpContext);
             }
             // If the remote IP is still empty, set it to "unknown"
             if (string.IsNullOrEmpty(remoteIp) && !optOutTypes.Contains(OptOutType.BlockIP))
@@ -740,7 +772,7 @@ namespace Classes.Insights
                     // check the cache first
                     if (Config.RedisConfiguration.Enabled)
                     {
-                        string? cachedUserId = await hasheous.Classes.RedisConnection.GetDatabase(0).StringGetAsync("Insights:User:" + httpContext.User.Identity.Name);
+                        string? cachedUserId = await hasheous.Classes.RedisConnection.GetCacheItem<string>("Insights:User:" + httpContext.User.Identity.Name);
                         if (cachedUserId != null)
                         {
                             userId = cachedUserId;
@@ -760,7 +792,7 @@ namespace Classes.Insights
                             // Cache the user ID for future requests
                             if (Config.RedisConfiguration.Enabled)
                             {
-                                hasheous.Classes.RedisConnection.GetDatabase(0).StringSet("Insights:User:" + httpContext.User.Identity.Name, userId, TimeSpan.FromHours(1));
+                                await hasheous.Classes.RedisConnection.SetCacheItem<string>("Insights:User:" + httpContext.User.Identity.Name, userId, TimeSpan.FromHours(1));
                             }
                         }
                     }

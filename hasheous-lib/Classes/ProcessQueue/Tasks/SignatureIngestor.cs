@@ -6,7 +6,8 @@ namespace Classes.ProcessQueue
     public class SignatureIngestor : IQueueTask
     {
         /// <inheritdoc/>
-        public List<QueueItemType> Blocks => new List<QueueItemType>{
+        public List<QueueItemType> Blocks => new List<QueueItemType>
+        {
             QueueItemType.SignatureIngestor
         };
 

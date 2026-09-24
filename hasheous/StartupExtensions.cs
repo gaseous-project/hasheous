@@ -1,15 +1,22 @@
 using System.Linq;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Mail;
 using System.Reflection;
+using System.Security.Claims;
+using System.Text;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Asp.Versioning;
 using Authentication;
 using Classes;
 using Classes.ProcessQueue;
+using Classes.RateLimiting;
+using Classes.Supporters;
 using hasheous.Classes;
 using hasheous_server.Classes;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -219,6 +226,21 @@ public static class StartupExtensions
     }
 
     /// <summary>
+    /// Registers the dynamic request rate limiter and applies it to MVC requests.
+    /// </summary>
+    public static IServiceCollection AddHasheousRateLimiting(this IServiceCollection services)
+    {
+        services.AddSingleton<DynamicRateLimitManager>();
+        services.AddSingleton<IHostedService>(serviceProvider => serviceProvider.GetRequiredService<DynamicRateLimitManager>());
+        services.AddScoped<DynamicRateLimitFilter>();
+        services.Configure<MvcOptions>(options =>
+        {
+            options.Filters.AddService<DynamicRateLimitFilter>();
+        });
+        return services;
+    }
+
+    /// <summary>
     /// Configures antiforgery token header and auto validation filter.
     /// </summary>
     public static IServiceCollection AddHasheousCsrf(this IServiceCollection services)
@@ -270,6 +292,7 @@ public static class StartupExtensions
             options.AddPolicy("Moderator", policy => policy.RequireRole("Moderator"));
             options.AddPolicy("Member", policy => policy.RequireRole("Member"));
             options.AddPolicy("VerifiedEmail", policy => policy.RequireRole("Verified Email"));
+            options.AddPolicy("Supporter", policy => policy.RequireRole(SupporterConstants.SupporterRoleName));
             options.AddPolicy("TaskRunner", policy => policy.RequireRole("Task Runner"));
         });
         services.AddAuthentication(o => { o.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme; });
@@ -293,6 +316,10 @@ public static class StartupExtensions
                 options.TokenEndpoint = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
             });
         }
+        if (Config.SupporterRecognitionConfiguration.OpenCollectiveLinkEnabled)
+        {
+            services.AddAuthentication().AddOAuth(SupporterConstants.OpenCollectiveProviderName, ConfigureOpenCollectiveOAuth);
+        }
         return services;
     }
 
@@ -303,9 +330,11 @@ public static class StartupExtensions
     {
         services.AddSingleton<Authentication.ApiKey.ApiKeyAuthorizationFilter>();
         services.AddSingleton<Authentication.ApiKey.IApiKeyValidator, Authentication.ApiKey.ApiKeyValidator>();
+        services.AddTransient<Authentication.ApiKey>();
         services.AddSingleton<Authentication.ClientApiKey.ClientApiKeyAuthorizationFilter>();
         services.AddSingleton<Authentication.ClientApiKey.IClientApiKeyValidator, Authentication.ClientApiKey.ClientApiKeyValidator>
         ();
+        services.AddTransient<Authentication.ClientApiKey>();
         services.AddSingleton<Authentication.TaskWorkerAPIKey.TaskWorkerAPIKeyAuthorizationFilter>();
         services.AddSingleton<Authentication.TaskWorkerAPIKey.ITaskWorkerAPIKeyValidator, Authentication.TaskWorkerAPIKey.TaskWorkerAPIKeyValidator>
         ();
@@ -341,6 +370,50 @@ public static class StartupExtensions
     }
 
     /// <summary>
+    /// Issues a server-signed cookie to browser UI requests so subsequent same-site API calls can be identified.
+    /// </summary>
+    public static void UseHasheousWebRequestMarker(this WebApplication app)
+    {
+        app.Use(async (context, next) =>
+        {
+            if (!context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
+                && (HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method)))
+            {
+                // Modern browsers set Sec-Fetch-Site on all fetches.
+                // "same-origin" = in-page navigation; "none" = top-level direct navigation
+                // (address bar, bookmark, external link). Both represent a legitimate browser
+                // request to serve a built-in page.
+                string secFetchSite = context.Request.Headers["Sec-Fetch-Site"].ToString();
+                bool issueMarker = secFetchSite == "same-origin" || secFetchSite == "none";
+
+                // If Sec-Fetch-Site is absent (older browsers), fall back to the Referer header.
+                if (!issueMarker && string.IsNullOrEmpty(secFetchSite))
+                {
+                    if (context.Request.Headers.TryGetValue("Referer", out var referer)
+                        && Uri.TryCreate(referer, UriKind.Absolute, out var refererUri))
+                    {
+                        issueMarker = Config.TrustedHosts.Contains(refererUri.Host, StringComparer.OrdinalIgnoreCase);
+                    }
+                    else
+                    {
+                        // No Sec-Fetch-Site and no Referer — could be a direct navigation on an
+                        // older browser. Issue the marker so built-in pages are not rate-limited.
+                        issueMarker = true;
+                    }
+                }
+
+                if (issueMarker)
+                {
+                    DynamicRateLimitManager dynamicRateLimitManager = context.RequestServices.GetRequiredService<DynamicRateLimitManager>();
+                    dynamicRateLimitManager.IssueWebRequestCookie(context);
+                }
+            }
+
+            await next();
+        });
+    }
+
+    /// <summary>
     /// Ensures system roles exist with proper dependencies and settings, and assigns Verified Email role to users with confirmed emails.
     /// </summary>
     public static async Task SeedRolesAndVerifiedEmailAsync(this WebApplication app)
@@ -348,7 +421,7 @@ public static class StartupExtensions
         using var scope = app.Services.CreateScope();
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleStore>();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-        var roles = new[] { "Admin", "Moderator", "Member", "Verified Email", "Task Runner" };
+        var roles = new[] { "Admin", "Moderator", "Member", "Verified Email", SupporterConstants.SupporterRoleName, "Task Runner" };
 
         // Create roles if they don't exist
         foreach (var role in roles)
@@ -365,6 +438,7 @@ public static class StartupExtensions
         var moderatorRole = await roleManager.FindByNameAsync("Moderator", CancellationToken.None);
         var adminRole = await roleManager.FindByNameAsync("Admin", CancellationToken.None);
         var verifiedEmailRole = await roleManager.FindByNameAsync("Verified Email", CancellationToken.None);
+        var supporterRole = await roleManager.FindByNameAsync(SupporterConstants.SupporterRoleName, CancellationToken.None);
         var taskRunnerRole = await roleManager.FindByNameAsync("Task Runner", CancellationToken.None);
 
         // Set up role hierarchy: Admin depends on Moderator depends on Member
@@ -396,6 +470,13 @@ public static class StartupExtensions
             await roleManager.UpdateAsync(verifiedEmailRole, CancellationToken.None);
         }
 
+        if (supporterRole != null && memberRole != null)
+        {
+            supporterRole.AllowManualAssignment = false;
+            supporterRole.RoleDependsOn = Guid.Parse(memberRole.Id);
+            await roleManager.UpdateAsync(supporterRole, CancellationToken.None);
+        }
+
         if (taskRunnerRole != null)
         {
             taskRunnerRole.AllowManualAssignment = true;
@@ -411,6 +492,85 @@ public static class StartupExtensions
             {
                 await userManager.AddToRoleAsync(user, "Verified Email");
             }
+        }
+    }
+
+    /// <summary>
+    /// Configures the OpenCollective OAuth handler used to link supporter accounts.
+    /// </summary>
+    /// <param name="options">The OAuth options to configure.</param>
+    private static void ConfigureOpenCollectiveOAuth(OAuthOptions options)
+    {
+        options.ClientId = Config.SupporterRecognitionConfiguration.OpenCollectiveClientId;
+        options.ClientSecret = Config.SupporterRecognitionConfiguration.OpenCollectiveClientSecret;
+        options.CallbackPath = "/signin-opencollective";
+        options.AuthorizationEndpoint = "https://opencollective.com/oauth/authorize";
+        options.TokenEndpoint = "https://opencollective.com/oauth/token";
+        options.SaveTokens = true;
+        options.SignInScheme = IdentityConstants.ExternalScheme;
+        options.Scope.Add("account");
+        options.Events = new OAuthEvents
+        {
+            OnCreatingTicket = PopulateOpenCollectiveClaimsAsync
+        };
+    }
+
+    /// <summary>
+    /// Populates the claims used for OpenCollective external login linking.
+    /// </summary>
+    /// <param name="context">The OAuth ticket context.</param>
+    /// <returns>A task that completes when the claims have been populated.</returns>
+    private static async Task PopulateOpenCollectiveClaimsAsync(OAuthCreatingTicketContext context)
+    {
+        string query = """
+            query {
+              me {
+                id
+                slug
+                name
+                email
+              }
+            }
+            """;
+
+        string payload = JsonSerializer.Serialize(new { query });
+        using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, "https://api.opencollective.com/graphql/v2");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", context.AccessToken);
+        request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+
+        using HttpResponseMessage response = await context.Backchannel.SendAsync(request, context.HttpContext.RequestAborted);
+        string responseContent = await response.Content.ReadAsStringAsync(context.HttpContext.RequestAborted);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException($"OpenCollective profile lookup failed with status code {(int)response.StatusCode}: {responseContent}");
+        }
+
+        using JsonDocument document = JsonDocument.Parse(responseContent);
+        JsonElement me = document.RootElement.GetProperty("data").GetProperty("me");
+        string? accountId = me.TryGetProperty("id", out JsonElement id) ? id.GetString() : null;
+        string? accountSlug = me.TryGetProperty("slug", out JsonElement slug) ? slug.GetString() : null;
+        string? displayName = me.TryGetProperty("name", out JsonElement name) ? name.GetString() : null;
+        string? emailAddress = me.TryGetProperty("email", out JsonElement email) ? email.GetString() : null;
+
+        if (string.IsNullOrWhiteSpace(accountId))
+        {
+            throw new InvalidOperationException("OpenCollective did not return an account identifier.");
+        }
+
+        context.Identity?.AddClaim(new Claim(ClaimTypes.NameIdentifier, accountId));
+        if (!string.IsNullOrWhiteSpace(accountSlug))
+        {
+            context.Identity?.AddClaim(new Claim(SupporterConstants.OpenCollectiveSlugClaimType, accountSlug));
+        }
+
+        if (!string.IsNullOrWhiteSpace(displayName))
+        {
+            context.Identity?.AddClaim(new Claim(ClaimTypes.Name, displayName));
+        }
+
+        if (!string.IsNullOrWhiteSpace(emailAddress))
+        {
+            context.Identity?.AddClaim(new Claim(ClaimTypes.Email, emailAddress));
         }
     }
 
@@ -434,7 +594,7 @@ public static class StartupExtensions
                     string cacheKey = $"PageCache:{id}";
                     if (Config.RedisConfiguration.Enabled)
                     {
-                        string? cachedData = await hasheous.Classes.RedisConnection.GetDatabase(0).StringGetAsync(cacheKey);
+                        string? cachedData = await hasheous.Classes.RedisConnection.GetCacheItem<string>(cacheKey);
                         if (!string.IsNullOrEmpty(cachedData))
                         {
                             html = html.Replace("<!--OG_INJECT-->", cachedData);
@@ -480,7 +640,7 @@ public static class StartupExtensions
 <link rel=""canonical"" href=""{canonical}"">";
                         if (Config.RedisConfiguration.Enabled)
                         {
-                            hasheous.Classes.RedisConnection.GetDatabase(0).StringSet(cacheKey, og, TimeSpan.FromHours(1));
+                            await hasheous.Classes.RedisConnection.SetCacheItem(cacheKey, og, TimeSpan.FromHours(1));
                         }
                         html = html.Replace("<!--OG_INJECT-->", og);
                         context.Response.ContentType = "text/html; charset=utf-8";

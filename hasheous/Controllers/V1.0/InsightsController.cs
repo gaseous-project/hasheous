@@ -50,7 +50,7 @@ namespace hasheous_server.Controllers.v1_0
 
                 DataObjectPermission dataObjectPermission = new DataObjectPermission(_userManager);
 
-                if (dataObjectPermission.CheckAsync(user, DataObjects.DataObjectType.App, DataObjectPermission.PermissionType.Read, Id).Result)
+                if (await dataObjectPermission.CheckAsync(user, DataObjects.DataObjectType.App, DataObjectPermission.PermissionType.Read, Id))
                 {
                     Dictionary<string, object> report = await Insights.GenerateInsightReport(Id);
 

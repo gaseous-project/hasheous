@@ -488,6 +488,8 @@ namespace hasheous_server.Classes.Tasks.Clients
     /// </summary>
     public static class TaskManagement
     {
+        private static HttpClient client = new HttpClient();
+
         /// <summary>
         /// Enqueues a new task of the specified type with the given capabilities and parameters.
         /// </summary>
@@ -1050,243 +1052,240 @@ namespace hasheous_server.Classes.Tasks.Clients
             }
 
             // fetch the data
-            using (var client = new System.Net.Http.HttpClient())
+            // set the user agent
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Hasheous/1.0");
+
+            var response = client.GetAsync(wikiApiUrl).Result;
+            if (response.IsSuccessStatusCode)
             {
-                // set the user agent
-                client.DefaultRequestHeaders.UserAgent.ParseAdd("Hasheous/1.0");
-
-                var response = client.GetAsync(wikiApiUrl).Result;
-                if (response.IsSuccessStatusCode)
+                var content = response.Content.ReadAsStringAsync().Result;
+                if (content.Length > 0)
                 {
-                    var content = response.Content.ReadAsStringAsync().Result;
-                    if (content.Length > 0)
+                    // the content is html - we need to extract the text content and remove any unneeded sections, and convert to a markdown-like format
+                    var htmlDoc = new HtmlAgilityPack.HtmlDocument();
+                    htmlDoc.LoadHtml(content);
+
+                    // remove all images - images are in "figure" elements
+                    var figureNodes = htmlDoc.DocumentNode.SelectNodes("//figure"); ;
+                    if (figureNodes != null)
                     {
-                        // the content is html - we need to extract the text content and remove any unneeded sections, and convert to a markdown-like format
-                        var htmlDoc = new HtmlAgilityPack.HtmlDocument();
-                        htmlDoc.LoadHtml(content);
-
-                        // remove all images - images are in "figure" elements
-                        var figureNodes = htmlDoc.DocumentNode.SelectNodes("//figure"); ;
-                        if (figureNodes != null)
+                        foreach (var figureNode in figureNodes)
                         {
-                            foreach (var figureNode in figureNodes)
-                            {
-                                figureNode.Remove();
-                            }
+                            figureNode.Remove();
                         }
-
-                        // get the infobox table and convert it to a markdown table
-                        string markdownTable = "";
-                        var infoboxNodeForTable = htmlDoc.DocumentNode.SelectSingleNode("//table[contains(@class, 'infobox')]");
-                        if (infoboxNodeForTable != null)
-                        {
-                            var rows = infoboxNodeForTable.SelectNodes(".//tr");
-                            if (rows != null)
-                            {
-                                List<string> tableLines = new List<string>();
-                                foreach (var row in rows)
-                                {
-                                    var headerCell = row.SelectSingleNode(".//th");
-                                    var dataCell = row.SelectSingleNode(".//td");
-                                    if (headerCell != null && dataCell != null)
-                                    {
-                                        string headerText = headerCell.InnerText.Trim().Replace("\n", " ");
-                                        string dataText = dataCell.InnerText.Trim().Replace("\n", " ");
-                                        tableLines.Add($"| **{headerText}** | {dataText} |");
-                                    }
-                                }
-                                if (tableLines.Count > 0)
-                                {
-                                    // add header separator
-                                    tableLines.Insert(1, "| --- | --- |");
-                                    markdownTable = string.Join("\n", tableLines);
-                                }
-                            }
-                        }
-
-                        // remove the infobox table and everything before it in the first section - infobox is a "table" element with class "infobox"
-                        // replace the infobox with the markdown table if it exists
-                        var infoboxNode = htmlDoc.DocumentNode.SelectSingleNode("//table[contains(@class, 'infobox')]");
-                        if (markdownTable != "" && infoboxNode != null)
-                        {
-                            var markdownNode = htmlDoc.CreateTextNode(markdownTable + "\n\n");
-                            infoboxNode.ParentNode.ReplaceChild(markdownNode, infoboxNode);
-                        }
-
-                        if (infoboxNode != null)
-                        {
-                            var firstSection = infoboxNode.ParentNode; ;
-                            if (firstSection != null)
-                            {
-                                var nodesToRemove = new List<HtmlAgilityPack.HtmlNode>();
-                                foreach (var childNode in firstSection.ChildNodes)
-                                {
-                                    nodesToRemove.Add(childNode);
-                                    if (childNode == infoboxNode)
-                                    {
-                                        break;
-                                    }
-                                }
-                                foreach (var node in nodesToRemove)
-                                {
-                                    node.Remove();
-                                }
-                            }
-                        }
-
-                        // remove all superscript elements - these are used for citations
-                        var superscriptNodes = htmlDoc.DocumentNode.SelectNodes("//sup"); ;
-                        if (superscriptNodes != null)
-                        {
-                            foreach (var supNode in superscriptNodes)
-                            {
-                                supNode.Remove();
-                            }
-                        }
-
-                        // convert all links to plain text - links are "a" elements
-                        var linkNodes = htmlDoc.DocumentNode.SelectNodes("//a"); ;
-                        if (linkNodes != null)
-                        {
-                            foreach (var linkNode in linkNodes)
-                            {
-                                var textNode = htmlDoc.CreateTextNode(linkNode.InnerText);
-                                linkNode.ParentNode.ReplaceChild(textNode, linkNode);
-                            }
-                        }
-
-                        // remove references section - references section is a "section" element where the first child is an "h2" with id "References"
-                        var referencesSection = htmlDoc.DocumentNode.SelectSingleNode("//section[h2[@id='References']]");
-                        if (referencesSection != null)
-                        {
-                            referencesSection.Remove();
-                        }
-
-                        // remove external links section - external links section is a "section" element where the first child is an "h2" with id "External_links"
-                        var externalLinksSection = htmlDoc.DocumentNode.SelectSingleNode("//section[h2[@id='External_links']]");
-                        if (externalLinksSection != null)
-                        {
-                            externalLinksSection.Remove();
-                        }
-
-                        // replace h1-h6 tags with their inner text prefixed with "#" corresponding to their level and suffixed with double newlines
-                        for (int i = 1; i <= 6; i++)
-                        {
-                            var headerNodes = htmlDoc.DocumentNode.SelectNodes($"//h{i}"); ;
-                            if (headerNodes != null)
-                            {
-                                foreach (var headerNode in headerNodes)
-                                {
-                                    var textNode = htmlDoc.CreateTextNode(new string('#', i) + " " + headerNode.InnerText + "\n\n");
-                                    headerNode.ParentNode.ReplaceChild(textNode, headerNode);
-                                }
-                            }
-                        }
-
-                        // replace br tags with single newlines
-                        var brNodes = htmlDoc.DocumentNode.SelectNodes("//br"); ;
-                        if (brNodes != null)
-                        {
-                            foreach (var brNode in brNodes)
-                            {
-                                var textNode = htmlDoc.CreateTextNode("\n");
-                                brNode.ParentNode.ReplaceChild(textNode, brNode);
-                            }
-                        }
-
-                        // replace p tags with double newlines
-                        var pNodes = htmlDoc.DocumentNode.SelectNodes("//p");
-                        if (pNodes != null)
-                        {
-                            foreach (var pNode in pNodes)
-                            {
-                                var textNode = htmlDoc.CreateTextNode(pNode.InnerText + "\n\n");
-                                pNode.ParentNode.ReplaceChild(textNode, pNode);
-                            }
-                        }
-
-                        // replace li tags with "- " prefix and single newline suffix
-                        var liNodes = htmlDoc.DocumentNode.SelectNodes("//li"); ;
-                        if (liNodes != null)
-                        {
-                            foreach (var liNode in liNodes)
-                            {
-                                var textNode = htmlDoc.CreateTextNode("- " + liNode.InnerText + "\n");
-                                liNode.ParentNode.ReplaceChild(textNode, liNode);
-                            }
-                        }
-
-                        // replace i tags with "*" prefix and suffix
-                        var iNodes = htmlDoc.DocumentNode.SelectNodes("//i"); ;
-                        if (iNodes != null)
-                        {
-                            foreach (var iNode in iNodes)
-                            {
-                                var textNode = htmlDoc.CreateTextNode("*" + iNode.InnerText + "*");
-                                iNode.ParentNode.ReplaceChild(textNode, iNode);
-                            }
-                        }
-
-                        // replace b and strong tags with "**" prefix and suffix
-                        var bNodes = htmlDoc.DocumentNode.SelectNodes("//b | //strong");
-                        if (bNodes != null)
-                        {
-                            foreach (var bNode in bNodes)
-                            {
-                                var textNode = htmlDoc.CreateTextNode("**" + bNode.InnerText + "**");
-                                bNode.ParentNode.ReplaceChild(textNode, bNode);
-                            }
-                        }
-
-                        // replace u and underline tags with "__" prefix and suffix
-                        var uNodes = htmlDoc.DocumentNode.SelectNodes("//u | //underline");
-                        if (uNodes != null)
-                        {
-                            foreach (var uNode in uNodes)
-                            {
-                                var textNode = htmlDoc.CreateTextNode("__" + uNode.InnerText + "__");
-                                uNode.ParentNode.ReplaceChild(textNode, uNode);
-                            }
-                        }
-
-                        // replace all code tags with "`" prefix and suffix
-                        var codeNodes = htmlDoc.DocumentNode.SelectNodes("//code"); ;
-                        if (codeNodes != null)
-                        {
-                            foreach (var codeNode in codeNodes)
-                            {
-                                var textNode = htmlDoc.CreateTextNode("`" + codeNode.InnerText + "`");
-                                codeNode.ParentNode.ReplaceChild(textNode, codeNode);
-                            }
-                        }
-
-                        // replace all pre tags with "```" prefix and suffix
-                        var preNodes = htmlDoc.DocumentNode.SelectNodes("//pre"); ;
-                        if (preNodes != null)
-                        {
-                            foreach (var preNode in preNodes)
-                            {
-                                var textNode = htmlDoc.CreateTextNode("```\n" + preNode.InnerText + "\n```");
-                                preNode.ParentNode.ReplaceChild(textNode, preNode);
-                            }
-                        }
-
-                        // replace all remaining tags with their inner text
-                        var allNodes = htmlDoc.DocumentNode.SelectNodes("//*"); ;
-                        if (allNodes != null)
-                        {
-                            foreach (var node in allNodes)
-                            {
-                                if (node.NodeType == HtmlAgilityPack.HtmlNodeType.Element)
-                                {
-                                    var textNode = htmlDoc.CreateTextNode(node.InnerText);
-                                    node.ParentNode.ReplaceChild(textNode, node);
-                                }
-                            }
-                        }
-
-                        return htmlDoc.DocumentNode.InnerText.Trim();
                     }
+
+                    // get the infobox table and convert it to a markdown table
+                    string markdownTable = "";
+                    var infoboxNodeForTable = htmlDoc.DocumentNode.SelectSingleNode("//table[contains(@class, 'infobox')]");
+                    if (infoboxNodeForTable != null)
+                    {
+                        var rows = infoboxNodeForTable.SelectNodes(".//tr");
+                        if (rows != null)
+                        {
+                            List<string> tableLines = new List<string>();
+                            foreach (var row in rows)
+                            {
+                                var headerCell = row.SelectSingleNode(".//th");
+                                var dataCell = row.SelectSingleNode(".//td");
+                                if (headerCell != null && dataCell != null)
+                                {
+                                    string headerText = headerCell.InnerText.Trim().Replace("\n", " ");
+                                    string dataText = dataCell.InnerText.Trim().Replace("\n", " ");
+                                    tableLines.Add($"| **{headerText}** | {dataText} |");
+                                }
+                            }
+                            if (tableLines.Count > 0)
+                            {
+                                // add header separator
+                                tableLines.Insert(1, "| --- | --- |");
+                                markdownTable = string.Join("\n", tableLines);
+                            }
+                        }
+                    }
+
+                    // remove the infobox table and everything before it in the first section - infobox is a "table" element with class "infobox"
+                    // replace the infobox with the markdown table if it exists
+                    var infoboxNode = htmlDoc.DocumentNode.SelectSingleNode("//table[contains(@class, 'infobox')]");
+                    if (markdownTable != "" && infoboxNode != null)
+                    {
+                        var markdownNode = htmlDoc.CreateTextNode(markdownTable + "\n\n");
+                        infoboxNode.ParentNode.ReplaceChild(markdownNode, infoboxNode);
+                    }
+
+                    if (infoboxNode != null)
+                    {
+                        var firstSection = infoboxNode.ParentNode; ;
+                        if (firstSection != null)
+                        {
+                            var nodesToRemove = new List<HtmlAgilityPack.HtmlNode>();
+                            foreach (var childNode in firstSection.ChildNodes)
+                            {
+                                nodesToRemove.Add(childNode);
+                                if (childNode == infoboxNode)
+                                {
+                                    break;
+                                }
+                            }
+                            foreach (var node in nodesToRemove)
+                            {
+                                node.Remove();
+                            }
+                        }
+                    }
+
+                    // remove all superscript elements - these are used for citations
+                    var superscriptNodes = htmlDoc.DocumentNode.SelectNodes("//sup"); ;
+                    if (superscriptNodes != null)
+                    {
+                        foreach (var supNode in superscriptNodes)
+                        {
+                            supNode.Remove();
+                        }
+                    }
+
+                    // convert all links to plain text - links are "a" elements
+                    var linkNodes = htmlDoc.DocumentNode.SelectNodes("//a"); ;
+                    if (linkNodes != null)
+                    {
+                        foreach (var linkNode in linkNodes)
+                        {
+                            var textNode = htmlDoc.CreateTextNode(linkNode.InnerText);
+                            linkNode.ParentNode.ReplaceChild(textNode, linkNode);
+                        }
+                    }
+
+                    // remove references section - references section is a "section" element where the first child is an "h2" with id "References"
+                    var referencesSection = htmlDoc.DocumentNode.SelectSingleNode("//section[h2[@id='References']]");
+                    if (referencesSection != null)
+                    {
+                        referencesSection.Remove();
+                    }
+
+                    // remove external links section - external links section is a "section" element where the first child is an "h2" with id "External_links"
+                    var externalLinksSection = htmlDoc.DocumentNode.SelectSingleNode("//section[h2[@id='External_links']]");
+                    if (externalLinksSection != null)
+                    {
+                        externalLinksSection.Remove();
+                    }
+
+                    // replace h1-h6 tags with their inner text prefixed with "#" corresponding to their level and suffixed with double newlines
+                    for (int i = 1; i <= 6; i++)
+                    {
+                        var headerNodes = htmlDoc.DocumentNode.SelectNodes($"//h{i}"); ;
+                        if (headerNodes != null)
+                        {
+                            foreach (var headerNode in headerNodes)
+                            {
+                                var textNode = htmlDoc.CreateTextNode(new string('#', i) + " " + headerNode.InnerText + "\n\n");
+                                headerNode.ParentNode.ReplaceChild(textNode, headerNode);
+                            }
+                        }
+                    }
+
+                    // replace br tags with single newlines
+                    var brNodes = htmlDoc.DocumentNode.SelectNodes("//br"); ;
+                    if (brNodes != null)
+                    {
+                        foreach (var brNode in brNodes)
+                        {
+                            var textNode = htmlDoc.CreateTextNode("\n");
+                            brNode.ParentNode.ReplaceChild(textNode, brNode);
+                        }
+                    }
+
+                    // replace p tags with double newlines
+                    var pNodes = htmlDoc.DocumentNode.SelectNodes("//p");
+                    if (pNodes != null)
+                    {
+                        foreach (var pNode in pNodes)
+                        {
+                            var textNode = htmlDoc.CreateTextNode(pNode.InnerText + "\n\n");
+                            pNode.ParentNode.ReplaceChild(textNode, pNode);
+                        }
+                    }
+
+                    // replace li tags with "- " prefix and single newline suffix
+                    var liNodes = htmlDoc.DocumentNode.SelectNodes("//li"); ;
+                    if (liNodes != null)
+                    {
+                        foreach (var liNode in liNodes)
+                        {
+                            var textNode = htmlDoc.CreateTextNode("- " + liNode.InnerText + "\n");
+                            liNode.ParentNode.ReplaceChild(textNode, liNode);
+                        }
+                    }
+
+                    // replace i tags with "*" prefix and suffix
+                    var iNodes = htmlDoc.DocumentNode.SelectNodes("//i"); ;
+                    if (iNodes != null)
+                    {
+                        foreach (var iNode in iNodes)
+                        {
+                            var textNode = htmlDoc.CreateTextNode("*" + iNode.InnerText + "*");
+                            iNode.ParentNode.ReplaceChild(textNode, iNode);
+                        }
+                    }
+
+                    // replace b and strong tags with "**" prefix and suffix
+                    var bNodes = htmlDoc.DocumentNode.SelectNodes("//b | //strong");
+                    if (bNodes != null)
+                    {
+                        foreach (var bNode in bNodes)
+                        {
+                            var textNode = htmlDoc.CreateTextNode("**" + bNode.InnerText + "**");
+                            bNode.ParentNode.ReplaceChild(textNode, bNode);
+                        }
+                    }
+
+                    // replace u and underline tags with "__" prefix and suffix
+                    var uNodes = htmlDoc.DocumentNode.SelectNodes("//u | //underline");
+                    if (uNodes != null)
+                    {
+                        foreach (var uNode in uNodes)
+                        {
+                            var textNode = htmlDoc.CreateTextNode("__" + uNode.InnerText + "__");
+                            uNode.ParentNode.ReplaceChild(textNode, uNode);
+                        }
+                    }
+
+                    // replace all code tags with "`" prefix and suffix
+                    var codeNodes = htmlDoc.DocumentNode.SelectNodes("//code"); ;
+                    if (codeNodes != null)
+                    {
+                        foreach (var codeNode in codeNodes)
+                        {
+                            var textNode = htmlDoc.CreateTextNode("`" + codeNode.InnerText + "`");
+                            codeNode.ParentNode.ReplaceChild(textNode, codeNode);
+                        }
+                    }
+
+                    // replace all pre tags with "```" prefix and suffix
+                    var preNodes = htmlDoc.DocumentNode.SelectNodes("//pre"); ;
+                    if (preNodes != null)
+                    {
+                        foreach (var preNode in preNodes)
+                        {
+                            var textNode = htmlDoc.CreateTextNode("```\n" + preNode.InnerText + "\n```");
+                            preNode.ParentNode.ReplaceChild(textNode, preNode);
+                        }
+                    }
+
+                    // replace all remaining tags with their inner text
+                    var allNodes = htmlDoc.DocumentNode.SelectNodes("//*"); ;
+                    if (allNodes != null)
+                    {
+                        foreach (var node in allNodes)
+                        {
+                            if (node.NodeType == HtmlAgilityPack.HtmlNodeType.Element)
+                            {
+                                var textNode = htmlDoc.CreateTextNode(node.InnerText);
+                                node.ParentNode.ReplaceChild(textNode, node);
+                            }
+                        }
+                    }
+
+                    return htmlDoc.DocumentNode.InnerText.Trim();
                 }
             }
             return "";

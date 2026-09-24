@@ -113,6 +113,55 @@ namespace Classes
         }
 
         /// <summary>
+        /// Lists all objects below an S3 key prefix.
+        /// </summary>
+        public async Task<List<S3Object>> ListObjectsAsync(string bucketName, string prefix, CancellationToken cancellationToken = default)
+        {
+            List<S3Object> objects = new List<S3Object>();
+            string? continuationToken = null;
+
+            do
+            {
+                ListObjectsV2Response response = await _client.ListObjectsV2Async(new ListObjectsV2Request
+                {
+                    BucketName = bucketName,
+                    Prefix = prefix,
+                    ContinuationToken = continuationToken
+                }, cancellationToken);
+
+                objects.AddRange(response.S3Objects);
+                continuationToken = response.IsTruncated == true ? response.NextContinuationToken : null;
+            }
+            while (continuationToken != null);
+
+            return objects;
+        }
+
+        /// <summary>
+        /// Deletes S3 objects in batches and returns the keys successfully deleted.
+        /// </summary>
+        public async Task<List<string>> DeleteObjectsAsync(string bucketName, IEnumerable<string> keys, CancellationToken cancellationToken = default)
+        {
+            List<string> deletedKeys = new List<string>();
+
+            foreach (string[] batch in keys
+                .Where(key => !string.IsNullOrWhiteSpace(key))
+                .Distinct(StringComparer.Ordinal)
+                .Chunk(1000))
+            {
+                DeleteObjectsResponse response = await _client.DeleteObjectsAsync(new DeleteObjectsRequest
+                {
+                    BucketName = bucketName,
+                    Objects = batch.Select(key => new KeyVersion { Key = key }).ToList()
+                }, cancellationToken);
+
+                deletedKeys.AddRange(response.DeletedObjects.Select(deleted => deleted.Key));
+            }
+
+            return deletedKeys;
+        }
+
+        /// <summary>
         /// Opens an object from S3 as a readable stream.
         /// Returns null if the object or bucket does not exist.
         /// </summary>

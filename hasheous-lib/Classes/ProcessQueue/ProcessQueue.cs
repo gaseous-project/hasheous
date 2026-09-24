@@ -96,6 +96,10 @@ namespace Classes.ProcessQueue
                         Task = new FetchLaunchBoxMetadata();
                         break;
 
+                    case QueueItemType.SyncSupporterStatus:
+                        Task = new SyncSupporterStatus();
+                        break;
+
                     case QueueItemType.HourlyMaintenance_Frontend:
                         Task = new HourlyMaintenance_Frontend();
                         break;
@@ -353,4 +357,3 @@ namespace Classes.ProcessQueue
         }
     }
 }
-

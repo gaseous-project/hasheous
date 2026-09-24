@@ -2,6 +2,8 @@
 
 Use this to get productive fast. Follow the existing patterns in this repo over generic .NET advice.
 
+- Always update this file in the same change when repository behavior, architecture, configuration, routing, authentication, migrations, background jobs, Docker, dependencies, APIs, or other cross-cutting development guidance changes. Keep the instructions current before considering the work complete.
+
 - Repo layout
   - `hasheous/` .NET 10 web API + static UI; public endpoints and Swagger.
   - `service-orchestrator/` .NET 10 API hosting background orchestration and scheduled jobs.
@@ -11,15 +13,28 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
 
 - Architecture & data flow
   - MariaDB/MySQL is the source of truth. On startup, schema is created/migrated via embedded scripts (see `hasheous-lib/Classes/Database.cs::InitDB`, scripts named `hasheous-####.sql`).
+  - Data object edits now use a minimal `GetObjectStateForEdit` fetch instead of rebuilding the full object graph per signature while saving. Keep the object comparison focused on the persisted state and avoid rehydrating entire child graphs unless the code genuinely needs them.
+  - Data object save-path mutations should be collected into a `List<Database.SQLTransactionItem>` and committed once via `ExecuteTransactionCMDAsync(...)` at the end of the edit. Keep reads, metadata lookups, and comparison logic outside the transaction; only the actual SQL writes should be batched.
+  - Synthetic/generated data-object attributes (for example `SearchAliases`, `Country`, `Language`, `ROMs`, `DumpFile`) are not persisted rows in `DataObject_Attributes` and must be filtered out before handing any payload to `EditDataObject(...)`.
   - Signature data is ingested from DAT/XML (TOSEC/No-Intro/etc.) by the shared importer stack under `hasheous-lib/Classes/SignatureIngestors/` into `Signatures_*` tables.
   - Signature import has been refactored around a pluggable importer contract: `IDATFileImport` defines `StageFiles()`, `ProcessFiles()`, and `ValidateFiles()`, and `SignatureIngestor.Register<T>()`/`GetRegisteredIngestors()` discover enabled importers and create queue items. Follow this pattern for new DAT/XML sources instead of hard-coding logic in `XML.cs`.
   - Signature game import still uses the bounded worker pool pattern (`MaxConcurrentImportWorkers`, currently 4) for processing games, but the surrounding importer lifecycle is now registry-driven rather than tied to a single XML implementation.
+  - XML signature ingestion keeps country, language, platform, and publisher lookup IDs in process-wide concurrent caches. The caches are loaded once per process; cache misses use the shared lookup mutation lock before database insertion.
   - Signature ingestion now stores game names from `SortingName` and includes a one-time per-parser migration flag (`HasMigratedToSortingName_<ParserType>`) to migrate legacy name records while preserving alternate-name mappings.
   - Signature game records now also persist country/language variants on `Signatures_Games` (`Country`, `Language`), and migration logic updates legacy null-country rows plus links variant rows back to existing `DataObject_SignatureMap` entries.
   - Public API (versioned) handles lookups like `POST /api/v1/Lookup/ByHash` via `Classes/HashLookup` + `Classes/Database`.
+  - Hash lookup performance: lightweight list/search callers should avoid forcing full child relation or metadata hydration; keep list responses to the minimal requested fields (`Publisher`, `Platform`, `Signatures`, etc.) and only load metadata/expanded attributes when the caller explicitly requests them. The `LookupController` response is intentionally cached for five minutes, which is acceptable because the raw signature lookup is already Redis-cached and repeated hash lookups are read-heavy and highly re-entrant.
+  - Raw signature lookups are cached in `SignatureManagement.GetRawSignatures(...)` using a Redis key derived from the normalized hash model list; the result remains valid for a long TTL and should be reused before deeper object hydration work is performed.
+  - Submission voting/reporting is handled by `hasheous-lib/Classes/Submissions.cs`: `AddVote(...)` resolves the target object by `DataObjectId` or hash lookup, validates source-specific IDs before inserting/updating `MatchUserVotes`, and `TallyVotes()` aggregates votes into the metadata map only when the vote threshold is reached and the metadata is not locked by manual/admin overrides.
+  - Supporter recognition uses linked provider accounts stored in `UserSupporterLinks`, grants the provider-agnostic `Supporter` role when a linked provider reports a payment within the configured active window, and currently syncs OpenCollective through `hasheous-lib/Classes/Supporters/SupporterRecognitionService.cs`.
+  - Insights logging records request method, endpoint path, execution time, and status on `Insights_API_Requests`; aggregated hourly/daily/monthly tables must preserve `endpoint_address` and `method` so reports can rank the busiest endpoints and identify CPU hotspots.
+  - Remote IP resolution for both Insights and dynamic rate limiting is centralized in `Common.GetContextRemoteIP(HttpContext)`, which checks proxy/CDN headers (`true-client-ip`, `CF-Connecting-IPv6`, `cf-connecting-ip`, `X-Forwarded-For`) before falling back to `Connection.RemoteIpAddress`.
   - MCP is hosted on the public `hasheous` web API at `POST /api/v1/Mcp` (controller: `hasheous/Controllers/V1.0/McpController.cs`; shared processor: `hasheous-lib/Classes/Mcp/McpRequestProcessor.cs`).
   - MCP discovery is published at `GET /.well-known/mcp.json` (controller: `hasheous/Controllers/WellKnownController.cs`) and should point clients to the hosted MCP endpoint.
-  - Redis (Valkey) provides caching if enabled (`Classes/RedisConnection`), otherwise an in-memory cache is used.
+  - Redis (Valkey) provides caching if enabled (`Classes/RedisConnection`), otherwise an in-memory cache is used. `RedisConnection` shortens generated internal keys by preserving their logical prefix and MD5-hashing long key payloads.
+  - Redis complex values are explicitly framed as `HRC` plus a one-byte format marker: `0` for UTF-8 JSON and `1` for Brotli-compressed JSON. Never infer a complex cache format from payload bytes. Primitive cache types (`string`, integer types currently supported by `RedisConnection`, `bool`, `double`, and `byte[]`) retain their direct handling; do not introduce byte-array caching without implementing a correct binary read/write path.
+  - Cache reads fail open. Once a complex entry has been successfully read from Redis, delete and warning-log it when it is unframed, empty, uses an unknown format marker, cannot decompress, or cannot deserialize; return a cache miss so the caller can recreate it. Do not attempt deletion after a Redis communication failure, since the existing value must remain available when connectivity is restored.
+  - `PurgeCache()` and `PurgeCache(prefix)` run against Redis database `0` and must remain compatible with the normal non-admin multiplexer. Do not use `FlushDatabaseAsync` unless `AllowAdmin` is explicitly enabled; enumerate keys and call `KeyDeleteAsync(RedisKey[])` in bounded batches (currently 500) instead of issuing one deletion command per key.
   - Metadata file caching now supports optional S3-compatible object storage fallback (including MinIO) via shared helpers in `hasheous-lib/Classes/S3StorageTools.cs` and `hasheous-lib/Classes/StorageFallbackResolver.cs`.
   - Metadata proxy image and bundle routes use local-disk first, then S3 fallback, and fail open: if S3 is unavailable they fall back to existing provider fetch/build behavior without surfacing S3 errors to clients.
   - Metadata proxy redirect handling is centralized in `MetadataProxyController.ResolveRedirectFlag(bool? redirect)` so route methods do not implement per-endpoint redirect date logic.
@@ -39,12 +54,18 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
 
 - Configuration
   - File: `~/.hasheous-server/config.json` (auto-updated on startup by `Config.UpdateConfig()`). Env vars (used by Docker): `dbhost`, `dbuser`, `dbpass`, `igdbclientid`, `igdbclientsecret`, `redisenabled`, `redishost`, `redisport`, `reportingserverurl`, etc.
+  - Dynamic request rate-limiter rules live in a separate file at `~/.hasheous-server/rate-limit-rules.json` (via `Config.RateLimitRulesFilePath`) and are reloaded every 5 minutes without restarting the server.
+  - Rate-limit rule sets are sanitized on load: invalid or empty profiles are normalized, defaults are supplied, `PartitionBy` falls back to `remote-ip`, and the last known-good rules stay active if the file cannot be parsed.
+  - Built-in webpage requests are exempt by design via a protected cookie + DPAPI-backed 7-day web session marker; API traffic must match explicit rate-limit profiles instead.
+  - Rate-limit profile matching supports `remote-ip`, `origin`, `user-agent`, `path`, `method`, `user-id`, `user-roles`, and `header:<name>` partition keys, and rule matches use wildcard-safe pattern parsing rather than raw regex injection.
   - S3 config (`Config.S3StorageConfiguration`): `Enabled`, `Region`, `ServiceUrl`, `AccessKey`, `SecretKey`, `SessionToken`, `ForcePathStyle`, `DefaultBucket`.
   - Tiered cache policy config (`Config.CachePolicies` / config field `Policies`) controls proxy cache retention by content type and storage tier:
     - `Media`: local tier defaults to size-only retention; S3 tier defaults to 2-year max age.
     - `Bundles`: local and S3 tiers default to 90-day max age.
     - `MinFreeDiskSpaceBytes` on local tiers triggers eviction even when size is under target if disk free space is low.
+    - S3 Tier 2 maintenance lists objects under each source prefix, removes objects older than `MaxAgeDays`, then evicts oldest remaining objects when the prefix exceeds `MaxSizeBytes`. Set `MaxAgeDays` to `null` and `MaxSizeBytes` to a sufficiently large positive value to disable policy cleanup.
   - S3 env vars: `s3enabled`, `s3region`, `s3serviceurl`, `s3accesskey`, `s3secretkey`, `s3sessiontoken`, `s3forcepathstyle`.
+  - Supporter recognition env vars: `opencollectiveclientid`, `opencollectiveclientsecret`, `opencollectiveapitoken`, `opencollectivecollectiveslug`.
   - For MinIO and similar S3-compatible endpoints, use host-only `ServiceUrl` (for example `https://s3.mrgtech.net`) and typically set `ForcePathStyle = true`.
   - S3 fallback is effectively disabled when either `Enabled` is false or bucket/key inputs are missing.
   - Temporary metadata bundle workspace is configured via `Config.LibraryConfiguration.LibraryTemporaryBundlesDirectory` (defaults to `Path.Combine(Path.GetTempPath(), "Bundles")`).
@@ -61,6 +82,8 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Data object admin task endpoints are exposed on `DataObjectsController` for moderators/admins:
     - `GET /api/v1/DataObjects/{ObjectType}/{Id}/Tasks` returns all task records for the object.
     - `GET /api/v1/DataObjects/{ObjectType}/{Id}/Tasks/{TaskId}?resetTask=true` returns a single task and optionally resets it.
+  - Rate limiter admin endpoint: `GET /api/v1/RateLimiter` (controller: `hasheous/Controllers/V1.0/RateLimiterController.cs`) is Admin-only and returns the currently loaded dynamic rules (`DynamicRateLimitManager.CurrentRules`). It is intentionally hidden from Swagger via `[ApiExplorerSettings(IgnoreApi = true)]`.
+  - Submission/reporting routes are also admin/moderator scoped: `GET /api/v1/DataObjects/{ObjectType}/{Id}/SubmissionReport` returns the current match-submission summary, and user submit flows live under `hasheous/Controllers/V1.0/SubmissionsController.cs` via `POST /api/v1/Submissions/FixMatch`.
   - Swagger is enabled with custom schema IDs and API key security definitions.
   - MCP endpoint route: `POST /api/v1/Mcp` (JSON-RPC over HTTP). Keep MCP internet-facing endpoints in `hasheous` (not `service-orchestrator`).
   - Discovery route: `GET /.well-known/mcp.json` for client/server discovery metadata.
@@ -72,14 +95,18 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
     - `GET /api/v1/MetadataProxy/ScreenScraper/systemesListe.php` returns cached/platform metadata from ScreenScraper integration. Requires `X-Client-API-Key`.
     - `GET /api/v1/MetadataProxy/ScreenScraper/media{endpoint}.php` proxies/caches media and rejects traversal-like media IDs. Does NOT require `X-Client-API-Key`.
   - MCP lookups are intentionally public: the hosted MCP controller uses `[AllowAnonymous]` rather than API key auth.
-  - Hash lookup endpoints (`POST /api/v1/Lookup/ByHash`) enforce request payload limits: `MaxLookupPayloadBytes = 262_144` (256 KB) and `MaxLookupArrayItems = 50`. These are enforced via `[RequestSizeLimit]` and manual JSON array size validation before database queries run.
+  - Hash lookup endpoints (`POST /api/v1/Lookup/ByHash`) enforce request payload limits: `MaxLookupPayloadBytes = 262_144` (256 KB) and `MaxLookupArrayItems = 40`. These are enforced via `[RequestSizeLimit]` and manual JSON array size validation before database queries run.
+  - Hash lookup responses use a layered caching model: the ASP.NET action is decorated with a short `[ResponseCache(CacheProfileName = "5Minute")]`, while expensive signature resolution is cached in Redis at the `SignatureManagement` layer. Keep the HTTP cache in place for repeated identical reads, and avoid forcing `All` metadata expansion on list/search callers when a minimal result payload is sufficient.
 
 - Auth & security
   - Identity cookies configured; roles/policies: Admin, Moderator, Member, "Verified Email". Roles are seeded on startup.
   - Role hierarchy: Admin > Moderator > Member. "Verified Email" is a status role (not hierarchical) automatically assigned/removed based on email confirmation status.
+  - `Supporter` is also a status role (non-manual) that depends on `Member` and is automatically assigned/removed by supporter sync.
   - API keys:
   - User key header `X-API-Key` via `[Authentication.ApiKey.ApiKeyAttribute]` (`ApiKeyAuthorizationFilter` wired in `hasheous/Program.cs`) — identifies individual users and their actions.
   - Client key header `X-Client-API-Key` via `[Authentication.ClientApiKey.ClientApiKeyAttribute]` — identifies client apps (e.g., Gaseous, Romm); typically required when `Config.RequireClientAPIKey` is true.
+  - MVC/API request rate limiting is enforced by the shared dynamic limiter in `hasheous-lib/Classes/RateLimiting/RequestRateLimiting.cs`; built-in webpage requests are always exempt and profiles can match on roles, origin, user agent, remote IP, and arbitrary headers from `rate-limit-rules.json`.
+  - The rate limiter uses a sanitized ruleset, wildcard-safe pattern matching, and 429 responses with `Retry-After` metadata when a profile is exhausted; do not add untrusted regex patterns or mutate a live rules file without validating it first.
   - To exempt specific endpoints from client API key requirement, use `[Authentication.ClientApiKey.NoClientApiKeyNeededAttribute]` on the method. This is useful for public media endpoints that should not require authentication.
   - Inter-host API key for orchestrator calls (see `InterHostApiKey*` and registration in `service-orchestrator/Program.cs`) — security mechanism allowing multiple web server frontends (load-balanced) to securely call the orchestrator.
   - Admin user list endpoints should avoid per-user role lookups. Prefer a single grouped query against `Users`/`UserRoles`/`Roles`, cache the result briefly in Redis, and invalidate that cache after role mutations.
@@ -87,17 +114,27 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
 - Data access & migrations
   - Create a `new Classes.Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString)`.
   - Prefer async methods: `ExecuteCMDAsync`/`ExecuteCMDDictAsync`; use `await` in controllers/handlers. Avoid blocking sync calls unless there’s no async alternative.
+  - For multi-step writes inside a logical edit, prefer building a transaction list and committing once with `Database.ExecuteTransactionCMDAsync(...)` rather than issuing many independent `ExecuteNonQuery` calls. This preserves atomicity and reduces repeated DB round-trips without rewriting the surrounding business logic.
+  - Generated/synthetic attribute names should be represented as a dedicated non-persisted set (or an explicit allowlist/denylist helper) rather than hidden in a broad save-time filter. Keep the persistence rule close to the edit logic so future contributors do not accidentally persist read-only values.
   - Add new migration scripts in `hasheous-lib/Schema` as `hasheous-####.sql` with the next number.
   - Recent migration note: `hasheous-1034.sql` updates `Signatures_Games.Country`/`Language` to `VARCHAR(100)` and adds country-aware composite indexes for ingestion and game matching.
   - Recent migration note: `hasheous-1035.sql` updates `Signatures_Sources.Url` to nullable `VARCHAR(255)` (from text) so source links are bounded and easier to render safely in the UI.
   - Recent migration note: `hasheous-1036.sql` adds composite indexes on `Signatures_Roms` for (`GameId`, hashes, `IngestorVersion`) to improve multi-hash lookup performance.
   - Recent migration note: `hasheous-1037.sql` adds FullText indexes for signature search fields (`Signatures_Games.Publisher`, `Signatures_Platforms.Platform`, `Signatures_Roms.Name`).
   - Recent migration note: `hasheous-1038.sql` adds an index on `Users.NormalizedEmail` to support faster admin user list ordering/filtering.
+  - Recent migration note: `hasheous-1039.sql` adds `IsBlockedFromMatching` BOOLEAN column to `DataObject` table (default 0) to allow excluding objects from automatic matching.
+  - Recent migration note: `hasheous-1040.sql` adds `endpoint_address` and `method` columns to the aggregated `Insights_API_Requests_*` tables so the busiest-endpoints report can aggregate and rank hot routes without re-reading raw request logs.
+  - Recent migration note: `hasheous-1041.sql` adds a composite index on `Task_Queue` (`task_name`, `status`) to support the task progress summary aggregation used by the task dashboard.
+  - Recent migration note: `hasheous-1042.sql` adds the `UserSupporterLinks` table for provider-linked supporter accounts (see Supporter Recognition).
+  - Recent migration note: `hasheous-1043.sql` adds a composite index on `Task_Queue` (`status`, `client_id`, `create_time`) to support the `ClientGetTask` polling query (see Background jobs: task worker polling).
   - Embedded migration & support file manifest names now start with `hasheous_lib.Schema.` or `hasheous_lib.Support.`. After adding a file, ensure Build Action = EmbeddedResource and verify with `Assembly.GetExecutingAssembly().GetManifestResourceNames()` if debugging mismatches.
+  - `Database.ExecuteTransactionCMDAsync`/`ExecuteTransactionCMD` capture a result set from any statement in the list that is a `SELECT` or that ends with a MariaDB `RETURNING` clause (detected via `CommandProducesResultSet(...)` in `hasheous-lib/Classes/Database.cs`). `RETURNING` support varies by statement/version: `DELETE ... RETURNING` works from MariaDB 10.0.5 and `INSERT ... RETURNING` from 10.5, but `UPDATE ... RETURNING` only works from MariaDB 13.0 — newer than this project's supported MariaDB 11+ minimum, so do not rely on `UPDATE ... RETURNING` in application code; use a follow-up equality `SELECT` in the same transaction instead (see Background jobs: task worker polling).
 
 - Caching
   - Use `hasheous.Classes.RedisConnection.GenerateKey(prefix, keyObj)` and `PurgeCache(prefix)`. Redis enabled when `Config.RedisConfiguration.Enabled`.
   - When caching admin/moderation lists or other high-read low-churn data, keep TTLs short and explicitly invalidate on writes that change the result set.
+  - For ordinary cache reads, call `GetCacheItem<T>()` directly and use a `null`/default result as the miss signal to avoid an `EXISTS` plus `GET` round trip. Keep `CacheItemExists()` only where callers deliberately cache `null`-equivalent state and need to distinguish presence from a miss.
+  - Redis serialization and framing behavior is covered by `hasheous-lib.Tests/RedisConnectionTests.cs`; extend those tests for any new primitive type, payload format, compression rule, or invalidation behavior.
 
 - Background jobs
   - Add/adjust scheduled tasks in `service-orchestrator/Program.cs` under `QueueProcessor.QueueItems` (e.g., `FetchIGDBMetadata`, timings are minutes).
@@ -105,10 +142,12 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - ScreenScraper: `FetchScreenScraperMetadata` is queued every 1440 minutes (24 hours). It reads cached metadata JSON under `Config.LibraryConfiguration.LibraryMetadataDirectory_Screenscraper/games` and imports records through `XML.XMLIngestor.ImportDatRecord(...)`.
   - Hourly maintenance now runs proxy cache policy maintenance via `ProxyCacheManager.RunMaintenanceAsync()` (tiered LRU/age eviction for local and S3 cache tiers).
   - Queue task refactor: obsolete blocking entries `GetMissingArtwork` and `MetadataMatchSearch` were removed from metadata fetch task `Blocks` lists. Don’t rely on them for future coordination.
+  - Supporter recognition sync is scheduled through `QueueItemType.SyncSupporterStatus` in `service-orchestrator/Program.cs`; wire new provider sync tasks through both `hasheous-lib/Classes/ProcessQueue/ProcessQueue.cs` and `service-host/Program.cs`.
   - Data object metadata guard: `DataObjects.DataObjectMetadataSearch(objectType, id?, ForceSearch)` now uses an atomic file lock under `~/.hasheous-server/Data/Metadata/Hasheous/DataObjectFlags` to prevent duplicate concurrent runs for the same `(objectType, id)` key.
   - Metadata search tasks are launched concurrently per metadata source. The per-run `jobId` must be unique, the bounded return guard is controlled by `maxWaitSeconds` (currently 4), and `finalise()` must wait until every launched task has completed before running.
   - Guard behavior details: lock acquisition uses create-new semantics (`FileMode.CreateNew`) and keeps the lock handle open for the full search duration; lock-file collisions cause immediate skip/return.
   - Stale lock policy: existing lock files are treated as valid for up to 1 hour; older lock files are deleted and lock acquisition is retried. For `id == null`, the lock key uses `all` (for example: `Game_all_MetadataSearchInProgress.flag`).
+  - Task worker polling: `ClientManagement.ClientGetTask(...)` (backing `GET`/POST task-worker endpoints in `TaskWorkerController`) assigns pending/re-claimable `Task_Queue` rows to a polling client using a single `UPDATE Task_Queue ... WHERE id IN (SELECT ... FOR UPDATE SKIP LOCKED) ...` statement, followed by a cheap equality `SELECT ... WHERE client_id = @client_id AND status = @status AND start_time = @start_time` in the same transaction to fetch the just-assigned rows back. Keep it this way — running the capability/status filter twice per poll (once to lock, once to re-identify) is the main cause of Kestrel command-timeout errors under concurrent client polling; `UPDATE ... RETURNING` is not an option here since MariaDB only added it in 13.0, newer than this project's supported MariaDB 11+ minimum. Rely on the `idx_task_queue_status_client_createtime` index (`status`, `client_id`, `create_time`) added in `hasheous-1043.sql` when extending this query.
 
 - JSON & serialization
   - System.Text.Json and Newtonsoft are both configured: enums-as-strings, nulls ignored, max depth 64, indented output (Newtonsoft).
@@ -172,6 +211,7 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 - `SignatureManagement.GetRawSignatures(...)` excludes zero-size ROM signature rows by default (`Signatures_Roms.Size > 0`) before hash-condition matching.
 - `SignatureManagement.GetRawSignatures(...)` validates input models (non-null, non-empty array) and throws `ArgumentException` on invalid input. This ensures failed input validation is caught early rather than at the database layer.
 - `SignatureManagement.GetRawSignatures(...)` constructs SQL clauses efficiently using `StringBuilder` to reduce allocations, especially important when building complex multi-model AND logic.
+- `SignatureManagement.GetRawSignatures(...)` now caches the lookup result in Redis under a normalized hash-model key, and callers should keep that short-circuit in place before any expensive per-object hydration or metadata expansion is triggered. This is the main hot-path optimization for `POST /api/v1/Lookup/ByHash`.
 - `LookupController` now rejects explicit zero-byte hashes early for both raw-body `POST /api/v1/Lookup/ByHash` and direct `GET /api/v1/Lookup/ByHash/{hash}` routes, returning `400 Bad Request` rather than querying the signature database.
 - Keep the non-zero-size filter when extending hash lookup SQL unless a feature explicitly requires zero-byte signatures.
 - `SignatureManagement.BuildGameItem(...)` currently populates both singular and plural dictionary properties for compatibility: `Country` and `Countries`, `Language` and `Languages`.
@@ -184,6 +224,21 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 - Across the array, each element is enforced as an `AND` requirement against the same game id using per-model `EXISTS` clauses bound to `view_Signatures_Games.Id`.
 - Practical effect: every array element must resolve for the same `GameId`, and every populated hash field inside each element must succeed for that element to pass.
 - `modelCount` is used for uniquely-named SQL parameters and subquery aliases (for example `@sha256{modelCount}`, `sr_model{modelCount}`) to avoid collisions across models.
+
+### DataObject matching blocks (new behavior)
+- `DataObject` model now includes `IsBlockedFromMatching` boolean field to allow manual exclusion of objects from automatic hash-to-metadata matching.
+- `HashLookup.PerformLookup(bool userInteractiveSession = false, bool applyMatchingBlocks = false)` now accepts `applyMatchingBlocks` parameter (defaults to false).
+- When `applyMatchingBlocks = true`, the lookup skips any discovered signatures that map to a DataObject with `IsBlockedFromMatching = true`.
+- Frontend (Game detail page): `IsBlockedFromMatching` is displayed as read-only when viewing games; edit page exposes it as a checkbox labeled "Blocked from Matching" to allow users to prevent automatic metadata matching for specific games.
+- Use case: allows moderators/admins to block problematic games from being auto-matched (e.g., for duplicate/incorrect mappings) while keeping the object in the system.
+- Database: `DataObject.IsBlockedFromMatching` persists the blocking state; backend enforces the block during lookups when the flag is enabled.
+
+### Metadata match method controls (new behavior)
+- `BackgroundMetadataMatcher.MatchMethod.NonAutomatic` is a persisted mapping state that keeps the current metadata mapping but prevents background metadata searches from replacing it.
+- `NonAutomatic` is accepted by the trusted edit/save path alongside `NoMatch`, `Automatic`, and `AutomaticTooManyMatches`; unsupported client values fall back to `ManualByAdmin`.
+- Community submission tallying may update mappings marked `NonAutomatic` without requiring three winning votes, matching the `NoMatch` exception. Manual, admin-manual, and voted mappings retain their protected behavior.
+- The data-object edit UI presents `No Change`, `Automatic Match`, `Disable Automatic Match`, and `Manual` choices per metadata source. `No Change` leaves the existing mapping and match method untouched.
+- When `Automatic` is selected without a metadata id, normalize the mapping to `NoMatch`. The controller passes `trustModelMetadataSearchType = true` to `EditDataObject(...)` so explicit match-method choices are validated and persisted.
 
 - Correlation & logging
   - Middleware sets `CallContext` values (CorrelationId, CallingProcess, CallingUser); orchestrator also returns `x-correlation-id` header.
@@ -222,7 +277,9 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 
 ## Maintenance
 - A PR guard (`.github/workflows/copilot-instructions-guard.yml`) fails when architecture/config files change without updating this file; it prints hints via `.github/scripts/copilot-instructions-help.sh`.
-  - Update this file when: resource namespace conventions change (e.g., `hasheous_lib.*` migration), new cross-cutting utilities like `ComputeObjectPropertyHash` are added, queue coordination semantics are modified, MCP routing/tooling/auth changes, or major framework/dependency updates occur (e.g., .NET version bumps, Swagger/OpenAPI package upgrades).
+  - Always update this file when: resource namespace conventions change (e.g., `hasheous_lib.*` migration), new cross-cutting utilities like `ComputeObjectPropertyHash` are added, queue coordination semantics are modified, MCP routing/tooling/auth changes, DataObject model or lookup behavior changes, or major framework/dependency updates occur (e.g., .NET version bumps, Swagger/OpenAPI package upgrades). This applies to every repository change that alters or documents project behavior; do not defer the update.
+- Current repo workflow note: when adding or changing a background job or metadata source, update the orchestrator schedule, the shared queue dispatcher, and the service-host task wiring in the same change. Do not leave one side of the task chain resolving the work while the other still expects the old entry or blocked dependency set.
+- Schema, cache, and API-contract changes are cross-cutting: when a change alters persisted tables, Redis/cache keys, or response payloads, update the matching controller/service logic, any UI callers, and relevant docs/examples in the same PR so the contract remains coherent across the stack.
 
 ## API key usage examples
 - User API key (header `X-API-Key`):
@@ -385,7 +442,7 @@ Additional example (rating boards):
 - Config and secrets: never hardcode secrets; use env vars or `~/.hasheous-server/config.json` fields updated via `Config`.
 - Swagger/docs: keep XML summaries up to date; include response types, cache profile notes, and examples (see `LookupController`).
 - Build/run checks: ensure the solution builds and the API boots locally; prefer the VS Code `watch` task for quick verification.
-- Update this guide when changing routing, auth, migrations, orchestrator queue, docker, or README. The PR guard will fail otherwise and prints hints.
+- Always update this guide when changing routing, auth, migrations, orchestrator queue, Docker, README, or any other repository behavior or contributor guidance. The PR guard will fail otherwise and prints hints.
 - UI/static: for changes under `wwwroot/`, include before/after screenshots if relevant.
   - Localization: move all user-visible text to `wwwroot/localisation/en.json` and use `data-lang` attributes or `lang.getLang()` calls.
   - CSS: use CSS variables (`--warning-color`, `--valid-color`, `--invalid-color`) and semantic class names instead of inline styles.
@@ -399,6 +456,14 @@ Additional example (rating boards):
 - Prompt templates for AI descriptions/tags live in `hasheous-lib/Support/AIGameDescriptionPrompt.txt`, `hasheous-lib/Support/AIGameTagPrompt.txt`, `hasheous-lib/Support/AIPlatformDescriptionPrompt.txt`, and `hasheous-lib/Support/AIPlatformTagPrompt.txt`.
 - Current prompt guidance no longer gives Wikipedia priority context instructions.
 - Description prompts now explicitly require plain description output with no added title headings.
+
+## Current repo conventions
+- Public metadata/media endpoints should stay anonymous when they are cache-first and non-user-sensitive; use `[Authentication.ClientApiKey.NoClientApiKeyNeededAttribute]` and keep any custom API-key auth filters aware of the public exemption logic.
+- Background metadata searches must remain concurrent per source: use unique per-run `jobId` values, keep the wait guard short, and only finalise after all child tasks finish instead of serialising the work behind a single provider call.
+- Task worker polling depends on the `Task_Queue` status/client/start-time index and the `UPDATE ... WHERE id IN (SELECT ... FOR UPDATE SKIP LOCKED)` + equality `SELECT` pattern; changing those fields without keeping the same transaction shape can trigger command timeouts under concurrent client polling.
+- When adding or updating a metadata source, include the orchestrator schedule, the shared queue dispatcher, the service-host wiring, UI source colors/localisation, and any public route/auth changes in the same change so the stack remains coherent.
+- Members may create Apps. Deleting an App remains limited to callers with its ACL `Delete` permission.
+- `POST /api/v1/DataObjects/app/{Id}/ClientApiKeys` requires `AgreeToTerms=true` before creating a client API key.
 
 ## .NET 10 and dependencies
 - Framework: .NET 10.0. Target framework set in `Directory.Build.props` and applied to all projects.
@@ -424,7 +489,7 @@ Additional example (rating boards):
 - For incremental async cleanup, update method signatures and call chains together in one change so no mixed sync/async regressions are introduced.
 
 ### Hash lookup request validation (current)
-- `POST /api/v1/Lookup/ByHash` now enforces request payload limits: `MaxLookupPayloadBytes = 262_144` (256 KB) via `[RequestSizeLimit]` and `MaxLookupArrayItems = 50` for the number of hash objects in the request body.
+- `POST /api/v1/Lookup/ByHash` now enforces request payload limits: `MaxLookupPayloadBytes = 262_144` (256 KB) via `[RequestSizeLimit]` and `MaxLookupArrayItems = 40` for the number of hash objects in the request body.
 - Zero-byte hashes are rejected with `400 Bad Request` for known hashes: MD5 `d41d8cd98f00b204e9800998ecf8427e`, SHA1 `da39a3ee5e6b4b0d3255bfef95601890afd80709`, SHA256 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`, CRC `00000000`.
 - Request body JSON parsing uses `JsonSerializerOptions` with `PropertyNameCaseInsensitive = true` to normalize input.
 - Validation occurs before any database lookups to fail fast on invalid input.

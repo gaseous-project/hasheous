@@ -151,26 +151,10 @@ namespace Authentication
 
             // Check if the API key is cached - use redis if available
             // Otherwise, use a simple in-memory cache
-            if (Config.RedisConfiguration.Enabled)
+            ClientApiKeyItem? cachedItem = await hasheous.Classes.RedisConnection.GetCacheItem<ClientApiKeyItem>(keyName);
+            if (cachedItem != null)
             {
-                string? cachedValue = await hasheous.Classes.RedisConnection.GetDatabase(0).StringGetAsync(keyName);
-                if (cachedValue != null)
-                {
-                    ClientApiKeyItem? cachedItem = Newtonsoft.Json.JsonConvert.DeserializeObject<ClientApiKeyItem>(cachedValue);
-
-                    return cachedItem;
-                }
-            }
-            else
-            {
-                // In-memory cache
-                string? cachedValue = LookupCache.Get(APIKeyCacheNamePrefix, keyName);
-                if (cachedValue != null)
-                {
-                    ClientApiKeyItem? cachedItem = Newtonsoft.Json.JsonConvert.DeserializeObject<ClientApiKeyItem>(cachedValue);
-
-                    return cachedItem;
-                }
+                return cachedItem;
             }
 
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
@@ -199,16 +183,7 @@ namespace Authentication
             // Cache the API key for 5 minutes
             if (cachedApiKey != null)
             {
-                string serializedApiKey = Newtonsoft.Json.JsonConvert.SerializeObject(cachedApiKey);
-
-                if (Config.RedisConfiguration.Enabled)
-                {
-                    await hasheous.Classes.RedisConnection.GetDatabase(0).StringSetAsync(keyName, serializedApiKey, TimeSpan.FromSeconds(CacheDuration));
-                }
-                else
-                {
-                    LookupCache.Add(APIKeyCacheNamePrefix, keyName, serializedApiKey, CacheDuration);
-                }
+                await hasheous.Classes.RedisConnection.SetCacheItem<ClientApiKeyItem>(keyName, cachedApiKey, TimeSpan.FromSeconds(CacheDuration));
             }
 
             return cachedApiKey;

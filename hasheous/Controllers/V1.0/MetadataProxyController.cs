@@ -13,8 +13,8 @@ using hasheous.Classes;
 using hasheous_server.Classes.Metadata;
 using hasheous_server.Classes.Metadata.IGDB;
 using HasheousClient;
+using HasheousClient.Models.Metadata.IGDB;
 using IGDB;
-using IGDB.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TheGamesDB.SQL;
@@ -61,7 +61,7 @@ namespace hasheous_server.Controllers.v1_0
         /// </param>
         /// <param name="MetadataType">
         /// The type of metadata to fetch, e.g. "Game", "Artwork", etc.
-        /// This should match the class name in IGDB.Models namespace.
+        /// This should match the class name in HasheousClient.Models.Metadata.IGDB namespace.
         /// </param>
         /// <returns>
         /// The metadata object from IGDB
@@ -86,12 +86,12 @@ namespace hasheous_server.Controllers.v1_0
         [ApiExplorerSettings(IgnoreApi = true)]
         public async Task<IActionResult> GetMetadata(string MetadataType, long Id, string slug = "", string expandColumns = "")
         {
-            // check that MetadataType is a valid class in IGDB.Models
-            var igdbAssembly = typeof(IGDB.Models.Game).Assembly;
-            Type? metadataType = igdbAssembly.GetType($"IGDB.Models.{MetadataType}", false, true);
+            // check that MetadataType is a valid class in HasheousClient.Models.Metadata.IGDB
+            var igdbAssembly = typeof(HasheousClient.Models.Metadata.IGDB.Game).Assembly;
+            Type? metadataType = igdbAssembly.GetType($"HasheousClient.Models.Metadata.IGDB.{MetadataType}", false, true);
             if (metadataType == null)
             {
-                return BadRequest(new Dictionary<string, string> { { "Error", $"Metadata type '{MetadataType}' not found in IGDB.Models namespace." } });
+                return BadRequest(new Dictionary<string, string> { { "Error", $"Metadata type '{MetadataType}' not found in HasheousClient.Models.Metadata.IGDB namespace." } });
             }
 
             // If valid, continue with your logic (e.g., call _GetMetadata)
@@ -109,12 +109,10 @@ namespace hasheous_server.Controllers.v1_0
             // check cache first
             string cacheKey = RedisConnection.GenerateKey("MetadataProxy-IGDB", routeName + Id.ToString() + slug + expandColumns);
 
-            if (Config.RedisConfiguration.Enabled)
+            var cacheItem = await RedisConnection.GetCacheItem<Dictionary<string, object>>(cacheKey);
+            if (cacheItem != null)
             {
-                if (await RedisConnection.CacheItemExists(cacheKey))
-                {
-                    return Ok(await RedisConnection.GetCacheItem<Dictionary<string, object>>(cacheKey));
-                }
+                return Ok(cacheItem);
             }
 
             // define variable for slug response
@@ -128,10 +126,11 @@ namespace hasheous_server.Controllers.v1_0
             // define return value
             object? returnValue = null;
 
-            // look for a type named "IGDB.Models.{routeName}"
-            var igdbAssembly = typeof(IGDB.Models.Game).Assembly;
-            Type? metadataType = igdbAssembly.GetType($"IGDB.Models.{routeName}", false, true);
-            if (metadataType == null)
+            // look for a type named "HasheousClient.Models.Metadata.IGDB.{routeName}"
+            var igdbAssembly = typeof(HasheousClient.Models.Metadata.IGDB.Game).Assembly;
+            string typeName = $"HasheousClient.Models.Metadata.IGDB.{routeName}";
+            Type? metadataType = igdbAssembly.GetType(typeName, false, true);
+            if (metadataType == null || IGDBMetadataDocumentFilter.IGDBTypeFilter.Contains(typeName))
             {
                 return BadRequest(new Dictionary<string, string> { { "Error", $"Metadata type '{routeName}' not found." } });
             }
@@ -353,9 +352,10 @@ namespace hasheous_server.Controllers.v1_0
             string cacheKey = RedisConnection.GenerateKey("MetadataProxy-IGDB", "Search-Platform" + SearchString);
             if (Config.RedisConfiguration.Enabled)
             {
-                if (await RedisConnection.CacheItemExists(cacheKey))
+                var cacheItem = await RedisConnection.GetCacheItem<List<HasheousClient.Models.Metadata.IGDB.Platform>>(cacheKey);
+                if (cacheItem != null)
                 {
-                    return Ok(await RedisConnection.GetCacheItem<List<HasheousClient.Models.Metadata.IGDB.Platform>>(cacheKey));
+                    return Ok(cacheItem);
                 }
             }
 
@@ -440,12 +440,10 @@ namespace hasheous_server.Controllers.v1_0
 
             // check cache first
             string cacheKey = RedisConnection.GenerateKey("MetadataProxy-IGDB", "Search-Platform-Game" + PlatformId.ToString() + SearchString);
-            if (Config.RedisConfiguration.Enabled)
+            var cacheItem = await RedisConnection.GetCacheItem<List<HasheousClient.Models.Metadata.IGDB.Game>>(cacheKey);
+            if (cacheItem != null)
             {
-                if (await RedisConnection.CacheItemExists(cacheKey))
-                {
-                    return Ok(await RedisConnection.GetCacheItem<List<HasheousClient.Models.Metadata.IGDB.Game>>(cacheKey));
-                }
+                return Ok(cacheItem);
             }
 
             if (Config.IGDB.UseDumps == true && Config.IGDB.DumpsAvailable == true)
@@ -1451,6 +1449,7 @@ namespace hasheous_server.Controllers.v1_0
 
             string mimeType = "image/png";
             string extension = "jpg"; // default extension
+            string mediaTypeDirectory = "Images";
             switch (mediaItem.format?.ToLower())
             {
                 case "jpg":
@@ -1473,10 +1472,12 @@ namespace hasheous_server.Controllers.v1_0
                 case "pdf":
                     mimeType = "application/pdf";
                     extension = "pdf";
+                    mediaTypeDirectory = "Documents";
                     break;
                 case "mp4":
                     mimeType = "video/mp4";
                     extension = "mp4";
+                    mediaTypeDirectory = "Videos";
                     break;
                 case "svg":
                     mimeType = "image/svg+xml";
@@ -1488,7 +1489,7 @@ namespace hasheous_server.Controllers.v1_0
                     break;
             }
 
-            string resourcePath = $"Images/{systemeid}/{jeuid}/{media}.{extension}";
+            string resourcePath = $"{mediaTypeDirectory}/{systemeid}/{jeuid}/{media}.{extension}";
             string url = Classes.MetadataLib.MetadataScreenScraper.ssMedia.Endpoint(jeuid, systemeid, media, null);
 
             string serviceName = "Screenscraper";
@@ -1539,6 +1540,274 @@ namespace hasheous_server.Controllers.v1_0
         }
         #endregion ScreenScraper
 
+        #region LaunchBox
+        /// <summary>
+        /// Retrieves a paginated list of LaunchBox resources based on the specified resource type.
+        /// </summary>
+        /// <param name="resourceType">The type of LaunchBox resource to retrieve.</param>
+        /// <param name="pageNumber">The page number for pagination.</param>
+        /// <param name="pageSize">The number of items per page.</param>
+        /// <returns>A paginated list of LaunchBox resources.</returns>
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(typeof(List<Dictionary<string, object>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [Route("LaunchBox/{resourceType}")]
+        public async Task<IActionResult> GetLaunchBoxResources(LaunchBoxResourceType resourceType, int pageNumber = 1, int pageSize = 50)
+        {
+            if (pageNumber < 1 || pageNumber >= 2000000000 || pageSize < 1 || pageSize > 100)
+            {
+                return BadRequest("Invalid pagination parameters.");
+            }
+
+            var result = await GetLaunchBoxResourcesInternal(resourceType, pageNumber, pageSize);
+            if (result == null)
+            {
+                return NotFound();
+            }
+            return Ok(result);
+        }
+
+        private async Task<List<Dictionary<string, object>>?> GetLaunchBoxResourcesInternal(LaunchBoxResourceType resourceType, int pageNumber, int pageSize, long? id = null)
+        {
+            string idField = "Id";
+            switch (resourceType)
+            {
+                case LaunchBoxResourceType.Game:
+                case LaunchBoxResourceType.GameAlternateName:
+                case LaunchBoxResourceType.GameImage:
+                    idField = "DatabaseID";
+                    break;
+                case LaunchBoxResourceType.PlatformAlternateName:
+                    idField = "Name";
+                    break;
+            }
+
+            string sql;
+            Dictionary<string, object> parameters = new Dictionary<string, object>
+            {
+                { "offset", (pageNumber - 1) * pageSize },
+                { "pageSize", pageSize }
+            };
+            if (id.HasValue)
+            {
+                sql = $"SELECT * FROM `launchbox`.`{resourceType}` WHERE `{idField}` = @id ORDER BY `{idField}` LIMIT @offset, @pageSize";
+                parameters.Add("id", id.Value);
+            }
+            else
+            {
+                sql = $"SELECT * FROM `launchbox`.`{resourceType}` ORDER BY `{idField}` LIMIT @offset, @pageSize";
+            }
+            var result = await Config.database.ExecuteCMDDictAsync(sql, parameters);
+            if (result == null || result.Count == 0)
+            {
+                return null;
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Retrieves a specific LaunchBox resource based on the specified resource type and ID.
+        /// </summary>
+        /// <param name="resourceType">The type of LaunchBox resource to retrieve.</param>
+        /// <param name="id">The ID of the LaunchBox resource to retrieve.</param>
+        /// <returns>The requested LaunchBox resource if found; otherwise, a 404 Not Found response.</returns>
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [ProducesResponseType(typeof(Dictionary<string, object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [Route("LaunchBox/{resourceType}/{id}")]
+        public async Task<IActionResult> GetLaunchBoxResource(LaunchBoxResourceType resourceType, string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                return BadRequest("Invalid ID");
+            }
+
+            var result = await GetLaunchBoxResourceInternal(resourceType, id);
+            if (result == null)
+            {
+                return NotFound();
+            }
+            return Ok(result);
+        }
+
+        private async Task<Dictionary<string, object>?> GetLaunchBoxResourceInternal(LaunchBoxResourceType resourceType, string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                return null;
+            }
+
+            string idField = "Id";
+            switch (resourceType)
+            {
+                case LaunchBoxResourceType.Game:
+                    idField = "DatabaseID";
+                    break;
+            }
+
+            string sql = $"SELECT * FROM `launchbox`.`{resourceType}` WHERE `{idField}` = @id";
+
+            var result = await Config.database.ExecuteCMDDictAsync(sql, new Dictionary<string, object> { { "id", id } });
+            if (result == null || result.Count == 0)
+            {
+                return null;
+            }
+            return result[0];
+        }
+
+        private async Task<object?> ExpandLaunchBoxResource(LaunchBoxResourceType Resource, string SubResourceId)
+        {
+            var subResourceData = await GetLaunchBoxResourceInternal(Resource, SubResourceId.ToString());
+            if (subResourceData != null)
+            {
+                switch (Resource)
+                {
+                    case LaunchBoxResourceType.GameImage:
+                        subResourceData["Region"] = await ExpandLaunchBoxResource(LaunchBoxResourceType.Region, subResourceData["Region"]?.ToString() ?? string.Empty) ?? string.Empty;
+                        subResourceData["Type"] = await ExpandLaunchBoxResource(LaunchBoxResourceType.ImageType, subResourceData["Type"]?.ToString() ?? string.Empty) ?? string.Empty;
+                        break;
+                    case LaunchBoxResourceType.Platform:
+                        subResourceData["Developer"] = await ExpandLaunchBoxResource(LaunchBoxResourceType.Company, subResourceData["Developer"]?.ToString() ?? string.Empty) ?? string.Empty;
+                        subResourceData["Manufacturer"] = await ExpandLaunchBoxResource(LaunchBoxResourceType.Company, subResourceData["Manufacturer"]?.ToString() ?? string.Empty) ?? string.Empty;
+                        subResourceData["Category"] = await ExpandLaunchBoxResource(LaunchBoxResourceType.PlatformCategory, subResourceData["Category"]?.ToString() ?? string.Empty) ?? string.Empty;
+                        if (!String.IsNullOrEmpty(subResourceData["Id"].ToString()) && long.TryParse(subResourceData["Id"].ToString(), out long platformId))
+                        {
+                            var altNames = await GetLaunchBoxResourcesInternal(LaunchBoxResourceType.PlatformAlternateName, 1, 50, platformId);
+                            subResourceData["AlternateNames"] = altNames ?? new List<Dictionary<string, object>>();
+                        }
+                        break;
+                }
+
+                return subResourceData;
+            }
+
+            return SubResourceId;
+        }
+
+        [MapToApiVersion("1.0")]
+        [HttpGet]
+        [NoClientApiKeyNeeded()]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [Route("LaunchBox/Images/{fileName}")]
+        [ResponseCache(CacheProfileName = "7Days")]
+        public async Task<IActionResult> GetLaunchBoxImage(string fileName, bool? redirect = null)
+        {
+            // ensure the file name doesn't contain invalid characters
+            if (string.IsNullOrWhiteSpace(fileName) || fileName.Contains("..") || fileName.Contains("\\") || fileName.Contains("/"))
+            {
+                return BadRequest("Invalid file name");
+            }
+
+            string mimeType = "image/png";
+            string extension = "jpg"; // default extension
+            switch (Path.GetExtension(fileName)?.ToLower())
+            {
+                case "jpg":
+                case "jpeg":
+                    mimeType = "image/jpeg";
+                    extension = "jpg";
+                    break;
+                case "gif":
+                    mimeType = "image/gif";
+                    extension = "gif";
+                    break;
+                case "bmp":
+                    mimeType = "image/bmp";
+                    extension = "bmp";
+                    break;
+                case "tiff":
+                    mimeType = "image/tiff";
+                    extension = "tiff";
+                    break;
+                case "pdf":
+                    mimeType = "application/pdf";
+                    extension = "pdf";
+                    break;
+                case "mp4":
+                    mimeType = "video/mp4";
+                    extension = "mp4";
+                    break;
+                case "svg":
+                    mimeType = "image/svg+xml";
+                    extension = "svg";
+                    break;
+                default:
+                    mimeType = "image/png";
+                    extension = "png";
+                    break;
+            }
+
+            string resourcePath = $"Images/{fileName}";
+            string url = $"https://images.launchbox-app.com/{fileName}";
+
+            string serviceName = "LaunchBox";
+
+            bool useRedirect = ResolveRedirectFlag(redirect);
+            if (useRedirect)
+            {
+                // redirect to s3
+                var redirectResponse = await HandleRedirect(serviceName, resourcePath);
+                if (redirectResponse != null)
+                {
+                    return redirectResponse;
+                }
+            }
+
+            try
+            {
+                // Try to resolve from cache (local or S3 fallback)
+                var cachedStream = await ProxyCacheManager.ResolveReadAsync(serviceName, resourcePath, CachePolicyType.Media, mimeType);
+                if (cachedStream != null)
+                {
+                    return FileWithManagedStream(cachedStream, mimeType);
+                }
+
+                // Download and cache the image
+                var fileStream = await ProxyCacheManager.DownloadAndCacheAsync(url, serviceName, resourcePath, CachePolicyType.Media, mimeType, HttpContext);
+                if (fileStream.ContentStream != null)
+                {
+                    if (fileStream.ContentStream.ContentLength.HasValue && fileStream.ContentStream.ContentLength.Value <= 7)
+                    {
+                        await fileStream.ContentStream.DisposeAsync();
+
+                        if (System.IO.File.Exists(fileStream.LocalFilePath))
+                        {
+                            System.IO.File.Delete(fileStream.LocalFilePath);
+                        }
+                        return NotFound("Media not found for the specified game and system.");
+                    }
+                    return FileWithManagedStream(fileStream.ContentStream, mimeType);
+                }
+
+                return NotFound();
+            }
+            catch
+            {
+                return NotFound();
+            }
+        }
+
+        public enum LaunchBoxResourceType
+        {
+            Company,
+            Emulator,
+            EmulatorPlatform,
+            ESRB,
+            Game,
+            GameAlternateName,
+            GameImage,
+            ImageType,
+            Platform,
+            PlatformAlternateName,
+            PlatformCategory,
+            Region,
+            ReleaseType
+        }
+        #endregion LaunchBox
+
         #region MetadataBundles
         /// <summary>
         /// Get a metadata bundle by its ID. Bundles contain pre-packaged metadata and images for offline use.
@@ -1562,6 +1831,12 @@ namespace hasheous_server.Controllers.v1_0
         [Route("Bundles/{MetadataSourceName}/{GameID}.bundle")]
         public async Task<IActionResult> GetMetadataBundle(string MetadataSourceName, string GameID, bool? redirect = null)
         {
+            // force rebuild only exists for debug purposes and should not be used in production
+            bool forcerebuild = false;
+#if DEBUG
+            forcerebuild = true;
+#endif
+
             // validate GameID
             GameID = System.Uri.UnescapeDataString(GameID);
             if (GameID.Contains("..") || GameID.Contains("\\"))
@@ -1574,7 +1849,7 @@ namespace hasheous_server.Controllers.v1_0
             }
 
             // validate MetadataSourceName
-            var validSources = new List<string> { "IGDB", "TheGamesDB", "Screenscraper" };
+            var validSources = new List<string> { "IGDB", "TheGamesDB", "Screenscraper", "LaunchBox" };
             if (!validSources.Contains(MetadataSourceName))
             {
                 return BadRequest("Invalid metadata source. Valid sources are: " + string.Join(", ", validSources));
@@ -1602,11 +1877,27 @@ namespace hasheous_server.Controllers.v1_0
                 }
             }
 
-            if (System.IO.File.Exists(bundleFilePath))
+            if (forcerebuild == false)
             {
-                // check the file age
-                fileInfo = new FileInfo(bundleFilePath);
-                if ((DateTime.Now - fileInfo.LastWriteTime).TotalDays <= Config.MetadataConfiguration.MetadataBundle_MaxAgeInDays)
+                if (System.IO.File.Exists(bundleFilePath))
+                {
+                    // check the file age
+                    fileInfo = new FileInfo(bundleFilePath);
+                    if ((DateTime.Now - fileInfo.LastWriteTime).TotalDays <= Config.MetadataConfiguration.MetadataBundle_MaxAgeInDays)
+                    {
+                        // Try to resolve from cache (local or S3 fallback)
+                        var cachedStream = await ProxyCacheManager.ResolveReadAsync("Bundles", resourcePath, CachePolicyType.Bundles, "application/octet-stream");
+                        if (cachedStream != null)
+                        {
+                            return FileWithManagedStream(cachedStream, "application/octet-stream", fileName);
+                        }
+
+                        // Rebuild if the existing bundle cannot be served.
+                        buildNewBundle = true;
+                    }
+                }
+
+                if (buildNewBundle && !System.IO.File.Exists(bundleFilePath))
                 {
                     // Try to resolve from cache (local or S3 fallback)
                     var cachedStream = await ProxyCacheManager.ResolveReadAsync("Bundles", resourcePath, CachePolicyType.Bundles, "application/octet-stream");
@@ -1614,19 +1905,6 @@ namespace hasheous_server.Controllers.v1_0
                     {
                         return FileWithManagedStream(cachedStream, "application/octet-stream", fileName);
                     }
-
-                    // Rebuild if the existing bundle cannot be served.
-                    buildNewBundle = true;
-                }
-            }
-
-            if (buildNewBundle && !System.IO.File.Exists(bundleFilePath))
-            {
-                // Try to resolve from cache (local or S3 fallback)
-                var cachedStream = await ProxyCacheManager.ResolveReadAsync("Bundles", resourcePath, CachePolicyType.Bundles, "application/octet-stream");
-                if (cachedStream != null)
-                {
-                    return FileWithManagedStream(cachedStream, "application/octet-stream", fileName);
                 }
             }
 
@@ -1842,6 +2120,68 @@ namespace hasheous_server.Controllers.v1_0
                             return BadRequest();
                         }
                         break;
+
+                    case "LaunchBox":
+                        // handle LaunchBox metadata
+                        var gameData = await GetLaunchBoxResourceInternal(LaunchBoxResourceType.Game, GameID);
+                        if (gameData == null)
+                        {
+                            return NotFound();
+                        }
+
+                        // populate the response with LaunchBox game data
+                        gameData["Developer"] = await ExpandLaunchBoxResource(LaunchBoxResourceType.Company, gameData["Developer"]?.ToString() ?? string.Empty) ?? string.Empty;
+                        gameData["ESRB"] = await ExpandLaunchBoxResource(LaunchBoxResourceType.ESRB, gameData["ESRB"]?.ToString() ?? string.Empty) ?? string.Empty;
+                        gameData["Platform"] = await ExpandLaunchBoxResource(LaunchBoxResourceType.Platform, gameData["Platform"]?.ToString() ?? string.Empty) ?? string.Empty;
+                        gameData["Publisher"] = await ExpandLaunchBoxResource(LaunchBoxResourceType.Company, gameData["Publisher"]?.ToString() ?? string.Empty) ?? string.Empty;
+                        gameData["ReleaseType"] = await ExpandLaunchBoxResource(LaunchBoxResourceType.ReleaseType, gameData["ReleaseType"]?.ToString() ?? string.Empty) ?? string.Empty;
+                        var gameAlternateNames = await GetLaunchBoxResourcesInternal(LaunchBoxResourceType.GameAlternateName, 1, 50, long.Parse(GameID));
+                        if (gameAlternateNames != null)
+                        {
+                            gameData["AlternateNames"] = new List<Dictionary<string, object>>();
+                            foreach (var alternateName in gameAlternateNames)
+                            {
+                                var expandedAlternateName = alternateName;
+                                if (alternateName.ContainsKey("Region") && alternateName["Region"] != null)
+                                {
+                                    expandedAlternateName["Region"] = await ExpandLaunchBoxResource(LaunchBoxResourceType.Region, alternateName["Region"]?.ToString() ?? string.Empty) ?? alternateName["Region"];
+                                }
+                                ((List<Dictionary<string, object>>)gameData["AlternateNames"]).Add(expandedAlternateName);
+                            }
+                        }
+                        var gameImages = await GetLaunchBoxResourcesInternal(LaunchBoxResourceType.GameImage, 1, 100, long.Parse(GameID));
+                        if (gameImages != null)
+                        {
+                            gameData["Images"] = new List<Dictionary<string, object>>();
+                            foreach (var image in gameImages)
+                            {
+                                if (String.IsNullOrEmpty(image["FileName"]?.ToString()))
+                                {
+                                    continue;
+                                }
+
+                                ((List<Dictionary<string, object>>)gameData["Images"]).Add(image);
+                                string mediaFileName = image["FileName"].ToString();
+                                var mediaFileResponse = await GetLaunchBoxImage(mediaFileName);
+
+                                if (mediaFileResponse is NotFoundObjectResult)
+                                {
+                                    // skip if media not found
+                                    continue;
+                                }
+
+                                if (mediaFileResponse is FileResult mediaFileData)
+                                {
+                                    await _AddFileToBundle(tempWorkingDir, "Images", mediaFileData, mediaFileName);
+                                }
+                            }
+                        }
+
+                        // convert the metadata to json and save it to the bundle
+                        var jsonMetadata = Newtonsoft.Json.JsonConvert.SerializeObject(gameData);
+                        await _AddMetadataToBundle(tempWorkingDir, "Game", jsonMetadata);
+
+                        break;
                 }
 
                 // zip the bundle
@@ -1862,7 +2202,7 @@ namespace hasheous_server.Controllers.v1_0
                             try
                             {
                                 StorageFallbackResolver resolver = new StorageFallbackResolver();
-                                await resolver.UploadLocalFileToS3Async(bundleFilePath, Config.S3StorageConfiguration.DefaultBucket, $"Bundles/{fileName}", overwrite: false);
+                                await resolver.UploadLocalFileToS3Async(bundleFilePath, Config.S3StorageConfiguration.DefaultBucket, $"Bundles/{fileName}", overwrite: forcerebuild);
                             }
                             catch (Exception ex)
                             {

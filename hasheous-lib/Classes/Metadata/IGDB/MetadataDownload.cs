@@ -61,7 +61,7 @@ namespace InternetGameDatabase
             // create the database if it does not exist
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionStringNoDatabase);
             string sql = "CREATE DATABASE IF NOT EXISTS `igdb`";
-            db.ExecuteNonQuery(sql);
+            await db.ExecuteNonQueryAsync(sql);
 
             bool downloadDumps = true;
             if (!IsLocalCopyOlderThanMaxAge(ExistingDumpsFilePath))
@@ -330,7 +330,7 @@ namespace InternetGameDatabase
 
                     // drop the table if it exists
                     sql = $"DROP TABLE IF EXISTS {tableName}";
-                    db.ExecuteNonQuery(sql);
+                    await db.ExecuteNonQueryAsync(sql);
 
                     // create the table based on the schema from the dump file
                     if (File.Exists(dumpFilePath))
@@ -425,7 +425,7 @@ namespace InternetGameDatabase
                                 sql += indexes.TrimEnd(',') + ""; // remove the last comma from indexes
                             }
                             sql = sql.TrimEnd(',') + ");"; // remove the last comma and close the statement
-                            db.ExecuteNonQuery(sql);
+                            await db.ExecuteNonQueryAsync(sql);
 
                             // import the data from the CSV file into the database table
                             var csvFilePath = Path.Combine(LocalFilePath, dump.endpoint + ".csv");
@@ -516,7 +516,7 @@ namespace InternetGameDatabase
                                         sql += $") VALUES ({columnValueParams});";
 
                                         // execute the insert statement
-                                        db.ExecuteNonQuery(sql, columnValues);
+                                        await db.ExecuteNonQueryAsync(sql, columnValues);
                                     }
                                 }
                             }

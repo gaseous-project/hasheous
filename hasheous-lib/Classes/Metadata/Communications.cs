@@ -219,6 +219,11 @@ namespace hasheous_server.Classes.Metadata
             LaunchBox,
 
             /// <summary>
+            /// MobyGames - queries MobyGames service for metadata
+            /// </summary>
+            MobyGames,
+
+            /// <summary>
             /// HowLongToBeat - queries HowLongToBeat service for metadata
             /// </summary>
             HowLongToBeat

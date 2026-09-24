@@ -99,7 +99,7 @@ fetch('/api/v1.0/Signatures/Rom/ById/' + romId, {
         )
     )
     if (jsonLoaded === true) {
-        await postData('/api/v1.0/Lookup/ByHash?returnAllSources=true', 'POST', jsonModel, true)
+        await postData('/api/v1/Lookup/ByHash?returnAllSources=true', 'POST', jsonModel, true)
             .then(response => {
                 if (!response.ok) {
                     throw new Error('Network response was not ok');

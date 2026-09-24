@@ -1,0 +1,20 @@
+CREATE TABLE `UserSupporterLinks` (
+  `Id` BIGINT NOT NULL AUTO_INCREMENT,
+  `UserId` VARCHAR(128) NOT NULL,
+  `Provider` VARCHAR(64) NOT NULL,
+  `ProviderAccountId` VARCHAR(255) NOT NULL,
+  `ProviderAccountSlug` VARCHAR(255) DEFAULT NULL,
+  `ProviderDisplayName` VARCHAR(255) DEFAULT NULL,
+  `LinkedAtUtc` DATETIME NOT NULL,
+  `LastPaymentUtc` DATETIME DEFAULT NULL,
+  `ActiveUntilUtc` DATETIME DEFAULT NULL,
+  `LastSyncedUtc` DATETIME DEFAULT NULL,
+  `IsActive` TINYINT(1) NOT NULL DEFAULT 0,
+  `MetadataJson` LONGTEXT DEFAULT NULL,
+  PRIMARY KEY (`Id`),
+  UNIQUE KEY `uq_UserSupporterLinks_UserProvider` (`UserId`, `Provider`),
+  UNIQUE KEY `uq_UserSupporterLinks_ProviderAccount` (`Provider`, `ProviderAccountId`),
+  KEY `idx_UserSupporterLinks_ProviderSlug` (`Provider`, `ProviderAccountSlug`),
+  KEY `idx_UserSupporterLinks_UserActive` (`UserId`, `IsActive`),
+  CONSTRAINT `fk_UserSupporterLinks_Users` FOREIGN KEY (`UserId`) REFERENCES `Users` (`Id`) ON DELETE CASCADE ON UPDATE NO ACTION
+);

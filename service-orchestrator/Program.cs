@@ -217,9 +217,6 @@ app.Use(async (context, next) =>
 // configure background services
 Classes.ProcessQueue.QueueProcessor.QueueItems = new List<Classes.ProcessQueue.QueueProcessor.QueueItem>
 {
-    // // signature ingestor
-    // new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.SignatureIngestor, 10080, false),
-
     // tally votes
     new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.TallyVotes, 1440, false),
 
@@ -244,6 +241,9 @@ Classes.ProcessQueue.QueueProcessor.QueueItems = new List<Classes.ProcessQueue.Q
     new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchTheGamesDbMetadata, 10080, false),
     // fetch LaunchBox metadata
     new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.FetchLaunchBoxMetadata, 10080, false),
+
+    // synchronize supporter recognition
+    new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.SyncSupporterStatus, 60, false),
 
     // dump all data objects
     new Classes.ProcessQueue.QueueProcessor.QueueItem(Classes.ProcessQueue.QueueItemType.MetadataMapDump, 10080, false)

@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Data;
 using System.Reflection;
 using System.Security.Cryptography.Xml;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Authentication;
@@ -298,16 +299,32 @@ namespace hasheous_server.Classes
         /// <returns>A string representing the Redis cache key.</returns>
         public static string DataObjectCacheKey(DataObjectType objectType, long objectId)
         {
-            return RedisConnection.GenerateKey("DataObject", objectType.ToString() + objectId.ToString());
+            return RedisConnection.GenerateKey($"DataObject:{objectId.ToString()}", objectType.ToString() + objectId.ToString());
         }
 
         public async Task<DataObjectsList> GetDataObjects(DataObjectType objectType, int pageNumber = 0, int pageSize = 0, string? search = null, bool GetChildRelations = false, bool GetMetadataMap = true, AttributeItem.AttributeName? filterAttribute = null, string? filterValue = null, ApplicationUser? user = null)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql;
             Dictionary<string, object> dbDict = new Dictionary<string, object>{
                 { "objecttype", objectType }
             };
+
+            // a page is only taken when both a page number and a page size are given -
+            // otherwise every matching row is returned
+            bool paged = pageNumber >= 1 && pageSize >= 1;
+
+            // the query is assembled in parts so the row count can be asked for separately
+            // from the rows themselves
+            string selectClause;
+            string countClause;
+            string fromWhereClause;
+            string orderByClause;
+
+            // whether the page can be taken by the database. Searches order by a relevance
+            // expression that no index can serve, so the server sorts every match whether or not
+            // a LIMIT is applied - asking for the count separately would just run the full text
+            // match a second time for no gain. Those rows are paged in memory instead.
+            bool pageInDatabase = true;
 
             if (filterAttribute == null)
             {
@@ -316,27 +333,52 @@ namespace hasheous_server.Classes
                     switch (objectType)
                     {
                         case DataObjectType.App:
+                            // DISTINCT because the ACL join returns one row per ACL entry, which
+                            // would otherwise repeat an app once per entry and inflate the count
+                            selectClause = "SELECT DISTINCT DataObject.*";
+                            countClause = "SELECT COUNT(DISTINCT DataObject.Id)";
                             if (user != null)
                             {
-                                sql = "SELECT * FROM DataObject LEFT JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId AND DataObject_Attributes.AttributeType = 6 LEFT JOIN DataObject_ACL ON DataObject.Id = DataObject_ACL.DataObject_ID WHERE ObjectType = @objecttype AND (DataObject_Attributes.AttributeValue = 1 OR (DataObject_ACL.UserId = @userid AND DataObject_ACL.Read = 1)) ORDER BY `Name`;";
+                                fromWhereClause = " FROM DataObject LEFT JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId AND DataObject_Attributes.AttributeType = 6 LEFT JOIN DataObject_ACL ON DataObject.Id = DataObject_ACL.DataObject_ID WHERE ObjectType = @objecttype AND (DataObject_Attributes.AttributeValue = 1 OR (DataObject_ACL.UserId = @userid AND DataObject_ACL.Read = 1))";
                                 dbDict.Add("userid", user.Id);
                             }
                             else
                             {
-                                sql = "SELECT * FROM DataObject LEFT JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId AND DataObject_Attributes.AttributeType = 6 LEFT JOIN DataObject_ACL ON DataObject.Id = DataObject_ACL.DataObject_ID WHERE ObjectType = @objecttype AND DataObject_Attributes.AttributeValue = 1 ORDER BY `Name`;";
+                                fromWhereClause = " FROM DataObject LEFT JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId AND DataObject_Attributes.AttributeType = 6 LEFT JOIN DataObject_ACL ON DataObject.Id = DataObject_ACL.DataObject_ID WHERE ObjectType = @objecttype AND DataObject_Attributes.AttributeValue = 1";
                             }
                             break;
 
                         default:
-                            sql = "SELECT * FROM DataObject WHERE ObjectType = @objecttype ORDER BY `Name`;";
+                            selectClause = "SELECT *";
+                            countClause = "SELECT COUNT(*)";
+                            fromWhereClause = " FROM DataObject WHERE ObjectType = @objecttype";
                             break;
                     }
+
+                    orderByClause = " ORDER BY `Name`";
                 }
                 else
                 {
-                    sql = "SELECT * FROM DataObject WHERE ObjectType = @objecttype AND MATCH(`Name`) AGAINST(@name IN BOOLEAN MODE) ORDER BY `Name`;";
-                    string searchTerms = Common.BuildFullTextBooleanPrefixQuery(search);
-                    dbDict.Add("name", searchTerms);
+                    string? searchPredicate = Common.BuildNameSearchPredicate("Name", search, dbDict);
+
+                    if (searchPredicate == null)
+                    {
+                        // the search string held no letters or digits, so there is nothing to match on
+                        return new DataObjectsList
+                        {
+                            Objects = new List<Models.DataObjectItem>(),
+                            Count = 0,
+                            PageNumber = pageNumber,
+                            PageSize = pageSize,
+                            TotalPages = 0
+                        };
+                    }
+
+                    pageInDatabase = false;
+                    selectClause = "SELECT *";
+                    countClause = "SELECT COUNT(*)";
+                    fromWhereClause = " FROM DataObject WHERE ObjectType = @objecttype AND " + searchPredicate;
+                    orderByClause = " ORDER BY " + Common.BuildNameRelevanceOrderBy("Name", search, dbDict);
                 }
             }
             else
@@ -344,34 +386,57 @@ namespace hasheous_server.Classes
                 dbDict.Add("filterAttribute", filterAttribute);
                 dbDict.Add("filterValue", filterValue);
 
+                selectClause = "SELECT DISTINCT DataObject.*";
+                countClause = "SELECT COUNT(DISTINCT DataObject.Id)";
+
                 switch (filterAttribute)
                 {
                     case AttributeItem.AttributeName.Manufacturer:
                     case AttributeItem.AttributeName.Publisher:
                     case AttributeItem.AttributeName.Platform:
-                        sql = "SELECT DISTINCT DataObject.* FROM DataObject JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId WHERE ObjectType = @objecttype AND DataObject_Attributes.AttributeName = @filterAttribute AND (DataObject_Attributes.AttributeRelation = @filterValue) ORDER BY `Name`;";
+                        fromWhereClause = " FROM DataObject JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId WHERE ObjectType = @objecttype AND DataObject_Attributes.AttributeName = @filterAttribute AND (DataObject_Attributes.AttributeRelation = @filterValue)";
                         break;
 
                     default:
-                        sql = "SELECT DISTINCT DataObject.* FROM DataObject JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId WHERE ObjectType = @objecttype AND DataObject_Attributes.AttributeName = @filterAttribute AND (DataObject_Attributes.AttributeValue = @filterValue) ORDER BY `Name`;";
+                        fromWhereClause = " FROM DataObject JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId WHERE ObjectType = @objecttype AND DataObject_Attributes.AttributeName = @filterAttribute AND (DataObject_Attributes.AttributeValue = @filterValue)";
                         break;
                 }
+
+                orderByClause = " ORDER BY `Name`";
             }
 
-            DataTable data = await db.ExecuteCMDAsync(sql, dbDict);
+            // the offset of the first row of the requested page within the whole result set
+            int pageOffset = paged ? pageSize * (pageNumber - 1) : 0;
+
+            DataTable data;
+            int totalCount;
+
+            if (paged && pageInDatabase)
+            {
+                // ask for the size of the result set, then for just the rows of this page
+                DataTable countData = await db.ExecuteCMDAsync(countClause + fromWhereClause + ";", dbDict);
+                totalCount = Convert.ToInt32(countData.Rows[0][0]);
+
+                dbDict.Add("pagesize", pageSize);
+                dbDict.Add("pageoffset", pageOffset);
+                data = await db.ExecuteCMDAsync(selectClause + fromWhereClause + orderByClause + " LIMIT @pagesize OFFSET @pageoffset;", dbDict);
+            }
+            else
+            {
+                data = await db.ExecuteCMDAsync(selectClause + fromWhereClause + orderByClause + ";", dbDict);
+                totalCount = data.Rows.Count;
+            }
 
             List<Models.DataObjectItem> DataObjects = new List<Models.DataObjectItem>();
 
-            // compile data for return
-            int pageOffset = pageSize * (pageNumber - 1);
-            for (int i = pageOffset; i < data.Rows.Count; i++)
+            // compile data for return. Rows the database has already paged start at the first
+            // row returned; rows paged here start at the offset of the requested page.
+            int firstRow = (paged && pageInDatabase) ? 0 : pageOffset;
+            for (int i = firstRow; i < data.Rows.Count; i++)
             {
-                if (pageNumber != 0 && pageSize != 0)
+                if (paged && !pageInDatabase && i >= (pageOffset + pageSize))
                 {
-                    if (i >= (pageOffset + pageSize))
-                    {
-                        break;
-                    }
+                    break;
                 }
 
                 Models.DataObjectItem item = await BuildDataObject(
@@ -380,20 +445,21 @@ namespace hasheous_server.Classes
                     data.Rows[i],
                     GetChildRelations,
                     GetMetadataMap,
+                    false,
                     false
                 );
 
                 DataObjects.Add(item);
             }
 
-            float pageCount = (float)data.Rows.Count / (float)pageSize;
             DataObjectsList objectsList = new DataObjectsList
             {
                 Objects = DataObjects,
-                Count = data.Rows.Count,
+                Count = totalCount,
                 PageNumber = pageNumber,
                 PageSize = pageSize,
-                TotalPages = (int)Math.Ceiling(pageCount)
+                // without a page size there is a single page holding everything
+                TotalPages = paged ? (int)Math.Ceiling((double)totalCount / pageSize) : (totalCount > 0 ? 1 : 0)
             };
 
             return objectsList;
@@ -487,6 +553,7 @@ namespace hasheous_server.Classes
                     data.Rows[i],
                     true,
                     false,
+                    false,
                     false
                 );
 
@@ -528,7 +595,7 @@ namespace hasheous_server.Classes
             }
         }
 
-        public async Task<Models.DataObjectItem?> GetDataObject(DataObjectType objectType, long id, bool GetChildRelations = true, bool GetMetadata = true, bool GetSignatureData = true)
+        public async Task<Models.DataObjectItem?> GetDataObject(DataObjectType objectType, long id, bool GetChildRelations = true, bool GetMetadata = true, bool GetSignatureData = true, bool BypassCache = false)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "SELECT * FROM DataObject WHERE ObjectType=@objecttype AND Id=@id;";
@@ -541,7 +608,7 @@ namespace hasheous_server.Classes
 
             if (data.Rows.Count > 0)
             {
-                DataObjectItem item = await BuildDataObject(objectType, id, data.Rows[0], GetChildRelations, GetMetadata, GetSignatureData);
+                DataObjectItem item = await BuildDataObject(objectType, id, data.Rows[0], GetChildRelations, GetMetadata, GetSignatureData, BypassCache);
 
                 return item;
             }
@@ -623,6 +690,21 @@ namespace hasheous_server.Classes
 
         private void UpdateDataObjectDate(long DataObjectId)
         {
+            UpdateDataObjectDate(DataObjectId, null);
+        }
+
+        /// <summary>
+        /// Stamps the object as updated and drops its cache entry.
+        /// </summary>
+        /// <param name="DataObjectId">The object to stamp.</param>
+        /// <param name="objectType">
+        /// The object's type, when the caller already knows it. Only the type is needed here, to
+        /// build the cache key - pass it in and no lookup happens at all. When it is null the type
+        /// is read with a single row query rather than by building the object, which would walk
+        /// every signature and every rom the object has.
+        /// </param>
+        private void UpdateDataObjectDate(long DataObjectId, DataObjectType? objectType)
+        {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "UPDATE DataObject SET UpdatedDate=@updateddate WHERE Id=@id;";
             db.ExecuteNonQuery(sql, new Dictionary<string, object>{
@@ -631,25 +713,35 @@ namespace hasheous_server.Classes
             });
 
             // get the object type
-            DataObjectItem? item = GetDataObject(DataObjectId).Result;
-            if (item != null)
+            DataObjectType? resolvedObjectType = objectType;
+            if (resolvedObjectType == null)
             {
-                DataObjectType objectType = item.ObjectType;
+                DataTable data = db.ExecuteCMD("SELECT ObjectType FROM DataObject WHERE Id=@id;", new Dictionary<string, object>{
+                    { "id", DataObjectId }
+                });
 
+                if (data.Rows.Count > 0)
+                {
+                    resolvedObjectType = (DataObjectType)data.Rows[0]["ObjectType"];
+                }
+            }
+
+            if (resolvedObjectType != null)
+            {
                 // generate a cache key for this object id
-                string cacheKey = DataObjectCacheKey(objectType, DataObjectId);
+                string cacheKey = DataObjectCacheKey((DataObjectType)resolvedObjectType, DataObjectId);
                 // purge redis cache of this object
                 if (Config.RedisConfiguration.Enabled)
                 {
-                    RedisConnection.GetDatabase(0).KeyDelete(cacheKey);
+                    Task.Run(async () => await RedisConnection.DeleteCacheItem(cacheKey));
                 }
             }
         }
 
-        private async Task<Models.DataObjectItem> BuildDataObject(DataObjectType ObjectType, long id, DataRow row, bool GetChildRelations = false, bool GetMetadata = true, bool GetSignatureData = true)
+        private async Task<Models.DataObjectItem> BuildDataObject(DataObjectType ObjectType, long id, DataRow row, bool GetChildRelations = false, bool GetMetadata = true, bool GetSignatureData = true, bool BypassCache = false)
         {
             // get attributes
-            List<AttributeItem> attributes = await GetAttributes(id, GetChildRelations);
+            List<AttributeItem> attributes = await GetAttributes(id, GetChildRelations, BypassCache);
 
             // get signature items
             List<Dictionary<string, object>> signatureItems = new List<Dictionary<string, object>>();
@@ -721,20 +813,33 @@ namespace hasheous_server.Classes
                 UpdatedDate = (DateTime)row["UpdatedDate"],
                 Metadata = metadataItems,
                 SignatureDataObjects = signatureItems,
-                Attributes = attributes
+                Attributes = attributes,
+                IsBlockedFromMatching = (bool)row["IsBlockedFromMatching"]
             };
 
             return item;
         }
 
-        public async Task<List<AttributeItem>> GetAttributes(long DataObjectId, bool GetChildRelations)
+        public async Task<List<AttributeItem>> GetAttributes(long DataObjectId, bool GetChildRelations, bool BypassCache = false)
         {
+            string cacheKey = RedisConnection.GenerateKey("AttributeItems", DataObjectId.ToString() + GetChildRelations.ToString());
+
+            List<AttributeItem>? attributes = null;
+            if (!BypassCache)
+            {
+                attributes = await RedisConnection.GetCacheItem<List<AttributeItem>>(cacheKey);
+                if (attributes != null)
+                {
+                    return attributes;
+                }
+            }
+
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "SELECT * FROM DataObject_Attributes WHERE DataObjectId = @id";
             DataTable data = await db.ExecuteCMDAsync(sql, new Dictionary<string, object>{
                 { "id", DataObjectId }
             });
-            List<AttributeItem> attributes = new List<AttributeItem>();
+            attributes = new List<AttributeItem>();
             foreach (DataRow dataRow in data.Rows)
             {
                 try
@@ -771,6 +876,7 @@ namespace hasheous_server.Classes
                 }
             }
 
+            await RedisConnection.SetCacheItem(cacheKey, attributes, new TimeSpan(0, 5, 0)); // cache for 5 minutes
             return attributes;
         }
 
@@ -987,7 +1093,7 @@ namespace hasheous_server.Classes
 
                         // insert a record for this metadata source
                         sql = "INSERT INTO DataObject_MetadataMap (DataObjectId, MetadataId, SourceId, MatchMethod, LastSearched, NextSearch) VALUES (@id, @metaid, @srcid, @method, @lastsearched, @nextsearch);";
-                        db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                        await db.ExecuteNonQueryAsync(sql, new Dictionary<string, object>{
                             { "id", DataObjectId },
                             { "metaid", "" },
                             { "srcid", (int)source },
@@ -1180,7 +1286,7 @@ namespace hasheous_server.Classes
                         { "lastsearched", DateTime.UtcNow.AddMonths(-3) },
                         { "nextsearch", DateTime.UtcNow.AddMonths(-1) }
                     };
-                            db.ExecuteNonQuery(sql, dbDict);
+                            await db.ExecuteNonQueryAsync(sql, dbDict);
                         }
                     }
 
@@ -1199,7 +1305,7 @@ namespace hasheous_server.Classes
                             { "write", true },
                             { "delete", true }
                         };
-                    db.ExecuteNonQuery(sql, dbDict);
+                    await db.ExecuteNonQueryAsync(sql, dbDict);
                     break;
 
                 default:
@@ -1212,22 +1318,23 @@ namespace hasheous_server.Classes
         public async Task<Models.DataObjectItem> EditDataObject(DataObjectType objectType, long id, Models.DataObjectItemModel model, bool allowSearch = true)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql = "UPDATE DataObject SET `Name`=@name, `UpdatedDate`=@updateddate WHERE ObjectType=@objecttype AND Id=@id";
+            string sql = "UPDATE DataObject SET `Name`=@name, `UpdatedDate`=@updateddate, `IsBlockedFromMatching`=@isblockedfrommatching WHERE ObjectType=@objecttype AND Id=@id";
             Dictionary<string, object> dbDict = new Dictionary<string, object>{
                 { "id", id },
                 { "name", model.Name },
                 { "objecttype", objectType },
-                { "updateddate", DateTime.UtcNow }
+                { "updateddate", DateTime.UtcNow },
+                { "isblockedfrommatching", model.IsBlockedFromMatching }
             };
 
-            db.ExecuteNonQuery(sql, dbDict);
+            await db.ExecuteNonQueryAsync(sql, dbDict);
 
             // generate a cache key for this object id
             string cacheKey = DataObjectCacheKey(objectType, id);
             // purge redis cache of this object
             if (Config.RedisConfiguration.Enabled)
             {
-                RedisConnection.GetDatabase(0).KeyDelete(cacheKey);
+                await RedisConnection.DeleteCacheItem(cacheKey);
             }
 
             if (allowSearch)
@@ -1254,32 +1361,53 @@ namespace hasheous_server.Classes
             if (Config.RedisConfiguration.Enabled)
             {
                 string cacheKey = DataObjectCacheKey(objectType, id);
-                RedisConnection.GetDatabase(0).KeyDelete(cacheKey);
+                Task.Run(async () => await RedisConnection.DeleteCacheItem(cacheKey));
             }
+        }
+
+        private async Task<DataObjectItem> GetObjectStateForEdit(DataObjectType objectType, long id)
+        {
+            var attributes = await GetAttributes(id, true);
+            var metadata = await GetMetadataMap(objectType, id);
+            var signatures = await GetSignatures(objectType, id);
+
+            return new DataObjectItem
+            {
+                Id = id,
+                ObjectType = objectType,
+                Attributes = attributes,
+                Metadata = metadata,
+                SignatureDataObjects = signatures
+            };
         }
 
         public async Task<Models.DataObjectItem> EditDataObject(DataObjectType objectType, long id, Models.DataObjectItem model, bool trustModelMetadataSearchType = false)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql = "UPDATE DataObject SET `Name`=@name, `UpdatedDate`=@updateddate WHERE ObjectType=@objecttype AND Id=@id";
+            List<Database.SQLTransactionItem> transactionItems = new List<Database.SQLTransactionItem>();
+            string sql = "UPDATE DataObject SET `Name`=@name, `UpdatedDate`=@updateddate, `IsBlockedFromMatching`=@isblockedfrommatching WHERE ObjectType=@objecttype AND Id=@id";
             Dictionary<string, object> dbDict = new Dictionary<string, object>{
                 { "id", id },
                 { "name", model.Name },
                 { "objecttype", objectType },
-                { "updateddate", DateTime.UtcNow }
+                { "updateddate", DateTime.UtcNow },
+                { "isblockedfrommatching", model.IsBlockedFromMatching }
             };
 
-            db.ExecuteNonQuery(sql, dbDict);
+            transactionItems.Add(new Database.SQLTransactionItem(sql, dbDict));
 
             // generate a cache key for this object id
             string cacheKey = DataObjectCacheKey(objectType, id);
             // purge redis cache of this object
             if (Config.RedisConfiguration.Enabled)
             {
-                RedisConnection.GetDatabase(0).KeyDelete(cacheKey);
+                await RedisConnection.DeleteCacheItem(cacheKey);
             }
 
-            DataObjectItem EditedObject = await GetDataObject(objectType, id);
+            DataObjectItem EditedObject = await GetObjectStateForEdit(objectType, id);
+            Dictionary<(AttributeItem.AttributeType attributeType, AttributeItem.AttributeName attributeName), AttributeItem> existingAttributesByKey = EditedObject.Attributes
+                .GroupBy(attribute => (attribute.attributeType, attribute.attributeName))
+                .ToDictionary(group => group.Key, group => group.First());
 
             // update attributes
             foreach (AttributeItem newAttribute in model.Attributes)
@@ -1470,90 +1598,82 @@ namespace hasheous_server.Classes
 
                     default:
                         bool attributeFound = false;
-                        foreach (AttributeItem existingAttribute in EditedObject.Attributes)
+                        var existingAttributeKey = (newAttribute.attributeType, newAttribute.attributeName);
+                        if (existingAttributesByKey.TryGetValue(existingAttributeKey, out AttributeItem? existingAttribute))
                         {
-                            if (
-                                (newAttribute.attributeType == existingAttribute.attributeType) &&
-                                (newAttribute.attributeName == existingAttribute.attributeName)
-                            )
-                            {
-                                attributeFound = true;
+                            attributeFound = true;
 
-                                string sqlField;
-                                bool isMatch = false;
-                                string matchValue = "";
-                                switch (existingAttribute.attributeType)
-                                {
-                                    case AttributeItem.AttributeType.ObjectRelationship:
-                                        sqlField = "AttributeRelation";
-                                        DataObjectItem tempCompare = (DataObjectItem)existingAttribute.Value;
-                                        if (tempCompare != null)
+                            string sqlField;
+                            bool isMatch = false;
+                            switch (existingAttribute.attributeType)
+                            {
+                                case AttributeItem.AttributeType.ObjectRelationship:
+                                    sqlField = "AttributeRelation";
+                                    DataObjectItem tempCompare = (DataObjectItem)existingAttribute.Value;
+                                    if (tempCompare != null)
+                                    {
+                                        if (long.TryParse(newAttribute.Value.ToString(), out long newCompareLong))
                                         {
-                                            if (long.TryParse(newAttribute.Value.ToString(), out long newCompareLong))
+                                            if (tempCompare.Id == newCompareLong)
                                             {
-                                                if (tempCompare.Id == newCompareLong)
-                                                {
-                                                    isMatch = true;
-                                                    matchValue = newCompareLong.ToString();
-                                                }
+                                                isMatch = true;
+                                            }
+                                        }
+                                        else
+                                        {
+                                            DataObjectItem? newCompare = null;
+                                            if (newAttribute.Value is hasheous_server.Models.RelationItem)
+                                            {
+                                                newCompare = await GetDataObject((newAttribute.Value as hasheous_server.Models.RelationItem).relationId);
                                             }
                                             else
                                             {
-                                                DataObjectItem? newCompare = null;
-                                                if (newAttribute.Value is hasheous_server.Models.RelationItem)
-                                                {
-                                                    newCompare = await GetDataObject((newAttribute.Value as hasheous_server.Models.RelationItem).relationId);
-                                                }
-                                                else
-                                                {
-                                                    newCompare = (DataObjectItem)newAttribute.Value;
-                                                }
+                                                newCompare = (DataObjectItem)newAttribute.Value;
+                                            }
 
-                                                if (tempCompare.Name == newCompare.Name)
-                                                {
-                                                    isMatch = true;
-                                                    matchValue = newCompare.Id.ToString();
-                                                }
+                                            if (tempCompare.Name == newCompare.Name)
+                                            {
+                                                isMatch = true;
                                             }
                                         }
-                                        break;
+                                    }
+                                    break;
 
-                                    default:
-                                        sqlField = "AttributeValue";
-                                        if ((string)newAttribute.Value == (string)existingAttribute.Value)
-                                        {
-                                            isMatch = true;
-                                        }
-                                        break;
+                                default:
+                                    sqlField = "AttributeValue";
+                                    if ((string)newAttribute.Value == (string)existingAttribute.Value)
+                                    {
+                                        isMatch = true;
+                                    }
+                                    break;
 
-                                }
+                            }
 
-                                //if (compareValue != (string)newAttribute.Value)
-                                if (isMatch == false)
+                            //if (compareValue != (string)newAttribute.Value)
+                            if (isMatch == false)
+                            {
+                                if (newAttribute.Value == "")
                                 {
-                                    if (newAttribute.Value == "")
-                                    {
-                                        // blank value - delete it
-                                        DeleteAttribute(id, (long)existingAttribute.Id);
-                                    }
-                                    else
-                                    {
-                                        // update existing value
-                                        sql = "UPDATE DataObject_Attributes SET " + sqlField + "=@value WHERE DataObjectId=@id AND AttributeId=@attrid;";
-                                        db.ExecuteNonQuery(sql, new Dictionary<string, object>{
-                                            { "id", id },
-                                            { "attrid", existingAttribute.Id },
-                                            { "value", newAttribute.Value }
-                                        });
-                                    }
+                                    // blank value - delete it
+                                    DeleteAttribute(id, (long)existingAttribute.Id);
                                 }
                                 else
                                 {
-                                    if (newAttribute.Value == "")
-                                    {
-                                        // blank value - delete it
-                                        DeleteAttribute(id, (long)existingAttribute.Id);
-                                    }
+                                    // update existing value
+                                    sql = "UPDATE DataObject_Attributes SET " + sqlField + "=@value WHERE DataObjectId=@id AND AttributeId=@attrid;";
+                                    transactionItems.Add(new Database.SQLTransactionItem(sql, new Dictionary<string, object>{
+                                        { "id", id },
+                                        { "attrid", existingAttribute.Id },
+                                        { "value", newAttribute.Value }
+                                    }));
+                                }
+                            }
+                            else
+                            {
+                                if (newAttribute.Value == "")
+                                {
+                                    // blank value - delete it
+                                    DeleteAttribute(id, (long)existingAttribute.Id);
                                 }
                             }
                         }
@@ -1577,6 +1697,18 @@ namespace hasheous_server.Classes
                 case DataObjectType.Company:
                 case DataObjectType.Platform:
                 case DataObjectType.Game:
+                    Dictionary<Metadata.Communications.MetadataSources, DataObjectItem.MetadataItem> existingMetadataBySource = EditedObject.Metadata
+                        .GroupBy(metadataItem => metadataItem.Source)
+                        .ToDictionary(group => group.Key, group => group.First());
+
+                    List<BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod?> validMatchMethods = new List<BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod?>
+                    {
+                        BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
+                        BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic,
+                        BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.AutomaticTooManyMatches,
+                        BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NonAutomatic
+                    };
+
                     foreach (DataObjectItem.MetadataItem newMetadataItem in model.Metadata)
                     {
                         // skip none
@@ -1654,69 +1786,78 @@ namespace hasheous_server.Classes
                                 break;
                         }
 
-                        bool metadataFound = false;
                         BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod? matchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin;
+
                         if (trustModelMetadataSearchType == true)
                         {
-                            matchMethod = newMetadataItem.MatchMethod;
+                            if (existingMetadataBySource.TryGetValue(newMetadataItem.Source, out DataObjectItem.MetadataItem? unchangedMetadataItem)
+                                && newMetadataId == unchangedMetadataItem.Id
+                                && newMetadataItem.MatchMethod == unchangedMetadataItem.MatchMethod)
+                            {
+                                matchMethod = unchangedMetadataItem.MatchMethod;
+                            }
+                            else if (validMatchMethods.Contains(newMetadataItem.MatchMethod))
+                            {
+                                matchMethod = newMetadataItem.MatchMethod;
+                            }
+                            else
+                            {
+                                matchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin;
+                            }
                         }
 
-                        foreach (DataObjectItem.MetadataItem existingMetadataItem in EditedObject.Metadata)
+                        if (matchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic && String.IsNullOrWhiteSpace(newMetadataId))
                         {
-                            if (newMetadataItem.Source == existingMetadataItem.Source)
-                            {
-                                metadataFound = true;
-                                if (newMetadataId.ToString() != existingMetadataItem.Id)
-                                {
-                                    metadataChangeDetected = true;
-
-                                    // change to manually set
-                                    sql = "UPDATE DataObject_MetadataMap SET MatchMethod=@match, MetadataId=@metaid, WinningVoteCount=@winningvotecount, TotalVoteCount=@totalvotecount WHERE DataObjectId=@id AND SourceId=@source;";
-                                    db.ExecuteNonQuery(sql, new Dictionary<string, object>{
-                                        { "id", id },
-                                        { "match", matchMethod ?? BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin },
-                                        { "metaid", newMetadataId },
-                                        { "source", existingMetadataItem.Source },
-                                        { "winningvotecount", 0 },
-                                        { "totalvotecount", 0 }
-                                    });
-                                }
-                            }
-
-                            if (trustModelMetadataSearchType == true)
-                            {
-                                // update next search field if match method is NoMatch or Automatic
-                                if (new List<BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod?>{
-                                    BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch,
-                                    BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Automatic,
-                                    BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.AutomaticTooManyMatches
-                                }.Contains(matchMethod))
-                                {
-                                    // update next search regardless of changes
-                                    sql = "UPDATE DataObject_MetadataMap SET LastSearched=@lastsearched, NextSearch=@nextsearch WHERE DataObjectId=@id AND SourceId=@source;";
-                                    db.ExecuteNonQuery(sql, new Dictionary<string, object>{
-                                        { "id", id },
-                                        { "source", newMetadataItem.Source },
-                                        { "lastsearched", newMetadataItem.LastSearch },
-                                        { "nextsearch", newMetadataItem.NextSearch }
-                                    });
-                                }
-                            }
+                            matchMethod = BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NoMatch;
                         }
 
-                        if (metadataFound == false)
+                        if (existingMetadataBySource.TryGetValue(newMetadataItem.Source, out DataObjectItem.MetadataItem? existingMetadataItem))
+                        {
+                            if (newMetadataId.ToString() != existingMetadataItem.Id || matchMethod != existingMetadataItem.MatchMethod)
+                            {
+                                metadataChangeDetected = true;
+
+                                // change to manually set
+                                sql = "UPDATE DataObject_MetadataMap SET MatchMethod=@match, MetadataId=@metaid, WinningVoteCount=@winningvotecount, TotalVoteCount=@totalvotecount WHERE DataObjectId=@id AND SourceId=@source;";
+                                transactionItems.Add(new Database.SQLTransactionItem(sql, new Dictionary<string, object>{
+                                    { "id", id },
+                                    { "match", matchMethod ?? BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin },
+                                    { "metaid", newMetadataId },
+                                    { "source", existingMetadataItem.Source },
+                                    { "winningvotecount", 0 },
+                                    { "totalvotecount", 0 }
+                                }));
+                            }
+                        }
+                        else
                         {
                             metadataChangeDetected = true;
 
                             sql = "INSERT INTO DataObject_MetadataMap (DataObjectId, MetadataId, SourceId, MatchMethod, LastSearched, NextSearch) VALUES (@id, @metaid, @source, @match, @last, @next);";
-                            db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                            transactionItems.Add(new Database.SQLTransactionItem(sql, new Dictionary<string, object>{
                                 { "id", id },
                                 { "match", matchMethod ?? BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin },
                                 { "metaid", newMetadataId },
                                 { "source", newMetadataItem.Source },
                                 { "last", DateTime.UtcNow },
                                 { "next", DateTime.UtcNow.AddMonths(1) }
-                            });
+                            }));
+                        }
+
+                        if (trustModelMetadataSearchType == true)
+                        {
+                            // update next search field if match method is NoMatch or Automatic
+                            if (validMatchMethods.Contains(matchMethod))
+                            {
+                                // update next search regardless of changes
+                                sql = "UPDATE DataObject_MetadataMap SET LastSearched=@lastsearched, NextSearch=@nextsearch WHERE DataObjectId=@id AND SourceId=@source;";
+                                transactionItems.Add(new Database.SQLTransactionItem(sql, new Dictionary<string, object>{
+                                    { "id", id },
+                                    { "source", newMetadataItem.Source },
+                                    { "lastsearched", newMetadataItem.LastSearch },
+                                    { "nextsearch", newMetadataItem.NextSearch }
+                                }));
+                            }
                         }
                     }
                     break;
@@ -1748,37 +1889,76 @@ namespace hasheous_server.Classes
             {
                 // delete ai description
                 sql = "DELETE FROM DataObject_Attributes WHERE DataObjectId=@id AND AttributeType=@attrtype AND AttributeName=@attrname;";
-                db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                transactionItems.Add(new Database.SQLTransactionItem(sql, new Dictionary<string, object>{
                     { "id", id },
                     { "attrtype", (int)AttributeItem.AttributeType.LongString },
                     { "attrname", (int)AttributeItem.AttributeName.AIDescription }
-                });
+                }));
                 // delete ai tags
                 sql = "DELETE FROM DataObject_Tags WHERE DataObjectId=@id AND AIAssigned=@aiassigned;";
-                db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                transactionItems.Add(new Database.SQLTransactionItem(sql, new Dictionary<string, object>{
                     { "id", id },
                     { "aiassigned", true }
-                });
+                }));
                 // delete ai tasks
                 sql = "DELETE FROM Task_Queue WHERE dataobjectid=@id;";
-                db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                transactionItems.Add(new Database.SQLTransactionItem(sql, new Dictionary<string, object>{
                     { "id", id }
-                });
+                }));
             }
 
             // signatures
-            sql = "DELETE FROM DataObject_SignatureMap WHERE DataObjectId=@id";
-            db.ExecuteNonQuery(sql, new Dictionary<string, object>{
-                { "id", id }
-            });
-            List<long> signatureIds = new List<long>();
-            foreach (Dictionary<string, object>? signature in model.SignatureDataObjects)
+            HashSet<long> signatureIds = new HashSet<long>();
+            foreach (Dictionary<string, object>? signature in model.SignatureDataObjects ?? new List<Dictionary<string, object>>())
             {
-                if (!signatureIds.Contains(long.Parse(signature["SignatureId"].ToString())))
+                signatureIds.Add(long.Parse(signature["SignatureId"].ToString()));
+            }
+
+            HashSet<long> existingSignatureIds = new HashSet<long>();
+            foreach (Dictionary<string, object>? signature in EditedObject.SignatureDataObjects ?? new List<Dictionary<string, object>>())
+            {
+                existingSignatureIds.Add(long.Parse(signature["SignatureId"].ToString()));
+            }
+
+            // only rewrite the map when it has actually changed - an edit that leaves the
+            // signatures alone should not touch them at all
+            if (!signatureIds.SetEquals(existingSignatureIds))
+            {
+                // the delete and the insert have to land together - a failure between them would
+                // leave the object with no signatures at all
+                List<Database.SQLTransactionItem> signatureCommands = new List<Database.SQLTransactionItem>
                 {
-                    AddSignature(id, objectType, long.Parse(signature["SignatureId"].ToString()));
-                    signatureIds.Add(long.Parse(signature["SignatureId"].ToString()));
+                    new Database.SQLTransactionItem("DELETE FROM DataObject_SignatureMap WHERE DataObjectId=@id;", new Dictionary<string, object>{
+                        { "id", id }
+                    })
+                };
+
+                if (signatureIds.Count > 0)
+                {
+                    // insert the whole map in one statement rather than a round trip per signature
+                    StringBuilder signatureSql = new StringBuilder("INSERT INTO DataObject_SignatureMap (DataObjectId, DataObjectTypeId, SignatureId) VALUES ");
+                    Dictionary<string, object> signatureDict = new Dictionary<string, object>{
+                        { "id", id },
+                        { "typeid", objectType }
+                    };
+
+                    int signatureIndex = 0;
+                    foreach (long signatureId in signatureIds)
+                    {
+                        if (signatureIndex > 0)
+                        {
+                            signatureSql.Append(", ");
+                        }
+                        signatureSql.Append("(@id, @typeid, @sigid").Append(signatureIndex).Append(')');
+                        signatureDict.Add("sigid" + signatureIndex, signatureId);
+                        signatureIndex++;
+                    }
+                    signatureSql.Append(';');
+
+                    signatureCommands.Add(new Database.SQLTransactionItem(signatureSql.ToString(), signatureDict));
                 }
+
+                await db.ExecuteTransactionCMDAsync(signatureCommands);
             }
 
             // access control
@@ -1786,9 +1966,9 @@ namespace hasheous_server.Classes
             {
                 // update access control
                 sql = "DELETE FROM DataObject_ACL WHERE DataObject_ID=@id";
-                db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+                transactionItems.Add(new Database.SQLTransactionItem(sql, new Dictionary<string, object>{
                     { "id", id}
-                });
+                }));
 
                 foreach (KeyValuePair<string, List<DataObjectPermission.PermissionType>> acl in model.UserPermissions)
                 {
@@ -1829,12 +2009,17 @@ namespace hasheous_server.Classes
                         {
                             dbDict.Add("delete", false);
                         }
-                        db.ExecuteNonQuery(sql, dbDict);
+                        transactionItems.Add(new Database.SQLTransactionItem(sql, dbDict));
                     }
                 }
             }
 
-            UpdateDataObjectDate(id);
+            if (transactionItems.Count > 0)
+            {
+                await db.ExecuteTransactionCMDAsync(transactionItems);
+            }
+
+            UpdateDataObjectDate(id, objectType);
 
             if (metadataChangeDetected == true)
             {
@@ -1857,7 +2042,7 @@ namespace hasheous_server.Classes
                 }
             }
 
-            return await GetDataObject(objectType, id);
+            return await GetDataObject(objectType, id, BypassCache: true);
         }
 
         /// <summary>
@@ -1979,11 +2164,12 @@ namespace hasheous_server.Classes
             }
         }
 
-        // do not search for metadata if the matchmethod is Manual, ManualByAdmin, or Voted
+        // do not search for metadata if the matchmethod is Manual, ManualByAdmin, Voted, or NonAutomatic
         private static List<BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod> dontSearchMatchMethods = [
             BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Manual,
             BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.ManualByAdmin,
-            BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Voted
+            BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.Voted,
+            BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.NonAutomatic
         ];
 
         // get all metadata sources
@@ -2286,6 +2472,12 @@ namespace hasheous_server.Classes
                     }
                 }
 
+                // breakout early if the match method is a don't search type
+                if (metadata.MatchMethod != null && dontSearchMatchMethods.Contains((BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod)metadata.MatchMethod))
+                {
+                    continue;
+                }
+
                 // create the search task for this metadata source
                 Task searchTask = Task.Run(async () =>
                 {
@@ -2427,7 +2619,7 @@ namespace hasheous_server.Classes
                 }
 
                 // update date
-                UpdateDataObjectDate((long)item.Id);
+                UpdateDataObjectDate((long)item.Id, objectType);
 
                 // enqueue AI description and tagging task if not already present
                 if (aiTaskPresent == false)
@@ -2928,20 +3120,20 @@ namespace hasheous_server.Classes
                 { "sigid", SignatureId }
             });
 
-            UpdateDataObjectDate(DataObjectId);
+            UpdateDataObjectDate(DataObjectId, dataObjectType);
         }
 
         public void DeleteSignature(long DataObjectId, DataObjectType dataObjectType, long SignatureId)
         {
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
-            string sql = "DELETE FROM DataObject_SignatureMap WHERE DataObjectId=@id AND DataObjectTypeId=@typeid AND SignatureId=@sigid);";
+            string sql = "DELETE FROM DataObject_SignatureMap WHERE DataObjectId=@id AND DataObjectTypeId=@typeid AND SignatureId=@sigid;";
             db.ExecuteNonQuery(sql, new Dictionary<string, object>{
                 { "id", DataObjectId },
                 { "typeid", dataObjectType },
                 { "sigid", SignatureId }
             });
 
-            UpdateDataObjectDate(DataObjectId);
+            UpdateDataObjectDate(DataObjectId, dataObjectType);
         }
 
         /// <summary>
@@ -3100,7 +3292,23 @@ namespace hasheous_server.Classes
             return tagAttribute;
         }
 
-        public DataObjectItem MergeObjects(DataObjectItem sourceObject, DataObjectItem targetObject, bool commit = false)
+        /// <summary>
+        /// Attributes that BuildDataObject generates while reading an object. They have no row in
+        /// DataObject_Attributes and are not meant to be stored, so they must be kept out of
+        /// anything handed to EditDataObject. Tags are deliberately not listed - they are also
+        /// generated on read, but EditDataObject has real persistence for them.
+        /// </summary>
+        private static readonly HashSet<AttributeItem.AttributeName> GeneratedAttributeNames = new HashSet<AttributeItem.AttributeName>
+        {
+            AttributeItem.AttributeName.SearchAliases,
+            AttributeItem.AttributeName.Country,
+            AttributeItem.AttributeName.Language,
+            AttributeItem.AttributeName.ROMs,
+            AttributeItem.AttributeName.DumpFile,
+            AttributeItem.AttributeName.LogoAttribution
+        };
+
+        public async Task<DataObjectItem> MergeObjects(DataObjectItem sourceObject, DataObjectItem targetObject, bool commit = false)
         {
             // first, ensure both objects are the same type
             if (sourceObject.ObjectType != targetObject.ObjectType)
@@ -3201,7 +3409,7 @@ namespace hasheous_server.Classes
             // This ensures that any dependencies on the source object are redirected to the target object during the merge operation.
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "UPDATE DataObject_Attributes SET AttributeRelation=@targetid WHERE AttributeRelation=@sourceid AND AttributeRelationType=@typeid;";
-            db.ExecuteNonQuery(sql, new Dictionary<string, object>{
+            await db.ExecuteNonQueryAsync(sql, new Dictionary<string, object>{
                 { "targetid", targetObject.Id },
                 { "sourceid", sourceObject.Id },
                 { "typeid", sourceObject.ObjectType }
@@ -3210,9 +3418,27 @@ namespace hasheous_server.Classes
             // apply changes if commit = true
             if (commit == true)
             {
-                var editDataObject = EditDataObject(targetObject.ObjectType, targetObject.Id, targetObject);
-                var dataObjectMetadataSearch = DataObjectMetadataSearch(targetObject.ObjectType, targetObject.Id, false);
-                UpdateDataObjectDate(targetObject.Id);
+                // targetObject was built for display, so it carries the attributes generated during
+                // the read. Saving those would insert derived values as if they were stored ones,
+                // so the save gets a copy without them - the object returned to the caller keeps
+                // them, since it feeds the merge preview.
+                DataObjectItem objectToSave = new DataObjectItem
+                {
+                    Id = targetObject.Id,
+                    ObjectType = targetObject.ObjectType,
+                    Name = targetObject.Name,
+                    IsBlockedFromMatching = targetObject.IsBlockedFromMatching,
+                    Attributes = targetObject.Attributes?
+                        .Where(attribute => !GeneratedAttributeNames.Contains(attribute.attributeName))
+                        .ToList(),
+                    Metadata = targetObject.Metadata,
+                    SignatureDataObjects = targetObject.SignatureDataObjects,
+                    UserPermissions = targetObject.UserPermissions
+                };
+
+                await EditDataObject(targetObject.ObjectType, targetObject.Id, objectToSave);
+                await DataObjectMetadataSearch(targetObject.ObjectType, targetObject.Id, false);
+                UpdateDataObjectDate(targetObject.Id, targetObject.ObjectType);
                 DeleteDataObject(sourceObject.ObjectType, sourceObject.Id);
             }
 

@@ -10,17 +10,15 @@ namespace TheGamesDB.SQL
 {
     public class MetadataQuery
     {
-        public T? GetMetadata<T>(QueryModel queryModel)
+        public T? GetMetadata<T>(QueryModel queryModel) where T : class
         {
             // check cache first
             string cacheKey = RedisConnection.GenerateKey("TheGamesDB-MetadataQuery", typeof(T).Name + "-" + queryModel);
 
-            if (Config.RedisConfiguration.Enabled)
+            var cacheItem = RedisConnection.GetCacheItem<T>(cacheKey).Result;
+            if (cacheItem != null)
             {
-                if (RedisConnection.CacheItemExists(cacheKey).Result)
-                {
-                    return RedisConnection.GetCacheItem<T>(cacheKey).Result;
-                }
+                return cacheItem;
             }
 
             // set up variables

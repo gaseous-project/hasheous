@@ -59,8 +59,15 @@ namespace BackgroundMetadataMatcher
             /// <summary>
             /// Match is in progress - this is used to prevent multiple matches from being made at the same time
             /// </summary>
-            InProgress = 6
+            InProgress = 6,
+
+            /// <summary>
+            /// Non-automatic matches are subject to change
+            /// </summary>
+            NonAutomatic = 7
         }
+
+        private static HttpClient client = new HttpClient();
 
         public async Task GetGamesWithoutArtwork()
         {
@@ -124,6 +131,7 @@ namespace BackgroundMetadataMatcher
                     {
                         if (
                             metadata.MatchMethod == MatchMethod.Automatic ||
+                            metadata.MatchMethod == MatchMethod.NonAutomatic ||
                             metadata.MatchMethod == MatchMethod.Manual ||
                             metadata.MatchMethod == MatchMethod.ManualByAdmin ||
                             metadata.MatchMethod == MatchMethod.Voted
@@ -166,21 +174,18 @@ namespace BackgroundMetadataMatcher
                                                             Directory.CreateDirectory(Path.GetDirectoryName(CoverPath));
                                                         }
 
-                                                        using (var client = new System.Net.Http.HttpClient())
-                                                        {
-                                                            Uri coverUri = new Uri("https://images.igdb.com/igdb/image/upload/t_original/" + cover.ImageId + ".jpg");
+                                                        Uri coverUri = new Uri("https://images.igdb.com/igdb/image/upload/t_original/" + cover.ImageId + ".jpg");
 
-                                                            var response = await client.GetAsync(coverUri);
-                                                            if (response.IsSuccessStatusCode)
-                                                            {
-                                                                var imageBytes = await response.Content.ReadAsByteArrayAsync();
-                                                                await File.WriteAllBytesAsync(CoverPath, imageBytes);
-                                                            }
-                                                            else
-                                                            {
-                                                                Logging.Log(Logging.LogType.Warning, "Background Metadata Matcher", "Failed to download cover image for game: " + game.Name);
-                                                                return;
-                                                            }
+                                                        var response = await client.GetAsync(coverUri);
+                                                        if (response.IsSuccessStatusCode)
+                                                        {
+                                                            var imageBytes = await response.Content.ReadAsByteArrayAsync();
+                                                            await File.WriteAllBytesAsync(CoverPath, imageBytes);
+                                                        }
+                                                        else
+                                                        {
+                                                            Logging.Log(Logging.LogType.Warning, "Background Metadata Matcher", "Failed to download cover image for game: " + game.Name);
+                                                            return;
                                                         }
                                                     }
 

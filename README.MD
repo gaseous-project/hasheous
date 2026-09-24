@@ -13,6 +13,8 @@ Hasheous is hosted at https://hasheous.org/
   * IGDB
 * Provides an API for developers to submit fixes to data matching
 * Includes a hosted MCP endpoint in the Hasheous API for AI-assisted database queries
+* Supports supporter recognition through linked OpenCollective accounts
+* Supports profile-driven API rate limiting with hot-reloaded rules
 * Is completely free to use
 
 ## Discord Server
@@ -33,6 +35,8 @@ The following projects are used by Hasheous
 ## Configuration File
 When Hasheous-Server is started for the first time, it creates a configuration file at ~/.hasheous-server/config.json if it doesn't exist. Some values can be filled in using environment variables (such as in the case of using docker).
 
+Rate limiter rules are stored separately at `~/.hasheous-server/rate-limit-rules.json` and are reloaded automatically every 5 minutes. See [`Rate Limiting`](./docs/Rate%20Limiting.md).
+
 ### DatabaseConfiguration
 | Attribute | Environment Variable |
 | --------- | -------------------- |
@@ -45,6 +49,18 @@ When Hasheous-Server is started for the first time, it creates a configuration f
 | --------- | -------------------- |
 | ClientId  | igdbclientid         |
 | Secret.   | igdbclientsecret     |
+
+### SupporterRecognitionConfiguration
+| Attribute | Environment Variable |
+| --------- | -------------------- |
+| OpenCollectiveClientId | opencollectiveclientid |
+| OpenCollectiveClientSecret | opencollectiveclientsecret |
+| OpenCollectiveApiToken | opencollectiveapitoken |
+| OpenCollectiveCollectiveSlug | opencollectivecollectiveslug |
+
+When configuring OpenCollective OAuth linking, use this callback URL:
+
+`https://<your-hasheous-host>/signin-opencollective`
 
 ### config.json
 ```json
@@ -60,12 +76,25 @@ When Hasheous-Server is started for the first time, it creates a configuration f
     "ClientId": "<clientid>",
     "Secret": "<secret>"
   },
+  "SupporterRecognitionConfiguration": {
+    "OpenCollectiveClientId": "<clientid>",
+    "OpenCollectiveClientSecret": "<clientsecret>",
+    "OpenCollectiveApiToken": "<apitoken>",
+    "OpenCollectiveCollectiveSlug": "hasheous",
+    "ActiveContributionDays": 30
+  },
   "LoggingConfiguration": {
     "DebugLogging": false,
     "LogRetention": 7
   }
 }
 ```
+
+## Supporter Recognition
+
+Supporter recognition is documented in [`Support Recognition`](./docs/Supporter%20Recognition.md).
+
+Active supporters receive the `Supporter` role when their linked OpenCollective account has made a payment within the last 30 days.
 
 ## Docker
 ### Build and deploy a Docker image from source
@@ -77,7 +106,7 @@ Dockerfile and docker-compose-build.yml files have been provided to make deploym
 5. Connect to the host on port 7157
 
 ## MCP Server
-Full MCP documentation: [`README-MCP.MD`](./README-MCP.MD)
+Full MCP documentation: [`MCP`](./docs/MCP.md)
 
 Hasheous includes a hosted MCP JSON-RPC endpoint at:
 
@@ -99,6 +128,17 @@ Currently exposed MCP tools:
 - `hasheous_search_games` (search by game name + optional platform, includes ROM/hash data)
 - `hasheous_get_game_details` (full details for a specific game id)
 - `hasheous_lookup_hashes` (find matching games by CRC/MD5/SHA1/SHA256)
+
+## Rate Limiting
+
+Rate limiting is documented in [`Rate Limiting`](./docs/Rate%20Limiting.md).
+
+Highlights:
+
+- rules are defined in `~/.hasheous-server/rate-limit-rules.json`
+- rules are hot-reloaded every 5 minutes
+- built-in webpage traffic is automatically exempt
+- profiles can match on roles, origin, user agent, remote IP, and arbitrary headers
 
 # Adding Content
 Currently supported DAT's:
