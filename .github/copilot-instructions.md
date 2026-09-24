@@ -368,7 +368,7 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 
 ## HowLongToBeat metadata
 - Provider class: `hasheous-lib/Classes/Metadata/HowLongToBeat/IMetadata_HowLongToBeat.cs` (`MetadataHowLongToBeat : IMetadata`); HTTP client in `HowLongToBeatClient.cs` in the same folder.
-- Source enum: `MetadataSources.HowLongToBeat` (appended after `LaunchBox`; never reorder the enum, values are stored as ints in `DataObject_MetadataMap.SourceId`).
+- Source enum: `MetadataSources.HowLongToBeat` (appended after `MobyGames`, currently the last value; new sources must be appended after it. Never reorder the enum, values are stored as ints in `DataObject_MetadataMap.SourceId`).
 - Games only. HowLongToBeat has no platform ids, so it is listed in `sourcesWithoutPlatformMetadata` in `DataObjects._DataObjectMetadataSearch_Apply`: games are searched without a platform mapping and the Hasheous platform name is passed as the `platformName` search option.
 - API is unofficial: the search endpoint path is scraped from the site's `/_next/static/chunks/*.js` (fallback `api/search/site`), and a token from `{searchPath}/init?t=<ms>` is sent as `x-auth-token` (plus `x-hp-key`/`x-hp-val` when the init response includes them). The token is bound to client IP + user agent, so a single static `HttpClient` is reused. On 403/404 the session is rediscovered once; 429 throws `MetadataRateLimitException`. Requests are serialized and throttled (1.5s minimum interval).
 - Matching (`MetadataHowLongToBeat.SelectBestMatch`): results scored with `Common.GetStrongNameMatchScore(...)` against name and aliases (`>= 8` required), ties broken by platform match (`IsPlatformMatch`), then base game over hack/mod/DLC, then completion count.
