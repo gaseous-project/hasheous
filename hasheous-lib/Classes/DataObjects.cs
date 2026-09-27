@@ -2059,12 +2059,6 @@ namespace hasheous_server.Classes
         /// <param name="id"></param>
         public async Task DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch = false, int? MaxRuntimeHours = null)
         {
-            using MetadataSearchFlagLock? metadataSearchFlagLock = TryAcquireMetadataSearchFlagLock(objectType, id);
-            if (metadataSearchFlagLock == null)
-            {
-                return;
-            }
-
             // begin search
             switch (objectType)
             {
@@ -2261,7 +2255,6 @@ namespace hasheous_server.Classes
                     // start processing data objects
                     foreach (DataRow row in ids.Rows)
                     {
-                        DateTime rowProcessStart = DateTime.Now;
                         // stop processing if total run time is longer than MaxRuntimeHours hours - this is to give processes that are blocked by long-running tasks a chance to complete
                         if (MaxRuntimeHours.HasValue && (DateTime.Now - processStart).TotalHours > MaxRuntimeHours.Value)
                         {
@@ -2291,6 +2284,12 @@ namespace hasheous_server.Classes
 
         private async Task _DataObjectMetadataSearch_Apply(DataObjectItem item, string logName, Random rand, DataObjectType objectType, long? id, bool ForceSearch, DateTime now, HashSet<MetadataSources> ProcessSources, int processedObjectCount, int objectTotalCount)
         {
+            using MetadataSearchFlagLock? metadataSearchFlagLock = TryAcquireMetadataSearchFlagLock(objectType, id);
+            if (metadataSearchFlagLock == null)
+            {
+                return;
+            }
+
             // check item metadata for any with a matchmethod of inprogress - if so, skip this item as it is already being processed
             if (item.Metadata != null && item.Metadata.Any(x => x.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.InProgress))
             {
@@ -2324,6 +2323,7 @@ namespace hasheous_server.Classes
                 if (itemPlatform == null)
                 {
                     Logging.Log(Logging.LogType.Warning, "Metadata Match", $"{processedObjectCount} / {objectTotalCount} - Skipping game {item.Name} as no platform is mapped.");
+                    metadataSearchFlagLock?.Dispose();
                     return;
                 }
             }
@@ -2625,6 +2625,9 @@ namespace hasheous_server.Classes
                 {
                     TaskManagement.EnqueueTask(item.Id, Models.Tasks.TaskType.AIDescriptionAndTagging);
                 }
+
+                // release the lock
+                metadataSearchFlagLock?.Dispose();
             };
 
             // wait a few seconds for metadata tasks so we can return quickly to the caller.
@@ -2669,6 +2672,9 @@ namespace hasheous_server.Classes
                             metadataLookupTasks.TryRemove(jobId, out _);
                         }
                     });
+
+                    // release the lock
+                    metadataSearchFlagLock?.Dispose();
 
                     return;
                 }
