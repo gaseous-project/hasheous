@@ -657,6 +657,33 @@ namespace Classes
 			return GetStrongNameMatchScore(candidate, resultName) >= 8;
 		}
 
+		/// <summary>
+		/// Scores how confident a match <paramref name="resultName"/> is for <paramref name="candidate"/>,
+		/// returning <see cref="int.MinValue"/> when the result must not be matched.
+		/// Unlike <see cref="GetStrongNameMatchScore"/> this also rejects results that introduce a number
+		/// the candidate does not contain, so a base title cannot be matched to a numbered instalment
+		/// (e.g. "Doom" must not match "Doom 3" or "Doom 64").
+		/// </summary>
+		public static int GetNumberAwareNameMatchScore(string candidate, string? resultName)
+		{
+			int score = GetStrongNameMatchScore(candidate, resultName);
+			if (score < 8)
+			{
+				return int.MinValue;
+			}
+
+			HashSet<long> candidateNumbers = GetNumberTokens(candidate);
+			foreach (long resultNumber in GetNumberTokens(resultName))
+			{
+				if (!candidateNumbers.Contains(resultNumber))
+				{
+					return int.MinValue;
+				}
+			}
+
+			return score;
+		}
+
 		public static int GetStrongNameMatchScore(string candidate, string? resultName)
 		{
 			if (string.IsNullOrWhiteSpace(candidate) || string.IsNullOrWhiteSpace(resultName))
@@ -745,6 +772,41 @@ namespace Classes
 			}
 
 			return tokens;
+		}
+
+		/// <summary>
+		/// Extracts the numeric identifiers from a name, treating Roman numerals as their integer value
+		/// so that "Sonic 2" and "Sonic II" produce the same token. Roman numerals are only recognised in
+		/// the range used for sequels (1-30) so that ordinary words built from numeral letters, such as
+		/// "Live" or "Mix", are not mistaken for numbers.
+		/// </summary>
+		private static HashSet<long> GetNumberTokens(string? value)
+		{
+			HashSet<long> numbers = new HashSet<long>();
+
+			if (string.IsNullOrWhiteSpace(value))
+			{
+				return numbers;
+			}
+
+			foreach (Match match in Regex.Matches(value, @"\b\d+\b|\b[IVXLCDM]+\b", RegexOptions.IgnoreCase))
+			{
+				string token = match.Value;
+
+				if (long.TryParse(token, out long numeric))
+				{
+					numbers.Add(numeric);
+					continue;
+				}
+
+				int roman = RomanNumerals.RomanToInt(token);
+				if (roman >= 1 && roman <= 30)
+				{
+					numbers.Add(roman);
+				}
+			}
+
+			return numbers;
 		}
 
 		private static bool TokensEquivalent(string a, string b)
