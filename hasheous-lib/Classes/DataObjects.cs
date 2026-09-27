@@ -2048,16 +2048,16 @@ namespace hasheous_server.Classes
         /// <summary>
         /// Performs a metadata look up on DataObjects with no match metadata
         /// </summary>
-        public async Task DataObjectMetadataSearch(DataObjectType objectType, bool ForceSearch = false)
+        public async Task DataObjectMetadataSearch(DataObjectType objectType, bool ForceSearch = false, bool StartedByService = false)
         {
-            await DataObjectMetadataSearch(objectType, null, ForceSearch);
+            await DataObjectMetadataSearch(objectType, null, ForceSearch, StartedByService);
         }
 
         /// <summary>
         /// Performs a metadata look up on the selected DataObject if it has no metadata match
         /// </summary>
         /// <param name="id"></param>
-        public async Task DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch = false)
+        public async Task DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch = false, bool StartedByService = false)
         {
             using MetadataSearchFlagLock? metadataSearchFlagLock = TryAcquireMetadataSearchFlagLock(objectType, id);
             if (metadataSearchFlagLock == null)
@@ -2071,7 +2071,7 @@ namespace hasheous_server.Classes
                 case DataObjectType.Company:
                 case DataObjectType.Platform:
                 case DataObjectType.Game:
-                    await _DataObjectMetadataSearch(objectType, id, ForceSearch);
+                    await _DataObjectMetadataSearch(objectType, id, ForceSearch, StartedByService);
                     break;
 
                 default:
@@ -2186,7 +2186,7 @@ namespace hasheous_server.Classes
             "3DO"
         };
 
-        private async Task _DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch)
+        private async Task _DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch, bool StartedByService)
         {
             HashSet<MetadataSources> ProcessSources = [
                 MetadataSources.IGDB,
@@ -2256,9 +2256,19 @@ namespace hasheous_server.Classes
                 ", dbDict);
                 if (ids.Rows.Count > 0)
                 {
+                    DateTime processStart = DateTime.Now;
+
                     // start processing data objects
                     foreach (DataRow row in ids.Rows)
                     {
+                        DateTime rowProcessStart = DateTime.Now;
+                        // stop processing if total run time is longer than 23 hours - this is to give processes that are blocked by long-running tasks a chance to complete
+                        if (StartedByService && (DateTime.Now - processStart).TotalHours > 23)
+                        {
+                            Logging.SendReport(logName, null, null, $"Stopping metadata search as total run time exceeded 23 hours.");
+                            return;
+                        }
+
                         processedObjectCount++;
 
                         var item = await GetDataObject(objectType, (long)row["Id"]);
