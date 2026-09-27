@@ -2048,30 +2048,24 @@ namespace hasheous_server.Classes
         /// <summary>
         /// Performs a metadata look up on DataObjects with no match metadata
         /// </summary>
-        public async Task DataObjectMetadataSearch(DataObjectType objectType, bool ForceSearch = false)
+        public async Task DataObjectMetadataSearch(DataObjectType objectType, bool ForceSearch = false, int? MaxRuntimeHours = null)
         {
-            await DataObjectMetadataSearch(objectType, null, ForceSearch);
+            await DataObjectMetadataSearch(objectType, null, ForceSearch, MaxRuntimeHours);
         }
 
         /// <summary>
         /// Performs a metadata look up on the selected DataObject if it has no metadata match
         /// </summary>
         /// <param name="id"></param>
-        public async Task DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch = false)
+        public async Task DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch = false, int? MaxRuntimeHours = null)
         {
-            using MetadataSearchFlagLock? metadataSearchFlagLock = TryAcquireMetadataSearchFlagLock(objectType, id);
-            if (metadataSearchFlagLock == null)
-            {
-                return;
-            }
-
             // begin search
             switch (objectType)
             {
                 case DataObjectType.Company:
                 case DataObjectType.Platform:
                 case DataObjectType.Game:
-                    await _DataObjectMetadataSearch(objectType, id, ForceSearch);
+                    await _DataObjectMetadataSearch(objectType, id, ForceSearch, MaxRuntimeHours);
                     break;
 
                 default:
@@ -2093,9 +2087,9 @@ namespace hasheous_server.Classes
 
             if (File.Exists(inUseFlagFile))
             {
-                // flag exists - if it's less than an hour old, abort
-                DateTime flagCreationTime = File.GetCreationTimeUtc(inUseFlagFile);
-                if (flagCreationTime > DateTime.UtcNow.AddHours(-1))
+                // A live lock refreshes its lease periodically; only recover locks whose lease expired.
+                DateTime leaseTime = File.GetLastWriteTimeUtc(inUseFlagFile);
+                if (leaseTime > DateTime.UtcNow.AddHours(-1))
                 {
                     return null;
                 }
@@ -2118,12 +2112,13 @@ namespace hasheous_server.Classes
             // atomically create lock file; if this fails, another worker already acquired it
             try
             {
-                FileStream lockStream = new FileStream(inUseFlagFile, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-                byte[] lockContents = System.Text.Encoding.UTF8.GetBytes("In Progress");
+                string lockToken = Guid.NewGuid().ToString("N");
+                FileStream lockStream = new FileStream(inUseFlagFile, FileMode.CreateNew, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+                byte[] lockContents = System.Text.Encoding.UTF8.GetBytes(lockToken);
                 lockStream.Write(lockContents, 0, lockContents.Length);
                 lockStream.Flush(true);
 
-                return new MetadataSearchFlagLock(lockStream, inUseFlagFile);
+                return new MetadataSearchFlagLock(lockStream, inUseFlagFile, lockToken);
             }
             catch (IOException)
             {
@@ -2139,20 +2134,90 @@ namespace hasheous_server.Classes
         {
             private readonly FileStream _lockStream;
             private readonly string _flagPath;
+            private readonly string _lockToken;
+            private readonly object _sync = new object();
+            private readonly System.Threading.Timer _leaseTimer;
+            private bool _disposeDeferred;
+            private bool _disposed;
 
-            public MetadataSearchFlagLock(FileStream lockStream, string flagPath)
+            public MetadataSearchFlagLock(FileStream lockStream, string flagPath, string lockToken)
             {
                 _lockStream = lockStream;
                 _flagPath = flagPath;
+                _lockToken = lockToken;
+                _leaseTimer = new System.Threading.Timer(RefreshLease, null, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
+            }
+
+            public void DeferDispose()
+            {
+                lock (_sync)
+                {
+                    if (!_disposed)
+                    {
+                        _disposeDeferred = true;
+                    }
+                }
+            }
+
+            public void ReleaseDeferred()
+            {
+                lock (_sync)
+                {
+                    if (_disposed)
+                    {
+                        return;
+                    }
+
+                    _disposeDeferred = false;
+                    DisposeCore();
+                }
             }
 
             public void Dispose()
             {
+                lock (_sync)
+                {
+                    if (_disposed || _disposeDeferred)
+                    {
+                        return;
+                    }
+
+                    DisposeCore();
+                }
+            }
+
+            private void RefreshLease(object? state)
+            {
+                lock (_sync)
+                {
+                    if (_disposed)
+                    {
+                        return;
+                    }
+
+                    try
+                    {
+                        if (File.Exists(_flagPath) && File.ReadAllText(_flagPath) == _lockToken)
+                        {
+                            File.SetLastWriteTimeUtc(_flagPath, DateTime.UtcNow);
+                        }
+                    }
+                    catch
+                    {
+                        // Lease refresh is best-effort; stale lock recovery remains available.
+                    }
+                }
+            }
+
+            private void DisposeCore()
+            {
+                _disposed = true;
+                _leaseTimer.Dispose();
                 _lockStream.Dispose();
 
                 try
                 {
-                    if (File.Exists(_flagPath))
+                    if (File.Exists(_flagPath) && File.ReadAllText(_flagPath) == _lockToken)
                     {
                         File.Delete(_flagPath);
                     }
@@ -2186,7 +2251,7 @@ namespace hasheous_server.Classes
             "3DO"
         };
 
-        private async Task _DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch)
+        private async Task _DataObjectMetadataSearch(DataObjectType objectType, long? id, bool ForceSearch, int? MaxRuntimeHours = null)
         {
             HashSet<MetadataSources> ProcessSources = [
                 MetadataSources.IGDB,
@@ -2256,9 +2321,18 @@ namespace hasheous_server.Classes
                 ", dbDict);
                 if (ids.Rows.Count > 0)
                 {
+                    DateTime processStart = DateTime.Now;
+
                     // start processing data objects
                     foreach (DataRow row in ids.Rows)
                     {
+                        // stop processing if total run time is longer than MaxRuntimeHours hours - this is to give processes that are blocked by long-running tasks a chance to complete
+                        if (MaxRuntimeHours.HasValue && (DateTime.Now - processStart).TotalHours > MaxRuntimeHours.Value)
+                        {
+                            Logging.SendReport(logName, null, null, $"Stopping metadata search as total run time exceeded {MaxRuntimeHours.Value} hours.");
+                            return;
+                        }
+
                         processedObjectCount++;
 
                         var item = await GetDataObject(objectType, (long)row["Id"]);
@@ -2281,6 +2355,12 @@ namespace hasheous_server.Classes
 
         private async Task _DataObjectMetadataSearch_Apply(DataObjectItem item, string logName, Random rand, DataObjectType objectType, long? id, bool ForceSearch, DateTime now, HashSet<MetadataSources> ProcessSources, int processedObjectCount, int objectTotalCount)
         {
+            using MetadataSearchFlagLock? metadataSearchFlagLock = TryAcquireMetadataSearchFlagLock(objectType, item.Id);
+            if (metadataSearchFlagLock == null)
+            {
+                return;
+            }
+
             // check item metadata for any with a matchmethod of inprogress - if so, skip this item as it is already being processed
             if (item.Metadata != null && item.Metadata.Any(x => x.MatchMethod == BackgroundMetadataMatcher.BackgroundMetadataMatcher.MatchMethod.InProgress))
             {
@@ -2314,6 +2394,7 @@ namespace hasheous_server.Classes
                 if (itemPlatform == null)
                 {
                     Logging.Log(Logging.LogType.Warning, "Metadata Match", $"{processedObjectCount} / {objectTotalCount} - Skipping game {item.Name} as no platform is mapped.");
+                    metadataSearchFlagLock?.Dispose();
                     return;
                 }
             }
@@ -2615,6 +2696,9 @@ namespace hasheous_server.Classes
                 {
                     TaskManagement.EnqueueTask(item.Id, Models.Tasks.TaskType.AIDescriptionAndTagging);
                 }
+
+                // release the lock
+                metadataSearchFlagLock?.Dispose();
             };
 
             // wait a few seconds for metadata tasks so we can return quickly to the caller.
@@ -2634,6 +2718,7 @@ namespace hasheous_server.Classes
                 catch (TimeoutException)
                 {
                     Logging.Log(Logging.LogType.Warning, "Metadata Match", $"{processedObjectCount} / {objectTotalCount} - Metadata search tasks did not complete within {maxWaitSeconds} seconds. Continuing and allowing them to finish in the background.");
+                    metadataSearchFlagLock?.DeferDispose();
 
                     _ = Task.Run(async () =>
                     {
@@ -2656,7 +2741,14 @@ namespace hasheous_server.Classes
                                 Logging.Log(Logging.LogType.Warning, "Metadata Match", $"{processedObjectCount} / {objectTotalCount} - Error running finalise after background metadata tasks completed.", ex);
                             }
 
-                            metadataLookupTasks.TryRemove(jobId, out _);
+                            try
+                            {
+                                metadataLookupTasks.TryRemove(jobId, out _);
+                            }
+                            finally
+                            {
+                                metadataSearchFlagLock?.ReleaseDeferred();
+                            }
                         }
                     });
 
