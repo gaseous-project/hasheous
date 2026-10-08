@@ -5,7 +5,7 @@ namespace DATImport
         /// <summary>
         /// The source type of the signature parser to use for this import.
         /// </summary>
-        public gaseous_signature_parser.parser.SignatureParser SourceType { get; }
+        public DATImport.SignatureIngestor.SignatureType SourceType { get; }
 
         /// <summary>
         /// The interval at which the import should be performed, in minutes. This can be used to schedule periodic imports or to determine how frequently the import should be executed. Minimum value is 1440 minutes (24 hours). If the value is less than 1440, it will be set to 1440.
@@ -32,5 +32,11 @@ namespace DATImport
         /// </summary>
         /// <returns>A task that represents the asynchronous validation operation. The task result is a boolean indicating whether the files are valid (true) or not (false).</returns>
         public Task<bool> ValidateFiles();
+
+        /// <summary>
+        /// Perform any post-import steps after the import has been completed. This may involve cleaning up temporary files, updating metadata, or performing any necessary finalization tasks. The implementation of this method should handle any necessary post-import operations to ensure the import process is properly concluded.
+        /// </summary>
+        /// <returns>A task that represents the asynchronous post-import operation.</returns>
+        public Task PostImport();
     }
 }

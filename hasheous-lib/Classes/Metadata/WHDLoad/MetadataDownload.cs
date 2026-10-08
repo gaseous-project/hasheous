@@ -14,7 +14,7 @@ namespace WHDLoad
         public static void RegisterImporter() => SignatureIngestor.Register<DownloadManager>();
 
         /// <inheritdoc/>
-        public gaseous_signature_parser.parser.SignatureParser SourceType => gaseous_signature_parser.parser.SignatureParser.WHDLoad;
+        public DATImport.SignatureIngestor.SignatureType SourceType => DATImport.SignatureIngestor.SignatureType.WHDLoad;
 
         /// <inheritdoc/>
         public int Interval => 10080; // 7 days in minutes

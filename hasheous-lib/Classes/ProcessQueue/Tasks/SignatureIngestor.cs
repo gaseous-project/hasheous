@@ -27,7 +27,7 @@ namespace Classes.ProcessQueue
             }
 
             // check the importer type
-            if (importer.SourceType == gaseous_signature_parser.parser.SignatureParser.Unknown || importer.SourceType == gaseous_signature_parser.parser.SignatureParser.Auto)
+            if (importer.SourceType == DATImport.SignatureIngestor.SignatureType.Unknown)
             {
                 return null; // Invalid importer type, nothing to process
             }

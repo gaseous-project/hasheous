@@ -1056,6 +1056,17 @@ namespace Classes
                     }
                 }
 
+                /// <summary>
+                /// Gets the directory path for libretro metadata within the library metadata directory.
+                /// </summary>
+                public string LibraryMetadataDirectory_libretro
+                {
+                    get
+                    {
+                        return Path.Combine(LibraryMetadataDirectory, "libretro");
+                    }
+                }
+
                 public string LibraryMetadataDirectory_Screenscraper
                 {
                     get

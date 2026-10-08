@@ -679,6 +679,7 @@ let signatureSources = {
     12: "TotalDOSCollection",
     13: "eXo",
     14: "HackHash",
+    15: "libretro",
     98: "ScreenScraper"
 }
 

@@ -15,7 +15,7 @@ namespace RetroAchievements
         public static void RegisterImporter() => SignatureIngestor.Register<DownloadManager>();
 
         /// <inheritdoc/>
-        public gaseous_signature_parser.parser.SignatureParser SourceType => gaseous_signature_parser.parser.SignatureParser.RetroAchievements;
+        public DATImport.SignatureIngestor.SignatureType SourceType => DATImport.SignatureIngestor.SignatureType.RetroAchievements;
 
         /// <inheritdoc/>
         public int Interval => 10080; // 7 days in minutes

@@ -12,7 +12,7 @@ namespace ScreenScraper
         public static void RegisterImporter() => SignatureIngestor.Register<DownloadManager>();
 
         /// <inheritdoc/>
-        public gaseous_signature_parser.parser.SignatureParser SourceType => gaseous_signature_parser.parser.SignatureParser.ScreenScraper;
+        public DATImport.SignatureIngestor.SignatureType SourceType => DATImport.SignatureIngestor.SignatureType.ScreenScraper;
 
         /// <inheritdoc/>
         public int Interval => 1440; // 1 day in minutes
@@ -205,7 +205,7 @@ namespace ScreenScraper
                                 }
                             }
 
-                            await xmlIngestor.ImportDatRecord(game, now, sourceId, gaseous_signature_parser.parser.SignatureParser.ScreenScraper);
+                            await xmlIngestor.ImportDatRecord(game, now, sourceId, DATImport.SignatureIngestor.SignatureType.ScreenScraper);
                         }
                     }
                 }

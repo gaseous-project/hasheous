@@ -11,7 +11,7 @@ namespace TotalDOSCollection
         public static void RegisterImporter() => SignatureIngestor.Register<DownloadManager>();
 
         /// <inheritdoc/>
-        public gaseous_signature_parser.parser.SignatureParser SourceType => gaseous_signature_parser.parser.SignatureParser.TotalDOSCollection;
+        public DATImport.SignatureIngestor.SignatureType SourceType => DATImport.SignatureIngestor.SignatureType.TotalDOSCollection;
 
         /// <inheritdoc/>
         public int Interval => 10080; // 7 days in minutes
@@ -24,7 +24,7 @@ namespace TotalDOSCollection
         /// <inheritdoc/>
         public async Task StageFiles()
         {
-            string datDirectoryPath = System.IO.Path.Combine(Config.LibraryConfiguration.LibrarySignaturesDirectory, gaseous_signature_parser.parser.SignatureParser.TotalDOSCollection.ToString());
+            string datDirectoryPath = System.IO.Path.Combine(Config.LibraryConfiguration.LibrarySignaturesDirectory, DATImport.SignatureIngestor.SignatureType.TotalDOSCollection.ToString());
             string zipFilePath = System.IO.Path.Combine(datDirectoryPath, "tdc_daily.zip");
             string datFilePath = System.IO.Path.Combine(datDirectoryPath, "tdc_daily.dat");
 

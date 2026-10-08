@@ -14,7 +14,7 @@ namespace MAMEArcade
         public static void RegisterImporter() => SignatureIngestor.Register<DownloadManager>();
 
         /// <inheritdoc/>
-        public gaseous_signature_parser.parser.SignatureParser SourceType => gaseous_signature_parser.parser.SignatureParser.MAMEArcade;
+        public DATImport.SignatureIngestor.SignatureType SourceType => DATImport.SignatureIngestor.SignatureType.MAMEArcade;
 
         /// <inheritdoc/>
         public int Interval => 10080; // 7 days in minutes

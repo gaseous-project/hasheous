@@ -14,6 +14,7 @@
     --signature-source-color-totaldoscollection: #ff69b4;
     --signature-source-color-exo: #008a55;
     --signature-source-color-hackhash: #4a4a6a;
+    --signature-source-color-libretro: #ff8c00;
     --signature-source-color-generic: #7f00ff;
 }
 
@@ -75,6 +76,10 @@
 
 .color-hackhash {
     background-color: var(--signature-source-color-hackhash);
+}
+
+.color-libretro {
+    background-color: var(--signature-source-color-libretro);
 }
 
 .color-generic {

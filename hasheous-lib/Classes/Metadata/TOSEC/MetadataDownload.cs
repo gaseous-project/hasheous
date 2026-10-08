@@ -11,7 +11,7 @@ namespace TOSEC
         public static void RegisterImporter() => SignatureIngestor.Register<DownloadManager>();
 
         /// <inheritdoc/>
-        public gaseous_signature_parser.parser.SignatureParser SourceType => gaseous_signature_parser.parser.SignatureParser.TOSEC;
+        public DATImport.SignatureIngestor.SignatureType SourceType => DATImport.SignatureIngestor.SignatureType.TOSEC;
 
         /// <inheritdoc/>
         public int Interval => 10080; // 7 days in minutes
