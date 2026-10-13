@@ -6,6 +6,8 @@ using System.Xml;
 using Classes;
 using DATImport;
 using RetroAchievements.Models;
+using gaseous_signature_parser.models.RomSignatureObject;
+using hasheous_server.Models;
 
 namespace RetroAchievements
 {
@@ -505,6 +507,18 @@ namespace RetroAchievements
             public string FileName { get; set; }
             public string MD5 { get; set; }
             public bool allowOverwrite { get; set; }
+        }
+
+        /// <inheritdoc/>
+        public Task PostImport(HasheousRomSignatureObject ImportedObject)
+        {
+            return Task.CompletedTask;
+        }
+
+        /// <inheritdoc/>
+        public Task<DataObjectItem> ApplyDATMetadata(DataObjectItem TargetObject)
+        {
+            return Task.FromResult(TargetObject);
         }
     }
 }

@@ -1552,11 +1552,13 @@ namespace hasheous_server.Classes
 
                                             if (tagIdToMap != -1)
                                             {
-                                                sql = "INSERT INTO DataObject_Tags (DataObjectId, TagId, AIAssigned) VALUES (@dataobjectid, @tagid, @aiassigned);";
+                                                sql = "INSERT INTO DataObject_Tags (DataObjectId, TagId, AIAssigned, MetadataSource, MetadataSourceID) VALUES (@dataobjectid, @tagid, @aiassigned, @metadatasource, @metadatasourceid);";
                                                 await db.ExecuteCMDAsync(sql, new Dictionary<string, object>{
                                                     { "dataobjectid", id },
                                                     { "tagid", tagIdToMap },
-                                                    { "aiassigned", false }
+                                                    { "aiassigned", false },
+                                                    { "metadatasource", null },
+                                                    { "metadatasourceid", null }
                                                 });
                                             }
                                         }
@@ -1582,7 +1584,7 @@ namespace hasheous_server.Classes
                                         if (mappingInSupplied == false)
                                         {
                                             // delete mapping
-                                            sql = "DELETE FROM DataObject_Tags WHERE DataObjectId=@dataobjectid AND TagId=@tagid AND AIAssigned=@aiassigned;";
+                                            sql = "DELETE FROM DataObject_Tags WHERE DataObjectId=@dataobjectid AND TagId=@tagid AND AIAssigned=@aiassigned AND MetadataSource IS NULL;";
                                             await db.ExecuteCMDAsync(sql, new Dictionary<string, object>{
                                                 { "dataobjectid", id },
                                                 { "tagid", existingTagModel.Id },
@@ -1895,7 +1897,7 @@ namespace hasheous_server.Classes
                     { "attrname", (int)AttributeItem.AttributeName.AIDescription }
                 }));
                 // delete ai tags
-                sql = "DELETE FROM DataObject_Tags WHERE DataObjectId=@id AND AIAssigned=@aiassigned;";
+                sql = "DELETE FROM DataObject_Tags WHERE DataObjectId=@id AND AIAssigned=@aiassigned AND MetadataSource IS NULL;";
                 transactionItems.Add(new Database.SQLTransactionItem(sql, new Dictionary<string, object>{
                     { "id", id },
                     { "aiassigned", true }
@@ -2670,6 +2672,17 @@ namespace hasheous_server.Classes
                 }
             }
 
+            // call signature metadata updaters - these are in the SignatureIngestor registration
+            foreach (var updater in DATImport.SignatureIngestor.DATImporters)
+            {
+                if (updater.IsEnabled)
+                {
+                    Logging.Log(Logging.LogType.Information, "Metadata Match", $"Applying DAT metadata - ${updater.SourceType}");
+
+                    item = await updater.ApplyDATMetadata(item);
+                }
+            }
+
             var finalise = async () =>
             {
                 // ensure there are tasks for this item
@@ -3330,7 +3343,7 @@ namespace hasheous_server.Classes
             Dictionary<string, object> dbDict = new Dictionary<string, object>();
             if (DataObjectId != null)
             {
-                sql = "SELECT Tags.id, Tags.`type`, Tags.`name`, DataObject_Tags.`AIAssigned` FROM `Tags` INNER JOIN `DataObject_Tags` ON `Tags`.`id` = `DataObject_Tags`.`TagId` WHERE `DataObject_Tags`.`DataObjectId`=@id ORDER BY `Tags`.`name`;";
+                sql = "SELECT Tags.id, Tags.`type`, Tags.`name`, DataObject_Tags.`AIAssigned`, `DataObject_Tags`.`MetadataSource`, `DataObject_Tags`.`MetadataSourceID` FROM `Tags` INNER JOIN `DataObject_Tags` ON `Tags`.`id` = `DataObject_Tags`.`TagId` WHERE `DataObject_Tags`.`DataObjectId`=@id ORDER BY `Tags`.`name`;";
                 dbDict.Add("id", DataObjectId);
             }
             DataTable data = await db.ExecuteCMDAsync(sql, dbDict);
@@ -3353,7 +3366,9 @@ namespace hasheous_server.Classes
                 {
                     Id = (long)row["id"],
                     Text = (string)row["name"],
-                    AIGenerated = row.Table.Columns.Contains("AIAssigned") && row["AIAssigned"] != DBNull.Value ? (bool)row["AIAssigned"] : false
+                    AIGenerated = row.Table.Columns.Contains("AIAssigned") && row["AIAssigned"] != DBNull.Value ? (bool)row["AIAssigned"] : false,
+                    MetadataSource = row.Table.Columns.Contains("MetadataSource") && row["MetadataSource"] != DBNull.Value ? (hasheous_server.Classes.Metadata.Communications.MetadataSources?)Convert.ToInt32(row["MetadataSource"]) : null,
+                    MetadataSourceID = row.Table.Columns.Contains("MetadataSourceID") && row["MetadataSourceID"] != DBNull.Value ? (long?)row["MetadataSourceID"] : null
                 });
             }
 

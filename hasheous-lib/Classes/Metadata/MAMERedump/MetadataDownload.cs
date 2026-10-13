@@ -2,6 +2,8 @@ using System.Runtime.CompilerServices;
 using Classes;
 using DATImport;
 using hasheous_server.Classes;
+using gaseous_signature_parser.models.RomSignatureObject;
+using hasheous_server.Models;
 
 namespace MAMERedump
 {
@@ -90,6 +92,18 @@ namespace MAMERedump
         {
             // Implement validation logic if needed
             return true; // No validation needed for MAMERedump metadata
+        }
+
+        /// <inheritdoc/>
+        public Task PostImport(HasheousRomSignatureObject ImportedObject)
+        {
+            return Task.CompletedTask;
+        }
+
+        /// <inheritdoc/>
+        public Task<DataObjectItem> ApplyDATMetadata(DataObjectItem TargetObject)
+        {
+            return Task.FromResult(TargetObject);
         }
     }
 }

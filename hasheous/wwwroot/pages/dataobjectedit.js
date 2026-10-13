@@ -383,7 +383,7 @@ async function loadData() {
                             if (tagValues[tagTypeKey]) {
                                 let selectedElement = document.getElementById('attribute' + dataObject.attributes[i].attributeName.toLowerCase() + 'select' + tagTypeKey);
                                 for (let t = 0; t < tagValues[tagTypeKey].tags.length; t++) {
-                                    if (tagValues[tagTypeKey].tags[t].aiGenerated == false) {
+                                    if (tagValues[tagTypeKey].tags[t].aiGenerated == false && tagValues[tagTypeKey].tags[t].metadataSource == null) {
                                         let tagOption = document.createElement('option');
                                         tagOption.value = tagValues[tagTypeKey].tags[t].text;
                                         tagOption.selected = 'selected';

@@ -382,16 +382,19 @@ function renderContent() {
 
                         for (const tag of tags[tagType].tags) {
                             hasTags = true;
+                            let tagText = tag.text;
                             let aiImage = '';
                             if (tag.aiGenerated) {
                                 aiImage = ' <img src="/images/ai.svg" class="banner_button_image aigeneratedicon" title="' + lang.getLang('aigeneratedtag') + '">';
                                 tagColour = ` style="background: linear-gradient(156deg,rgba(255, 0, 217, 1) 0px, rgba(255, 0, 208, 1) 10px, ${tagColourValue} 40px, ${tagColourValue} 100%);" `;
+                            } else if (tag.metadataSource != null) {
+                                tagText = tag.text;
                             }
 
                             if (tagOutput != '') {
                                 tagOutput += ' ';
                             }
-                            tagOutput += `<span class="badge badge-tag badge-tag-type-${tagType.toLowerCase()}" ${tagColour}>${aiImage} ${tag.text}</span>`;
+                            tagOutput += `<span class="badge badge-tag badge-tag-type-${tagType.toLowerCase()}" ${tagColour}>${aiImage} ${tagText}</span>`;
                         }
 
                         attributeValues.push(

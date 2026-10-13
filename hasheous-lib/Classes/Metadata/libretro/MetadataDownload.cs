@@ -1,3 +1,4 @@
+using System.Data;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
@@ -10,6 +11,8 @@ using gaseous_signature_parser.classes;
 using gaseous_signature_parser.classes.bracketparsers;
 using gaseous_signature_parser.models.RomSignatureObject;
 using hasheous_server.Classes;
+using hasheous_server.Classes.Metadata;
+using hasheous_server.Models;
 
 namespace libretro
 {
@@ -34,6 +37,8 @@ namespace libretro
         private static string GitDirectory { get; } = System.IO.Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_libretro, "libretro-database");
 
         private static string SourceName { get; } = "libretro";
+
+        private static string metadataExportPath = Path.Combine(Config.LibraryConfiguration.LibraryMetadataDirectory_libretro, "exported_metadata");
 
         /// <inheritdoc/>
         public async Task StageFiles()
@@ -162,9 +167,173 @@ namespace libretro
         }
 
         /// <inheritdoc/>
-        public Task PostImport()
+        public async Task PostImport(HasheousRomSignatureObject ImportedObject)
         {
-            throw new NotImplementedException();
+            // export the ImportedObject metadata to the appropriate location
+            if (!Directory.Exists(metadataExportPath))
+            {
+                Directory.CreateDirectory(metadataExportPath);
+            }
+
+            string metadataExportFilePath = Path.Combine(metadataExportPath, $"{ImportedObject.Name}.json");
+
+            if (File.Exists(metadataExportFilePath))
+            {
+                File.Delete(metadataExportFilePath);
+            }
+
+            await File.WriteAllTextAsync(metadataExportFilePath, Newtonsoft.Json.JsonConvert.SerializeObject(ImportedObject));
+        }
+
+        /// <inheritdoc/>
+        public async Task<DataObjectItem> ApplyDATMetadata(DataObjectItem TargetObject)
+        {
+            Console.WriteLine($"Applying DAT metadata to TargetObject: {TargetObject.Name}");
+
+            // libretro only works on game DataObjectItems
+            if (TargetObject.ObjectType != DataObjects.DataObjectType.Game)
+            {
+                {
+                    return TargetObject;
+                }
+            }
+
+            // remove all tags associated with this item before applying new metadata
+            string removeTagsSql = "DELETE FROM DataObject_Tags WHERE DataObjectId=@dataobjectid AND MetadataSource=@metadatasource;";
+            await Config.database.ExecuteCMDAsync(removeTagsSql, new Dictionary<string, object>
+            {
+                { "dataobjectid", TargetObject.Id },
+                { "metadatasource", Communications.MetadataSources.Libretro }
+            });
+
+            // remove all libretro tags from the tags attribute of the item
+            if (TargetObject.Attributes != null)
+            {
+                var tagsAttribute = TargetObject.Attributes.FirstOrDefault(a => a.attributeName == AttributeItem.AttributeName.Tags);
+                if (tagsAttribute != null && tagsAttribute.Value != null)
+                {
+                    Dictionary<hasheous_server.Models.DataObjectItemTags.TagType, DataObjectItemTags> tags = (Dictionary<hasheous_server.Models.DataObjectItemTags.TagType, DataObjectItemTags>)tagsAttribute.Value;
+                    foreach (var tagKey in tags.Keys.ToList())
+                    {
+                        foreach (var tag in tags[tagKey].Tags.ToList())
+                        {
+                            if (tag.MetadataSource == Communications.MetadataSources.Libretro)
+                            {
+                                tags[tagKey].Tags.Remove(tag);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // get all libretro signatures for the platform DataObject (if available)
+            foreach (var signature in TargetObject.SignatureDataObjects)
+            {
+                // check for a libretro file
+                if (!signature.ContainsKey("MetadataSource"))
+                {
+                    continue;
+                }
+
+                int signatureTypeId = Convert.ToInt32(signature["MetadataSource"]);
+
+                if (signatureTypeId != (int)SourceType)
+                {
+                    continue;
+                }
+
+                string libretroFile = Path.Combine(metadataExportPath, signature["Platform"] + ".json");
+                if (!File.Exists(libretroFile))
+                {
+                    continue;
+                }
+
+                string libretroJson = await File.ReadAllTextAsync(libretroFile);
+                HasheousRomSignatureObject? ImportedObject = Newtonsoft.Json.JsonConvert.DeserializeObject<HasheousRomSignatureObject>(libretroJson);
+                if (ImportedObject == null)
+                {
+                    continue;
+                }
+
+                // find the game with hasheous id
+                var game = ImportedObject.Games.FirstOrDefault(g => g.HasheousGameId == Convert.ToInt64(signature["SignatureId"]));
+                if (game == null)
+                {
+                    continue;
+                }
+
+                // check if this signature has a tag associated with it
+                if (!game.flags.ContainsKey("genre"))
+                {
+                    continue;
+                }
+
+                string? genre = game.flags["genre"].ToString();
+                if (string.IsNullOrWhiteSpace(genre))
+                {
+                    continue;
+                }
+
+                // normalise the tag
+                genre = genre.Trim().ToLower();
+
+                // get the existing tag id
+                long tagId = -1;
+                string tagSql = "SELECT `id` FROM Tags WHERE `type`=@type AND `name`=@name;";
+                DataTable tagDt = await Config.database.ExecuteCMDAsync(tagSql, new Dictionary<string, object>
+                {
+                    { "type", hasheous_server.Models.DataObjectItemTags.TagType.GameGenre },
+                    { "name", genre }
+                });
+                if (tagDt.Rows.Count == 0)
+                {
+                    // if the tag does not exist, create it and get the new ID
+                    string insertTagSql = "INSERT INTO Tags (`type`, `name`) VALUES (@type, @name); SELECT LAST_INSERT_ID();";
+                    DataTable insertTagDt = await Config.database.ExecuteCMDAsync(insertTagSql, new Dictionary<string, object>
+                    {
+                        { "type", hasheous_server.Models.DataObjectItemTags.TagType.GameGenre },
+                        { "name", genre }
+                    });
+                    if (insertTagDt.Rows.Count > 0)
+                    {
+                        tagId = Convert.ToInt64(insertTagDt.Rows[0][0]);
+                    }
+                }
+                else
+                {
+                    tagId = Convert.ToInt64(tagDt.Rows[0]["id"]);
+                }
+
+                if (tagId == -1)
+                {
+                    continue;
+                }
+
+                string sql = "SELECT * FROM DataObject_SignatureMap WHERE DataObjectTypeId=@datatypeid AND SignatureId=@gameid;";
+                DataTable dt = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object>
+                {
+                    { "datatypeid", DataObjects.DataObjectType.Game },
+                    { "gameid", game.HasheousGameId }
+                });
+
+                foreach (DataRow row in dt.Rows)
+                {
+                    // Update the metadata for each data object associated with this game
+                    long DataObjectId = (long)row["DataObjectId"];
+
+                    string insertMappingSql = "INSERT INTO DataObject_Tags (DataObjectId, TagId, AIAssigned, MetadataSource, MetadataSourceID) VALUES (@dataobjectid, @tagid, @aiassigned, @metadatasource, @metadatasourceid);";
+                    await Config.database.ExecuteCMDAsync(insertMappingSql, new Dictionary<string, object>
+                    {
+                        { "dataobjectid", DataObjectId },
+                        { "tagid", tagId },
+                        { "aiassigned", false },
+                        { "metadatasource", Communications.MetadataSources.Libretro },
+                        { "metadatasourceid", game.HasheousGameId }
+                    });
+                }
+            }
+
+            return TargetObject;
         }
     }
 }

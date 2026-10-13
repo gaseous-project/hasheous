@@ -2,7 +2,9 @@ using System.Data;
 using System.Runtime.CompilerServices;
 using Classes;
 using DATImport;
+using gaseous_signature_parser.models.RomSignatureObject;
 using hasheous_server.Classes;
+using hasheous_server.Models;
 
 namespace ScreenScraper
 {
@@ -40,14 +42,14 @@ namespace ScreenScraper
             string[] metadataFiles = Directory.GetFiles(cachePath, "*.json", SearchOption.AllDirectories);
 
             var parser = new gaseous_signature_parser.parser();
-            var xmlIngestor = new XML.XMLIngestor();
+            var xmlIngestor = new XML.XMLIngestor(this);
 
             foreach (string metadataFile in metadataFiles)
             {
                 try
                 {
                     // convert the game metadata to a signature object
-                    var signatureObject = parser.ParseSignatureDAT(metadataFile, Parser: gaseous_signature_parser.parser.SignatureParser.ScreenScraper);
+                    var signatureObject = HasheousRomSignatureObject.FromBase(parser.ParseSignatureDAT(metadataFile, Parser: gaseous_signature_parser.parser.SignatureParser.ScreenScraper));
                     if (signatureObject == null)
                     {
                         Logging.Log(Logging.LogType.Warning, "Fetch ScreenScraper", "Parsed metadata was null, skipping: " + metadataFile);
@@ -227,6 +229,20 @@ namespace ScreenScraper
         {
             // Implement validation logic if needed
             return true; // No validation needed for ScreenScraper metadata
+        }
+
+        /// <inheritdoc/>
+        public Task PostImport(HasheousRomSignatureObject ImportedObject)
+        {
+            // attach this signature to DataObjects with the corresponding metadata map
+
+            return Task.CompletedTask;
+        }
+
+        /// <inheritdoc/>
+        public Task<DataObjectItem> ApplyDATMetadata(DataObjectItem TargetObject)
+        {
+            return Task.FromResult(TargetObject);
         }
     }
 }

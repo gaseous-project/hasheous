@@ -1,3 +1,5 @@
+using hasheous_server.Models;
+
 namespace DATImport
 {
     public interface IDATFileImport
@@ -37,6 +39,13 @@ namespace DATImport
         /// Perform any post-import steps after the import has been completed. This may involve cleaning up temporary files, updating metadata, or performing any necessary finalization tasks. The implementation of this method should handle any necessary post-import operations to ensure the import process is properly concluded.
         /// </summary>
         /// <returns>A task that represents the asynchronous post-import operation.</returns>
-        public Task PostImport();
+        public Task PostImport(HasheousRomSignatureObject ImportedObject);
+
+        /// <summary>
+        /// Apply the metadata from the specified DAT source to the relevant DataObject. This may involve updating existing metadata or adding new metadata based on the information provided by the DAT source. The implementation of this method should handle any necessary operations to ensure the metadata is correctly applied.
+        /// </summary>
+        /// <param name="TargetObject">The data object to which the metadata should be applied.</param>
+        /// <returns>A task that represents the asynchronous operation of applying the metadata.</returns>
+        public Task<DataObjectItem> ApplyDATMetadata(DataObjectItem TargetObject);
     }
 }

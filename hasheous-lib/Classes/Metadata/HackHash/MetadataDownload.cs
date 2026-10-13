@@ -2,7 +2,9 @@ using System.IO.Compression;
 using System.Runtime.CompilerServices;
 using Classes;
 using DATImport;
+using gaseous_signature_parser.models.RomSignatureObject;
 using hasheous_server.Classes;
+using hasheous_server.Models;
 
 namespace HackHash
 {
@@ -83,6 +85,18 @@ namespace HackHash
         public async Task<bool> ValidateFiles()
         {
             return true; // Always valid for HackHash metadata
+        }
+
+        /// <inheritdoc/>
+        public Task PostImport(HasheousRomSignatureObject ImportedObject)
+        {
+            return Task.CompletedTask;
+        }
+
+        /// <inheritdoc/>
+        public Task<DataObjectItem> ApplyDATMetadata(DataObjectItem TargetObject)
+        {
+            return Task.FromResult(TargetObject);
         }
     }
 }

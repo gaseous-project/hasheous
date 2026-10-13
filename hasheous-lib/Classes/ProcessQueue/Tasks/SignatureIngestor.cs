@@ -78,7 +78,7 @@ namespace Classes.ProcessQueue
             }
 
             // files should now be in the appropriate signatures directory for importing into the database
-            XML.XMLIngestor tIngest = new XML.XMLIngestor();
+            XML.XMLIngestor tIngest = new XML.XMLIngestor(importer);
 
             string SignaturePath = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesDirectory, importer.SourceType.ToString());
 

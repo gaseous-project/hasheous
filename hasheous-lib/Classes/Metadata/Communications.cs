@@ -161,67 +161,72 @@ namespace hasheous_server.Classes.Metadata
             /// <summary>
             /// None - always returns null for metadata requests - should not really be using this source
             /// </summary>
-            None,
+            None = 0,
 
             /// <summary>
             /// IGDB - queries the IGDB service for metadata
             /// </summary>
-            IGDB,
+            IGDB = 1,
 
             /// <summary>
             /// TheGamesDb - queries TheGamesDb service for metadata
             /// </summary>
-            TheGamesDb,
+            TheGamesDb = 2,
 
             /// <summary>
             /// RetroAchievements - queries RetroAchievements service for metadata
             /// </summary>
-            RetroAchievements,
+            RetroAchievements = 3,
 
             /// <summary>
             /// GiantBomb - queries GiantBomb service for metadata
             /// </summary>
-            GiantBomb,
+            GiantBomb = 4,
 
             /// <summary>
             /// Steam - queries Steam service for metadata
             /// </summary>
-            Steam,
+            Steam = 5,
 
             /// <summary>
             /// GOG - queries GOG service for metadata
             /// </summary>
-            GOG,
+            GOG = 6,
 
             /// <summary>
             /// EpicGameStore - queries Epic Game Store service for metadata
             /// </summary>
-            EpicGameStore,
+            EpicGameStore = 7,
 
             /// <summary>
             /// Wikipedia - queries Wikipedia service for metadata
             /// </summary>
-            Wikipedia,
+            Wikipedia = 8,
 
             /// <summary>
             /// SteamGridDb - queries SteamGridDb service for metadata
             /// </summary>
-            SteamGridDb,
+            SteamGridDb = 9,
 
             /// <summary>
             /// ScreenScraper - queries ScreenScraper service for metadata
             /// </summary>
-            ScreenScraper,
+            ScreenScraper = 10,
 
             /// <summary>
             /// LaunchBox - queries LaunchBox Metadata.xml file for metadata
             /// </summary>
-            LaunchBox,
+            LaunchBox = 11,
 
             /// <summary>
             /// MobyGames - queries MobyGames service for metadata
             /// </summary>
-            MobyGames
+            MobyGames = 12,
+
+            /// <summary>
+            /// Libretro - queries Libretro service for metadata
+            /// </summary>
+            Libretro = 13
         }
 
         /// <summary>

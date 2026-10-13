@@ -1,5 +1,7 @@
 using System.Runtime.CompilerServices;
 using DATImport;
+using gaseous_signature_parser.models.RomSignatureObject;
+using hasheous_server.Models;
 
 namespace Generic
 {
@@ -33,6 +35,18 @@ namespace Generic
         public async Task<bool> ValidateFiles()
         {
             return true; // Always valid for Generic metadata
+        }
+
+        /// <inheritdoc/>
+        public Task PostImport(HasheousRomSignatureObject ImportedObject)
+        {
+            return Task.CompletedTask;
+        }
+
+        /// <inheritdoc/>
+        public Task<DataObjectItem> ApplyDATMetadata(DataObjectItem TargetObject)
+        {
+            return Task.FromResult(TargetObject);
         }
     }
 }
