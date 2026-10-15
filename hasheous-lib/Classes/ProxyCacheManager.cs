@@ -285,11 +285,11 @@ namespace Classes
                 filesLocal += fl;
                 bytesLocal += bl;
 
-                // Run Tier 2 (S3) maintenance for the same source prefix.
-                Logging.Log(Logging.LogType.Information, "ProxyCacheManager", $"Running S3 maintenance for source key: {sourceKey}");
-                var (filesS3ForSource, bytesS3ForSource) = await RunS3MaintenanceAsync(sourceKey, tier2Config, cancellationToken);
-                filesS3 += filesS3ForSource;
-                bytesS3 += bytesS3ForSource;
+                // // Run Tier 2 (S3) maintenance for the same source prefix.
+                // Logging.Log(Logging.LogType.Information, "ProxyCacheManager", $"Running S3 maintenance for source key: {sourceKey}");
+                // var (filesS3ForSource, bytesS3ForSource) = await RunS3MaintenanceAsync(sourceKey, tier2Config, cancellationToken);
+                // filesS3 += filesS3ForSource;
+                // bytesS3 += bytesS3ForSource;
             }
 
             return (filesLocal, filesS3, bytesLocal, bytesS3);
