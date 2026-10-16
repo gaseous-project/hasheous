@@ -227,7 +227,7 @@ namespace Classes
         // ===== MAINTENANCE =====
 
         /// <summary>
-        /// Runs cache maintenance for all policies and tiers.
+        /// Runs local cache maintenance for all policies. S3 cleanup is managed by bucket lifecycle policies.
         /// Returns (FilesDeletedLocal, FilesDeletedS3, BytesFreedLocal, BytesFreedS3).
         /// </summary>
         public static async Task<(long FilesLocal, long FilesS3, long BytesLocal, long BytesS3)> RunMaintenanceAsync(
@@ -266,7 +266,7 @@ namespace Classes
         }
 
         /// <summary>
-        /// Runs maintenance for a specific policy (all tiers).
+        /// Runs local-disk maintenance for a specific policy.
         /// </summary>
         private static async Task<(long FilesLocal, long FilesS3, long BytesLocal, long BytesS3)> RunPolicyMaintenanceAsync(
             CachePolicyType policyType,
@@ -285,11 +285,7 @@ namespace Classes
                 filesLocal += fl;
                 bytesLocal += bl;
 
-                // Run Tier 2 (S3) maintenance for the same source prefix.
-                Logging.Log(Logging.LogType.Information, "ProxyCacheManager", $"Running S3 maintenance for source key: {sourceKey}");
-                var (filesS3ForSource, bytesS3ForSource) = await RunS3MaintenanceAsync(sourceKey, tier2Config, cancellationToken);
-                filesS3 += filesS3ForSource;
-                bytesS3 += bytesS3ForSource;
+                // S3 cleanup is intentionally disabled; configure lifecycle policies on the bucket.
             }
 
             return (filesLocal, filesS3, bytesLocal, bytesS3);
