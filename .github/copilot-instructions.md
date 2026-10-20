@@ -61,10 +61,10 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Rate-limit profile matching supports `remote-ip`, `origin`, `user-agent`, `path`, `method`, `user-id`, `user-roles`, and `header:<name>` partition keys, and rule matches use wildcard-safe pattern parsing rather than raw regex injection.
   - S3 config (`Config.S3StorageConfiguration`): `Enabled`, `Region`, `ServiceUrl`, `AccessKey`, `SecretKey`, `SessionToken`, `ForcePathStyle`, `DefaultBucket`.
   - Tiered cache policy config (`Config.CachePolicies` / config field `Policies`) controls proxy cache retention by content type and storage tier:
-    - `Media`: local tier defaults to size-only retention; S3 tier defaults to 2-year max age.
-    - `Bundles`: local and S3 tiers default to 90-day max age.
+    - `Media`: local tier defaults to size-only retention; configured S3 tier defaults are not enforced by application maintenance.
+    - `Bundles`: local tier defaults to 90-day max age; configured S3 tier defaults are not enforced by application maintenance.
     - `MinFreeDiskSpaceBytes` on local tiers triggers eviction even when size is under target if disk free space is low.
-    - S3 Tier 2 maintenance lists objects under each source prefix, removes objects older than `MaxAgeDays`, then evicts oldest remaining objects when the prefix exceeds `MaxSizeBytes`. Set `MaxAgeDays` to `null` and `MaxSizeBytes` to a sufficiently large positive value to disable policy cleanup.
+    - Application-managed S3 cache maintenance is disabled. Configure bucket lifecycle/expiration policies directly in S3 for object retention and cleanup; do not rely on `MaxAgeDays` or `MaxSizeBytes` for S3 cleanup.
   - S3 env vars: `s3enabled`, `s3region`, `s3serviceurl`, `s3accesskey`, `s3secretkey`, `s3sessiontoken`, `s3forcepathstyle`.
   - Supporter recognition env vars: `opencollectiveclientid`, `opencollectiveclientsecret`, `opencollectiveapitoken`, `opencollectivecollectiveslug`.
   - For MinIO and similar S3-compatible endpoints, use host-only `ServiceUrl` (for example `https://s3.mrgtech.net`) and typically set `ForcePathStyle = true`.
@@ -140,7 +140,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Add/adjust scheduled tasks in `service-orchestrator/Program.cs` under `QueueProcessor.QueueItems` (e.g., `FetchIGDBMetadata`, timings are minutes).
   - GiantBomb: when `Config.GiantBomb.APIKey` is present a `FetchGiantBombMetadata` job is queued (default 10080 minutes / 7 days) to refresh GiantBomb platform/game/image data.
   - ScreenScraper: `FetchScreenScraperMetadata` is queued every 1440 minutes (24 hours). It reads cached metadata JSON under `Config.LibraryConfiguration.LibraryMetadataDirectory_Screenscraper/games` and imports records through `XML.XMLIngestor.ImportDatRecord(...)`.
-  - Hourly maintenance now runs proxy cache policy maintenance via `ProxyCacheManager.RunMaintenanceAsync()` (tiered LRU/age eviction for local and S3 cache tiers).
+  - Hourly maintenance runs proxy cache policy maintenance via `ProxyCacheManager.RunMaintenanceAsync()` for local-disk cleanup only. S3 object cleanup is disabled; manage retention with lifecycle policies on the S3 bucket.
   - Queue task refactor: obsolete blocking entries `GetMissingArtwork` and `MetadataMatchSearch` were removed from metadata fetch task `Blocks` lists. Don’t rely on them for future coordination.
   - Supporter recognition sync is scheduled through `QueueItemType.SyncSupporterStatus` in `service-orchestrator/Program.cs`; wire new provider sync tasks through both `hasheous-lib/Classes/ProcessQueue/ProcessQueue.cs` and `service-host/Program.cs`.
   - Data object metadata guard: `DataObjects.DataObjectMetadataSearch(objectType, id?, ForceSearch)` uses an atomic file lock under `~/.hasheous-server/Data/Metadata/Hasheous/DataObjectFlags`, keyed by object type and object ID, so batch and single-object searches contend on the same object lock.
