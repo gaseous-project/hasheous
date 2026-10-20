@@ -698,3 +698,13 @@ let tagTypes = {
     11: "PlatformInputMethod",
     1000: "Default"
 }
+
+let metadataSources = {
+    "libretro": {
+        "providesDat": true,
+        "providesMetadata": true,
+        "image": "libretro.png",
+        "tagClass": "sourceiconsmall",
+        "cssColour": "var(--signature-source-color-libretro)"
+    }
+}
