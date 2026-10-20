@@ -297,6 +297,12 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
   - MAME Mess: `MAME MESS/`
   - Redump: `Redump/`
 
+  ## Libretro signature import
+  - Importer: `hasheous-lib/Classes/Metadata/libretro/MetadataDownload.cs` (`DownloadManager`), registered with `SignatureIngestor` through a module initializer.
+  - The shared DAT importer registry creates its signature-ingestion queue item; do not add a duplicate schedule or dispatcher entry for this importer. It refreshes every 10080 minutes (7 days).
+  - Staging refreshes `https://github.com/libretro/libretro-database.git` (`master`) under `LibraryMetadataDirectory_libretro`, then copies a curated set of DAT files and matching metadata DATs from the repository's `dat/` and `metadat/` directories into `LibrarySignaturesDirectory/libretro/`.
+  - Post-import data is exported under `LibraryMetadataDirectory_libretro/exported_metadata/`. `ApplyDATMetadata(...)` applies Libretro `flags.genre` values as `GameGenre` tags to matching game objects, replacing existing tags assigned by Libretro.
+
 ## Redump metadata
 - Downloader class: `hasheous-lib/Classes/Metadata/Redump/MetadataDownload.cs`.
 - Redump host migration: use `https://redump.info` as the base host (`BaseUrl`) and `https://redump.info/downloads/` for platform listing.
@@ -454,6 +460,7 @@ Additional example (rating boards):
 - Background metadata searches must remain concurrent per source: use unique per-run `jobId` values, keep the wait guard short, and only finalise after all child tasks finish instead of serialising the work behind a single provider call.
 - Task worker polling depends on the `Task_Queue` status/client/start-time index and the `UPDATE ... WHERE id IN (SELECT ... FOR UPDATE SKIP LOCKED)` + equality `SELECT` pattern; changing those fields without keeping the same transaction shape can trigger command timeouts under concurrent client polling.
 - When adding or updating a metadata source, include the orchestrator schedule, the shared queue dispatcher, the service-host wiring, UI source colors/localisation, and any public route/auth changes in the same change so the stack remains coherent.
+- DAT importers implementing `IDATFileImport` are registered with `SignatureIngestor` and scheduled through its generated queue items; follow that registry path instead of adding a separate orchestrator schedule or duplicate task wiring.
 - Members may create Apps. Deleting an App remains limited to callers with its ACL `Delete` permission.
 - `POST /api/v1/DataObjects/app/{Id}/ClientApiKeys` requires `AgreeToTerms=true` before creating a client API key.
 
