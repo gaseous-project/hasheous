@@ -65,5 +65,29 @@ namespace DATImport
 
             return queueItems;
         }
+
+        public enum SignatureType
+        {
+            // reimplement source types from gaseous_signature_parser.parser.SignatureParser
+
+            TOSEC = gaseous_signature_parser.parser.SignatureParser.TOSEC,
+            MAMEArcade = gaseous_signature_parser.parser.SignatureParser.MAMEArcade,
+            MAMEMess = gaseous_signature_parser.parser.SignatureParser.MAMEMess,
+            NoIntro = gaseous_signature_parser.parser.SignatureParser.NoIntro,
+            Redump = gaseous_signature_parser.parser.SignatureParser.Redump,
+            WHDLoad = gaseous_signature_parser.parser.SignatureParser.WHDLoad,
+            RetroAchievements = gaseous_signature_parser.parser.SignatureParser.RetroAchievements,
+            FBNeo = gaseous_signature_parser.parser.SignatureParser.FBNeo,
+            PureDOSDAT = gaseous_signature_parser.parser.SignatureParser.PureDOSDAT,
+            Pleasuredome = gaseous_signature_parser.parser.SignatureParser.Pleasuredome,
+            MAMERedump = gaseous_signature_parser.parser.SignatureParser.MAMERedump,
+            eXo = gaseous_signature_parser.parser.SignatureParser.eXo,
+            HackHash = gaseous_signature_parser.parser.SignatureParser.HackHash,
+            Generic = gaseous_signature_parser.parser.SignatureParser.Generic,
+            TotalDOSCollection = gaseous_signature_parser.parser.SignatureParser.TotalDOSCollection,
+            libretro = gaseous_signature_parser.parser.SignatureParser.libretro,
+            ScreenScraper = gaseous_signature_parser.parser.SignatureParser.ScreenScraper,
+            Unknown = gaseous_signature_parser.parser.SignatureParser.Unknown
+        }
     }
 }

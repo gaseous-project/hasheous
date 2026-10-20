@@ -1,7 +1,9 @@
 using System.Runtime.CompilerServices;
 using Classes;
 using DATImport;
+using gaseous_signature_parser.models.RomSignatureObject;
 using hasheous_server.Classes;
+using hasheous_server.Models;
 
 namespace FBNEO
 {
@@ -11,7 +13,7 @@ namespace FBNEO
         public static void RegisterImporter() => SignatureIngestor.Register<DownloadManager>();
 
         /// <inheritdoc/>
-        public gaseous_signature_parser.parser.SignatureParser SourceType => gaseous_signature_parser.parser.SignatureParser.FBNeo;
+        public DATImport.SignatureIngestor.SignatureType SourceType => DATImport.SignatureIngestor.SignatureType.FBNeo;
 
         /// <inheritdoc/>
         public int Interval => 10080; // 7 days in minutes
@@ -85,6 +87,18 @@ namespace FBNEO
         {
             // Implement validation logic if needed
             return true; // No validation needed for FBNEO metadata
+        }
+
+        /// <inheritdoc/>
+        public Task PostImport(HasheousRomSignatureObject ImportedObject)
+        {
+            return Task.CompletedTask;
+        }
+
+        /// <inheritdoc/>
+        public Task<DataObjectItem> ApplyDATMetadata(DataObjectItem TargetObject)
+        {
+            return Task.FromResult(TargetObject);
         }
     }
 }

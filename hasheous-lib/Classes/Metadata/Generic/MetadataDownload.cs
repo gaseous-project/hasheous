@@ -1,5 +1,7 @@
 using System.Runtime.CompilerServices;
 using DATImport;
+using gaseous_signature_parser.models.RomSignatureObject;
+using hasheous_server.Models;
 
 namespace Generic
 {
@@ -9,7 +11,7 @@ namespace Generic
         public static void RegisterImporter() => SignatureIngestor.Register<DownloadManager>();
 
         /// <inheritdoc/>
-        public gaseous_signature_parser.parser.SignatureParser SourceType => gaseous_signature_parser.parser.SignatureParser.Generic;
+        public DATImport.SignatureIngestor.SignatureType SourceType => DATImport.SignatureIngestor.SignatureType.Generic;
 
         /// <inheritdoc/>
         public int Interval => 10080; // 7 days in minutes
@@ -33,6 +35,18 @@ namespace Generic
         public async Task<bool> ValidateFiles()
         {
             return true; // Always valid for Generic metadata
+        }
+
+        /// <inheritdoc/>
+        public Task PostImport(HasheousRomSignatureObject ImportedObject)
+        {
+            return Task.CompletedTask;
+        }
+
+        /// <inheritdoc/>
+        public Task<DataObjectItem> ApplyDATMetadata(DataObjectItem TargetObject)
+        {
+            return Task.FromResult(TargetObject);
         }
     }
 }

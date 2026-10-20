@@ -2,7 +2,9 @@ using System.IO.Compression;
 using System.Runtime.CompilerServices;
 using Classes;
 using DATImport;
+using gaseous_signature_parser.models.RomSignatureObject;
 using hasheous_server.Classes;
+using hasheous_server.Models;
 
 namespace HackHash
 {
@@ -12,7 +14,7 @@ namespace HackHash
         public static void RegisterImporter() => SignatureIngestor.Register<DownloadManager>();
 
         /// <inheritdoc/>
-        public gaseous_signature_parser.parser.SignatureParser SourceType => gaseous_signature_parser.parser.SignatureParser.HackHash;
+        public DATImport.SignatureIngestor.SignatureType SourceType => DATImport.SignatureIngestor.SignatureType.HackHash;
 
         /// <inheritdoc/>
         public int Interval => 10080; // 7 days in minutes
@@ -83,6 +85,18 @@ namespace HackHash
         public async Task<bool> ValidateFiles()
         {
             return true; // Always valid for HackHash metadata
+        }
+
+        /// <inheritdoc/>
+        public Task PostImport(HasheousRomSignatureObject ImportedObject)
+        {
+            return Task.CompletedTask;
+        }
+
+        /// <inheritdoc/>
+        public Task<DataObjectItem> ApplyDATMetadata(DataObjectItem TargetObject)
+        {
+            return Task.FromResult(TargetObject);
         }
     }
 }

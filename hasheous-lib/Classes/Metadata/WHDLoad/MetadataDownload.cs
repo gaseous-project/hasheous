@@ -4,7 +4,9 @@ using System.Text.Json;
 using System.Xml;
 using Classes;
 using DATImport;
+using gaseous_signature_parser.models.RomSignatureObject;
 using hasheous_server.Classes;
+using hasheous_server.Models;
 
 namespace WHDLoad
 {
@@ -14,7 +16,7 @@ namespace WHDLoad
         public static void RegisterImporter() => SignatureIngestor.Register<DownloadManager>();
 
         /// <inheritdoc/>
-        public gaseous_signature_parser.parser.SignatureParser SourceType => gaseous_signature_parser.parser.SignatureParser.WHDLoad;
+        public DATImport.SignatureIngestor.SignatureType SourceType => DATImport.SignatureIngestor.SignatureType.WHDLoad;
 
         /// <inheritdoc/>
         public int Interval => 10080; // 7 days in minutes
@@ -196,6 +198,18 @@ namespace WHDLoad
         {
             // Implement validation logic if needed
             return true; // No validation needed for WHDLoad metadata
+        }
+
+        /// <inheritdoc/>
+        public Task PostImport(HasheousRomSignatureObject ImportedObject)
+        {
+            return Task.CompletedTask;
+        }
+
+        /// <inheritdoc/>
+        public Task<DataObjectItem> ApplyDATMetadata(DataObjectItem TargetObject)
+        {
+            return Task.FromResult(TargetObject);
         }
     }
 }

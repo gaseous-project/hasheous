@@ -1,7 +1,9 @@
 using System.Runtime.CompilerServices;
 using Classes;
 using DATImport;
+using gaseous_signature_parser.models.RomSignatureObject;
 using hasheous_server.Classes;
+using hasheous_server.Models;
 
 namespace TOSEC
 {
@@ -11,7 +13,7 @@ namespace TOSEC
         public static void RegisterImporter() => SignatureIngestor.Register<DownloadManager>();
 
         /// <inheritdoc/>
-        public gaseous_signature_parser.parser.SignatureParser SourceType => gaseous_signature_parser.parser.SignatureParser.TOSEC;
+        public DATImport.SignatureIngestor.SignatureType SourceType => DATImport.SignatureIngestor.SignatureType.TOSEC;
 
         /// <inheritdoc/>
         public int Interval => 10080; // 7 days in minutes
@@ -146,6 +148,18 @@ namespace TOSEC
         {
             // Implement validation logic if needed
             return true; // No validation needed for TOSEC metadata
+        }
+
+        /// <inheritdoc/>
+        public Task PostImport(HasheousRomSignatureObject ImportedObject)
+        {
+            return Task.CompletedTask;
+        }
+
+        /// <inheritdoc/>
+        public Task<DataObjectItem> ApplyDATMetadata(DataObjectItem TargetObject)
+        {
+            return Task.FromResult(TargetObject);
         }
     }
 }

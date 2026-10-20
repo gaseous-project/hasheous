@@ -27,7 +27,7 @@ namespace Classes.ProcessQueue
             }
 
             // check the importer type
-            if (importer.SourceType == gaseous_signature_parser.parser.SignatureParser.Unknown || importer.SourceType == gaseous_signature_parser.parser.SignatureParser.Auto)
+            if (importer.SourceType == DATImport.SignatureIngestor.SignatureType.Unknown)
             {
                 return null; // Invalid importer type, nothing to process
             }
@@ -78,7 +78,7 @@ namespace Classes.ProcessQueue
             }
 
             // files should now be in the appropriate signatures directory for importing into the database
-            XML.XMLIngestor tIngest = new XML.XMLIngestor();
+            XML.XMLIngestor tIngest = new XML.XMLIngestor(importer);
 
             string SignaturePath = Path.Combine(Config.LibraryConfiguration.LibrarySignaturesDirectory, importer.SourceType.ToString());
 

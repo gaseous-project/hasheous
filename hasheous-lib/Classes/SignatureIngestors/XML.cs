@@ -8,6 +8,7 @@ using System.Threading;
 using Classes;
 using gaseous_signature_parser.models.RomSignatureObject;
 using hasheous_server.Classes.Metadata.IGDB;
+using hasheous_server.Models;
 using Microsoft.CodeAnalysis;
 using MySqlConnector;
 
@@ -19,6 +20,13 @@ namespace XML
     /// </summary>
     public class XMLIngestor
     {
+        private DATImport.IDATFileImport _datImporter;
+
+        public XMLIngestor(DATImport.IDATFileImport DATImporter)
+        {
+            _datImporter = DATImporter;
+        }
+
         private sealed class ImportLookupCache
         {
             public ConcurrentDictionary<string, int> CountryIdsByCode { get; } = GlobalCountryIdsByCode;
@@ -96,15 +104,25 @@ namespace XML
         /// </summary>
         /// <param name="SearchPath">The directory path containing XML/DAT files to process.</param>
         /// <param name="XMLType">The type of signature parser to use (e.g., NoIntro, TOSEC, MAME).</param>
-        public async Task Import(string SearchPath, gaseous_signature_parser.parser.SignatureParser XMLType)
+        public async Task Import(string SearchPath, DATImport.SignatureIngestor.SignatureType XMLType)
         {
             Logging.Log(Logging.LogType.Information, "Signature Ingest", "Starting import of " + XMLType.ToString() + " signature files from: " + SearchPath);
 
             string? XMLDBSearchPath = null;
-            if (XMLType == gaseous_signature_parser.parser.SignatureParser.NoIntro)
+            bool getDbPathContents = false;
+            switch (XMLType)
             {
-                XMLDBSearchPath = Path.Combine(SearchPath, "DB");
-                SearchPath = Path.Combine(SearchPath, "DAT");
+                case DATImport.SignatureIngestor.SignatureType.NoIntro:
+                    XMLDBSearchPath = Path.Combine(SearchPath, "DB");
+                    SearchPath = Path.Combine(SearchPath, "DAT");
+                    getDbPathContents = true;
+                    break;
+
+                case DATImport.SignatureIngestor.SignatureType.libretro:
+                    XMLDBSearchPath = Path.Combine(SearchPath, "metadat");
+                    SearchPath = Path.Combine(SearchPath, "dat");
+                    getDbPathContents = true;
+                    break;
             }
 
             List<string> supportedFileTypes = new List<string> { ".xml", ".dat" };
@@ -119,14 +137,17 @@ namespace XML
             Array.Sort(PathContents);
 
             string[]? DBPathContents = null;
-            if (XMLDBSearchPath != null)
+            if (getDbPathContents)
             {
-                if (!Directory.Exists(XMLDBSearchPath))
+                if (XMLDBSearchPath != null)
                 {
-                    Directory.CreateDirectory(XMLDBSearchPath);
-                }
+                    if (!Directory.Exists(XMLDBSearchPath))
+                    {
+                        Directory.CreateDirectory(XMLDBSearchPath);
+                    }
 
-                DBPathContents = Directory.GetFiles(XMLDBSearchPath);
+                    DBPathContents = Directory.GetFiles(XMLDBSearchPath);
+                }
             }
 
             DateTime now = DateTime.UtcNow;
@@ -155,7 +176,7 @@ namespace XML
             await PruneOldSources(XMLType, now);
         }
 
-        private async Task ProcessDatFile(string XMLFile, string? XMLDBSearchPath, string[]? DBPathContents, gaseous_signature_parser.parser.SignatureParser XMLType, DateTime now, bool hasMigratedOldSignatureGameNamesToSortingName)
+        private async Task ProcessDatFile(string XMLFile, string? XMLDBSearchPath, string[]? DBPathContents, DATImport.SignatureIngestor.SignatureType XMLType, DateTime now, bool hasMigratedOldSignatureGameNamesToSortingName)
         {
             string sql = "";
             Dictionary<string, object> dbDict = new Dictionary<string, object>();
@@ -167,7 +188,7 @@ namespace XML
             {
                 switch (XMLType)
                 {
-                    case gaseous_signature_parser.parser.SignatureParser.NoIntro:
+                    case DATImport.SignatureIngestor.SignatureType.NoIntro:
                         if (DBPathContents == null)
                         {
                             break;
@@ -183,14 +204,26 @@ namespace XML
                             }
                         }
                         break;
+
+                    case DATImport.SignatureIngestor.SignatureType.libretro:
+                        DBFile = XMLDBSearchPath;
+                        break;
                 }
             }
 
             try
             {
                 // start parsing file
-                gaseous_signature_parser.parser Parser = new gaseous_signature_parser.parser();
-                RomSignatureObject Object = Parser.ParseSignatureDAT(XMLFile, DBFile, XMLType);
+                HasheousRomSignatureObject Object;
+                if ((long)XMLType < 1000)
+                {
+                    gaseous_signature_parser.parser Parser = new gaseous_signature_parser.parser();
+                    Object = HasheousRomSignatureObject.FromBase(Parser.ParseSignatureDAT(XMLFile, DBFile, (gaseous_signature_parser.parser.SignatureParser)XMLType));
+                }
+                else
+                {
+                    throw new Exception("Unsupported XML type code: " + XMLType);
+                }
 
                 // store source object
                 bool processGames = false;
@@ -242,6 +275,8 @@ namespace XML
 
                         sourceId = Convert.ToInt32(sigDB.Rows[0]["Id"]);
                     }
+
+                    Object.HasheousSourceId = sourceId;
 
                     #region "Migrate old signature game names to sortingname"
                     if (hasMigratedOldSignatureGameNamesToSortingName == false)
@@ -427,7 +462,7 @@ namespace XML
                                         lastReportedGameIndex = gameIndex;
                                     }
 
-                                    await ImportDatRecordInternal(Object.Games[gameIndex], now, sourceId, XMLType, lookupCache);
+                                    Object.Games[gameIndex] = await ImportDatRecordInternal(Object.Games[gameIndex], now, sourceId, XMLType, lookupCache);
                                 }
                             }
 
@@ -439,6 +474,16 @@ namespace XML
 
                             await Task.WhenAll(workers);
                         }
+
+                        // run post DAT import tasks
+                        try
+                        {
+                            await _datImporter.PostImport(Object);
+                        }
+                        catch (NotImplementedException ex)
+                        {
+                            // silently swallow this exception
+                        }
                     }
                 }
             }
@@ -448,7 +493,7 @@ namespace XML
             }
         }
 
-        private async Task PruneOldSources(gaseous_signature_parser.parser.SignatureParser XMLType, DateTime now)
+        private async Task PruneOldSources(DATImport.SignatureIngestor.SignatureType XMLType, DateTime now)
         {
             // get the most recent source entries for this XML type - anything with a processed_at value of now should be kept - everything else should be removed
             // this is the "safe" sources list - these should be kept - anything not in this list should be removed
@@ -501,12 +546,13 @@ namespace XML
         /// <param name="sourceId">The ID of the source from which the game data originates.</param>
         /// <param name="XMLType">The type of XML/DAT file being processed.</param>
         /// <returns></returns>
-        public async Task ImportDatRecord(RomSignatureObject.Game gameObject, DateTime now, int sourceId, gaseous_signature_parser.parser.SignatureParser XMLType)
+        public async Task<HasheousRomSignatureObject.Game> ImportDatRecord(HasheousRomSignatureObject.Game gameObject, DateTime now, int sourceId, DATImport.SignatureIngestor.SignatureType XMLType)
         {
-            await ImportDatRecordInternal(gameObject, now, sourceId, XMLType, await LoadImportLookupCacheAsync());
+            gameObject = await ImportDatRecordInternal(gameObject, now, sourceId, XMLType, await LoadImportLookupCacheAsync());
+            return gameObject;
         }
 
-        private async Task ImportDatRecordInternal(RomSignatureObject.Game gameObject, DateTime now, int sourceId, gaseous_signature_parser.parser.SignatureParser XMLType, ImportLookupCache lookupCache)
+        private async Task<HasheousRomSignatureObject.Game> ImportDatRecordInternal(HasheousRomSignatureObject.Game gameObject, DateTime now, int sourceId, DATImport.SignatureIngestor.SignatureType XMLType, ImportLookupCache lookupCache)
         {
             // Per-record sets avoid cross-worker mutation when processing games concurrently.
             HashSet<int> gameCountries = new HashSet<int>();
@@ -633,6 +679,7 @@ namespace XML
                 dbDict.Add("gameid", gameId);
                 await Config.database.ExecuteCMDAsync(gameSourceSql, dbDict);
             }
+            gameObject.HasheousGameId = gameId;
 
             // insert countries
             foreach (int gameCountry in gameCountries)
@@ -679,23 +726,28 @@ namespace XML
             }
 
             // store rom
-            foreach (RomSignatureObject.Game.Rom romObject in gameObject.Roms)
+            foreach (HasheousRomSignatureObject.Game.Rom romObject in gameObject.Roms)
             {
                 if (romObject.Md5 != null || romObject.Sha1 != null || romObject.Sha256 != null || romObject.Crc != null)
                 {
+                    if (romObject.Crc == "8FC4E6D0")
+                    {
+                        Console.WriteLine("Found rom with CRC 8FC4E6D0 for game id: " + gameId);
+                    }
+
                     long romId = 0;
                     sql = "SELECT `Id`, `IngestorVersion` FROM Signatures_Roms WHERE `GameId`=@gameid AND ((`MD5`=@md5 AND `SHA1`=@sha1 AND `SHA256`=@sha256 AND `CRC`=@crc AND `IngestorVersion`=3) OR (`MD5`=@md5 AND `SHA1`=@sha1 AND `IngestorVersion`<=2)) LIMIT 1;";
                     dbDict = new Dictionary<string, object>
-                                {
-                                    { "gameid", gameId },
-                                    { "name", Common.ReturnValueIfNull(romObject.Name, "") },
-                                    { "size", Common.ReturnValueIfNull(romObject.Size, 0) },
-                                    { "crc", (Convert.ToString(Common.ReturnValueIfNull(romObject.Crc, "")) ?? "").ToLowerInvariant() },
-                                    { "md5", (Convert.ToString(Common.ReturnValueIfNull(romObject.Md5, "")) ?? "").ToLowerInvariant() },
-                                    { "sha1", (Convert.ToString(Common.ReturnValueIfNull(romObject.Sha1, "")) ?? "").ToLowerInvariant() },
-                                    { "sha256", (Convert.ToString(Common.ReturnValueIfNull(romObject.Sha256, "")) ?? "").ToLowerInvariant() },
-                                    { "developmentstatus", Common.ReturnValueIfNull(romObject.DevelopmentStatus, "") }
-                                };
+                    {
+                        { "gameid", gameId },
+                        { "name", Common.ReturnValueIfNull(romObject.Name, "") },
+                        { "size", Common.ReturnValueIfNull(romObject.Size, 0) },
+                        { "crc", (Convert.ToString(Common.ReturnValueIfNull(romObject.Crc, "")) ?? "").ToLowerInvariant() },
+                        { "md5", (Convert.ToString(Common.ReturnValueIfNull(romObject.Md5, "")) ?? "").ToLowerInvariant() },
+                        { "sha1", (Convert.ToString(Common.ReturnValueIfNull(romObject.Sha1, "")) ?? "").ToLowerInvariant() },
+                        { "sha256", (Convert.ToString(Common.ReturnValueIfNull(romObject.Sha256, "")) ?? "").ToLowerInvariant() },
+                        { "developmentstatus", Common.ReturnValueIfNull(romObject.DevelopmentStatus, "") }
+                    };
 
                     if (romObject.Attributes != null)
                     {
@@ -765,6 +817,8 @@ namespace XML
                         await Config.database.ExecuteCMDAsync(sql, dbDict);
                     }
 
+                    romObject.HasheousRomId = romId;
+
                     // map the rom to the source
                     sql = "SELECT 1 FROM Signatures_RomToSource WHERE SourceId=@sourceid AND RomId=@romid LIMIT 1;";
 
@@ -776,6 +830,8 @@ namespace XML
                     }
                 }
             }
+
+            return gameObject;
         }
 
         private static async Task<ImportLookupCache> LoadImportLookupCacheAsync()

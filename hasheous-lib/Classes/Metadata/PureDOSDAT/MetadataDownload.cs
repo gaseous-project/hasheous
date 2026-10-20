@@ -2,6 +2,8 @@ using System.Runtime.CompilerServices;
 using Classes;
 using DATImport;
 using hasheous_server.Classes;
+using gaseous_signature_parser.models.RomSignatureObject;
+using hasheous_server.Models;
 
 namespace PureDOSDAT
 {
@@ -11,7 +13,7 @@ namespace PureDOSDAT
         public static void RegisterImporter() => SignatureIngestor.Register<DownloadManager>();
 
         /// <inheritdoc/>
-        public gaseous_signature_parser.parser.SignatureParser SourceType => gaseous_signature_parser.parser.SignatureParser.PureDOSDAT;
+        public DATImport.SignatureIngestor.SignatureType SourceType => DATImport.SignatureIngestor.SignatureType.PureDOSDAT;
 
         /// <inheritdoc/>
         public int Interval => 10080; // 7 days in minutes
@@ -91,6 +93,18 @@ namespace PureDOSDAT
         {
             // Implement validation logic if needed
             return true; // No validation needed for PureDOSDAT metadata
+        }
+
+        /// <inheritdoc/>
+        public Task PostImport(HasheousRomSignatureObject ImportedObject)
+        {
+            return Task.CompletedTask;
+        }
+
+        /// <inheritdoc/>
+        public Task<DataObjectItem> ApplyDATMetadata(DataObjectItem TargetObject)
+        {
+            return Task.FromResult(TargetObject);
         }
     }
 }

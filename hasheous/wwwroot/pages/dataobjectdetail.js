@@ -377,21 +377,55 @@ function renderContent() {
                 for (const tagType of Object.values(tagTypes)) {
                     if (tags[tagType]) {
                         let tagOutput = '<table>';
-                        let tagColourValue = `#${intToRGB(hashCode(tagType.toLowerCase()))}`;
-                        let tagColour = `style="background-color: ${tagColourValue};"`;
+                        // let tagColourValue = `#${intToRGB(hashCode(tagType.toLowerCase()))}`;
+                        // let tagColour = `background-color: ${tagColourValue};`;
+                        tagColour = '';
 
                         for (const tag of tags[tagType].tags) {
                             hasTags = true;
-                            let aiImage = '';
+                            let tagText = tag.text;
+                            let tagToolTip = '';
+                            let tagImage = '';
+                            let tagImageClasses = '';
                             if (tag.aiGenerated) {
-                                aiImage = ' <img src="/images/ai.svg" class="banner_button_image aigeneratedicon" title="' + lang.getLang('aigeneratedtag') + '">';
-                                tagColour = ` style="background: linear-gradient(156deg,rgba(255, 0, 217, 1) 0px, rgba(255, 0, 208, 1) 10px, ${tagColourValue} 40px, ${tagColourValue} 100%);" `;
+                                tagImage = 'ai.svg';
+                                tagImageClasses = 'aigeneratedicon';
+                                tagColour = `background: linear-gradient(156deg,rgba(255, 0, 217, 1) 0px, rgba(255, 0, 208, 1) 10px, ${tagColourValue} 40px, ${tagColourValue} 100%);`;
+                                tagToolTip = lang.getLang('aigeneratedtag');
+                            } else if (tag.metadataSource != null) {
+                                if (metadataSources[tag.metadataSource.toLowerCase()]) {
+                                    if (metadataSources[tag.metadataSource.toLowerCase()].image) {
+                                        tagImage = metadataSources[tag.metadataSource.toLowerCase()].image;
+                                    }
+                                    if (metadataSources[tag.metadataSource.toLowerCase()].tagClass) {
+                                        tagImageClasses = metadataSources[tag.metadataSource.toLowerCase()].tagClass;
+                                    }
+                                    if (metadataSources[tag.metadataSource.toLowerCase()].cssColour) {
+                                        tagColour = `background-color: ${metadataSources[tag.metadataSource.toLowerCase()].cssColour};`;
+                                    }
+                                    tagToolTip = lang.getLang(tag.metadataSource.toLowerCase());
+                                }
                             }
 
                             if (tagOutput != '') {
                                 tagOutput += ' ';
                             }
-                            tagOutput += `<span class="badge badge-tag badge-tag-type-${tagType.toLowerCase()}" ${tagColour}>${aiImage} ${tag.text}</span>`;
+
+                            if (tagToolTip != '') {
+                                tagToolTip = ` title="${tagToolTip}"`;
+                            }
+
+                            let tagString = '';
+                            if (tagImage) {
+                                tagString += `<img src="/images/${tagImage}" class="banner_button_image ${tagImageClasses}">`;
+                            }
+                            tagString += tagText;
+
+                            if (tagColour != '') {
+                                tagColour = ` style="${tagColour};"`;
+                            }
+
+                            tagOutput += `<span class="badge badge-tag badge-tag-type-${tagType.toLowerCase()}" ${tagColour} ${tagToolTip}>${tagString}</span>`;
                         }
 
                         attributeValues.push(

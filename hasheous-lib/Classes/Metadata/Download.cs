@@ -141,7 +141,7 @@ namespace hasheous_server.Classes
             {
                 Logging.Log(Logging.LogType.Information, "Git", $"Cloning {repoUrl} (branch {branch}) to {localDirectory}");
                 Directory.CreateDirectory(localDirectory);
-                var (cloneExit, _, _) = await RunGitAsync($"clone --branch \"{branch}\" --single-branch \"{repoUrl}\" \"{localDirectory}\"");
+                var (cloneExit, _, _) = await RunGitAsync($"clone --recurse-submodules --branch \"{branch}\" --single-branch \"{repoUrl}\" \"{localDirectory}\"");
                 if (cloneExit != 0)
                     throw new Exception($"git clone failed (exit {cloneExit}) for {repoUrl}.");
 
@@ -162,12 +162,12 @@ namespace hasheous_server.Classes
                 throw new Exception("Failed to obtain current HEAD before pull.");
 
             // Fetch & prune
-            var (fetchExit, _, _) = await RunGitAsync("fetch --all --prune", localDirectory);
+            var (fetchExit, _, _) = await RunGitAsync("fetch --all --prune --recurse-submodules=yes", localDirectory);
             if (fetchExit != 0)
                 throw new Exception("git fetch failed.");
 
             // Pull (ff-only)
-            var (pullExit, pullStdout, pullStderr) = await RunGitAsync("pull --ff-only", localDirectory);
+            var (pullExit, pullStdout, pullStderr) = await RunGitAsync("pull --ff-only --recurse-submodules", localDirectory);
             if (pullExit != 0)
                 throw new Exception($"git pull failed (exit {pullExit}). {pullStderr}");
 
@@ -179,12 +179,15 @@ namespace hasheous_server.Classes
             bool changed = !string.Equals(headBefore.Trim(), headAfter.Trim(), StringComparison.Ordinal);
 
             // Only perform hard reset & clean to ensure a pristine working tree (does not affect change detection).
-            var (resetExit, _, _) = await RunGitAsync($"reset --hard origin/{branch}", localDirectory);
+            var (resetExit, _, _) = await RunGitAsync($"reset --hard --recurse-submodules origin/{branch}", localDirectory);
             if (resetExit != 0)
                 throw new Exception("git reset --hard failed.");
             var (cleanExit, _, _) = await RunGitAsync("clean -fd", localDirectory);
             if (cleanExit != 0)
                 throw new Exception("git clean failed.");
+            var (submoduleCleanExit, _, _) = await RunGitAsync("submodule foreach --recursive 'git clean -fd'", localDirectory);
+            if (submoduleCleanExit != 0)
+                throw new InvalidOperationException("git submodule clean failed.");
 
             if (changed)
                 Logging.Log(Logging.LogType.Information, "Git", $"Changes detected for {localDirectory}: {headBefore.Trim()} -> {headAfter.Trim()}");

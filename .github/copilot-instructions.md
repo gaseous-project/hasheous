@@ -17,6 +17,7 @@ Use this to get productive fast. Follow the existing patterns in this repo over 
   - Data object save-path mutations should be collected into a `List<Database.SQLTransactionItem>` and committed once via `ExecuteTransactionCMDAsync(...)` at the end of the edit. Keep reads, metadata lookups, and comparison logic outside the transaction; only the actual SQL writes should be batched.
   - Synthetic/generated data-object attributes (for example `SearchAliases`, `Country`, `Language`, `ROMs`, `DumpFile`) are not persisted rows in `DataObject_Attributes` and must be filtered out before handing any payload to `EditDataObject(...)`.
   - Signature data is ingested from DAT/XML (TOSEC/No-Intro/etc.) by the shared importer stack under `hasheous-lib/Classes/SignatureIngestors/` into `Signatures_*` tables.
+  - `DownloadTools.CloneOrRefreshRepoAsync(...)` initializes submodules recursively when cloning and fetches, updates, resets, and cleans submodules recursively when refreshing a repository.
   - Signature import has been refactored around a pluggable importer contract: `IDATFileImport` defines `StageFiles()`, `ProcessFiles()`, and `ValidateFiles()`, and `SignatureIngestor.Register<T>()`/`GetRegisteredIngestors()` discover enabled importers and create queue items. Follow this pattern for new DAT/XML sources instead of hard-coding logic in `XML.cs`.
   - Signature game import still uses the bounded worker pool pattern (`MaxConcurrentImportWorkers`, currently 4) for processing games, but the surrounding importer lifecycle is now registry-driven rather than tied to a single XML implementation.
   - XML signature ingestion keeps country, language, platform, and publisher lookup IDs in process-wide concurrent caches. The caches are loaded once per process; cache misses use the shared lookup mutation lock before database insertion.
@@ -296,6 +297,12 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
   - MAME Mess: `MAME MESS/`
   - Redump: `Redump/`
 
+  ## Libretro signature import
+  - Importer: `hasheous-lib/Classes/Metadata/libretro/MetadataDownload.cs` (`DownloadManager`), registered with `SignatureIngestor` through a module initializer.
+  - The shared DAT importer registry creates its signature-ingestion queue item; do not add a duplicate schedule or dispatcher entry for this importer. It refreshes every 10080 minutes (7 days).
+  - Staging refreshes `https://github.com/libretro/libretro-database.git` (`master`) under `LibraryMetadataDirectory_libretro`, then copies a curated set of DAT files and matching metadata DATs from the repository's `dat/` and `metadat/` directories into `LibrarySignaturesDirectory/libretro/`.
+  - Post-import data is exported under `LibraryMetadataDirectory_libretro/exported_metadata/`. `ApplyDATMetadata(...)` applies Libretro `flags.genre` values as `GameGenre` tags to matching game objects, replacing existing tags assigned by Libretro.
+
 ## Redump metadata
 - Downloader class: `hasheous-lib/Classes/Metadata/Redump/MetadataDownload.cs`.
 - Redump host migration: use `https://redump.info` as the base host (`BaseUrl`) and `https://redump.info/downloads/` for platform listing.
@@ -453,6 +460,7 @@ Additional example (rating boards):
 - Background metadata searches must remain concurrent per source: use unique per-run `jobId` values, keep the wait guard short, and only finalise after all child tasks finish instead of serialising the work behind a single provider call.
 - Task worker polling depends on the `Task_Queue` status/client/start-time index and the `UPDATE ... WHERE id IN (SELECT ... FOR UPDATE SKIP LOCKED)` + equality `SELECT` pattern; changing those fields without keeping the same transaction shape can trigger command timeouts under concurrent client polling.
 - When adding or updating a metadata source, include the orchestrator schedule, the shared queue dispatcher, the service-host wiring, UI source colors/localisation, and any public route/auth changes in the same change so the stack remains coherent.
+- DAT importers implementing `IDATFileImport` are registered with `SignatureIngestor` and scheduled through its generated queue items; follow that registry path instead of adding a separate orchestrator schedule or duplicate task wiring.
 - Members may create Apps. Deleting an App remains limited to callers with its ACL `Delete` permission.
 - `POST /api/v1/DataObjects/app/{Id}/ClientApiKeys` requires `AgreeToTerms=true` before creating a client API key.
 
