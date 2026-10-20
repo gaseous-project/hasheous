@@ -394,7 +394,7 @@ namespace Classes.Insights
                 // drop aggregated data from Insights_API_Requests older than 2 days
                 string deleteSql = @"
                 DELETE FROM Insights_API_Requests
-                WHERE event_datetime < @deleteBefore LIMIT 1000;
+                WHERE event_datetime < @deleteBefore LIMIT 10000;
                 SELECT ROW_COUNT() as rows_deleted;";
                 Dictionary<string, object> deleteParams = new Dictionary<string, object>
                 {

@@ -377,7 +377,7 @@ function renderContent() {
                 for (const tagType of Object.values(tagTypes)) {
                     if (tags[tagType]) {
                         let tagOutput = '<table>';
-                        // let tagColourValue = `#${intToRGB(hashCode(tagType.toLowerCase()))}`;
+                        let tagColourValue = `#${intToRGB(hashCode(tagType.toLowerCase()))}`;
                         // let tagColour = `background-color: ${tagColourValue};`;
                         tagColour = '';
 

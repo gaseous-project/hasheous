@@ -5,12 +5,22 @@
     "editor.formatOnSave": true,
     "editor.formatOnType": true,
     "github.copilot.chat.codeGeneration.instructions": [
-        { "file": ".github/copilot-instructions.md" }
+        {
+            "file": ".github/copilot-instructions.md"
+        }
     ],
     "github.copilot.chat.reviewSelection.instructions": [
-        { "file": ".github/copilot-instructions.md" }
+        {
+            "file": ".github/copilot-instructions.md"
+        }
     ],
     "github.copilot.chat.commitMessageGeneration.instructions": [
-        { "file": ".github/copilot-instructions.md" }
-    ]
+        {
+            "file": ".github/copilot-instructions.md"
+        }
+    ],
+    "sonarlint.connectedMode.project": {
+        "connectionId": "gaseous-project",
+        "projectKey": "gaseous-project_hasheous"
+    }
 }
