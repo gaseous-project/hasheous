@@ -652,6 +652,52 @@ namespace Classes
 		static readonly ConcurrentDictionary<Type, System.Reflection.PropertyInfo[]> _hashPropsCache =
 			new ConcurrentDictionary<Type, System.Reflection.PropertyInfo[]>();
 
+		/// <summary>
+		/// Upper bound on the name-trim regex matches below. The patterns are anchored and run
+		/// against short signature names, so this should never be reached - it is a backstop
+		/// against catastrophic backtracking rather than an expected code path.
+		/// </summary>
+		private static readonly TimeSpan NameTrimTimeout = TimeSpan.FromSeconds(1);
+
+		/// <summary>
+		/// Trims a signature game name down to a value suitable for data object name searching.
+		/// </summary>
+		/// <param name="name">The signature game name to trim</param>
+		/// <returns>The trimmed name</returns>
+		public static string TrimSignatureGameName(string? name)
+		{
+			if (string.IsNullOrWhiteSpace(name))
+			{
+				return string.Empty;
+			}
+
+			// ScreenScraper prefixes non-game entries with "ZZZ(notgame):". Strip it before the
+			// parenthesis removal below, otherwise every such entry trims down to "ZZZ" and they
+			// all match the same data object
+			const string screenScraperNotGamePrefix = "ZZZ(notgame):";
+
+			string gameName = name;
+			if (gameName.StartsWith(screenScraperNotGamePrefix, StringComparison.OrdinalIgnoreCase))
+			{
+				gameName = gameName.Substring(screenScraperNotGamePrefix.Length).Trim();
+			}
+
+			// remove version numbers from name
+			gameName = Regex.Replace(gameName, @"v(\d+\.)?(\d+\.)?(\*|\d+)$", "",
+				RegexOptions.None, NameTrimTimeout).Trim();
+			gameName = Regex.Replace(gameName, @"Rev (\d+\.)?(\d+\.)?(\*|\d+)$", "",
+				RegexOptions.None, NameTrimTimeout).Trim();
+
+			// assumption: no games have () in their titles so we'll remove them
+			int idx = gameName.IndexOf('(');
+			if (idx >= 0)
+			{
+				gameName = gameName.Substring(0, idx);
+			}
+
+			return gameName;
+		}
+
 		public static bool IsStrongNameMatch(string candidate, string? resultName)
 		{
 			return GetStrongNameMatchScore(candidate, resultName) >= 8;

@@ -1,4 +1,4 @@
-# Copilot instructions for the hasheous codebase
+﻿# Copilot instructions for the hasheous codebase
 
 Use this to get productive fast. Follow the existing patterns in this repo over generic .NET advice.
 
@@ -216,6 +216,7 @@ If something is unclear or missing (e.g., additional services, tests, or new aut
 - Keep the non-zero-size filter when extending hash lookup SQL unless a feature explicitly requires zero-byte signatures.
 - `SignatureManagement.BuildGameItem(...)` currently populates both singular and plural dictionary properties for compatibility: `Country` and `Countries`, `Language` and `Languages`.
 - Data object signature listing for games includes `Signatures_Games.Country`; frontend game signature labels/suggestions append country text in `wwwroot/pages/dataobjectdetail.js` and `wwwroot/pages/dataobjectedit.js`.
+- `Common.TrimSignatureGameName(...)` normalizes a signature game name before the `ForceSearch` data object name search in `HashLookup.PerformLookup(...)`: it strips ScreenScraper's `ZZZ(notgame):` non-game prefix, removes trailing version/revision numbers, then drops any parenthetical suffix. The prefix must be removed before the parenthesis trim, otherwise every ScreenScraper non-game entry collapses to the name `ZZZ` and they all match a single data object per platform.
 - Text search on signature names now uses FullText `MATCH ... AGAINST` with boolean-prefix tokens for partial matches (for example `archer maclean` becomes `+archer* +maclean*`). Prefer this pattern over `LIKE '%...%'` when the column has a FullText index.
 
 ### Multi-hash lookup (new behavior)
