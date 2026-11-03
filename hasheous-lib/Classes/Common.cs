@@ -653,6 +653,13 @@ namespace Classes
 			new ConcurrentDictionary<Type, System.Reflection.PropertyInfo[]>();
 
 		/// <summary>
+		/// Upper bound on the name-trim regex matches below. The patterns are anchored and run
+		/// against short signature names, so this should never be reached - it is a backstop
+		/// against catastrophic backtracking rather than an expected code path.
+		/// </summary>
+		private static readonly TimeSpan NameTrimTimeout = TimeSpan.FromSeconds(1);
+
+		/// <summary>
 		/// Trims a signature game name down to a value suitable for data object name searching.
 		/// </summary>
 		/// <param name="name">The signature game name to trim</param>
@@ -676,8 +683,10 @@ namespace Classes
 			}
 
 			// remove version numbers from name
-			gameName = Regex.Replace(gameName, @"v(\d+\.)?(\d+\.)?(\*|\d+)$", "").Trim();
-			gameName = Regex.Replace(gameName, @"Rev (\d+\.)?(\d+\.)?(\*|\d+)$", "").Trim();
+			gameName = Regex.Replace(gameName, @"v(\d+\.)?(\d+\.)?(\*|\d+)$", "",
+				RegexOptions.None, NameTrimTimeout).Trim();
+			gameName = Regex.Replace(gameName, @"Rev (\d+\.)?(\d+\.)?(\*|\d+)$", "",
+				RegexOptions.None, NameTrimTimeout).Trim();
 
 			// assumption: no games have () in their titles so we'll remove them
 			int idx = gameName.IndexOf('(');
