@@ -283,7 +283,12 @@ namespace hasheous_server.Models.Tasks
         /// <summary>
         /// Task for AI description generation and tagging.
         /// </summary>
-        AIDescriptionAndTagging = 0
+        AIDescriptionAndTagging = 0,
+
+        /// <summary>
+        /// Task for localisation generation.
+        /// </summary>
+        AILocalisationGeneration = 10
     }
 
     /// <summary>

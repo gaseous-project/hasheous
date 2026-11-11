@@ -898,6 +898,17 @@ namespace Classes
                 }
 
                 /// <summary>
+                /// Gets the directory path for library localisation files.
+                /// </summary>
+                public string LibraryLocalisationDirectory
+                {
+                    get
+                    {
+                        return Path.Combine(LibraryRootDirectory, "Localisation");
+                    }
+                }
+
+                /// <summary>
                 /// Gets the directory path for library metadata map dumps.
                 /// </summary>
                 public string LibraryMetadataMapDumpsDirectory

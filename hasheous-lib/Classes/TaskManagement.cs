@@ -547,6 +547,25 @@ namespace hasheous_server.Classes.Tasks.Clients
                         return null;
                     }
                     break;
+
+                case TaskType.AILocalisationGeneration:
+                    capabilities.Add(Capabilities.AI);
+                    Dictionary<string, string>? localisationParams = BuildTaskParams(dataObjectId, taskType, parameters);
+                    if (localisationParams != null)
+                    {
+                        if (!localisationParams.ContainsKey("language") || String.IsNullOrEmpty(localisationParams["language"]))
+                        {
+                            // nothing to do
+                            return null;
+                        }
+                        parameters = localisationParams;
+                    }
+                    else
+                    {
+                        // nothing to do
+                        return null;
+                    }
+                    break;
             }
 
             return EnqueueTask(dataObjectId, taskType, capabilities, parameters);

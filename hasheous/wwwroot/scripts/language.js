@@ -49,13 +49,32 @@ class language {
         }
         console.log("Browser locale: " + this.locale);
 
+        // load language list from the server (languages.json)
+        this.languages = await $.getJSON('/localisation/languages.json');
+        console.log('Available languages:', this.languages);
+
+        // // check if the current locale is available in the language list
+        // if (!this.languages.some(lang => lang.FullCode === this.locale)) {
+        //     console.warn("Locale " + this.locale + " is not available in the language list");
+
+        //     console.warn("Locale " + this.locale + " is not available, falling back to English");
+        //     console.log(`Sending localisation request for ${this.locale}`);
+        //     await $.getJSON('/localisation/request/' + this.locale + '.json');
+
+        //     // set locale to English after requesting the unavailable locale
+        //     this.locale = "en";
+        // }
+
+        // load language files based on the locale
         let language = this.locale.split("-")[0];
         let localisation = this.locale.split("-")[1];
         try {
-            this.languageDefault = await $.getJSON('/localisation/' + language + '.json');
+            let langDefault = await $.getJSON('/localisation/' + language + '.json');
+            this.languageDefault = this.#ExtractStrings(langDefault);
         } catch (e) {
             // something went wrong - default to en
-            this.languageDefault = await $.getJSON('/localisation/en.json');
+            let langDefault = await $.getJSON('/localisation/en.json');
+            this.languageDefault = this.#ExtractStrings(langDefault);
             console.warn("No suitable language file for " + language + ". Falling back to en");
             language = "en";
         }
@@ -64,8 +83,11 @@ class language {
         try {
             if (localisation) {
                 // load overlay language
-                this.languageOverlay = await $.getJSON('/localisation/' + language + '-' + localisation + '.json');
-                console.log('Loaded language localisation file: ' + language + '-' + localisation + '.json');
+                let langOverlay = await $.getJSON('/localisation/' + language + '-' + localisation + '.json');
+                if (langOverlay?.translations) {
+                    this.languageOverlay = this.#ExtractStrings(langOverlay);
+                    console.log('Loaded language localisation file: ' + language + '-' + localisation + '.json');
+                }
             }
         } catch (e) {
             console.warn(e);
@@ -75,11 +97,17 @@ class language {
         this.applyLanguage();
     }
 
-    // async getJSON(url) {
-    //     return fetch(url)
-    //         .then((response) => response.json())
-    //         .then((responseJson) => { return responseJson });
-    // }
+    #ExtractStrings(language) {
+        let strings = {};
+        if (language?.translations) {
+            for (let key in language.translations) {
+                if (language.translations.hasOwnProperty(key)) {
+                    strings[key.toLowerCase()] = language.translations[key].value;
+                }
+            }
+        }
+        return strings;
+    }
 
     getLang(token, substituteArray) {
         // check if token is null or undefined

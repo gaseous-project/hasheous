@@ -48,6 +48,7 @@ namespace hasheous_server.Classes
             Game = 2,
             ROM = 3,
             App = 4,
+            Language = 5,
             None = 100
         }
 
@@ -620,10 +621,10 @@ namespace hasheous_server.Classes
 
         public async Task<Models.DataObjectItem?> SearchDataObject(DataObjectType objectType, string? objectName, List<DataObjectSearchCriteriaItem> searchCriteria)
         {
-            if (searchCriteria.Count == 0)
-            {
-                throw new DataObjectsBadSearchCriteriaException("No search criteria provided");
-            }
+            // if (searchCriteria.Count == 0)
+            // {
+            //     throw new DataObjectsBadSearchCriteriaException("No search criteria provided");
+            // }
 
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "SELECT * FROM DataObject";
@@ -645,22 +646,25 @@ namespace hasheous_server.Classes
             }
 
             int loopCount = 0;
-            foreach (DataObjectSearchCriteriaItem searchCriteriaItem in searchCriteria)
+            if (searchCriteria != null && searchCriteria.Count > 0)
             {
-                string valueField = "AttributeValue";
-                switch (searchCriteriaItem.Field)
+                foreach (DataObjectSearchCriteriaItem searchCriteriaItem in searchCriteria)
                 {
-                    case AttributeItem.AttributeName.Platform:
-                    case AttributeItem.AttributeName.Publisher:
-                        valueField = "AttributeRelation";
-                        break;
+                    string valueField = "AttributeValue";
+                    switch (searchCriteriaItem.Field)
+                    {
+                        case AttributeItem.AttributeName.Platform:
+                        case AttributeItem.AttributeName.Publisher:
+                            valueField = "AttributeRelation";
+                            break;
+                    }
+
+                    sql += " JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId AND DataObject_Attributes.AttributeName = @field" + loopCount + " AND DataObject_Attributes." + valueField + " = @value" + loopCount;
+                    dbDict.Add("field" + loopCount, (int)searchCriteriaItem.Field);
+                    dbDict.Add("value" + loopCount, searchCriteriaItem.Value);
+
+                    loopCount++;
                 }
-
-                sql += " JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId AND DataObject_Attributes.AttributeName = @field" + loopCount + " AND DataObject_Attributes." + valueField + " = @value" + loopCount;
-                dbDict.Add("field" + loopCount, (int)searchCriteriaItem.Field);
-                dbDict.Add("value" + loopCount, searchCriteriaItem.Value);
-
-                loopCount++;
             }
 
             if (nameClause != "")
