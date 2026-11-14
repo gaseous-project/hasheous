@@ -33,6 +33,7 @@ namespace Classes.RateLimiting
         public List<string> PartitionBy { get; set; } = new() { "remote-ip" };
         public RateLimitMatchCriteria Match { get; set; } = new();
         public FixedWindowRateLimitSettings FixedWindow { get; set; } = new();
+        public SlidingWindowRateLimitSettings SlidingWindow { get; set; } = new();
     }
 
     /// <summary>
@@ -57,6 +58,16 @@ namespace Classes.RateLimiting
     /// Fixed-window limiter settings for a profile.
     /// </summary>
     public class FixedWindowRateLimitSettings
+    {
+        public int PermitLimit { get; set; } = 60;
+        public int WindowSeconds { get; set; } = 60;
+        public int QueueLimit { get; set; } = 0;
+    }
+
+    /// <summary>
+    /// Sliding-window limiter settings for a profile.
+    /// </summary>
+    public class SlidingWindowRateLimitSettings
     {
         public int PermitLimit { get; set; } = 60;
         public int WindowSeconds { get; set; } = 60;
@@ -497,6 +508,7 @@ namespace Classes.RateLimiting
             {
                 profile.Match ??= new RateLimitMatchCriteria();
                 profile.FixedWindow ??= new FixedWindowRateLimitSettings();
+                profile.SlidingWindow ??= new SlidingWindowRateLimitSettings();
                 profile.PartitionBy ??= new List<string>();
 
                 profile.Name = string.IsNullOrWhiteSpace(profile.Name) ? $"Profile-{Guid.NewGuid():N}" : profile.Name.Trim();
@@ -504,6 +516,9 @@ namespace Classes.RateLimiting
                 profile.FixedWindow.PermitLimit = Math.Max(1, profile.FixedWindow.PermitLimit);
                 profile.FixedWindow.WindowSeconds = Math.Max(1, profile.FixedWindow.WindowSeconds);
                 profile.FixedWindow.QueueLimit = Math.Max(0, profile.FixedWindow.QueueLimit);
+                profile.SlidingWindow.PermitLimit = Math.Max(1, profile.SlidingWindow.PermitLimit);
+                profile.SlidingWindow.WindowSeconds = Math.Max(1, profile.SlidingWindow.WindowSeconds);
+                profile.SlidingWindow.QueueLimit = Math.Max(0, profile.SlidingWindow.QueueLimit);
                 profile.Match.Methods ??= new List<string>();
                 profile.Match.Paths ??= new List<string>();
                 profile.Match.Origins ??= new List<string>();
