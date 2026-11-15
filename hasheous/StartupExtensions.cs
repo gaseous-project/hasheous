@@ -149,10 +149,10 @@ public static class StartupExtensions
             options.KnownIPNetworks.Clear();
             options.KnownProxies.Clear();
 
-            // Process X-Forwarded-For, X-Forwarded-Proto, and X-Forwarded-Host headers.
+            // Process client address and scheme headers, but do not accept forwarded hosts.
             // RequireHeaderSymmetry = false: allow headers to be present without expecting all forwarding headers.
             options.RequireHeaderSymmetry = false;
-            options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
+            options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
 
             // Add each configured trusted proxy to the allowed list.
             // These IPs must be the direct connection peer that forwards traffic to Hasheous.
