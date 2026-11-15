@@ -1,5 +1,7 @@
+using System.Net;
 using System.Security.Claims;
 using System.Text.Json;
+using Classes;
 using Classes.RateLimiting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.DataProtection;
@@ -8,6 +10,18 @@ namespace hasheous_lib.Tests;
 
 public class RateLimiterMatchTests
 {
+    [Fact]
+    public void RemoteIpUsesConnectionAddressInsteadOfUntrustedForwardedHeaders()
+    {
+        DefaultHttpContext context = new();
+        context.Connection.RemoteIpAddress = IPAddress.Parse("192.0.2.10");
+        context.Request.Headers["true-client-ip"] = "198.51.100.10";
+        context.Request.Headers["CF-Connecting-IP"] = "198.51.100.11";
+        context.Request.Headers["X-Forwarded-For"] = "198.51.100.12";
+
+        Assert.Equal("192.0.2.10", Common.GetContextRemoteIP(context));
+    }
+
     [Fact]
     public void MatchesWildcardRolePathAndHeaderRules()
     {

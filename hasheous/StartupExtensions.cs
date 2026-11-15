@@ -134,8 +134,18 @@ public static class StartupExtensions
         {
             options.RequireHeaderSymmetry = false;
             options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-            options.KnownProxies.Clear();
-            options.KnownNetworks.Clear();
+            foreach (string proxyAddress in Config.TrustedProxies)
+            {
+                if (!IPAddress.TryParse(proxyAddress, out IPAddress? trustedProxy))
+                {
+                    throw new InvalidOperationException($"Configured trusted proxy '{proxyAddress}' is not a valid IP address.");
+                }
+
+                if (!options.KnownProxies.Contains(trustedProxy))
+                {
+                    options.KnownProxies.Add(trustedProxy);
+                }
+            }
         });
         return services;
     }

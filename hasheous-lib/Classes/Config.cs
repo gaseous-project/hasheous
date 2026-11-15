@@ -65,6 +65,20 @@ namespace Classes
             }
         }
 
+        public static string[] TrustedProxies
+        {
+            get
+            {
+                string? trustedProxies = Environment.GetEnvironmentVariable("trustedproxies");
+                if (!string.IsNullOrWhiteSpace(trustedProxies))
+                {
+                    return trustedProxies.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                }
+
+                return _config.TrustedProxies ?? Array.Empty<string>();
+            }
+        }
+
         /// <summary>
         /// Gets the database configuration settings.
         /// </summary>
@@ -613,6 +627,11 @@ namespace Classes
             /// Gets or sets the host names to exempt from rate limiting
             /// </summary>
             public string[] TrustedHosts = Array.Empty<string>();
+
+            /// <summary>
+            /// Gets or sets IP addresses allowed to provide forwarded headers.
+            /// </summary>
+            public string[] TrustedProxies = Array.Empty<string>();
 
             /// <summary>
             /// Gets or sets the library configuration settings, including paths for metadata, uploads, and dumps.
