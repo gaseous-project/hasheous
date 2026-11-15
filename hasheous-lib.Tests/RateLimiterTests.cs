@@ -1,4 +1,7 @@
+using System.Net;
 using System.Security.Claims;
+using System.Text.Json;
+using Classes;
 using Classes.RateLimiting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.DataProtection;
@@ -7,6 +10,18 @@ namespace hasheous_lib.Tests;
 
 public class RateLimiterMatchTests
 {
+    [Fact]
+    public void RemoteIpUsesConnectionAddressInsteadOfUntrustedForwardedHeaders()
+    {
+        DefaultHttpContext context = new();
+        context.Connection.RemoteIpAddress = IPAddress.Parse("192.0.2.10");
+        context.Request.Headers["true-client-ip"] = "198.51.100.10";
+        context.Request.Headers["CF-Connecting-IP"] = "198.51.100.11";
+        context.Request.Headers["X-Forwarded-For"] = "198.51.100.12";
+
+        Assert.Equal("192.0.2.10", Common.GetContextRemoteIP(context));
+    }
+
     [Fact]
     public void MatchesWildcardRolePathAndHeaderRules()
     {
@@ -123,5 +138,83 @@ public class RateLimiterRuleFileTests
         Assert.True(File.Exists(rulesPath));
         string contents = File.ReadAllText(rulesPath);
         Assert.Contains("Example External Lookup Clients", contents);
+    }
+}
+
+public class RateLimiterWindowTests
+{
+    [Fact]
+    public async Task SlidingWindowCanBeConfiguredWithoutFixedWindow()
+    {
+        DynamicRateLimitManager manager = CreateManager(new RateLimitProfile
+        {
+            Name = "Sliding only",
+            FixedWindow = null,
+            SlidingWindow = new SlidingWindowRateLimitSettings
+            {
+                PermitLimit = 1,
+                WindowSeconds = 30,
+                SegmentsPerWindow = 3
+            }
+        });
+        DefaultHttpContext context = new();
+
+        RateLimitDecision first = await manager.AcquireLeaseAsync(context, CancellationToken.None);
+        RateLimitDecision second = await manager.AcquireLeaseAsync(context, CancellationToken.None);
+
+        Assert.True(first.Allowed);
+        Assert.False(second.Allowed);
+    }
+
+    [Fact]
+    public async Task BothConfiguredWindowsAreEnforced()
+    {
+        DynamicRateLimitManager manager = CreateManager(new RateLimitProfile
+        {
+            Name = "Both windows",
+            FixedWindow = new FixedWindowRateLimitSettings
+            {
+                PermitLimit = 2,
+                WindowSeconds = 30
+            },
+            SlidingWindow = new SlidingWindowRateLimitSettings
+            {
+                PermitLimit = 1,
+                WindowSeconds = 30,
+                SegmentsPerWindow = 3
+            }
+        });
+        DefaultHttpContext context = new();
+
+        RateLimitDecision first = await manager.AcquireLeaseAsync(context, CancellationToken.None);
+        RateLimitDecision second = await manager.AcquireLeaseAsync(context, CancellationToken.None);
+
+        Assert.True(first.Allowed);
+        Assert.False(second.Allowed);
+    }
+
+    [Fact]
+    public void ProfilesWithoutWindowSettingsRetainFixedWindowDefaults()
+    {
+        DynamicRateLimitManager manager = CreateManager(new RateLimitProfile
+        {
+            Name = "Legacy profile"
+        });
+        RateLimitProfile profile = Assert.Single(manager.CurrentRules.Profiles);
+
+        Assert.NotNull(profile.FixedWindow);
+        Assert.Null(profile.SlidingWindow);
+    }
+
+    private static DynamicRateLimitManager CreateManager(RateLimitProfile profile)
+    {
+        string rulesPath = Path.Combine(Path.GetTempPath(), "hasheous-rate-limiter-tests", Guid.NewGuid().ToString("N"), "rules.json");
+        DynamicRateLimitManager manager = new(rulesPath, TimeSpan.FromMinutes(5));
+        File.WriteAllText(rulesPath, JsonSerializer.Serialize(new RateLimitRuleSet
+        {
+            Profiles = new List<RateLimitProfile> { profile }
+        }));
+        manager.ReloadRules();
+        return manager;
     }
 }
