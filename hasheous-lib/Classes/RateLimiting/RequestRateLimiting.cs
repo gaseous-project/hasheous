@@ -32,8 +32,8 @@ namespace Classes.RateLimiting
         public bool Exempt { get; set; }
         public List<string> PartitionBy { get; set; } = new() { "remote-ip" };
         public RateLimitMatchCriteria Match { get; set; } = new();
-        public FixedWindowRateLimitSettings FixedWindow { get; set; } = new();
-        public SlidingWindowRateLimitSettings SlidingWindow { get; set; } = new();
+        public FixedWindowRateLimitSettings? FixedWindow { get; set; }
+        public SlidingWindowRateLimitSettings? SlidingWindow { get; set; }
     }
 
     /// <summary>
@@ -71,6 +71,7 @@ namespace Classes.RateLimiting
     {
         public int PermitLimit { get; set; } = 60;
         public int WindowSeconds { get; set; } = 60;
+        public int SegmentsPerWindow { get; set; } = 6;
         public int QueueLimit { get; set; } = 0;
     }
 
@@ -125,7 +126,7 @@ namespace Classes.RateLimiting
         private readonly IDataProtector? _webRequestProtector;
         private readonly IServiceScopeFactory? _serviceScopeFactory;
         private ConcurrentDictionary<string, Regex> _patternCache = new(StringComparer.Ordinal);
-        private ConcurrentDictionary<string, FixedWindowRateLimiter> _limiters = new(StringComparer.Ordinal);
+        private ConcurrentDictionary<string, RateLimiterSet> _limiters = new(StringComparer.Ordinal);
         private ConcurrentDictionary<string, DateTime> _limiterLastUsed = new(StringComparer.Ordinal);
         private RateLimitRuleSet _rules = new();
         public RateLimitRuleSet CurrentRules => _rules;
@@ -233,9 +234,9 @@ namespace Classes.RateLimiting
                     _rules = Sanitize(parsedRules ?? new RateLimitRuleSet());
                     _patternCache = new ConcurrentDictionary<string, Regex>(StringComparer.Ordinal);
 
-                    ConcurrentDictionary<string, FixedWindowRateLimiter> oldLimiters = _limiters;
+                    ConcurrentDictionary<string, RateLimiterSet> oldLimiters = _limiters;
                     ConcurrentDictionary<string, DateTime> oldLimiterLastUsed = _limiterLastUsed;
-                    var newLimiters = new ConcurrentDictionary<string, FixedWindowRateLimiter>(StringComparer.Ordinal);
+                    var newLimiters = new ConcurrentDictionary<string, RateLimiterSet>(StringComparer.Ordinal);
                     var newLimiterLastUsed = new ConcurrentDictionary<string, DateTime>(StringComparer.Ordinal);
 
                     // check if limiters need to be recreated based on the newly loaded rules
@@ -246,7 +247,7 @@ namespace Classes.RateLimiting
                         _limiterLastUsed = newLimiterLastUsed;
                         Interlocked.Increment(ref _rulesVersion);
 
-                        foreach (FixedWindowRateLimiter limiter in oldLimiters.Values)
+                        foreach (RateLimiterSet limiter in oldLimiters.Values)
                         {
                             limiter.Dispose();
                         }
@@ -507,18 +508,30 @@ namespace Classes.RateLimiting
             foreach (RateLimitProfile profile in rules.Profiles)
             {
                 profile.Match ??= new RateLimitMatchCriteria();
-                profile.FixedWindow ??= new FixedWindowRateLimitSettings();
-                profile.SlidingWindow ??= new SlidingWindowRateLimitSettings();
                 profile.PartitionBy ??= new List<string>();
 
                 profile.Name = string.IsNullOrWhiteSpace(profile.Name) ? $"Profile-{Guid.NewGuid():N}" : profile.Name.Trim();
                 profile.PartitionBy = profile.PartitionBy.Count == 0 ? new List<string> { "remote-ip" } : profile.PartitionBy;
-                profile.FixedWindow.PermitLimit = Math.Max(1, profile.FixedWindow.PermitLimit);
-                profile.FixedWindow.WindowSeconds = Math.Max(1, profile.FixedWindow.WindowSeconds);
-                profile.FixedWindow.QueueLimit = Math.Max(0, profile.FixedWindow.QueueLimit);
-                profile.SlidingWindow.PermitLimit = Math.Max(1, profile.SlidingWindow.PermitLimit);
-                profile.SlidingWindow.WindowSeconds = Math.Max(1, profile.SlidingWindow.WindowSeconds);
-                profile.SlidingWindow.QueueLimit = Math.Max(0, profile.SlidingWindow.QueueLimit);
+                if (profile.FixedWindow == null && profile.SlidingWindow == null)
+                {
+                    profile.FixedWindow = new FixedWindowRateLimitSettings();
+                }
+
+                if (profile.FixedWindow != null)
+                {
+                    profile.FixedWindow.PermitLimit = Math.Max(1, profile.FixedWindow.PermitLimit);
+                    profile.FixedWindow.WindowSeconds = Math.Max(1, profile.FixedWindow.WindowSeconds);
+                    profile.FixedWindow.QueueLimit = Math.Max(0, profile.FixedWindow.QueueLimit);
+                }
+
+                if (profile.SlidingWindow != null)
+                {
+                    profile.SlidingWindow.PermitLimit = Math.Max(1, profile.SlidingWindow.PermitLimit);
+                    profile.SlidingWindow.WindowSeconds = Math.Max(1, profile.SlidingWindow.WindowSeconds);
+                    profile.SlidingWindow.SegmentsPerWindow = Math.Max(1, profile.SlidingWindow.SegmentsPerWindow);
+                    profile.SlidingWindow.QueueLimit = Math.Max(0, profile.SlidingWindow.QueueLimit);
+                }
+
                 profile.Match.Methods ??= new List<string>();
                 profile.Match.Paths ??= new List<string>();
                 profile.Match.Origins ??= new List<string>();
@@ -561,16 +574,53 @@ namespace Classes.RateLimiting
             };
         }
 
-        private static FixedWindowRateLimiter CreateLimiter(RateLimitProfile profile)
+        private sealed class RateLimiterSet : IDisposable
         {
-            return new FixedWindowRateLimiter(new FixedWindowRateLimiterOptions
+            public RateLimiterSet(IEnumerable<RateLimiter> limiters)
             {
-                PermitLimit = profile.FixedWindow.PermitLimit,
-                Window = TimeSpan.FromSeconds(profile.FixedWindow.WindowSeconds),
-                QueueLimit = profile.FixedWindow.QueueLimit,
-                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                AutoReplenishment = true
-            });
+                Limiters = limiters.ToArray();
+            }
+
+            public RateLimiter[] Limiters { get; }
+
+            public void Dispose()
+            {
+                foreach (RateLimiter limiter in Limiters)
+                {
+                    limiter.Dispose();
+                }
+            }
+        }
+
+        private static RateLimiterSet CreateLimiterSet(RateLimitProfile profile)
+        {
+            List<RateLimiter> limiters = new();
+            if (profile.FixedWindow is FixedWindowRateLimitSettings fixedWindow)
+            {
+                limiters.Add(new FixedWindowRateLimiter(new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = fixedWindow.PermitLimit,
+                    Window = TimeSpan.FromSeconds(fixedWindow.WindowSeconds),
+                    QueueLimit = fixedWindow.QueueLimit,
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                    AutoReplenishment = true
+                }));
+            }
+
+            if (profile.SlidingWindow is SlidingWindowRateLimitSettings slidingWindow)
+            {
+                limiters.Add(new SlidingWindowRateLimiter(new SlidingWindowRateLimiterOptions
+                {
+                    PermitLimit = slidingWindow.PermitLimit,
+                    Window = TimeSpan.FromSeconds(slidingWindow.WindowSeconds),
+                    SegmentsPerWindow = slidingWindow.SegmentsPerWindow,
+                    QueueLimit = slidingWindow.QueueLimit,
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                    AutoReplenishment = true
+                }));
+            }
+
+            return new RateLimiterSet(limiters);
         }
 
         private static TimeSpan? TryGetRetryAfter(RateLimitLease lease)
@@ -587,40 +637,46 @@ namespace Classes.RateLimiting
         {
             for (int attempt = 0; attempt < 2; attempt++)
             {
-                ConcurrentDictionary<string, FixedWindowRateLimiter> limiters = _limiters;
-                FixedWindowRateLimiter limiter;
-                if (!limiters.TryGetValue(limiterKey, out limiter!))
+                ConcurrentDictionary<string, RateLimiterSet> limiters = _limiters;
+                RateLimiterSet limiterSet;
+                if (!limiters.TryGetValue(limiterKey, out limiterSet!))
                 {
-                    FixedWindowRateLimiter createdLimiter = CreateLimiter(profile);
-                    if (!limiters.TryAdd(limiterKey, createdLimiter))
+                    RateLimiterSet createdLimiterSet = CreateLimiterSet(profile);
+                    if (!limiters.TryAdd(limiterKey, createdLimiterSet))
                     {
-                        createdLimiter.Dispose();
-                        limiter = limiters[limiterKey];
+                        createdLimiterSet.Dispose();
+                        if (!limiters.TryGetValue(limiterKey, out limiterSet!))
+                        {
+                            continue;
+                        }
                     }
                     else
                     {
-                        limiter = createdLimiter;
+                        limiterSet = createdLimiterSet;
                     }
                 }
 
                 _limiterLastUsed[limiterKey] = DateTime.UtcNow;
                 try
                 {
-                    using RateLimitLease lease = await limiter.AcquireAsync(1, cancellationToken);
-                    if (lease.IsAcquired)
+                    foreach (RateLimiter limiter in limiterSet.Limiters)
                     {
-                        return new RateLimitDecision
+                        using RateLimitLease lease = await limiter.AcquireAsync(1, cancellationToken);
+                        if (!lease.IsAcquired)
                         {
-                            Allowed = true,
-                            ProfileName = profile.Name
-                        };
+                            return new RateLimitDecision
+                            {
+                                Allowed = false,
+                                ProfileName = profile.Name,
+                                RetryAfter = TryGetRetryAfter(lease)
+                            };
+                        }
                     }
 
                     return new RateLimitDecision
                     {
-                        Allowed = false,
-                        ProfileName = profile.Name,
-                        RetryAfter = TryGetRetryAfter(lease)
+                        Allowed = true,
+                        ProfileName = profile.Name
                     };
                 }
                 catch (ObjectDisposedException) when (attempt == 0)
@@ -644,9 +700,9 @@ namespace Classes.RateLimiting
                     continue;
                 }
 
-                if (_limiters.TryRemove(entry.Key, out FixedWindowRateLimiter? limiter))
+                if (_limiters.TryRemove(entry.Key, out RateLimiterSet? limiterSet))
                 {
-                    limiter.Dispose();
+                    limiterSet.Dispose();
                 }
             }
         }

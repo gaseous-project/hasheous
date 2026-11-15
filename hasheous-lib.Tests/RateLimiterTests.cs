@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 using Classes.RateLimiting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.DataProtection;
@@ -123,5 +124,83 @@ public class RateLimiterRuleFileTests
         Assert.True(File.Exists(rulesPath));
         string contents = File.ReadAllText(rulesPath);
         Assert.Contains("Example External Lookup Clients", contents);
+    }
+}
+
+public class RateLimiterWindowTests
+{
+    [Fact]
+    public async Task SlidingWindowCanBeConfiguredWithoutFixedWindow()
+    {
+        DynamicRateLimitManager manager = CreateManager(new RateLimitProfile
+        {
+            Name = "Sliding only",
+            FixedWindow = null,
+            SlidingWindow = new SlidingWindowRateLimitSettings
+            {
+                PermitLimit = 1,
+                WindowSeconds = 30,
+                SegmentsPerWindow = 3
+            }
+        });
+        DefaultHttpContext context = new();
+
+        RateLimitDecision first = await manager.AcquireLeaseAsync(context, CancellationToken.None);
+        RateLimitDecision second = await manager.AcquireLeaseAsync(context, CancellationToken.None);
+
+        Assert.True(first.Allowed);
+        Assert.False(second.Allowed);
+    }
+
+    [Fact]
+    public async Task BothConfiguredWindowsAreEnforced()
+    {
+        DynamicRateLimitManager manager = CreateManager(new RateLimitProfile
+        {
+            Name = "Both windows",
+            FixedWindow = new FixedWindowRateLimitSettings
+            {
+                PermitLimit = 2,
+                WindowSeconds = 30
+            },
+            SlidingWindow = new SlidingWindowRateLimitSettings
+            {
+                PermitLimit = 1,
+                WindowSeconds = 30,
+                SegmentsPerWindow = 3
+            }
+        });
+        DefaultHttpContext context = new();
+
+        RateLimitDecision first = await manager.AcquireLeaseAsync(context, CancellationToken.None);
+        RateLimitDecision second = await manager.AcquireLeaseAsync(context, CancellationToken.None);
+
+        Assert.True(first.Allowed);
+        Assert.False(second.Allowed);
+    }
+
+    [Fact]
+    public void ProfilesWithoutWindowSettingsRetainFixedWindowDefaults()
+    {
+        DynamicRateLimitManager manager = CreateManager(new RateLimitProfile
+        {
+            Name = "Legacy profile"
+        });
+        RateLimitProfile profile = Assert.Single(manager.CurrentRules.Profiles);
+
+        Assert.NotNull(profile.FixedWindow);
+        Assert.Null(profile.SlidingWindow);
+    }
+
+    private static DynamicRateLimitManager CreateManager(RateLimitProfile profile)
+    {
+        string rulesPath = Path.Combine(Path.GetTempPath(), "hasheous-rate-limiter-tests", Guid.NewGuid().ToString("N"), "rules.json");
+        DynamicRateLimitManager manager = new(rulesPath, TimeSpan.FromMinutes(5));
+        File.WriteAllText(rulesPath, JsonSerializer.Serialize(new RateLimitRuleSet
+        {
+            Profiles = new List<RateLimitProfile> { profile }
+        }));
+        manager.ReloadRules();
+        return manager;
     }
 }
