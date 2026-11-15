@@ -169,8 +169,11 @@ public static class StartupExtensions
                 }
             }
 
-            // If no trusted proxies are configured, the middleware will only trust loopback addresses.
-            // This is secure by default and allows local development without proxy configuration.
+            // Empty trust lists otherwise cause the middleware to trust every peer.
+            if (options.KnownProxies.Count == 0)
+            {
+                options.ForwardedHeaders = ForwardedHeaders.None;
+            }
         });
         return services;
     }
