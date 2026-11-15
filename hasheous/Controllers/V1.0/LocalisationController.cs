@@ -115,15 +115,7 @@ namespace hasheous_server.Controllers.v1_0
                 LocalisationItem? item = await Localisation.GetLocalisationItem(locale);
                 if (item != null)
                 {
-                    // merge missing translations from the English localisation item
-                    if (locale == "en")
-                    {
-                        return Ok(item);
-                    }
-                    else
-                    {
-                        return Ok(item);
-                    }
+                    return Ok(item);
                 }
                 return NotFound();
             }

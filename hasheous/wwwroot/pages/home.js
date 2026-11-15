@@ -22,8 +22,8 @@ fetch('/api/v1.0/Insights/app/0/Insights', {
 
                 if (key == 'busiest_endpoints') {
                     continue; // skip busiest_endpoints
-                    showHeader = true;
-                    insightElement.style.width = 'auto';
+                    // showHeader = true;
+                    // insightElement.style.width = 'auto';
                 }
 
                 let insightTitle = document.createElement('span');
