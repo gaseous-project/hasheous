@@ -1089,52 +1089,23 @@ namespace Classes
 			}
 		}
 
+		/// <summary>
+		/// Extracts the remote client IP address from the HTTP context.
+		/// 
+		/// This method reads HttpContext.Connection.RemoteIpAddress, which is populated by ASP.NET Core's
+		/// forwarded-header middleware when processing X-Forwarded-For and X-Forwarded-Proto headers
+		/// from trusted proxies (configured via Config.TrustedProxies).
+		/// 
+		/// Returns the client IP address if available, or an empty string if null. This value is used by:
+		/// - Insights logging (request source IP tracking)
+		/// - Rate-limiter with "remote-ip" partitioning (grouping requests by client IP)
+		/// - Account login logging (tracking login source IPs)
+		/// 
+		/// See docs/IP-Detection.md for configuration and multi-hop proxy scenarios.
+		/// </summary>
 		public static string GetContextRemoteIP(Microsoft.AspNetCore.Http.HttpContext httpContext)
 		{
-			string remoteIp = "";
-
-			if (httpContext.Request.Headers.ContainsKey("true-client-ip"))
-			{
-				// If behind a CloudFlare proxy, use the true-client-ip header
-				remoteIp = httpContext.Request.Headers["true-client-ip"].ToString();
-			}
-			else if (httpContext.Request.Headers.ContainsKey("CF-Connecting-IPv6"))
-			{
-				// If behind a CloudFlare proxy, use the CF-Connecting-IPv6 header
-				remoteIp = httpContext.Request.Headers["CF-Connecting-IPv6"].ToString();
-			}
-			else if (httpContext.Request.Headers.ContainsKey("cf-connecting-ip"))
-			{
-				// If behind a CloudFlare proxy, use the cf-connecting-ip header
-				remoteIp = httpContext.Request.Headers["cf-connecting-ip"].ToString();
-			}
-			else if (httpContext.Request.Headers.ContainsKey("X-Forwarded-For"))
-			{
-				// If behind a proxy, use the X-Forwarded-For header
-				string? forwardedFor = httpContext.Request.Headers["X-Forwarded-For"].ToString();
-				if (!String.IsNullOrEmpty(forwardedFor))
-				{
-					string ipAddress = forwardedFor.Split(',').FirstOrDefault()?.Trim();
-					if (!string.IsNullOrEmpty(ipAddress))
-					{
-						if (IPAddress.TryParse(ipAddress, out IPAddress? parsedIp))
-						{
-							remoteIp = parsedIp.ToString();
-						}
-						else
-						{
-							remoteIp = ipAddress; // Fallback to the raw value if parsing fails
-						}
-					}
-				}
-			}
-			else if (httpContext.Connection.RemoteIpAddress != null)
-			{
-				// Otherwise, use the RemoteIpAddress from the connection
-				remoteIp = httpContext.Connection.RemoteIpAddress.ToString();
-			}
-
-			return remoteIp;
+			return httpContext.Connection.RemoteIpAddress?.ToString() ?? string.Empty;
 		}
 
 		/// <summary>
