@@ -104,7 +104,7 @@ namespace hasheous_server.Controllers.v1_0
         {
             // ensure locale is valid since we'll likely be hitting the disk
             string localePattern = @"^[a-z]{2}(?:-[A-Z]{2}|_[A-Z]{2})?$";
-            if (!Regex.IsMatch(locale, localePattern))
+            if (!Regex.IsMatch(locale, localePattern, RegexOptions.None, new TimeSpan(0, 0, 10)))
             {
                 return NotFound();
             }
