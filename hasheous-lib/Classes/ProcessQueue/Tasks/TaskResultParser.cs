@@ -22,12 +22,12 @@ namespace Classes.ProcessQueue
         {
             try
             {
-                // Find all tasks submitted more than 10 minutes ago
+                // Find all tasks submitted more than 5 minutes ago
                 string sql = "SELECT * FROM Task_Queue WHERE status = @status AND completion_time < @time;";
                 DataTable submittedTasks = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object>
                 {
                     { "@status", QueueItemStatus.Submitted},
-                    { "@time", DateTime.UtcNow.AddMinutes(-10) }
+                    { "@time", DateTime.UtcNow.AddMinutes(-5) }
                 });
 
                 hasheous_server.Classes.DataObjects dataObjects = new hasheous_server.Classes.DataObjects();
@@ -196,6 +196,26 @@ namespace Classes.ProcessQueue
                                         }
                                     }
                                 }
+                                break;
+
+                            case TaskType.AILocalisationGeneration:
+                            case TaskType.AILocalisationGenerationRegional:
+                                // import processed language files
+                                // parse result from json into a Dictionary
+                                Dictionary<string, string?>? aiTranslationResults = JsonConvert.DeserializeObject<Dictionary<string, string?>>(taskItem.Result ?? "");
+
+                                // pull the translation results from the AI task
+                                if (dataObject != null && aiTranslationResults != null && aiTranslationResults.ContainsKey("translated"))
+                                {
+                                    hasheous_server.Models.LocalisationItem? localisationItem = Newtonsoft.Json.JsonConvert.DeserializeObject<hasheous_server.Models.LocalisationItem>(aiTranslationResults["translated"] ?? "");
+
+                                    if (localisationItem != null)
+                                    {
+                                        // start the import process
+                                        await hasheous_server.Classes.Localisation.ImportLocalisationFileAsync(localisationItem);
+                                    }
+                                }
+
                                 break;
                         }
 

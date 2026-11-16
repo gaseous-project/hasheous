@@ -288,7 +288,12 @@ namespace hasheous_server.Models.Tasks
         /// <summary>
         /// Task for localisation generation.
         /// </summary>
-        AILocalisationGeneration = 10
+        AILocalisationGeneration = 10,
+
+        /// <summary>
+        /// Task for regional localisation generation.
+        /// </summary>
+        AILocalisationGenerationRegional = 20
     }
 
     /// <summary>

@@ -63,9 +63,9 @@ namespace hasheous_server.Classes
         public static async Task<LocalisationItem> GetLocalisationItem(string locale)
         {
             // Check if the localisation item for the specified locale is already loaded - return immediately if found
-            if (LocalisationItems.Any(item => item.LanguageCode == locale))
+            if (LocalisationItems.Any(item => item.FullCode == locale))
             {
-                return LocalisationItems.First(item => item.LanguageCode == locale);
+                return LocalisationItems.First(item => item.FullCode == locale);
             }
 
             // If the localisation item is not already loaded, attempt to load it from the database, local file system, or embedded JSON files
@@ -145,7 +145,7 @@ namespace hasheous_server.Classes
                 }
 
                 // remove any existing localisation item with the same language code from the in-memory collection
-                LocalisationItems.RemoveAll(i => i.LanguageCode == item.LanguageCode);
+                LocalisationItems.RemoveAll(i => i.FullCode == item.FullCode);
 
                 // add the localisation item to the in-memory collection
                 LocalisationItems.Add(item);
@@ -167,7 +167,7 @@ namespace hasheous_server.Classes
                     item = ConvertStringsToTranslationItem(item);
 
                     // remove any existing localisation item with the same language code from the in-memory collection
-                    LocalisationItems.RemoveAll(i => i.LanguageCode == item.LanguageCode);
+                    LocalisationItems.RemoveAll(i => i.FullCode == item.FullCode);
                     // add the localisation item to the in-memory collection
                     LocalisationItems.Add(item);
 
@@ -193,7 +193,7 @@ namespace hasheous_server.Classes
                     item = ConvertStringsToTranslationItem(item);
 
                     // remove any existing localisation item with the same language code from the in-memory collection
-                    LocalisationItems.RemoveAll(i => i.LanguageCode == item.LanguageCode);
+                    LocalisationItems.RemoveAll(i => i.FullCode == item.FullCode);
 
                     // add the localisation item to the in-memory collection
                     LocalisationItems.Add(item);
@@ -215,7 +215,7 @@ namespace hasheous_server.Classes
         /// <remarks>
         /// This method will check for existing entries in the database and update them if necessary, or add new entries if they do not exist. It will generally be run as a background task.
         /// </remarks>
-        private static async Task ImportLocalisationFileAsync(LocalisationItem item)
+        public static async Task ImportLocalisationFileAsync(LocalisationItem item)
         {
             if (item == null)
             {
@@ -223,7 +223,7 @@ namespace hasheous_server.Classes
             }
 
             // check required values are present
-            if (string.IsNullOrWhiteSpace(item.LanguageCode))
+            if (string.IsNullOrWhiteSpace(item.FullCode))
             {
                 throw new InvalidOperationException("Localisation item has no language code.");
             }
@@ -245,7 +245,7 @@ namespace hasheous_server.Classes
             DateTime now = DateTime.UtcNow;
 
             // import the item into the database
-            LocalisationItem? existingItem = await LoadLocalisationItemFromDatabaseAsync(item.LanguageCode);
+            LocalisationItem? existingItem = await LoadLocalisationItemFromDatabaseAsync(item.FullCode);
             if (existingItem == null)
             {
                 // full import
@@ -283,10 +283,10 @@ namespace hasheous_server.Classes
             else
             {
                 // verify the incoming item version is higher than the existing one before updating the existing localisation language entry
-                string existingVersionSQL = "SELECT id, version FROM localisation_languages WHERE language_code = @LanguageCode;";
+                string existingVersionSQL = "SELECT id, version FROM localisation_languages WHERE FullCode = @LanguageCode;";
                 Dictionary<string, object> existingVersionParams = new Dictionary<string, object>
                 {
-                    { "@LanguageCode", item.LanguageCode }
+                    { "@LanguageCode", item.FullCode }
                 };
                 var existingVersionTable = await Config.database.ExecuteCMDAsync(existingVersionSQL, existingVersionParams);
                 int existingVersion = int.Parse(existingVersionTable.Rows[0]["Version"].ToString());

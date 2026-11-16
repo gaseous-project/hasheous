@@ -54,6 +54,28 @@ namespace hasheous_server.Classes
 
         public static Dictionary<DataObjectType, object> DataObjectDefinitions = new Dictionary<DataObjectType, object>
         {
+            { DataObjectType.Language, new DataObjectDefinition{
+                HasMetadata = false,
+                HasSignatures = false,
+                AllowMerge = true,
+                Attributes = new List<AttributeItem>{
+                    new AttributeItem{
+                        attributeName = AttributeItem.AttributeName.EnglishName,
+                        attributeType = AttributeItem.AttributeType.ShortString,
+                        attributeRelationType = DataObjectType.None
+                    },
+                    new AttributeItem{
+                        attributeName = AttributeItem.AttributeName.NativeName,
+                        attributeType = AttributeItem.AttributeType.ShortString,
+                        attributeRelationType = DataObjectType.None
+                    },
+                    new AttributeItem{
+                        attributeName = AttributeItem.AttributeName.ParentLanguage,
+                        attributeType = AttributeItem.AttributeType.ObjectRelationship,
+                        attributeRelationType = DataObjectType.Language
+                    }
+                }
+            } },
             { DataObjectType.Company, new DataObjectDefinition{
                 HasMetadata = true,
                 HasSignatures = true,
