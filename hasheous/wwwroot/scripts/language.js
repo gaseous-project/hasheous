@@ -93,7 +93,7 @@ class language {
             console.warn("No language files loaded for locale: " + this.locale + ". Falling back to default language (en).");
         }
 
-        if (!this.languageBase && !this.languageRegion) {
+        if (!this.languageBase || !this.languageRegion) {
             // place request for language matching the locale
             try {
                 await $.getJSON('/localisation/request/' + this.locale + '.json');

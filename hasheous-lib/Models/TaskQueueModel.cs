@@ -140,7 +140,7 @@ namespace hasheous_server.Models.Tasks
             this.StartedAt = null;
             this.CompletedAt = null;
 
-            this.Parameters = TaskManagement.BuildTaskParams(this.DataObjectId, this.TaskName);
+            this.Parameters = await TaskManagement.BuildTaskParams(this.DataObjectId, this.TaskName);
 
             switch (this.TaskName)
             {

@@ -512,7 +512,7 @@ namespace hasheous_server.Classes.Tasks.Clients
         /// <param name="taskType">The type of the task to enqueue.</param>
         /// <param name="parameters">Optional dictionary of task-specific parameters that may be modified or extended by the method.</param>
         /// <returns>The enqueued <see cref="QueueItemModel"/> instance.</returns>
-        public static QueueItemModel? EnqueueTask(long dataObjectId, TaskType taskType, Dictionary<string, string>? parameters = null)
+        public async static Task<QueueItemModel?> EnqueueTask(long dataObjectId, TaskType taskType, Dictionary<string, string>? parameters = null)
         {
             // default capabilities to Internet and DiskSpace
             List<Capabilities> capabilities = new List<Capabilities>
@@ -530,7 +530,7 @@ namespace hasheous_server.Classes.Tasks.Clients
             {
                 case TaskType.AIDescriptionAndTagging:
                     capabilities.Add(Capabilities.AI);
-                    Dictionary<string, string>? aiParams = BuildTaskParams(dataObjectId, taskType, parameters);
+                    Dictionary<string, string>? aiParams = await BuildTaskParams(dataObjectId, taskType, parameters);
                     if (aiParams != null)
                     {
                         if (!aiParams.ContainsKey("prompt_description") || !aiParams.ContainsKey("prompt_tags") || !aiParams.ContainsKey("sources") ||
@@ -549,8 +549,9 @@ namespace hasheous_server.Classes.Tasks.Clients
                     break;
 
                 case TaskType.AILocalisationGeneration:
+                case TaskType.AILocalisationGenerationRegional:
                     capabilities.Add(Capabilities.AI);
-                    Dictionary<string, string>? localisationParams = BuildTaskParams(dataObjectId, taskType, parameters);
+                    Dictionary<string, string>? localisationParams = await BuildTaskParams(dataObjectId, taskType, parameters);
                     if (localisationParams != null)
                     {
                         if (!localisationParams.ContainsKey("language") || String.IsNullOrEmpty(localisationParams["language"]))
@@ -687,11 +688,19 @@ namespace hasheous_server.Classes.Tasks.Clients
             _ = task.Commit();
         }
 
-        public static Dictionary<string, string>? BuildTaskParams(long dataObjectId, TaskType taskType, Dictionary<string, string>? parameters = null)
+        public async static Task<Dictionary<string, string>?> BuildTaskParams(long dataObjectId, TaskType taskType, Dictionary<string, string>? parameters = null)
         {
             if (parameters == null)
             {
                 parameters = new Dictionary<string, string>();
+            }
+
+            // get the data object
+            var dataObjects = new DataObjects();
+            var dataObject = await dataObjects.GetDataObject(dataObjectId);
+            if (dataObject == null)
+            {
+                throw new Exception("Data object not found.");
             }
 
             switch (taskType)
@@ -703,14 +712,6 @@ namespace hasheous_server.Classes.Tasks.Clients
 
                     string prompt_description = "";
                     string prompt_tags = "";
-
-                    // get the data object for use in prompt generation
-                    var dataObjects = new DataObjects();
-                    var dataObject = dataObjects.GetDataObject(dataObjectId).Result;
-                    if (dataObject == null)
-                    {
-                        throw new Exception("Data object not found.");
-                    }
 
                     // supply the sources and prompts based on data object type
                     switch (dataObject.ObjectType)
@@ -983,6 +984,21 @@ namespace hasheous_server.Classes.Tasks.Clients
                         default:
                             break;
                     }
+                    break;
+
+                case TaskType.AILocalisationGeneration:
+                case TaskType.AILocalisationGenerationRegional:
+                    // both of these task types are handled similarly for localisation generation
+                    if (parameters == null)
+                    {
+                        parameters = new Dictionary<string, string>();
+                    }
+
+                    if (!parameters.ContainsKey("language"))
+                    {
+                        parameters["language"] = dataObject.Name;
+                    }
+
                     break;
             }
 
