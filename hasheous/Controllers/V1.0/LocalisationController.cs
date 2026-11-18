@@ -113,10 +113,11 @@ namespace hasheous_server.Controllers.v1_0
 
             // check if the data object has a localisation task already queued - queue if not, otherwise do nothing
             var baseLanguaguageTasks = hasheous_server.Classes.Tasks.Clients.TaskManagement.GetAllTasks(baseLanguaguageDataObjectItem.Id);
-            if (baseLanguaguageTasks.Find(t => t.TaskName == Models.Tasks.TaskType.AILocalisationGeneration) == null)
+            Models.Tasks.QueueItemModel? baseLanguageTask = baseLanguaguageTasks.Find(t => t.TaskName == Models.Tasks.TaskType.AILocalisationGeneration);
+            if (baseLanguageTask == null)
             {
                 // queue a task to generate the localisation for this new data object
-                hasheous_server.Classes.Tasks.Clients.TaskManagement.EnqueueTask(baseLanguaguageDataObjectItem.Id, Models.Tasks.TaskType.AILocalisationGeneration, new List<Models.Tasks.Capabilities> { Models.Tasks.Capabilities.Internet, Models.Tasks.Capabilities.AI, Models.Tasks.Capabilities.DiskSpace }, new Dictionary<string, string> { { "language", baseLanguage } });
+                baseLanguageTask = hasheous_server.Classes.Tasks.Clients.TaskManagement.EnqueueTask(baseLanguaguageDataObjectItem.Id, Models.Tasks.TaskType.AILocalisationGeneration, new List<Models.Tasks.Capabilities> { Models.Tasks.Capabilities.Internet, Models.Tasks.Capabilities.AI, Models.Tasks.Capabilities.DiskSpace }, new Dictionary<string, string> { { "language", baseLanguage } });
             }
 
             // generate a task to generate the variant language if it exists
@@ -161,7 +162,7 @@ namespace hasheous_server.Controllers.v1_0
                 if (variantLanguaguageTasks.Find(t => t.TaskName == Models.Tasks.TaskType.AILocalisationGenerationRegional) == null)
                 {
                     // queue a task to generate the localisation for this new data object
-                    hasheous_server.Classes.Tasks.Clients.TaskManagement.EnqueueTask(variantLanguageDataObject.Id, Models.Tasks.TaskType.AILocalisationGenerationRegional, new List<Models.Tasks.Capabilities> { Models.Tasks.Capabilities.Internet, Models.Tasks.Capabilities.AI, Models.Tasks.Capabilities.DiskSpace }, new Dictionary<string, string> { { "language", locale } });
+                    hasheous_server.Classes.Tasks.Clients.TaskManagement.EnqueueTask(variantLanguageDataObject.Id, Models.Tasks.TaskType.AILocalisationGenerationRegional, new List<Models.Tasks.Capabilities> { Models.Tasks.Capabilities.Internet, Models.Tasks.Capabilities.AI, Models.Tasks.Capabilities.DiskSpace }, new Dictionary<string, string> { { "language", locale } }, baseLanguageTask.Id);
                 }
             }
 

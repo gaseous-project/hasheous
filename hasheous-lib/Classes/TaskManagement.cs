@@ -299,7 +299,7 @@ namespace hasheous_server.Classes.Tasks.Clients
             // Step 1: SELECT with FOR UPDATE SKIP LOCKED (locks the row)
             // Step 2: UPDATE the locked row to assign it
             // Both must happen in the same transaction!
-            string selectSql = @"SELECT tq.id AS id, tq.create_time AS create_time, tq.dataobjectid AS dataobjectid, tq.task_name AS task_name, tq.status AS status, tq.client_id AS client_id, tq.parameters AS parameters, tq.result AS result, tq.error_message AS error_message, tq.start_time AS start_time, tq.completion_time AS completion_time
+            string selectSql = @"SELECT tq.id AS id, tq.create_time AS create_time, tq.dataobjectid AS dataobjectid, tq.task_name AS task_name, tq.status AS status, tq.client_id AS client_id, tq.parameters AS parameters, tq.result AS result, tq.error_message AS error_message, tq.start_time AS start_time, tq.completion_time AS completion_time, tq.parent_task_id AS parent_task_id
                 FROM Task_Queue tq
                 LEFT JOIN Task_Queue_Capabilities tqc ON tq.id = tqc.task_queue_id
                 WHERE ((tq.status = 0 AND tq.client_id IS NULL) OR ((tq.status = 10 OR tq.status = 20) AND tq.client_id = @client_id))
@@ -308,6 +308,14 @@ namespace hasheous_server.Classes.Tasks.Clients
                     FROM Task_Queue_Capabilities tqc_required
                     WHERE tqc_required.task_queue_id = tq.id
                     AND tqc_required.capability_id NOT IN (" + string.Join(", ", client.Capabilities.Select(c => ((int)c).ToString())) + @")
+                )
+                AND (
+                    tq.parent_task_id IS NULL OR 
+                    EXISTS (
+                        SELECT 1 FROM Task_Queue parent_tq 
+                        WHERE parent_tq.id = tq.parent_task_id 
+                        AND parent_tq.status = " + (int)QueueItemStatus.Completed + @"
+                    )
                 )
                 GROUP BY tq.id
                 ORDER BY tq.create_time ASC
@@ -334,6 +342,14 @@ namespace hasheous_server.Classes.Tasks.Clients
                             FROM Task_Queue_Capabilities tqc_required
                             WHERE tqc_required.task_queue_id = tq.id
                             AND tqc_required.capability_id NOT IN (" + string.Join(", ", client.Capabilities.Select(c => ((int)c).ToString())) + @")
+                        )
+                        AND (
+                            tq.parent_task_id IS NULL OR 
+                            EXISTS (
+                                SELECT 1 FROM Task_Queue parent_tq 
+                                WHERE parent_tq.id = tq.parent_task_id 
+                                AND parent_tq.status = " + (int)QueueItemStatus.Completed + @"
+                            )
                         )
                         GROUP BY tq.id
                         ORDER BY tq.create_time ASC
@@ -497,10 +513,11 @@ namespace hasheous_server.Classes.Tasks.Clients
         /// <param name="taskType">The type of the task to enqueue.</param>
         /// <param name="capabilities">A list of capabilities required to process the task.</param>
         /// <param name="parameters">A dictionary containing task-specific parameters.</param>
+        /// <param name="parentTaskId">The identifier of the parent task, if any.</param>
         /// <returns>The enqueued <see cref="QueueItemModel"/> instance.</returns>
-        public static QueueItemModel EnqueueTask(long dataObjectId, TaskType taskType, List<Capabilities> capabilities, Dictionary<string, string>? parameters)
+        public static QueueItemModel EnqueueTask(long dataObjectId, TaskType taskType, List<Capabilities> capabilities, Dictionary<string, string>? parameters, long? parentTaskId = null)
         {
-            QueueItemModel task = new QueueItemModel(dataObjectId, taskType, capabilities, parameters);
+            QueueItemModel task = new QueueItemModel(dataObjectId, taskType, capabilities, parameters, parentTaskId);
             return task;
         }
 
@@ -511,8 +528,9 @@ namespace hasheous_server.Classes.Tasks.Clients
         /// <param name="dataObjectId">The identifier of the associated data object.</param>
         /// <param name="taskType">The type of the task to enqueue.</param>
         /// <param name="parameters">Optional dictionary of task-specific parameters that may be modified or extended by the method.</param>
+        /// <param name="parentTaskId">The identifier of the parent task, if any.</param>
         /// <returns>The enqueued <see cref="QueueItemModel"/> instance.</returns>
-        public async static Task<QueueItemModel?> EnqueueTask(long dataObjectId, TaskType taskType, Dictionary<string, string>? parameters = null)
+        public async static Task<QueueItemModel?> EnqueueTask(long dataObjectId, TaskType taskType, Dictionary<string, string>? parameters = null, long? parentTaskId = null)
         {
             // default capabilities to Internet and DiskSpace
             List<Capabilities> capabilities = new List<Capabilities>
@@ -569,7 +587,7 @@ namespace hasheous_server.Classes.Tasks.Clients
                     break;
             }
 
-            return EnqueueTask(dataObjectId, taskType, capabilities, parameters);
+            return EnqueueTask(dataObjectId, taskType, capabilities, parameters, parentTaskId);
         }
 
         /// <summary>
@@ -676,6 +694,31 @@ namespace hasheous_server.Classes.Tasks.Clients
             {
                 throw new Exception("Task not found.");
             }
+
+            // If the task is being restarted (from Completed or Failed to another state), 
+            // we need to also reset its child tasks
+            bool isRestarting = (task.Status == QueueItemStatus.Completed || task.Status == QueueItemStatus.Failed) &&
+                               (status != QueueItemStatus.Completed && status != QueueItemStatus.Failed);
+
+            if (isRestarting)
+            {
+                // Reset all child tasks that depend on this task
+                DataTable childTasks = Config.database.ExecuteCMD(
+                    "SELECT id FROM `Task_Queue` WHERE `parent_task_id` = @parent_task_id AND `status` IN (@status1, @status2);",
+                    new Dictionary<string, object>
+                    {
+                        { "@parent_task_id", taskId },
+                        { "@status1", (int)QueueItemStatus.Completed },
+                        { "@status2", (int)QueueItemStatus.Failed }
+                    });
+
+                foreach (DataRow row in childTasks.Rows)
+                {
+                    long childTaskId = Convert.ToInt64(row["id"]);
+                    UpdateTaskStatus(childTaskId, QueueItemStatus.Pending);
+                }
+            }
+
             task.Status = status;
             if (result != null)
             {

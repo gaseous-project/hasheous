@@ -181,7 +181,10 @@ namespace hasheous_server.Classes
         private static async Task<LocalisationItem?> LoadLocalisationItemFromEmbeddedResourceAsync(string locale)
         {
             string resourceName = $"hasheous.localisation.{locale}.json";
-            Assembly assembly = Assembly.GetExecutingAssembly();
+            Assembly? assembly = Assembly.GetEntryAssembly();
+            if (assembly == null)
+                assembly = Assembly.GetExecutingAssembly();
+            var resourceNames = assembly.GetManifestResourceNames();
             using Stream? stream = assembly.GetManifestResourceStream(resourceName);
             if (stream != null)
             {

@@ -33,7 +33,7 @@ namespace hasheous_server.Models.Tasks
         /// <param name="taskType">The type of task to be performed.</param>
         /// <param name="requiredCapabilities">The list of required capabilities for this task.</param>
         /// <param name="parameters">Optional parameters for the task.</param>
-        public QueueItemModel(long dataObjectId, TaskType taskType, List<Capabilities> requiredCapabilities, Dictionary<string, string>? parameters = null)
+        public QueueItemModel(long dataObjectId, TaskType taskType, List<Capabilities> requiredCapabilities, Dictionary<string, string>? parameters = null, long? parentTaskId = null)
         {
             this._CreatedAt = DateTime.UtcNow;
             this._DataObjectId = dataObjectId;
@@ -41,16 +41,18 @@ namespace hasheous_server.Models.Tasks
             this.Status = QueueItemStatus.Pending;
             this._RequiredCapabilities = requiredCapabilities;
             this.Parameters = parameters;
+            this.ParentTaskId = parentTaskId;
 
             // Id will be set when saved to database
-            DataTable dt = Config.database.ExecuteCMD("INSERT INTO `Task_Queue` (`create_time`, `dataobjectid`, `task_name`, `status`, `required_capabilities`, `parameters`) VALUES (@created_at, @dataobjectid, @task_name, @status, @required_capabilities, @parameters); SELECT LAST_INSERT_ID();", new Dictionary<string, object>
+            DataTable dt = Config.database.ExecuteCMD("INSERT INTO `Task_Queue` (`create_time`, `dataobjectid`, `task_name`, `status`, `required_capabilities`, `parameters`, `parent_task_id`) VALUES (@created_at, @dataobjectid, @task_name, @status, @required_capabilities, @parameters, @parent_task_id); SELECT LAST_INSERT_ID();", new Dictionary<string, object>
             {
                 { "@created_at", this._CreatedAt },
                 { "@dataobjectid", this._DataObjectId },
                 { "@task_name", (int)this._TaskName },
                 { "@status", (int)this.Status },
                 { "@required_capabilities", System.Text.Json.JsonSerializer.Serialize(this.RequiredCapabilities) },
-                { "@parameters", System.Text.Json.JsonSerializer.Serialize(this.Parameters) ?? "{}"}
+                { "@parameters", System.Text.Json.JsonSerializer.Serialize(this.Parameters) ?? "{}"},
+                { "@parent_task_id", this.ParentTaskId }
             });
             foreach (Capabilities capability in requiredCapabilities)
             {
@@ -127,6 +129,11 @@ namespace hasheous_server.Models.Tasks
         /// Gets or sets the date and time when the task was completed, if available.
         /// </summary>
         public DateTime? CompletedAt { get; set; }
+
+        /// <summary>
+        /// Gets or sets the identifier of the parent task, if any.
+        /// </summary>
+        public long? ParentTaskId { get; set; }
 
         /// <summary>
         /// Resets transient runtime fields on the queue item so it can be re-queued or retried.
