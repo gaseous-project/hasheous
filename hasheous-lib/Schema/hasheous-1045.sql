@@ -20,5 +20,6 @@ CREATE TABLE `localisation_strings` (
     `AIGenerated` BOOLEAN NOT NULL,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`language_id`, `key`)
+    PRIMARY KEY (`language_id`, `key`),
+    CONSTRAINT `fk_localisation_strings_language` FOREIGN KEY (`language_id`) REFERENCES `localisation_languages` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 );
