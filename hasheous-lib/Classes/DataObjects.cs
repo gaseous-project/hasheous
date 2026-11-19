@@ -643,11 +643,6 @@ namespace hasheous_server.Classes
 
         public async Task<Models.DataObjectItem?> SearchDataObject(DataObjectType objectType, string? objectName, List<DataObjectSearchCriteriaItem> searchCriteria)
         {
-            // if (searchCriteria.Count == 0)
-            // {
-            //     throw new DataObjectsBadSearchCriteriaException("No search criteria provided");
-            // }
-
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "SELECT * FROM DataObject";
             Dictionary<string, object> dbDict = new Dictionary<string, object> { };

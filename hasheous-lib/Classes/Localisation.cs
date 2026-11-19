@@ -5,7 +5,10 @@ using hasheous_server.Models;
 
 namespace hasheous_server.Classes
 {
-    public class Localisation
+    /// <summary>
+    /// Provides methods for managing and retrieving localisation items.
+    /// </summary>
+    public static class Localisation
     {
         private static readonly List<LocalisationItem> LocalisationItems = new List<LocalisationItem>();
 
@@ -98,7 +101,7 @@ namespace hasheous_server.Classes
                 }
             }
 
-            throw new NotFoundException($"Localisation language not found for locale: {locale}");
+            throw new ArgumentException($"Localisation language not found for locale: {locale}");
         }
 
         private static async Task<LocalisationItem?> LoadLocalisationItemFromDatabaseAsync(string locale)
@@ -184,7 +187,6 @@ namespace hasheous_server.Classes
             Assembly? assembly = Assembly.GetEntryAssembly();
             if (assembly == null)
                 assembly = Assembly.GetExecutingAssembly();
-            var resourceNames = assembly.GetManifestResourceNames();
             using Stream? stream = assembly.GetManifestResourceStream(resourceName);
             if (stream != null)
             {
@@ -342,22 +344,6 @@ namespace hasheous_server.Classes
             }
             localisationItem.Strings.Clear();
             return localisationItem;
-        }
-
-        [Serializable]
-        internal class NotFoundException : Exception
-        {
-            public NotFoundException()
-            {
-            }
-
-            public NotFoundException(string? message) : base(message)
-            {
-            }
-
-            public NotFoundException(string? message, Exception? innerException) : base(message, innerException)
-            {
-            }
         }
     }
 }
