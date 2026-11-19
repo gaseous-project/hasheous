@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Data;
 using System.Reflection;
 using System.Text.Json;
 using Classes;
@@ -10,7 +12,7 @@ namespace hasheous_server.Classes
     /// </summary>
     public static class Localisation
     {
-        private static readonly List<LocalisationItem> LocalisationItems = new List<LocalisationItem>();
+        private static readonly ConcurrentDictionary<string, LocalisationItem> LocalisationItems = new ConcurrentDictionary<string, LocalisationItem>();
 
         /// <summary>
         /// Retrieves a list of all available localisation items.
@@ -18,18 +20,21 @@ namespace hasheous_server.Classes
         /// <returns>A task representing the asynchronous operation, containing a list of localisation items.</returns>
         public static async Task<List<LocalisationItem>> GetLanguages()
         {
+            string sql = "SELECT * FROM localisation_languages ORDER BY FullCode;";
+            DataTable dataTable = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object>());
+
             List<LocalisationItem> languages = new List<LocalisationItem>();
-            foreach (var item in LocalisationItems)
+            foreach (DataRow row in dataTable.Rows)
             {
                 languages.Add(new LocalisationItem
                 {
-                    FullCode = item.FullCode,
-                    EnglishName = item.EnglishName,
-                    NativeName = item.NativeName,
-                    EnglishRegionName = item.EnglishRegionName,
-                    NativeRegionName = item.NativeRegionName,
-                    Direction = item.Direction,
-                    Version = item.Version
+                    FullCode = row["FullCode"].ToString(),
+                    EnglishName = row["EnglishName"].ToString(),
+                    NativeName = row["NativeName"].ToString(),
+                    EnglishRegionName = row["EnglishRegionName"].ToString(),
+                    NativeRegionName = row["NativeRegionName"].ToString(),
+                    Direction = Enum.Parse<LocalisationItem.LanguageDirection>(row["Direction"].ToString()),
+                    Version = int.Parse(row["Version"].ToString())
                 });
             }
 
@@ -66,9 +71,9 @@ namespace hasheous_server.Classes
         public static async Task<LocalisationItem> GetLocalisationItem(string locale)
         {
             // Check if the localisation item for the specified locale is already loaded - return immediately if found
-            if (LocalisationItems.Any(item => item.FullCode == locale))
+            if (LocalisationItems.ContainsKey(locale))
             {
-                return LocalisationItems.First(item => item.FullCode == locale);
+                return LocalisationItems[locale];
             }
 
             // If the localisation item is not already loaded, attempt to load it from the database, local file system, or embedded JSON files
@@ -148,10 +153,13 @@ namespace hasheous_server.Classes
                 }
 
                 // remove any existing localisation item with the same language code from the in-memory collection
-                LocalisationItems.RemoveAll(i => i.FullCode == item.FullCode);
+                if (LocalisationItems.ContainsKey(item.FullCode))
+                {
+                    LocalisationItems.Remove(item.FullCode, out _);
+                }
 
                 // add the localisation item to the in-memory collection
-                LocalisationItems.Add(item);
+                LocalisationItems[item.FullCode] = item;
                 return item;
             }
 
@@ -170,9 +178,12 @@ namespace hasheous_server.Classes
                     item = ConvertStringsToTranslationItem(item);
 
                     // remove any existing localisation item with the same language code from the in-memory collection
-                    LocalisationItems.RemoveAll(i => i.FullCode == item.FullCode);
+                    if (LocalisationItems.ContainsKey(item.FullCode))
+                    {
+                        LocalisationItems.Remove(item.FullCode, out _);
+                    }
                     // add the localisation item to the in-memory collection
-                    LocalisationItems.Add(item);
+                    LocalisationItems[item.FullCode] = item;
 
                     return item;
                 }
@@ -198,10 +209,13 @@ namespace hasheous_server.Classes
                     item = ConvertStringsToTranslationItem(item);
 
                     // remove any existing localisation item with the same language code from the in-memory collection
-                    LocalisationItems.RemoveAll(i => i.FullCode == item.FullCode);
+                    if (LocalisationItems.ContainsKey(item.FullCode))
+                    {
+                        LocalisationItems.Remove(item.FullCode, out _);
+                    }
 
                     // add the localisation item to the in-memory collection
-                    LocalisationItems.Add(item);
+                    LocalisationItems[item.FullCode] = item;
 
                     return item;
                 }

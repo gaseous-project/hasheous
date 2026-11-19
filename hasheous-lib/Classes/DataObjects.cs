@@ -662,6 +662,13 @@ namespace hasheous_server.Classes
                 }
             }
 
+            string typeClause = "";
+            if (objectType != DataObjectType.None)
+            {
+                typeClause = "`ObjectType` = @objecttype";
+                dbDict.Add("objecttype", objectType);
+            }
+
             int loopCount = 0;
             if (searchCriteria != null && searchCriteria.Count > 0)
             {
@@ -684,9 +691,21 @@ namespace hasheous_server.Classes
                 }
             }
 
-            if (nameClause != "")
+            if (nameClause != "" || typeClause != "")
             {
-                sql += " WHERE " + nameClause;
+                sql += " WHERE ";
+                if (nameClause != "")
+                {
+                    sql += nameClause;
+                }
+                if (nameClause != "" && typeClause != "")
+                {
+                    sql += " AND ";
+                }
+                if (typeClause != "")
+                {
+                    sql += typeClause;
+                }
             }
 
             DataTable data = await db.ExecuteCMDAsync(sql, dbDict);
