@@ -703,4 +703,14 @@ public static class StartupExtensions
         maintenanceQueueItem.ForceExecute();
         QueueProcessor.QueueItems.Add(maintenanceQueueItem);
     }
+
+    public static void ConfigureLanguageImporter(this WebApplication app)
+    {
+        QueueProcessor.QueueItem languageImporterQueueItem = new QueueProcessor.QueueItem(QueueItemType.LanguageImporter, 60, true)
+        {
+            Task = new Classes.ProcessQueue.LanguageImporter()
+        };
+        languageImporterQueueItem.ForceExecute();
+        QueueProcessor.QueueItems.Add(languageImporterQueueItem);
+    }
 }

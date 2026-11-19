@@ -78,7 +78,8 @@ function LoadBackgroundTasks() {
                             "DailyMaintenance",
                             "WeeklyMaintenance",
                             "CacheWarmer",
-                            "SyncSupporterStatus"
+                            "SyncSupporterStatus",
+                            "LanguageImporter"
                         ],
                         "servicemanagement": [
                             "TallyVotes",
