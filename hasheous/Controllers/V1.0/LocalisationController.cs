@@ -21,23 +21,6 @@ namespace hasheous_server.Controllers.v1_0
     [AllowAnonymous]
     public class LocalisationController : ControllerBase
     {
-        private readonly UserManager<ApplicationUser> _userManager;
-        private readonly SignInManager<ApplicationUser> _signInManager;
-        private readonly IEmailSender _emailSender;
-        private readonly ILogger _logger;
-
-        public LocalisationController(
-                    UserManager<ApplicationUser> userManager,
-                    SignInManager<ApplicationUser> signInManager,
-                    IEmailSender emailSender,
-                    ILoggerFactory loggerFactory)
-        {
-            _userManager = userManager;
-            _signInManager = signInManager;
-            _emailSender = emailSender;
-            _logger = loggerFactory.CreateLogger<LocalisationController>();
-        }
-
         [MapToApiVersion("1.0")]
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
@@ -72,8 +55,17 @@ namespace hasheous_server.Controllers.v1_0
 
             var baseLanguageCulture = System.Globalization.CultureInfo.GetCultures(System.Globalization.CultureTypes.AllCultures)
                 .FirstOrDefault(c => c.Name == baseLanguage);
+            if (baseLanguageCulture == null)
+            {
+                return NotFound();
+            }
+
             var variantLanguageCulture = variantLanguage != null ? System.Globalization.CultureInfo.GetCultures(System.Globalization.CultureTypes.AllCultures)
                 .FirstOrDefault(c => c.Name == locale) : null;
+            if (variantLanguage != null && variantLanguageCulture == null)
+            {
+                return NotFound();
+            }
 
             var dataObjects = new DataObjects();
 
