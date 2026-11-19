@@ -3,6 +3,7 @@ using System.Data;
 using System.Reflection;
 using System.Text.Json;
 using Classes;
+using hasheous_server.Classes.Tasks.Clients;
 using hasheous_server.Models;
 
 namespace hasheous_server.Classes
@@ -340,6 +341,27 @@ namespace hasheous_server.Classes
                         await Config.database.ExecuteCMDAsync(updateTranslationSQL, updateTranslationParams);
                     }
                 }
+            }
+            await ResetLocalisationTasks(item.FullCode);
+        }
+
+        /// <summary>
+        /// Resets localisation tasks for the specified locale, or all locales if the locale is en
+        /// </summary>
+        /// <param name="locale">
+        /// The locale to reset localisation tasks for. If set to "en", all locales will be reset.
+        /// </param>
+        private async static Task ResetLocalisationTasks(string locale)
+        {
+            if (locale == "en")
+            {
+                // Reset all localisation tasks
+                TaskManagement.GetAllTasks().Where(task => task.TaskName == Models.Tasks.TaskType.AILocalisationGeneration || task.TaskName == Models.Tasks.TaskType.AILocalisationGenerationRegional).ToList().ForEach(async task => await task.Reset());
+            }
+            else
+            {
+                // Reset localisation tasks for the specified locale and child locales
+                TaskManagement.GetAllTasks().Where(task => (task.TaskName == Models.Tasks.TaskType.AILocalisationGeneration || task.TaskName == Models.Tasks.TaskType.AILocalisationGenerationRegional) && task.Parameters != null && task.Parameters.ContainsKey("language") && task.Parameters["language"] == locale.Split("-")[0]).ToList().ForEach(async task => await task.Reset());
             }
         }
 
