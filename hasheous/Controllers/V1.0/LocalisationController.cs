@@ -23,8 +23,9 @@ namespace hasheous_server.Controllers.v1_0
     {
         [MapToApiVersion("1.0")]
         [HttpGet]
-        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(List<LocalisationItem>), StatusCodes.Status200OK)]
         [Route("languages.json")]
+        [ResponseCache(CacheProfileName = "1Day")]
         public async Task<IActionResult> GetLanguages()
         {
             List<LocalisationItem> languages = await Localisation.GetLanguages();
@@ -163,9 +164,10 @@ namespace hasheous_server.Controllers.v1_0
 
         [MapToApiVersion("1.0")]
         [HttpGet]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
         [Route("{locale}.json")]
+        [ProducesResponseType(typeof(LocalisationItem), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ResponseCache(CacheProfileName = "1Day")]
         public async Task<IActionResult> GetLocalisation(string locale)
         {
             // ensure locale is valid since we'll likely be hitting the disk

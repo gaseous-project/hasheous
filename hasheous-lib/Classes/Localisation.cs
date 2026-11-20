@@ -13,8 +13,6 @@ namespace hasheous_server.Classes
     /// </summary>
     public static class Localisation
     {
-        private static readonly ConcurrentDictionary<string, LocalisationItem> LocalisationItems = new ConcurrentDictionary<string, LocalisationItem>();
-
         /// <summary>
         /// Retrieves a list of all available localisation items.
         /// </summary>
@@ -71,12 +69,6 @@ namespace hasheous_server.Classes
         /// </remarks>
         public static async Task<LocalisationItem> GetLocalisationItem(string locale)
         {
-            // Check if the localisation item for the specified locale is already loaded - return immediately if found
-            if (LocalisationItems.ContainsKey(locale))
-            {
-                return LocalisationItems[locale];
-            }
-
             // If the localisation item is not already loaded, attempt to load it from the database, local file system, or embedded JSON files
             LocalisationItem? itemFromDatabase = await LoadLocalisationItemFromDatabaseAsync(locale);
             if (itemFromDatabase != null)
@@ -110,7 +102,16 @@ namespace hasheous_server.Classes
             throw new ArgumentException($"Localisation language not found for locale: {locale}");
         }
 
-        private static async Task<LocalisationItem?> LoadLocalisationItemFromDatabaseAsync(string locale)
+        /// <summary>
+        /// Loads a localisation item from the database based on the provided locale.
+        /// </summary>
+        /// <param name="locale">
+        /// The locale code for the localisation item to load, e.g., "en".
+        /// </param>
+        /// <returns>
+        /// The localisation item corresponding to the specified locale, or null if it could not be loaded from the database.
+        /// </returns>
+        public static async Task<LocalisationItem?> LoadLocalisationItemFromDatabaseAsync(string locale)
         {
             string sql = $"SELECT * FROM localisation_languages WHERE FullCode = @FullCode";
             Dictionary<string, object> parameters = new Dictionary<string, object>
@@ -153,21 +154,22 @@ namespace hasheous_server.Classes
                     }
                 }
 
-                // remove any existing localisation item with the same language code from the in-memory collection
-                if (LocalisationItems.ContainsKey(item.FullCode))
-                {
-                    LocalisationItems.Remove(item.FullCode, out _);
-                }
-
-                // add the localisation item to the in-memory collection
-                LocalisationItems[item.FullCode] = item;
                 return item;
             }
 
             return null;
         }
 
-        private static async Task<LocalisationItem?> LoadLocalisationItemFromLocalFileAsync(string locale)
+        /// <summary>
+        /// Loads a localisation item from a local JSON file based on the provided locale.
+        /// </summary>
+        /// <param name="locale">
+        /// The locale code for the localisation item to load, e.g., "en".
+        /// </param>
+        /// <returns>
+        /// The localisation item corresponding to the specified locale, or null if it could not be loaded.
+        /// </returns>
+        public static async Task<LocalisationItem?> LoadLocalisationItemFromLocalFileAsync(string locale)
         {
             string localFilePath = Path.Combine(Config.LibraryConfiguration.LibraryLocalisationDirectory, $"{locale}.json");
             if (System.IO.File.Exists(localFilePath))
@@ -178,14 +180,6 @@ namespace hasheous_server.Classes
                 {
                     item = ConvertStringsToTranslationItem(item);
 
-                    // remove any existing localisation item with the same language code from the in-memory collection
-                    if (LocalisationItems.ContainsKey(item.FullCode))
-                    {
-                        LocalisationItems.Remove(item.FullCode, out _);
-                    }
-                    // add the localisation item to the in-memory collection
-                    LocalisationItems[item.FullCode] = item;
-
                     return item;
                 }
             }
@@ -193,7 +187,16 @@ namespace hasheous_server.Classes
             return null;
         }
 
-        private static async Task<LocalisationItem?> LoadLocalisationItemFromEmbeddedResourceAsync(string locale)
+        /// <summary>
+        /// Loads a localisation item from an embedded resource file based on the provided locale.
+        /// </summary>
+        /// <param name="locale">
+        /// The locale code for the localisation item to load, e.g., "en".
+        /// </param>
+        /// <returns>
+        /// The localisation item corresponding to the specified locale, or null if it could not be loaded.
+        /// </returns>
+        public static async Task<LocalisationItem?> LoadLocalisationItemFromEmbeddedResourceAsync(string locale)
         {
             string resourceName = $"hasheous.localisation.{locale}.json";
             Assembly? assembly = Assembly.GetEntryAssembly();
@@ -208,15 +211,6 @@ namespace hasheous_server.Classes
                 if (item != null)
                 {
                     item = ConvertStringsToTranslationItem(item);
-
-                    // remove any existing localisation item with the same language code from the in-memory collection
-                    if (LocalisationItems.ContainsKey(item.FullCode))
-                    {
-                        LocalisationItems.Remove(item.FullCode, out _);
-                    }
-
-                    // add the localisation item to the in-memory collection
-                    LocalisationItems[item.FullCode] = item;
 
                     return item;
                 }
@@ -266,6 +260,7 @@ namespace hasheous_server.Classes
 
             // import the item into the database
             LocalisationItem? existingItem = await LoadLocalisationItemFromDatabaseAsync(item.FullCode);
+            bool changed = false;
             if (existingItem == null)
             {
                 // full import
@@ -299,6 +294,8 @@ namespace hasheous_server.Classes
                     };
                     await Config.database.ExecuteCMDAsync(translationSQL, translationParams);
                 }
+
+                changed = true;
             }
             else
             {
@@ -312,6 +309,43 @@ namespace hasheous_server.Classes
                 int existingVersion = int.Parse(existingVersionTable.Rows[0]["Version"].ToString());
                 if (item.Version > existingVersion)
                 {
+                    // update each translation for the existing language entry
+                    foreach (var translation in item.Translations)
+                    {
+                        string keySql = "SELECT COUNT(*) FROM localisation_strings WHERE language_id = @language_id AND `Key` = @Key;";
+                        Dictionary<string, object> keyParams = new Dictionary<string, object>
+                        {
+                            { "@language_id", existingVersionTable.Rows[0]["id"] },
+                            { "@Key", translation.Key }
+                        };
+                        var updateCountDt = await Config.database.ExecuteCMDAsync(keySql, keyParams);
+
+                        Dictionary<string, object> updateTranslationParams = new Dictionary<string, object>
+                        {
+                            { "@Value", translation.Value.Value },
+                            { "@AITranslated", translation.Value.AITranslated },
+                            { "@CreatedAt", now },
+                            { "@UpdatedAt", now },
+                            { "@language_id", existingVersionTable.Rows[0]["id"] },
+                            { "@Key", translation.Key }
+                        };
+
+                        if (updateCountDt.Rows[0][0] == DBNull.Value || Convert.ToInt32(updateCountDt.Rows[0][0]) == 0)
+                        {
+                            // language key does not exist, insert new translation
+                            string translationSQL = "INSERT INTO localisation_strings (language_id, `key`, `value`, AIGenerated, created_at, updated_at) VALUES (@language_id, @Key, @Value, @AITranslated, @CreatedAt, @UpdatedAt);";
+
+                            await Config.database.ExecuteCMDAsync(translationSQL, updateTranslationParams);
+                        }
+                        else
+                        {
+                            // language key exists, update the translation
+                            string updateTranslationSQL = "UPDATE `localisation_strings` SET `value` = @Value, `AIGenerated` = @AITranslated, `updated_at` = @UpdatedAt WHERE `language_id` = @language_id AND `Key` = @Key;";
+
+                            await Config.database.ExecuteCMDAsync(updateTranslationSQL, updateTranslationParams);
+                        }
+                    }
+
                     // update the existing localisation language entry with the new version and other details
                     string updateSQL = "UPDATE localisation_languages SET EnglishName = @EnglishName, NativeName = @NativeName, EnglishRegionName = @EnglishRegionName, NativeRegionName = @NativeRegionName, Direction = @Direction, Version = @Version, updated_at = @UpdatedAt WHERE id = @id;";
                     Dictionary<string, object> updateParams = new Dictionary<string, object>
@@ -327,22 +361,14 @@ namespace hasheous_server.Classes
                     };
                     await Config.database.ExecuteCMDAsync(updateSQL, updateParams);
 
-                    foreach (var translation in item.Translations)
-                    {
-                        string updateTranslationSQL = "UPDATE localisation_translations SET Value = @Value, AITranslated = @AITranslated, UpdatedAt = @UpdatedAt WHERE language_id = @language_id AND Key = @Key;";
-                        Dictionary<string, object> updateTranslationParams = new Dictionary<string, object>
-                        {
-                            { "@Value", translation.Value.Value },
-                            { "@AITranslated", translation.Value.AITranslated },
-                            { "@UpdatedAt", now },
-                            { "@language_id", existingVersionTable.Rows[0]["id"] },
-                            { "@Key", translation.Key }
-                        };
-                        await Config.database.ExecuteCMDAsync(updateTranslationSQL, updateTranslationParams);
-                    }
+                    changed = true;
                 }
             }
-            await ResetLocalisationTasks(item.FullCode);
+
+            if (changed)
+            {
+                await ResetLocalisationTasks(item.FullCode);
+            }
         }
 
         /// <summary>

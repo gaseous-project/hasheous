@@ -73,6 +73,7 @@ public static class StartupExtensions
             options.CacheProfiles.Add("None", new CacheProfile { Duration = 1, Location = ResponseCacheLocation.Any, VaryByQueryKeys = new[] { "*" } });
             options.CacheProfiles.Add("Default30", new CacheProfile { Duration = 30, Location = ResponseCacheLocation.Any, VaryByQueryKeys = new[] { "*" } });
             options.CacheProfiles.Add("5Minute", new CacheProfile { Duration = 300, Location = ResponseCacheLocation.Any, VaryByQueryKeys = new[] { "*" } });
+            options.CacheProfiles.Add("1Day", new CacheProfile { Duration = 86400, Location = ResponseCacheLocation.Any, VaryByQueryKeys = new[] { "*" } });
             options.CacheProfiles.Add("7Days", new CacheProfile { Duration = 604800, Location = ResponseCacheLocation.Any, VaryByQueryKeys = new[] { "*" } });
             options.CacheProfiles.Add("MaxDays", new CacheProfile { Duration = int.MaxValue, Location = ResponseCacheLocation.Any, VaryByQueryKeys = new[] { "*" } });
         });
@@ -706,6 +707,11 @@ public static class StartupExtensions
 
     public static void ConfigureLanguageImporter(this WebApplication app)
     {
+        // re-import the embedded localisation languages and translations into the system
+        var embeddedLocalisationLanguages = Localisation.LoadLocalisationItemFromEmbeddedResourceAsync("en").Result;
+        if (embeddedLocalisationLanguages != null)
+            Localisation.ImportLocalisationFileAsync(embeddedLocalisationLanguages).Wait();
+
         QueueProcessor.QueueItem languageImporterQueueItem = new QueueProcessor.QueueItem(QueueItemType.LanguageImporter, 60, true)
         {
             Task = new Classes.ProcessQueue.LanguageImporter()
