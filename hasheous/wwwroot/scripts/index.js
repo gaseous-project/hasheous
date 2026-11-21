@@ -51,6 +51,38 @@ lang.Init(
                         pageScriptDiv.appendChild(pageScriptElement);
 
                         lang.applyLanguage();
+
+                        // populate language popup
+                        let languagePopup = document.getElementById('site_language');
+                        let languageSection = document.getElementById('footer_language_section');
+                        if (languagePopup && languageSection) {
+                            languagePopup.innerHTML = '';
+                            if (lang.languages.length === 1) {
+                                languageSection.style.display = 'none';
+                            } else {
+                                languageSection.style.display = 'block';
+                                for (const language in lang.languages) {
+                                    let langOption = document.createElement('option');
+                                    if (lang.selectedLocale === lang.languages[language].fullCode) {
+                                        langOption.selected = 'selected';
+                                    } else {
+                                        langOption.selected = '';
+                                    }
+                                    langOption.value = lang.languages[language].fullCode;
+                                    langOption.textContent = lang.languages[language].nativeName;
+                                    if (lang.languages[language].nativeName != lang.languages[language].englishName) {
+                                        langOption.textContent += ' (' + lang.languages[language].englishName + ')';
+                                    }
+                                    languagePopup.appendChild(langOption);
+                                }
+                                languagePopup.addEventListener('change', async function () {
+                                    lang.selectedLocale = this.value;
+                                    setCookie('userLocale', this.value, 365);
+                                    // reload the page to apply the new language
+                                    window.location.reload();
+                                });
+                            }
+                        }
                     }
                     if (statusTxt == "error") {
                         console.error("Error loading page: " + xhr.status + ": " + xhr.statusText);
@@ -139,12 +171,12 @@ function setPageTitle(targetPage, overrideLanguageLookup) {
     } else {
         if (lang.getLang(targetPage)) {
             if (lang.getLang(targetPage).length > 0) {
-                document.title = lang.getLang("Hasheous") + " - " + lang.getLang(targetPage);
+                document.title = lang.getLang("Hasheous", [], true) + " - " + lang.getLang(targetPage, [], true);
             } else {
-                document.title = lang.getLang("Hasheous");
+                document.title = lang.getLang("Hasheous", [], true);
             }
         } else {
-            document.title = lang.getLang("Hasheous");
+            document.title = lang.getLang("Hasheous", [], true);
         }
     }
 }

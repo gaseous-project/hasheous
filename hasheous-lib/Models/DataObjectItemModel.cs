@@ -54,7 +54,10 @@ namespace hasheous_server.Models
             DumpFile = 20,
             Tags = 21,
             AIDescription = 22,
-            SearchAliases = 23
+            SearchAliases = 23,
+            ParentLanguage = 24,
+            EnglishName = 25,
+            NativeName = 26
         }
 
         public long? Id { get; set; }

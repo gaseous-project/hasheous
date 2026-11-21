@@ -1,3 +1,6 @@
 [submodule "docs"]
 	path = docs
 	url = https://github.com/gaseous-project/hasheous.wiki.git
+[submodule "hasheous/wwwroot/images/country-flags"]
+	path = hasheous/wwwroot/images/country-flags
+	url = https://github.com/hampusborgos/country-flags.git

@@ -27,7 +27,7 @@ function loadSourceCounts() {
             if (lang.getLang(key + 'homepage')) {
                 let homepage = document.createElement('div');
                 homepage.classList.add('source-homepage');
-                homepage.innerHTML = lang.getLang('homepage') + '<br /><a href="' + lang.getLang(key + 'homepage') + '" target="_blank" rel="noopener noreferrer">' + lang.getLang(key + 'homepage') + '<img src="/images/link.svg" class="linkicon"></a>';
+                homepage.innerHTML = lang.getLang('homepage') + '<br /><a href="' + lang.getLang(key + 'homepage', [], true) + '" target="_blank" rel="noopener noreferrer">' + lang.getLang(key + 'homepage') + '<img src="/images/link.svg" class="linkicon"></a>';
                 sourceBox.appendChild(homepage);
             }
 

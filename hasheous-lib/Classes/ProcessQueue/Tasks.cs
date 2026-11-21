@@ -99,6 +99,11 @@ namespace Classes.ProcessQueue
         /// <summary>
         /// Synchronizes supporter recognition state for linked payment providers.
         /// </summary>
-        SyncSupporterStatus
+        SyncSupporterStatus,
+
+        /// <summary>
+        /// Imports language data into the system from localisation files
+        /// </summary>
+        LanguageImporter
     }
 }

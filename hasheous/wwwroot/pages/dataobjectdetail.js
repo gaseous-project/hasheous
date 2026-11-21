@@ -300,9 +300,10 @@ function renderContent() {
 
                     if (countryCode.length == 2) {
                         // get the flag emoji from the country code
-                        let flagEmoji = countryCode.toUpperCase().replace(/./g, char => String.fromCodePoint(char.charCodeAt(0) + 127397));
+                        // let flagEmoji = countryCode.toUpperCase().replace(/./g, char => String.fromCodePoint(char.charCodeAt(0) + 127397));
+                        let flagEmoji = "<img class=\"flagImage\" src=\"/images/country-flags/svg/" + countryCode.toLowerCase() + ".svg\" alt=\"" + countryName + " flag\">";
 
-                        countries[j] = "<span class=\"flagemoji\" title=\"" + countryName + "\">" + flagEmoji + "</span>";
+                        countries[j] = "<span title=\"" + countryName + "\">" + flagEmoji + "</span>";
                     } else {
                         countries[j] = countryName + ' (' + countryCode + ')';
                     }
@@ -482,9 +483,14 @@ function renderContent() {
                                     // loop all keys in the countries object
                                     for (let key in rom.country) {
                                         // get the flag emoji from the country code
-                                        let flagEmoji = key.toUpperCase().replace(/./g, char => String.fromCodePoint(char.charCodeAt(0) + 127397));
+                                        //let flagEmoji = key.toUpperCase().replace(/./g, char => String.fromCodePoint(char.charCodeAt(0) + 127397));
+                                        if (rom.country[key]) {
+                                            let flagEmoji = "<img class=\"flagImage\" src=\"/images/country-flags/svg/" + key.toLowerCase() + ".svg\" alt=\"" + rom.country[key] + " flag\">";
 
-                                        countries += "<span class=\"flagemoji\" title=\"" + rom.country[key] + "\">" + flagEmoji + "</span>";
+                                            countries += "<span title=\"" + rom.country[key] + "\">" + flagEmoji + "</span>";
+                                        } else {
+                                            countries += "<span title=\"" + rom.country[key] + "\">" + key.toUpperCase() + "</span>";
+                                        }
                                     }
 
                                     // convert languages list to flags

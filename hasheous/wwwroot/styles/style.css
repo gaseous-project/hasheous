@@ -819,6 +819,11 @@ pre {
     font-size: 24px;
 }
 
+.flagImage {
+    width: 24px;
+    vertical-align: middle;
+}
+
 #sources_hashes {
     display: inline-block;
     width: 100%;
