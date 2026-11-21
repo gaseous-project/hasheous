@@ -19,7 +19,7 @@ namespace hasheous_server.Classes
         /// <returns>A task representing the asynchronous operation, containing a list of localisation items.</returns>
         public static async Task<List<LocalisationItem>> GetLanguages()
         {
-            string sql = "SELECT * FROM localisation_languages ORDER BY FullCode;";
+            string sql = "SELECT * FROM localisation_languages WHERE Available = 1 ORDER BY FullCode;";
             DataTable dataTable = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object>());
 
             List<LocalisationItem> languages = new List<LocalisationItem>();
@@ -83,6 +83,9 @@ namespace hasheous_server.Classes
                 // save the localisation item to the database
                 await ImportLocalisationFileAsync(itemFromLocalFile);
 
+                // imported from local file system, mark the language as available
+                await SetLanguageAvailablity(true, itemFromLocalFile.FullCode);
+
                 return itemFromLocalFile;
             }
 
@@ -94,6 +97,9 @@ namespace hasheous_server.Classes
                 {
                     // save the localisation item to the database
                     await ImportLocalisationFileAsync(itemFromEmbedded);
+
+                    // imported from embedded resource, mark the language as available
+                    await SetLanguageAvailablity(true, itemFromEmbedded.FullCode);
 
                     return itemFromEmbedded;
                 }
@@ -312,7 +318,7 @@ namespace hasheous_server.Classes
                     // update each translation for the existing language entry
                     foreach (var translation in item.Translations)
                     {
-                        string keySql = "SELECT COUNT(*) FROM localisation_strings WHERE language_id = @language_id AND `Key` = @Key;";
+                        string keySql = "SELECT * FROM localisation_strings WHERE language_id = @language_id AND `Key` = @Key;";
                         Dictionary<string, object> keyParams = new Dictionary<string, object>
                         {
                             { "@language_id", existingVersionTable.Rows[0]["id"] },
@@ -330,7 +336,7 @@ namespace hasheous_server.Classes
                             { "@Key", translation.Key }
                         };
 
-                        if (updateCountDt.Rows[0][0] == DBNull.Value || Convert.ToInt32(updateCountDt.Rows[0][0]) == 0)
+                        if (updateCountDt.Rows.Count == 0)
                         {
                             // language key does not exist, insert new translation
                             string translationSQL = "INSERT INTO localisation_strings (language_id, `key`, `value`, AIGenerated, created_at, updated_at) VALUES (@language_id, @Key, @Value, @AITranslated, @CreatedAt, @UpdatedAt);";
@@ -339,7 +345,13 @@ namespace hasheous_server.Classes
                         }
                         else
                         {
-                            // language key exists, update the translation
+                            // compare old string to new string - if no change, just continue
+                            if (updateCountDt.Rows[0]["value"] != DBNull.Value && updateCountDt.Rows[0]["value"].ToString() == translation.Value.Value)
+                            {
+                                continue;
+                            }
+
+                            // language key exists and string is different, update the translation
                             string updateTranslationSQL = "UPDATE `localisation_strings` SET `value` = @Value, `AIGenerated` = @AITranslated, `updated_at` = @UpdatedAt WHERE `language_id` = @language_id AND `Key` = @Key;";
 
                             await Config.database.ExecuteCMDAsync(updateTranslationSQL, updateTranslationParams);
@@ -406,6 +418,22 @@ namespace hasheous_server.Classes
             }
             localisationItem.Strings.Clear();
             return localisationItem;
+        }
+
+        /// <summary>
+        /// Sets the availability status of a language in the localisation system.
+        /// </summary>
+        /// <param name="isAvailable">Indicates whether the language should be marked as available.</param>
+        /// <param name="fullCode">The full code of the language to update.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        public static async Task SetLanguageAvailablity(bool isAvailable, string fullCode)
+        {
+            string sql = "UPDATE localisation_languages SET Available = @Available WHERE FullCode = @FullCode;";
+            await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object>
+            {
+                { "@Available", isAvailable },
+                { "@FullCode", fullCode }
+            });
         }
     }
 }

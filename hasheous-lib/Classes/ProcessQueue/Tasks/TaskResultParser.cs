@@ -22,12 +22,12 @@ namespace Classes.ProcessQueue
         {
             try
             {
-                // Find all tasks submitted more than 5 minutes ago
+                // Find all submitted tasks - checking completion time to ensure they have been submitted for at least 1 second
                 string sql = "SELECT * FROM Task_Queue WHERE status = @status AND completion_time < @time;";
                 DataTable submittedTasks = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object>
                 {
                     { "@status", QueueItemStatus.Submitted},
-                    { "@time", DateTime.UtcNow.AddMinutes(-5) }
+                    { "@time", DateTime.UtcNow.AddSeconds(-1) }
                 });
 
                 hasheous_server.Classes.DataObjects dataObjects = new hasheous_server.Classes.DataObjects();
@@ -213,6 +213,9 @@ namespace Classes.ProcessQueue
                                     {
                                         // start the import process
                                         await hasheous_server.Classes.Localisation.ImportLocalisationFileAsync(localisationItem);
+
+                                        // mark the language as available after import
+                                        await hasheous_server.Classes.Localisation.SetLanguageAvailablity(true, localisationItem.FullCode);
                                     }
                                 }
 

@@ -7,6 +7,7 @@ CREATE TABLE `localisation_languages` (
     `NativeRegionName` VARCHAR(255) DEFAULT NULL,
     `Direction` INT NOT NULL,
     `Version` INT NOT NULL,
+    `Available` BOOLEAN NOT NULL DEFAULT 0,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),

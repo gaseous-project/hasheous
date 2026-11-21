@@ -1,5 +1,8 @@
 class language {
     locale = undefined;
+    selectedLocale = undefined;
+
+    languages = undefined;
 
     languageDefault = undefined;
     languageBase = undefined;
@@ -52,12 +55,12 @@ class language {
 
         // load language list from the server (languages.json)
         this.languages = await $.getJSON('/localisation/languages.json');
-        console.log('Available languages:', this.languages);
 
         // loading default language file - this is always en as it's always the most complete
         try {
             let langDefault = await $.getJSON('/localisation/en.json');
             this.languageDefault = this.#ExtractStrings(langDefault);
+            this.selectedLocale = "en";
             console.log('Loaded default language file: en.json');
         } catch (e) {
             console.error("Failed to load default language file (en.json):", e);
@@ -71,6 +74,7 @@ class language {
         try {
             let langBase = await $.getJSON('/localisation/' + language + '.json');
             this.languageBase = this.#ExtractStrings(langBase);
+            this.selectedLocale = language;
             console.log('Loaded base language file: ' + language + '.json');
         } catch (e) {
             console.warn("Failed to load base language file for " + language + ".");
@@ -82,6 +86,7 @@ class language {
                 let langRegion = await $.getJSON('/localisation/' + this.locale + '.json');
                 if (langRegion?.translations) {
                     this.languageRegion = this.#ExtractStrings(langRegion);
+                    this.selectedLocale = this.locale;
                     console.log('Loaded language localisation file: ' + this.locale + '.json');
                 }
             } catch (e) {
@@ -106,6 +111,8 @@ class language {
         console.log(this.languageBase);
         console.log(this.languageDefault);
 
+        console.log("Selected language: " + this.selectedLocale);
+
         this.applyLanguage();
     }
 
@@ -121,7 +128,7 @@ class language {
         return strings;
     }
 
-    getLang(token, substituteArray) {
+    getLang(token, substituteArray, bypassMarkdown = false) {
         // check if token is null or undefined
         if (token === null || token === undefined) {
             return '';
@@ -149,29 +156,40 @@ class language {
                 break;
         }
 
+        // store the lowercase version of the token as the default return value
+        let returnValue = token.toLowerCase();
+        let tokenFound = false;
+
         // check if token exists in the regional language first
         if (this.languageRegion) {
             if (token.toLowerCase() in this.languageRegion) {
-                return this.#replaceTokens(this.languageRegion[token.toLowerCase()], substituteArray);
+                returnValue = this.#replaceTokens(this.languageRegion[token.toLowerCase()], substituteArray);
+                tokenFound = true;
             }
         }
 
         // check if token exists in the base language next
-        if (this.languageBase) {
+        if (this.languageBase && !tokenFound) {
             if (token.toLowerCase() in this.languageBase) {
-                return this.#replaceTokens(this.languageBase[token.toLowerCase()], substituteArray);
+                returnValue = this.#replaceTokens(this.languageBase[token.toLowerCase()], substituteArray);
+                tokenFound = true;
             }
         }
 
         // if token not found in either language region or base, check default language
-        if (this.languageDefault) {
+        if (this.languageDefault && !tokenFound) {
             if (token.toLowerCase() in this.languageDefault) {
-                return this.#replaceTokens(this.languageDefault[token.toLowerCase()], substituteArray);
+                returnValue = this.#replaceTokens(this.languageDefault[token.toLowerCase()], substituteArray);
+                tokenFound = true;
             }
         }
 
+        if (!bypassMarkdown) {
+            returnValue = renderSafeMarkdown(returnValue);
+        }
+
         // if token not found in either language region or base, return the token itself
-        return token.toLowerCase();
+        return returnValue;
     }
 
     #replaceTokens(text, substituteArray) {

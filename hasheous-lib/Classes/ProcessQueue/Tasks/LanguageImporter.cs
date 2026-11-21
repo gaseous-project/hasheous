@@ -27,7 +27,19 @@ namespace Classes.ProcessQueue
                     LocalisationItem? item = Newtonsoft.Json.JsonConvert.DeserializeObject<LocalisationItem>(json);
                     if (item != null)
                     {
+                        // check if there is a language already imported and compare versions
+                        LocalisationItem? existingItem = await Localisation.LoadLocalisationItemFromDatabaseAsync(item.FullCode);
+                        if (existingItem != null && existingItem.Version >= item.Version)
+                        {
+                            // skip import if the existing version is newer or the same
+                            continue;
+                        }
+
+                        // import the localisation item into the database
                         await Localisation.ImportLocalisationFileAsync(item);
+
+                        // mark the language as available after import
+                        await Localisation.SetLanguageAvailablity(true, item.FullCode);
                     }
                 }
             }

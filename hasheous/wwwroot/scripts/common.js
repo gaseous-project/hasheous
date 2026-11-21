@@ -184,7 +184,7 @@ function renderSafeMarkdown(markdownText) {
     // marked.parse() is intentionally used here because the source content is markdown, not raw HTML.
     const parsedHtml = typeof marked !== 'undefined' && typeof marked.parse === 'function'
         ? marked.parse(rawMarkdown)
-        : rawMarkdown;
+        : rawMarkdown.trim();
 
     // Work on a detached DOM fragment so the original page is not modified while we clean it.
     const sanitizedRoot = document.createElement('div');
@@ -209,6 +209,14 @@ function renderSafeMarkdown(markdownText) {
             }
         });
     });
+
+    // remove surrounding <p> tags if markdownText does not contain "\n"
+    if (!rawMarkdown.includes('\n')) {
+        const firstChild = sanitizedRoot.firstChild;
+        if (firstChild && firstChild.nodeName === 'P') {
+            sanitizedRoot.innerHTML = firstChild.innerHTML;
+        }
+    }
 
     return sanitizedRoot.innerHTML;
 }

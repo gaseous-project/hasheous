@@ -710,7 +710,11 @@ public static class StartupExtensions
         // re-import the embedded localisation languages and translations into the system
         var embeddedLocalisationLanguages = Localisation.LoadLocalisationItemFromEmbeddedResourceAsync("en").Result;
         if (embeddedLocalisationLanguages != null)
+        {
             Localisation.ImportLocalisationFileAsync(embeddedLocalisationLanguages).Wait();
+
+            Localisation.SetLanguageAvailablity(true, embeddedLocalisationLanguages.FullCode).Wait();
+        }
 
         QueueProcessor.QueueItem languageImporterQueueItem = new QueueProcessor.QueueItem(QueueItemType.LanguageImporter, 60, true)
         {
