@@ -171,12 +171,12 @@ function setPageTitle(targetPage, overrideLanguageLookup) {
     } else {
         if (lang.getLang(targetPage)) {
             if (lang.getLang(targetPage).length > 0) {
-                document.title = lang.getLang("Hasheous") + " - " + lang.getLang(targetPage);
+                document.title = lang.getLang("Hasheous", [], true) + " - " + lang.getLang(targetPage, [], true);
             } else {
-                document.title = lang.getLang("Hasheous");
+                document.title = lang.getLang("Hasheous", [], true);
             }
         } else {
-            document.title = lang.getLang("Hasheous");
+            document.title = lang.getLang("Hasheous", [], true);
         }
     }
 }
