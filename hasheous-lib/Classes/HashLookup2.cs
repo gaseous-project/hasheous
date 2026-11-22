@@ -2,7 +2,6 @@ using System.Collections.Concurrent;
 using System.Data;
 using System.Security.Cryptography.Xml;
 using System.Text.Json.Serialization;
-using System.Text.RegularExpressions;
 using gaseous_signature_parser.models.RomSignatureObject;
 using hasheous.Classes;
 using hasheous_server.Classes;
@@ -246,17 +245,7 @@ namespace Classes
             {
                 // no returned game! trim up the name and check if one exists with the same name and platform
 
-                // remove version numbers from name
-                string gameName = discoveredSignature.Game.Name;
-                gameName = Regex.Replace(gameName, @"v(\d+\.)?(\d+\.)?(\*|\d+)$", "").Trim();
-                gameName = Regex.Replace(gameName, @"Rev (\d+\.)?(\d+\.)?(\*|\d+)$", "").Trim();
-
-                // assumption: no games have () in their titles so we'll remove them
-                int idx = gameName.IndexOf('(');
-                if (idx >= 0)
-                {
-                    gameName = gameName.Substring(0, idx);
-                }
+                string gameName = TrimSignatureGameName(discoveredSignature.Game.Name);
 
                 // check if the game exists - create a new one if it doesn't
                 game = await dataObjects.SearchDataObject(DataObjects.DataObjectType.Game, gameName, new List<DataObjects.DataObjectSearchCriteriaItem>
