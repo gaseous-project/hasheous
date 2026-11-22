@@ -120,6 +120,19 @@ public static class StartupExtensions
 
     /// <summary>
     /// Configures large request body limits and forwarded headers (X-Forwarded-*).
+    /// 
+    /// The forwarded headers middleware processes X-Forwarded-For, X-Forwarded-Proto, and X-Forwarded-Host headers
+    /// only when the immediate connection peer is a trusted proxy (configured via Config.TrustedProxies).
+    /// Without trusted proxies configured, these headers are ignored and HttpContext.Connection.RemoteIpAddress
+    /// reflects the direct peer address only.
+    /// 
+    /// For multi-hop scenarios (e.g., CloudFlare -> Reverse Proxy -> Hasheous):
+    /// - CloudFlare or other edge services send client IP via X-Forwarded-For
+    /// - An intermediate reverse proxy receives and validates this header, then forwards it
+    /// - That reverse proxy's IP must be added to TrustedProxies for the final hop to Hasheous
+    /// - Hasheous trusts only the direct peer (reverse proxy) to read and populate forwarded headers
+    /// 
+    /// See docs/IP-Detection.md for detailed configuration and examples.
     /// </summary>
     public static IServiceCollection AddHasheousUploadAndForwardingLimits(this IServiceCollection services)
     {
@@ -133,10 +146,35 @@ public static class StartupExtensions
         });
         services.Configure<ForwardedHeadersOptions>(options =>
         {
+            // Clear any default network/proxy entries to enforce explicit trust configuration only.
+            options.KnownIPNetworks.Clear();
+            options.KnownProxies.Clear();
+
+            // Process client address and scheme headers, but do not accept forwarded hosts.
+            // RequireHeaderSymmetry = false: allow headers to be present without expecting all forwarding headers.
             options.RequireHeaderSymmetry = false;
             options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-            options.KnownProxies.Clear();
-            options.KnownNetworks.Clear();
+
+            // Add each configured trusted proxy to the allowed list.
+            // These IPs must be the direct connection peer that forwards traffic to Hasheous.
+            foreach (string proxyAddress in Config.TrustedProxies)
+            {
+                if (!IPAddress.TryParse(proxyAddress, out IPAddress? trustedProxy))
+                {
+                    throw new InvalidOperationException($"Configured trusted proxy '{proxyAddress}' is not a valid IP address.");
+                }
+
+                if (!options.KnownProxies.Contains(trustedProxy))
+                {
+                    options.KnownProxies.Add(trustedProxy);
+                }
+            }
+
+            // Empty trust lists otherwise cause the middleware to trust every peer.
+            if (options.KnownProxies.Count == 0)
+            {
+                options.ForwardedHeaders = ForwardedHeaders.None;
+            }
         });
         return services;
     }
