@@ -1,17 +1,17 @@
+using System.Net;
+using System.Net.Mail;
 using System.Reflection;
+using Authentication;
 using Classes;
 using Classes.ProcessQueue;
-using static Classes.Common;
-using hasheous_server.Classes;
 using hasheous.Classes;
+using Hasheous;
+using hasheous_server.Classes;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Authentication;
-using System.Net.Mail;
-using System.Net;
 using StackExchange.Redis;
-using Hasheous;
+using static Classes.Common;
 
 Logging.WriteToDiskOnly = true;
 Logging.Log(Logging.LogType.Information, "Startup", "Starting Hasheous Server " + Assembly.GetExecutingAssembly().GetName().Version);
@@ -59,6 +59,7 @@ app.MapControllers();
 app.UseCorrelationId();
 app.ConfigureCacheWarmer();
 app.ConfigureHourlyMaintenance();
+app.ConfigureLanguageImporter();
 Logging.WriteToDiskOnly = false;
 app.Run();
 

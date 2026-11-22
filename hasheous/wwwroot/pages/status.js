@@ -78,7 +78,8 @@ function LoadBackgroundTasks() {
                             "DailyMaintenance",
                             "WeeklyMaintenance",
                             "CacheWarmer",
-                            "SyncSupporterStatus"
+                            "SyncSupporterStatus",
+                            "LanguageImporter"
                         ],
                         "servicemanagement": [
                             "TallyVotes",
@@ -280,7 +281,17 @@ function LoadTaskStatus() {
                 // generate status items
                 for (const status of Object.keys(tasks[taskType])) {
                     const count = tasks[taskType][status];
-                    const elementColour = `#${intToRGB(hashCode(status + taskType))}`;
+                    // const elementColour = `#${intToRGB(hashCode(status + taskType))}`;
+                    const elementColour = (() => {
+                        switch (status.toLowerCase()) {
+                            case 'pending': return '#979797';
+                            case 'inprogress': return '#7cc0d6';
+                            case 'submitted': return '#a9ffa9';
+                            case 'completed': return '#186b18';
+                            case 'failed': return '#FF4500';
+                            default: return '#000000';
+                        }
+                    })();
 
                     // generate status bar item
                     const statusItem = document.createElement('div');

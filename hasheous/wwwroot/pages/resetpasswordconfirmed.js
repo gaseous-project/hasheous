@@ -5,7 +5,7 @@ function countDownTimer() {
     if (totalTime == 0) {
         window.location.replace('/');
     } else {
-        document.getElementById('resetpasswordconfirmationcomplete').innerHTML = lang.getLang('resetpasswordconfirmationcomplete', [ totalTime, '<a href="#" onclick="window.location.replace(\'/\');">' + lang.getLang('home') + '</a>' ]);
+        document.getElementById('resetpasswordconfirmationcomplete').innerHTML = lang.getLang('resetpasswordconfirmationcomplete', [totalTime, '<a href="#" onclick="window.location.replace(\'/\');">' + lang.getLang('home') + '</a>'], true);
         totalTime = totalTime - 1;
         setTimeout(countDownTimer, 1000);
     }

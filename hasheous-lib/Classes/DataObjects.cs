@@ -48,11 +48,34 @@ namespace hasheous_server.Classes
             Game = 2,
             ROM = 3,
             App = 4,
+            Language = 5,
             None = 100
         }
 
         public static Dictionary<DataObjectType, object> DataObjectDefinitions = new Dictionary<DataObjectType, object>
         {
+            { DataObjectType.Language, new DataObjectDefinition{
+                HasMetadata = false,
+                HasSignatures = false,
+                AllowMerge = true,
+                Attributes = new List<AttributeItem>{
+                    new AttributeItem{
+                        attributeName = AttributeItem.AttributeName.EnglishName,
+                        attributeType = AttributeItem.AttributeType.ShortString,
+                        attributeRelationType = DataObjectType.None
+                    },
+                    new AttributeItem{
+                        attributeName = AttributeItem.AttributeName.NativeName,
+                        attributeType = AttributeItem.AttributeType.ShortString,
+                        attributeRelationType = DataObjectType.None
+                    },
+                    new AttributeItem{
+                        attributeName = AttributeItem.AttributeName.ParentLanguage,
+                        attributeType = AttributeItem.AttributeType.ObjectRelationship,
+                        attributeRelationType = DataObjectType.Language
+                    }
+                }
+            } },
             { DataObjectType.Company, new DataObjectDefinition{
                 HasMetadata = true,
                 HasSignatures = true,
@@ -620,11 +643,6 @@ namespace hasheous_server.Classes
 
         public async Task<Models.DataObjectItem?> SearchDataObject(DataObjectType objectType, string? objectName, List<DataObjectSearchCriteriaItem> searchCriteria)
         {
-            if (searchCriteria.Count == 0)
-            {
-                throw new DataObjectsBadSearchCriteriaException("No search criteria provided");
-            }
-
             Database db = new Database(Database.databaseType.MySql, Config.DatabaseConfiguration.ConnectionString);
             string sql = "SELECT * FROM DataObject";
             Dictionary<string, object> dbDict = new Dictionary<string, object> { };
@@ -644,28 +662,50 @@ namespace hasheous_server.Classes
                 }
             }
 
-            int loopCount = 0;
-            foreach (DataObjectSearchCriteriaItem searchCriteriaItem in searchCriteria)
+            string typeClause = "";
+            if (objectType != DataObjectType.None)
             {
-                string valueField = "AttributeValue";
-                switch (searchCriteriaItem.Field)
-                {
-                    case AttributeItem.AttributeName.Platform:
-                    case AttributeItem.AttributeName.Publisher:
-                        valueField = "AttributeRelation";
-                        break;
-                }
-
-                sql += " JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId AND DataObject_Attributes.AttributeName = @field" + loopCount + " AND DataObject_Attributes." + valueField + " = @value" + loopCount;
-                dbDict.Add("field" + loopCount, (int)searchCriteriaItem.Field);
-                dbDict.Add("value" + loopCount, searchCriteriaItem.Value);
-
-                loopCount++;
+                typeClause = "`ObjectType` = @objecttype";
+                dbDict.Add("objecttype", objectType);
             }
 
-            if (nameClause != "")
+            int loopCount = 0;
+            if (searchCriteria != null && searchCriteria.Count > 0)
             {
-                sql += " WHERE " + nameClause;
+                foreach (DataObjectSearchCriteriaItem searchCriteriaItem in searchCriteria)
+                {
+                    string valueField = "AttributeValue";
+                    switch (searchCriteriaItem.Field)
+                    {
+                        case AttributeItem.AttributeName.Platform:
+                        case AttributeItem.AttributeName.Publisher:
+                            valueField = "AttributeRelation";
+                            break;
+                    }
+
+                    sql += " JOIN DataObject_Attributes ON DataObject.Id = DataObject_Attributes.DataObjectId AND DataObject_Attributes.AttributeName = @field" + loopCount + " AND DataObject_Attributes." + valueField + " = @value" + loopCount;
+                    dbDict.Add("field" + loopCount, (int)searchCriteriaItem.Field);
+                    dbDict.Add("value" + loopCount, searchCriteriaItem.Value);
+
+                    loopCount++;
+                }
+            }
+
+            if (nameClause != "" || typeClause != "")
+            {
+                sql += " WHERE ";
+                if (nameClause != "")
+                {
+                    sql += nameClause;
+                }
+                if (nameClause != "" && typeClause != "")
+                {
+                    sql += " AND ";
+                }
+                if (typeClause != "")
+                {
+                    sql += typeClause;
+                }
             }
 
             DataTable data = await db.ExecuteCMDAsync(sql, dbDict);
@@ -2040,7 +2080,7 @@ namespace hasheous_server.Classes
                 else
                 {
                     // no tagging task exists - create one
-                    TaskManagement.EnqueueTask((long)id, Models.Tasks.TaskType.AIDescriptionAndTagging);
+                    await TaskManagement.EnqueueTask((long)id, Models.Tasks.TaskType.AIDescriptionAndTagging);
                 }
             }
 
@@ -2707,7 +2747,7 @@ namespace hasheous_server.Classes
                 // enqueue AI description and tagging task if not already present
                 if (aiTaskPresent == false)
                 {
-                    TaskManagement.EnqueueTask(item.Id, Models.Tasks.TaskType.AIDescriptionAndTagging);
+                    await TaskManagement.EnqueueTask(item.Id, Models.Tasks.TaskType.AIDescriptionAndTagging);
                 }
 
                 // release the lock

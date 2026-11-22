@@ -1,8 +1,12 @@
 class language {
     locale = undefined;
+    selectedLocale = undefined;
+
+    languages = undefined;
 
     languageDefault = undefined;
-    languageOverlay = undefined;
+    languageBase = undefined;
+    languageRegion = undefined;
 
     langMapping =
         {
@@ -49,39 +53,88 @@ class language {
         }
         console.log("Browser locale: " + this.locale);
 
+        // load language list from the server (languages.json)
+        try {
+            this.languages = await $.getJSON('/localisation/languages.json');
+        } catch (e) {
+            console.error("Failed to load languages list:", e);
+        }
+
+        // loading default language file - this is always en as it's always the most complete
+        try {
+            let langDefault = await $.getJSON('/localisation/en.json');
+            this.languageDefault = this.#ExtractStrings(langDefault);
+            this.selectedLocale = "en";
+            console.log('Loaded default language file: en.json');
+        } catch (e) {
+            console.error("Failed to load default language file (en.json):", e);
+        }
+
+        // load language files based on the locale
         let language = this.locale.split("-")[0];
         let localisation = this.locale.split("-")[1];
-        try {
-            this.languageDefault = await $.getJSON('/localisation/' + language + '.json');
-        } catch (e) {
-            // something went wrong - default to en
-            this.languageDefault = await $.getJSON('/localisation/en.json');
-            console.warn("No suitable language file for " + language + ". Falling back to en");
-            language = "en";
-        }
-        console.log("Loaded base language file: " + language + ".json");
 
+        // load the base language file
         try {
-            if (localisation) {
-                // load overlay language
-                this.languageOverlay = await $.getJSON('/localisation/' + language + '-' + localisation + '.json');
-                console.log('Loaded language localisation file: ' + language + '-' + localisation + '.json');
-            }
+            let langBase = await $.getJSON('/localisation/' + language + '.json');
+            this.languageBase = this.#ExtractStrings(langBase);
+            this.selectedLocale = language;
+            console.log('Loaded base language file: ' + language + '.json');
         } catch (e) {
-            console.warn(e);
-            this.languageOverlay = undefined;
+            console.warn("Failed to load base language file for " + language + ".");
         }
+
+        // load the regional language file
+        if (localisation) {
+            try {
+                let langRegion = await $.getJSON('/localisation/' + this.locale + '.json');
+                if (langRegion?.translations) {
+                    this.languageRegion = this.#ExtractStrings(langRegion);
+                    this.selectedLocale = this.locale;
+                    console.log('Loaded language localisation file: ' + this.locale + '.json');
+                }
+            } catch (e) {
+                console.warn("Failed to load regional language file for " + this.locale + ".");
+            }
+        }
+
+        if (!this.languageBase && !this.languageRegion) {
+            console.warn("No language files loaded for locale: " + this.locale + ". Falling back to default language (en).");
+        }
+
+        if ((!this.languageBase || (!this.languageRegion && localisation)) && this.locale != "en") {
+            // place request for language matching the locale
+            try {
+                await $.getJSON('/localisation/request/' + this.locale + '.json');
+            } catch (e) {
+                console.warn("Failed to request language file for locale: " + this.locale + ".", e);
+            }
+        }
+
+        console.log(this.languageRegion);
+        console.log(this.languageBase);
+        console.log(this.languageDefault);
+
+        console.log("Selected language: " + this.selectedLocale);
+
+        document.documentElement.lang = this.selectedLocale;
 
         this.applyLanguage();
     }
 
-    // async getJSON(url) {
-    //     return fetch(url)
-    //         .then((response) => response.json())
-    //         .then((responseJson) => { return responseJson });
-    // }
+    #ExtractStrings(language) {
+        let strings = {};
+        if (language?.translations) {
+            for (let key in language.translations) {
+                if (language.translations.hasOwnProperty(key)) {
+                    strings[key.toLowerCase()] = language.translations[key].value;
+                }
+            }
+        }
+        return strings;
+    }
 
-    getLang(token, substituteArray) {
+    getLang(token, substituteArray, bypassMarkdown = false) {
         // check if token is null or undefined
         if (token === null || token === undefined) {
             return '';
@@ -109,19 +162,40 @@ class language {
                 break;
         }
 
-        if (this.languageOverlay) {
-            if (token.toLowerCase() in this.languageOverlay) {
-                return this.#replaceTokens(this.languageOverlay[token.toLowerCase()], substituteArray);
+        // store the lowercase version of the token as the default return value
+        let returnValue = token.toLowerCase();
+        let tokenFound = false;
+
+        // check if token exists in the regional language first
+        if (this.languageRegion) {
+            if (token.toLowerCase() in this.languageRegion) {
+                returnValue = this.#replaceTokens(this.languageRegion[token.toLowerCase()], substituteArray);
+                tokenFound = true;
             }
         }
 
-        if (this.languageDefault) {
-            if (token.toLowerCase() in this.languageDefault) {
-                return this.#replaceTokens(this.languageDefault[token.toLowerCase()], substituteArray);
-            } else {
-                return token.toLowerCase();
+        // check if token exists in the base language next
+        if (this.languageBase && !tokenFound) {
+            if (token.toLowerCase() in this.languageBase) {
+                returnValue = this.#replaceTokens(this.languageBase[token.toLowerCase()], substituteArray);
+                tokenFound = true;
             }
         }
+
+        // if token not found in either language region or base, check default language
+        if (this.languageDefault && !tokenFound) {
+            if (token.toLowerCase() in this.languageDefault) {
+                returnValue = this.#replaceTokens(this.languageDefault[token.toLowerCase()], substituteArray);
+                tokenFound = true;
+            }
+        }
+
+        if (!bypassMarkdown) {
+            returnValue = renderSafeMarkdown(returnValue);
+        }
+
+        // if token not found in either language region or base, return the token itself
+        return returnValue;
     }
 
     #replaceTokens(text, substituteArray) {

@@ -26,9 +26,10 @@ fetch('/api/v1.0/Signatures/Rom/ById/' + romId, {
                         // loop all keys in the countries object
                         for (let ckey in value) {
                             // get the flag emoji from the country code
-                            let flagEmoji = ckey.toUpperCase().replace(/./g, char => String.fromCodePoint(char.charCodeAt(0) + 127397));
+                            // let flagEmoji = ckey.toUpperCase().replace(/./g, char => String.fromCodePoint(char.charCodeAt(0) + 127397));
+                            let flagEmoji = "<img class=\"flagImage\" src=\"/images/country-flags/svg/" + ckey.toLowerCase() + ".svg\" alt=\"" + value[ckey] + " flag\">";
 
-                            displayValue += "<span class=\"flagemoji\" title=\"" + value[ckey] + "\">" + flagEmoji + "</span>";
+                            displayValue += "<span title=\"" + value[ckey] + "\">" + flagEmoji + "</span>";
                         }
                         break;
 

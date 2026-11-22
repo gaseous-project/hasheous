@@ -33,7 +33,7 @@ namespace hasheous_server.Models.Tasks
         /// <param name="taskType">The type of task to be performed.</param>
         /// <param name="requiredCapabilities">The list of required capabilities for this task.</param>
         /// <param name="parameters">Optional parameters for the task.</param>
-        public QueueItemModel(long dataObjectId, TaskType taskType, List<Capabilities> requiredCapabilities, Dictionary<string, string>? parameters = null)
+        public QueueItemModel(long dataObjectId, TaskType taskType, List<Capabilities> requiredCapabilities, Dictionary<string, string>? parameters = null, long? parentTaskId = null)
         {
             this._CreatedAt = DateTime.UtcNow;
             this._DataObjectId = dataObjectId;
@@ -41,16 +41,18 @@ namespace hasheous_server.Models.Tasks
             this.Status = QueueItemStatus.Pending;
             this._RequiredCapabilities = requiredCapabilities;
             this.Parameters = parameters;
+            this.ParentTaskId = parentTaskId;
 
             // Id will be set when saved to database
-            DataTable dt = Config.database.ExecuteCMD("INSERT INTO `Task_Queue` (`create_time`, `dataobjectid`, `task_name`, `status`, `required_capabilities`, `parameters`) VALUES (@created_at, @dataobjectid, @task_name, @status, @required_capabilities, @parameters); SELECT LAST_INSERT_ID();", new Dictionary<string, object>
+            DataTable dt = Config.database.ExecuteCMD("INSERT INTO `Task_Queue` (`create_time`, `dataobjectid`, `task_name`, `status`, `required_capabilities`, `parameters`, `parent_task_id`) VALUES (@created_at, @dataobjectid, @task_name, @status, @required_capabilities, @parameters, @parent_task_id); SELECT LAST_INSERT_ID();", new Dictionary<string, object>
             {
                 { "@created_at", this._CreatedAt },
                 { "@dataobjectid", this._DataObjectId },
                 { "@task_name", (int)this._TaskName },
                 { "@status", (int)this.Status },
                 { "@required_capabilities", System.Text.Json.JsonSerializer.Serialize(this.RequiredCapabilities) },
-                { "@parameters", System.Text.Json.JsonSerializer.Serialize(this.Parameters) ?? "{}"}
+                { "@parameters", System.Text.Json.JsonSerializer.Serialize(this.Parameters) ?? "{}"},
+                { "@parent_task_id", this.ParentTaskId ?? (object)DBNull.Value }
             });
             foreach (Capabilities capability in requiredCapabilities)
             {
@@ -129,6 +131,11 @@ namespace hasheous_server.Models.Tasks
         public DateTime? CompletedAt { get; set; }
 
         /// <summary>
+        /// Gets or sets the identifier of the parent task, if any.
+        /// </summary>
+        public long? ParentTaskId { get; set; }
+
+        /// <summary>
         /// Resets transient runtime fields on the queue item so it can be re-queued or retried.
         /// </summary>
         public async Task Reset()
@@ -140,7 +147,13 @@ namespace hasheous_server.Models.Tasks
             this.StartedAt = null;
             this.CompletedAt = null;
 
-            this.Parameters = TaskManagement.BuildTaskParams(this.DataObjectId, this.TaskName);
+            this.Parameters = await TaskManagement.BuildTaskParams(this.DataObjectId, this.TaskName);
+
+            // reset all child tasks for this queue item
+            if (!this.ParentTaskId.HasValue)
+            {
+                TaskManagement.GetAllTasks().Where(task => task.ParentTaskId == this.Id).ToList().ForEach(async task => await task.Reset());
+            }
 
             switch (this.TaskName)
             {
@@ -189,6 +202,7 @@ namespace hasheous_server.Models.Tasks
             this.ErrorMessage = row.IsNull("error_message") ? null : row.Field<string>("error_message");
             this.StartedAt = row.IsNull("start_time") ? null : (DateTime?)row.Field<DateTime>("start_time");
             this.CompletedAt = row.IsNull("completion_time") ? null : (DateTime?)row.Field<DateTime>("completion_time");
+            this.ParentTaskId = row.IsNull("parent_task_id") ? null : (long?)row.Field<long>("parent_task_id");
 
             // Load required capabilities from the database
             DataTable capabilitiesDt = Config.database.ExecuteCMD("SELECT `capability_id` FROM `Task_Queue_Capabilities` WHERE `task_queue_id` = @task_queue_id", new Dictionary<string, object>
@@ -222,7 +236,7 @@ namespace hasheous_server.Models.Tasks
         /// </summary>
         public async Task Commit()
         {
-            await Config.database.ExecuteCMDAsync("UPDATE `Task_Queue` SET `status` = @status, `client_id` = @client_id, `parameters` = @parameters, `result` = @result, `error_message` = @error_message, `start_time` = @started_at, `completion_time` = @completed_at WHERE `id` = @id", new Dictionary<string, object>
+            await Config.database.ExecuteCMDAsync("UPDATE `Task_Queue` SET `status` = @status, `client_id` = @client_id, `parameters` = @parameters, `result` = @result, `error_message` = @error_message, `parent_task_id` = @parent_task_id, `start_time` = @started_at, `completion_time` = @completed_at WHERE `id` = @id", new Dictionary<string, object>
             {
                 { "@id", this.Id },
                 { "@status", this.Status },
@@ -231,7 +245,8 @@ namespace hasheous_server.Models.Tasks
                 { "@result", this.Result ?? (object)DBNull.Value },
                 { "@error_message", this.ErrorMessage ?? (object)DBNull.Value },
                 { "@started_at", this.StartedAt ?? (object)DBNull.Value },
-                { "@completed_at", this.CompletedAt?? (object)DBNull.Value }
+                { "@completed_at", this.CompletedAt?? (object)DBNull.Value },
+                { "@parent_task_id", this.ParentTaskId ?? (object)DBNull.Value }
             });
         }
     }
@@ -283,7 +298,17 @@ namespace hasheous_server.Models.Tasks
         /// <summary>
         /// Task for AI description generation and tagging.
         /// </summary>
-        AIDescriptionAndTagging = 0
+        AIDescriptionAndTagging = 0,
+
+        /// <summary>
+        /// Task for localisation generation.
+        /// </summary>
+        AILocalisationGeneration = 10,
+
+        /// <summary>
+        /// Task for regional localisation generation.
+        /// </summary>
+        AILocalisationGenerationRegional = 20
     }
 
     /// <summary>

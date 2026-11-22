@@ -16,4 +16,7 @@
   <ItemGroup>
     <ProjectReference Include="../hasheous-lib/hasheous-lib.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="localisation/*.json" />
+  </ItemGroup>
 </Project>

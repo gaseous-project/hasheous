@@ -36,7 +36,7 @@ namespace hasheous_server.Classes.Tasks.Clients
             var userRoles = userRolesTable.FindByUserId(user.Id);
             if (!userRoles.Contains("Task Runner"))
             {
-                throw new Exception("User does not have the required 'Task Runner' role.");
+                throw new UnauthorizedAccessException("User does not have the required 'Task Runner' role.");
             }
 
             // create new client
@@ -111,9 +111,6 @@ namespace hasheous_server.Classes.Tasks.Clients
         /// </remarks>
         public async static Task<ClientModel?> GetClientByAPIKeyAndPublicId(string clientAPIKey, string publicId)
         {
-            // create cache key
-            string cacheKey = hasheous.Classes.RedisConnection.GenerateKey("TaskWorkerAPIKeys", clientAPIKey + publicId);
-
             DataTable dt = await db.ExecuteCMDAsync("SELECT * FROM Task_Clients WHERE api_key = @api_key AND public_id = @public_id LIMIT 1;", new Dictionary<string, object>
             {
                 { "@api_key", clientAPIKey },
@@ -219,7 +216,7 @@ namespace hasheous_server.Classes.Tasks.Clients
             ClientModel? client = await GetClientByAPIKeyAndPublicId(clientAPIKey, publicId);
             if (client == null)
             {
-                throw new Exception("Invalid client API key or public ID.");
+                throw new ArgumentException("Invalid client API key or public ID.");
             }
             await client.Heartbeat();
         }
@@ -238,7 +235,7 @@ namespace hasheous_server.Classes.Tasks.Clients
             ClientModel? client = await GetClientByAPIKeyAndPublicId(clientAPIKey, publicId);
             if (client == null)
             {
-                throw new Exception("Invalid client API key or public ID.");
+                throw new ArgumentException("Invalid client API key or public ID.");
             }
 
             if (!string.IsNullOrEmpty(clientName))
@@ -277,7 +274,7 @@ namespace hasheous_server.Classes.Tasks.Clients
             ClientModel? client = await GetClientByAPIKeyAndPublicId(clientAPIKey, publicId);
             if (client == null)
             {
-                throw new Exception("Invalid client API key or public ID.");
+                throw new ArgumentException("Invalid client API key or public ID.");
             }
 
             // clients older than 1.1.0 expect a single task back
@@ -299,7 +296,7 @@ namespace hasheous_server.Classes.Tasks.Clients
             // Step 1: SELECT with FOR UPDATE SKIP LOCKED (locks the row)
             // Step 2: UPDATE the locked row to assign it
             // Both must happen in the same transaction!
-            string selectSql = @"SELECT tq.id AS id, tq.create_time AS create_time, tq.dataobjectid AS dataobjectid, tq.task_name AS task_name, tq.status AS status, tq.client_id AS client_id, tq.parameters AS parameters, tq.result AS result, tq.error_message AS error_message, tq.start_time AS start_time, tq.completion_time AS completion_time
+            string selectSql = @"SELECT tq.id AS id, tq.create_time AS create_time, tq.dataobjectid AS dataobjectid, tq.task_name AS task_name, tq.status AS status, tq.client_id AS client_id, tq.parameters AS parameters, tq.result AS result, tq.error_message AS error_message, tq.start_time AS start_time, tq.completion_time AS completion_time, tq.parent_task_id AS parent_task_id
                 FROM Task_Queue tq
                 LEFT JOIN Task_Queue_Capabilities tqc ON tq.id = tqc.task_queue_id
                 WHERE ((tq.status = 0 AND tq.client_id IS NULL) OR ((tq.status = 10 OR tq.status = 20) AND tq.client_id = @client_id))
@@ -308,6 +305,14 @@ namespace hasheous_server.Classes.Tasks.Clients
                     FROM Task_Queue_Capabilities tqc_required
                     WHERE tqc_required.task_queue_id = tq.id
                     AND tqc_required.capability_id NOT IN (" + string.Join(", ", client.Capabilities.Select(c => ((int)c).ToString())) + @")
+                )
+                AND (
+                    tq.parent_task_id IS NULL OR 
+                    EXISTS (
+                        SELECT 1 FROM Task_Queue parent_tq 
+                        WHERE parent_tq.id = tq.parent_task_id 
+                        AND parent_tq.status = " + (int)QueueItemStatus.Completed + @"
+                    )
                 )
                 GROUP BY tq.id
                 ORDER BY tq.create_time ASC
@@ -334,6 +339,14 @@ namespace hasheous_server.Classes.Tasks.Clients
                             FROM Task_Queue_Capabilities tqc_required
                             WHERE tqc_required.task_queue_id = tq.id
                             AND tqc_required.capability_id NOT IN (" + string.Join(", ", client.Capabilities.Select(c => ((int)c).ToString())) + @")
+                        )
+                        AND (
+                            tq.parent_task_id IS NULL OR 
+                            EXISTS (
+                                SELECT 1 FROM Task_Queue parent_tq 
+                                WHERE parent_tq.id = tq.parent_task_id 
+                                AND parent_tq.status = " + (int)QueueItemStatus.Completed + @"
+                            )
                         )
                         GROUP BY tq.id
                         ORDER BY tq.create_time ASC
@@ -411,17 +424,17 @@ namespace hasheous_server.Classes.Tasks.Clients
             ClientModel? client = await GetClientByAPIKeyAndPublicId(clientAPIKey, publicId);
             if (client == null)
             {
-                throw new Exception("Invalid client API key or public ID.");
+                throw new ArgumentException("Invalid client API key or public ID.");
             }
 
             QueueItemModel? task = TaskManagement.GetTask(long.Parse(taskId));
             if (task == null)
             {
-                throw new Exception("Task not found.");
+                throw new ArgumentException("Task not found.");
             }
             if (task.ClientId != client.Id)
             {
-                throw new Exception("Task is not assigned to this client.");
+                throw new ArgumentException("Task is not assigned to this client.");
             }
             task.Status = status;
             // task completedAt is used to denote the last time the status changed.
@@ -466,7 +479,7 @@ namespace hasheous_server.Classes.Tasks.Clients
             }
 
             // Extremely unlikely fallback
-            throw new Exception("Unable to generate a unique client API key after multiple attempts.");
+            throw new ArgumentException("Unable to generate a unique client API key after multiple attempts.");
         }
 
         private static async Task<Authentication.ApplicationUser> GetUserObjectFromAPIKey(string userAPIKey)
@@ -476,7 +489,7 @@ namespace hasheous_server.Classes.Tasks.Clients
             var user = await apiKeyAuth.GetUserFromApiKey(userAPIKey);
             if (user == null)
             {
-                throw new Exception("Invalid API Key");
+                throw new ArgumentException("Invalid API Key");
             }
 
             return user;
@@ -497,10 +510,11 @@ namespace hasheous_server.Classes.Tasks.Clients
         /// <param name="taskType">The type of the task to enqueue.</param>
         /// <param name="capabilities">A list of capabilities required to process the task.</param>
         /// <param name="parameters">A dictionary containing task-specific parameters.</param>
+        /// <param name="parentTaskId">The identifier of the parent task, if any.</param>
         /// <returns>The enqueued <see cref="QueueItemModel"/> instance.</returns>
-        public static QueueItemModel EnqueueTask(long dataObjectId, TaskType taskType, List<Capabilities> capabilities, Dictionary<string, string>? parameters)
+        public static QueueItemModel EnqueueTask(long dataObjectId, TaskType taskType, List<Capabilities> capabilities, Dictionary<string, string>? parameters, long? parentTaskId = null)
         {
-            QueueItemModel task = new QueueItemModel(dataObjectId, taskType, capabilities, parameters);
+            QueueItemModel task = new QueueItemModel(dataObjectId, taskType, capabilities, parameters, parentTaskId);
             return task;
         }
 
@@ -511,8 +525,9 @@ namespace hasheous_server.Classes.Tasks.Clients
         /// <param name="dataObjectId">The identifier of the associated data object.</param>
         /// <param name="taskType">The type of the task to enqueue.</param>
         /// <param name="parameters">Optional dictionary of task-specific parameters that may be modified or extended by the method.</param>
+        /// <param name="parentTaskId">The identifier of the parent task, if any.</param>
         /// <returns>The enqueued <see cref="QueueItemModel"/> instance.</returns>
-        public static QueueItemModel? EnqueueTask(long dataObjectId, TaskType taskType, Dictionary<string, string>? parameters = null)
+        public async static Task<QueueItemModel?> EnqueueTask(long dataObjectId, TaskType taskType, Dictionary<string, string>? parameters = null, long? parentTaskId = null)
         {
             // default capabilities to Internet and DiskSpace
             List<Capabilities> capabilities = new List<Capabilities>
@@ -530,7 +545,7 @@ namespace hasheous_server.Classes.Tasks.Clients
             {
                 case TaskType.AIDescriptionAndTagging:
                     capabilities.Add(Capabilities.AI);
-                    Dictionary<string, string>? aiParams = BuildTaskParams(dataObjectId, taskType, parameters);
+                    Dictionary<string, string>? aiParams = await BuildTaskParams(dataObjectId, taskType, parameters);
                     if (aiParams != null)
                     {
                         if (!aiParams.ContainsKey("prompt_description") || !aiParams.ContainsKey("prompt_tags") || !aiParams.ContainsKey("sources") ||
@@ -547,9 +562,29 @@ namespace hasheous_server.Classes.Tasks.Clients
                         return null;
                     }
                     break;
+
+                case TaskType.AILocalisationGeneration:
+                case TaskType.AILocalisationGenerationRegional:
+                    capabilities.Add(Capabilities.AI);
+                    Dictionary<string, string>? localisationParams = await BuildTaskParams(dataObjectId, taskType, parameters);
+                    if (localisationParams != null)
+                    {
+                        if (!localisationParams.ContainsKey("language") || String.IsNullOrEmpty(localisationParams["language"]))
+                        {
+                            // nothing to do
+                            return null;
+                        }
+                        parameters = localisationParams;
+                    }
+                    else
+                    {
+                        // nothing to do
+                        return null;
+                    }
+                    break;
             }
 
-            return EnqueueTask(dataObjectId, taskType, capabilities, parameters);
+            return EnqueueTask(dataObjectId, taskType, capabilities, parameters, parentTaskId);
         }
 
         /// <summary>
@@ -562,7 +597,7 @@ namespace hasheous_server.Classes.Tasks.Clients
             QueueItemModel? task = GetTask(taskId);
             if (task == null)
             {
-                throw new Exception("Task not found.");
+                throw new ArgumentException("Task not found.");
             }
             _ = task.Terminate();
         }
@@ -654,8 +689,33 @@ namespace hasheous_server.Classes.Tasks.Clients
             var task = GetTask(taskId);
             if (task == null)
             {
-                throw new Exception("Task not found.");
+                throw new ArgumentException("Task not found.");
             }
+
+            // If the task is being restarted (from Completed or Failed to another state), 
+            // we need to also reset its child tasks
+            bool isRestarting = (task.Status == QueueItemStatus.Completed || task.Status == QueueItemStatus.Failed) &&
+                               (status != QueueItemStatus.Completed && status != QueueItemStatus.Failed);
+
+            if (isRestarting)
+            {
+                // Reset all child tasks that depend on this task
+                DataTable childTasks = Config.database.ExecuteCMD(
+                    "SELECT id FROM `Task_Queue` WHERE `parent_task_id` = @parent_task_id AND `status` IN (@status1, @status2);",
+                    new Dictionary<string, object>
+                    {
+                        { "@parent_task_id", taskId },
+                        { "@status1", (int)QueueItemStatus.Completed },
+                        { "@status2", (int)QueueItemStatus.Failed }
+                    });
+
+                foreach (DataRow row in childTasks.Rows)
+                {
+                    long childTaskId = Convert.ToInt64(row["id"]);
+                    UpdateTaskStatus(childTaskId, QueueItemStatus.Pending);
+                }
+            }
+
             task.Status = status;
             if (result != null)
             {
@@ -668,11 +728,19 @@ namespace hasheous_server.Classes.Tasks.Clients
             _ = task.Commit();
         }
 
-        public static Dictionary<string, string>? BuildTaskParams(long dataObjectId, TaskType taskType, Dictionary<string, string>? parameters = null)
+        public async static Task<Dictionary<string, string>?> BuildTaskParams(long dataObjectId, TaskType taskType, Dictionary<string, string>? parameters = null)
         {
             if (parameters == null)
             {
                 parameters = new Dictionary<string, string>();
+            }
+
+            // get the data object
+            var dataObjects = new DataObjects();
+            var dataObject = await dataObjects.GetDataObject(dataObjectId);
+            if (dataObject == null)
+            {
+                throw new ArgumentException("Data object not found.");
             }
 
             switch (taskType)
@@ -685,14 +753,6 @@ namespace hasheous_server.Classes.Tasks.Clients
                     string prompt_description = "";
                     string prompt_tags = "";
 
-                    // get the data object for use in prompt generation
-                    var dataObjects = new DataObjects();
-                    var dataObject = dataObjects.GetDataObject(dataObjectId).Result;
-                    if (dataObject == null)
-                    {
-                        throw new Exception("Data object not found.");
-                    }
-
                     // supply the sources and prompts based on data object type
                     switch (dataObject.ObjectType)
                     {
@@ -702,14 +762,14 @@ namespace hasheous_server.Classes.Tasks.Clients
                             {
                                 using (StreamReader reader = new StreamReader(stream))
                                 {
-                                    prompt_description = reader.ReadToEnd();
+                                    prompt_description = await reader.ReadToEndAsync();
                                 }
                             }
                             using (Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("hasheous_lib.Support.AIGameTagPrompt.txt"))
                             {
                                 using (StreamReader reader = new StreamReader(stream))
                                 {
-                                    prompt_tags = reader.ReadToEnd();
+                                    prompt_tags = await reader.ReadToEndAsync();
                                 }
                             }
 
@@ -758,47 +818,38 @@ namespace hasheous_server.Classes.Tasks.Clients
                                     {
                                         case Metadata.Communications.MetadataSources.IGDB:
                                             sql = "SELECT `summary` FROM `igdb`.`games` WHERE `id` = @id LIMIT 1;";
-                                            dt = Config.database.ExecuteCMD(sql, new Dictionary<string, object>
+                                            dt = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object>
                                             {
                                                 { "@id", metadataItem.ImmutableId}
                                             });
-                                            if (dt.Rows.Count > 0)
+                                            if (dt.Rows.Count > 0 && dt.Rows[0]["summary"] != DBNull.Value && dt.Rows[0]["summary"].ToString() != "")
                                             {
-                                                if (dt.Rows[0]["summary"] != DBNull.Value && dt.Rows[0]["summary"].ToString() != "")
-                                                {
-                                                    parameters.Add("Source_IGDB", dt.Rows[0]["summary"].ToString() ?? "");
-                                                    parameters["sources"] += "IGDB; ";
-                                                }
+                                                parameters.Add("Source_IGDB", dt.Rows[0]["summary"].ToString() ?? "");
+                                                parameters["sources"] += "IGDB; ";
                                             }
                                             break;
                                         case Metadata.Communications.MetadataSources.TheGamesDb:
                                             sql = "SELECT `overview` FROM `thegamesdb`.`games` WHERE `id` = @id LIMIT 1;";
-                                            dt = Config.database.ExecuteCMD(sql, new Dictionary<string, object>
+                                            dt = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object>
                                             {
                                                 { "@id", metadataItem.ImmutableId}
                                             });
-                                            if (dt.Rows.Count > 0)
+                                            if (dt.Rows.Count > 0 && dt.Rows[0]["overview"] != DBNull.Value && dt.Rows[0]["overview"].ToString() != "")
                                             {
-                                                if (dt.Rows[0]["overview"] != DBNull.Value && dt.Rows[0]["overview"].ToString() != "")
-                                                {
-                                                    parameters.Add("Source_TheGamesDb", dt.Rows[0]["overview"].ToString() ?? "");
-                                                    parameters["sources"] += "TheGamesDb; ";
-                                                }
+                                                parameters.Add("Source_TheGamesDb", dt.Rows[0]["overview"].ToString() ?? "");
+                                                parameters["sources"] += "TheGamesDb; ";
                                             }
                                             break;
                                         case Metadata.Communications.MetadataSources.GiantBomb:
                                             sql = "SELECT `description` FROM `giantbomb`.`Game` WHERE `id` = @id LIMIT 1;";
-                                            dt = Config.database.ExecuteCMD(sql, new Dictionary<string, object>
+                                            dt = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object>
                                             {
                                                 { "@id", metadataItem.ImmutableId}
                                             });
-                                            if (dt.Rows.Count > 0)
+                                            if (dt.Rows.Count > 0 && dt.Rows[0]["description"] != DBNull.Value && dt.Rows[0]["description"].ToString() != "")
                                             {
-                                                if (dt.Rows[0]["description"] != DBNull.Value && dt.Rows[0]["description"].ToString() != "")
-                                                {
-                                                    parameters.Add("Source_GiantBomb", dt.Rows[0]["description"].ToString() ?? "");
-                                                    parameters["sources"] += "GiantBomb; ";
-                                                }
+                                                parameters.Add("Source_GiantBomb", dt.Rows[0]["description"].ToString() ?? "");
+                                                parameters["sources"] += "GiantBomb; ";
                                             }
                                             break;
                                         case Metadata.Communications.MetadataSources.Wikipedia:
@@ -816,17 +867,14 @@ namespace hasheous_server.Classes.Tasks.Clients
                                             break;
                                         case Metadata.Communications.MetadataSources.LaunchBox:
                                             sql = "SELECT `Overview` FROM `launchbox`.`Game` WHERE `DatabaseID` = @id LIMIT 1;";
-                                            dt = Config.database.ExecuteCMD(sql, new Dictionary<string, object>
+                                            dt = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object>
                                             {
                                                 { "@id", metadataItem.ImmutableId }
                                             });
-                                            if (dt.Rows.Count > 0)
+                                            if (dt.Rows.Count > 0 && dt.Rows[0]["Overview"] != DBNull.Value && dt.Rows[0]["Overview"].ToString() != "")
                                             {
-                                                if (dt.Rows[0]["Overview"] != DBNull.Value && dt.Rows[0]["Overview"].ToString() != "")
-                                                {
-                                                    parameters.Add("Source_LaunchBox", dt.Rows[0]["Overview"].ToString() ?? "");
-                                                    parameters["sources"] += "LaunchBox; ";
-                                                }
+                                                parameters.Add("Source_LaunchBox", dt.Rows[0]["Overview"].ToString() ?? "");
+                                                parameters["sources"] += "LaunchBox; ";
                                             }
                                             break;
                                     }
@@ -845,14 +893,14 @@ namespace hasheous_server.Classes.Tasks.Clients
                             {
                                 using (StreamReader reader = new StreamReader(stream))
                                 {
-                                    prompt_description = reader.ReadToEnd();
+                                    prompt_description = await reader.ReadToEndAsync();
                                 }
                             }
                             using (Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("hasheous_lib.Support.AIPlatformTagPrompt.txt"))
                             {
                                 using (StreamReader reader = new StreamReader(stream))
                                 {
-                                    prompt_tags = reader.ReadToEnd();
+                                    prompt_tags = await reader.ReadToEndAsync();
                                 }
                             }
 
@@ -870,49 +918,38 @@ namespace hasheous_server.Classes.Tasks.Clients
                                     {
                                         case Metadata.Communications.MetadataSources.IGDB:
                                             sql = "SELECT `summary` FROM `igdb`.`platforms` WHERE `id` = @id LIMIT 1;";
-                                            dt = Config.database.ExecuteCMD(sql, new Dictionary<string, object>
+                                            dt = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object>
                                             {
                                                 { "@id", metadataItem.ImmutableId}
                                             });
-                                            if (dt.Rows.Count > 0)
+                                            if (dt.Rows.Count > 0 && dt.Rows[0]["summary"] != DBNull.Value && dt.Rows[0]["summary"].ToString() != "")
                                             {
-                                                if (dt.Rows[0]["summary"] != DBNull.Value && dt.Rows[0]["summary"].ToString() != "")
-                                                {
-                                                    {
-                                                        parameters.Add("Source_IGDB", dt.Rows[0]["summary"].ToString() ?? "");
-                                                        parameters["sources"] += "IGDB; ";
-                                                    }
-                                                }
+                                                parameters.Add("Source_IGDB", dt.Rows[0]["summary"].ToString() ?? "");
+                                                parameters["sources"] += "IGDB; ";
                                             }
                                             break;
                                         case Metadata.Communications.MetadataSources.TheGamesDb:
                                             sql = "SELECT `overview` FROM `thegamesdb`.`platforms` WHERE `id` = @id LIMIT 1;";
-                                            dt = Config.database.ExecuteCMD(sql, new Dictionary<string, object>
+                                            dt = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object>
                                             {
                                                 { "@id", metadataItem.ImmutableId}
                                             });
-                                            if (dt.Rows.Count > 0)
+                                            if (dt.Rows.Count > 0 && dt.Rows[0]["overview"] != DBNull.Value && dt.Rows[0]["overview"].ToString() != "")
                                             {
-                                                if (dt.Rows[0]["overview"] != DBNull.Value && dt.Rows[0]["overview"].ToString() != "")
-                                                {
-                                                    parameters.Add("Source_TheGamesDb", dt.Rows[0]["overview"].ToString() ?? "");
-                                                    parameters["sources"] += "TheGamesDb; ";
-                                                }
+                                                parameters.Add("Source_TheGamesDb", dt.Rows[0]["overview"].ToString() ?? "");
+                                                parameters["sources"] += "TheGamesDb; ";
                                             }
                                             break;
                                         case Metadata.Communications.MetadataSources.GiantBomb:
                                             sql = "SELECT `description` FROM `giantbomb`.`Platform` WHERE `id` = @id LIMIT 1;";
-                                            dt = Config.database.ExecuteCMD(sql, new Dictionary<string, object>
+                                            dt = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object>
                                             {
                                                 { "@id", metadataItem.ImmutableId}
                                             });
-                                            if (dt.Rows.Count > 0)
+                                            if (dt.Rows.Count > 0 && dt.Rows[0]["description"] != DBNull.Value && dt.Rows[0]["description"].ToString() != "")
                                             {
-                                                if (dt.Rows[0]["description"] != DBNull.Value && dt.Rows[0]["description"].ToString() != "")
-                                                {
-                                                    parameters.Add("Source_GiantBomb", dt.Rows[0]["description"].ToString() ?? "");
-                                                    parameters["sources"] += "GiantBomb; ";
-                                                }
+                                                parameters.Add("Source_GiantBomb", dt.Rows[0]["description"].ToString() ?? "");
+                                                parameters["sources"] += "GiantBomb; ";
                                             }
                                             break;
                                         case Metadata.Communications.MetadataSources.Wikipedia:
@@ -938,17 +975,14 @@ namespace hasheous_server.Classes.Tasks.Clients
                                             // remove the first item which is the id, and rejoin the rest (replacing the dashes with spaces) to get the slug
                                             string slug = string.Join(" ", parts.Skip(1));
                                             sql = "SELECT `Notes` FROM `launchbox`.`Platform` WHERE `Name` = @slug LIMIT 1;";
-                                            dt = Config.database.ExecuteCMD(sql, new Dictionary<string, object>
+                                            dt = await Config.database.ExecuteCMDAsync(sql, new Dictionary<string, object>
                                             {
                                                 { "@slug", slug }
                                             });
-                                            if (dt.Rows.Count > 0)
+                                            if (dt.Rows.Count > 0 && dt.Rows[0]["Notes"] != DBNull.Value && dt.Rows[0]["Notes"].ToString() != "")
                                             {
-                                                if (dt.Rows[0]["Notes"] != DBNull.Value && dt.Rows[0]["Notes"].ToString() != "")
-                                                {
-                                                    parameters.Add("Source_LaunchBox", dt.Rows[0]["Notes"].ToString() ?? "");
-                                                    parameters["sources"] += "LaunchBox; ";
-                                                }
+                                                parameters.Add("Source_LaunchBox", dt.Rows[0]["Notes"].ToString() ?? "");
+                                                parameters["sources"] += "LaunchBox; ";
                                             }
                                             break;
                                     }
@@ -964,6 +998,16 @@ namespace hasheous_server.Classes.Tasks.Clients
                         default:
                             break;
                     }
+                    break;
+
+                case TaskType.AILocalisationGeneration:
+                case TaskType.AILocalisationGenerationRegional:
+                    // both of these task types are handled similarly for localisation generation
+                    if (!parameters.ContainsKey("language"))
+                    {
+                        parameters["language"] = dataObject.Name;
+                    }
+
                     break;
             }
 
@@ -1066,7 +1110,7 @@ namespace hasheous_server.Classes.Tasks.Clients
                     htmlDoc.LoadHtml(content);
 
                     // remove all images - images are in "figure" elements
-                    var figureNodes = htmlDoc.DocumentNode.SelectNodes("//figure"); ;
+                    var figureNodes = htmlDoc.DocumentNode.SelectNodes("//figure");
                     if (figureNodes != null)
                     {
                         foreach (var figureNode in figureNodes)
@@ -1115,7 +1159,7 @@ namespace hasheous_server.Classes.Tasks.Clients
 
                     if (infoboxNode != null)
                     {
-                        var firstSection = infoboxNode.ParentNode; ;
+                        var firstSection = infoboxNode.ParentNode;
                         if (firstSection != null)
                         {
                             var nodesToRemove = new List<HtmlAgilityPack.HtmlNode>();
@@ -1135,7 +1179,7 @@ namespace hasheous_server.Classes.Tasks.Clients
                     }
 
                     // remove all superscript elements - these are used for citations
-                    var superscriptNodes = htmlDoc.DocumentNode.SelectNodes("//sup"); ;
+                    var superscriptNodes = htmlDoc.DocumentNode.SelectNodes("//sup");
                     if (superscriptNodes != null)
                     {
                         foreach (var supNode in superscriptNodes)
@@ -1145,7 +1189,7 @@ namespace hasheous_server.Classes.Tasks.Clients
                     }
 
                     // convert all links to plain text - links are "a" elements
-                    var linkNodes = htmlDoc.DocumentNode.SelectNodes("//a"); ;
+                    var linkNodes = htmlDoc.DocumentNode.SelectNodes("//a");
                     if (linkNodes != null)
                     {
                         foreach (var linkNode in linkNodes)
@@ -1172,7 +1216,7 @@ namespace hasheous_server.Classes.Tasks.Clients
                     // replace h1-h6 tags with their inner text prefixed with "#" corresponding to their level and suffixed with double newlines
                     for (int i = 1; i <= 6; i++)
                     {
-                        var headerNodes = htmlDoc.DocumentNode.SelectNodes($"//h{i}"); ;
+                        var headerNodes = htmlDoc.DocumentNode.SelectNodes($"//h{i}");
                         if (headerNodes != null)
                         {
                             foreach (var headerNode in headerNodes)
@@ -1184,7 +1228,7 @@ namespace hasheous_server.Classes.Tasks.Clients
                     }
 
                     // replace br tags with single newlines
-                    var brNodes = htmlDoc.DocumentNode.SelectNodes("//br"); ;
+                    var brNodes = htmlDoc.DocumentNode.SelectNodes("//br");
                     if (brNodes != null)
                     {
                         foreach (var brNode in brNodes)
@@ -1206,7 +1250,7 @@ namespace hasheous_server.Classes.Tasks.Clients
                     }
 
                     // replace li tags with "- " prefix and single newline suffix
-                    var liNodes = htmlDoc.DocumentNode.SelectNodes("//li"); ;
+                    var liNodes = htmlDoc.DocumentNode.SelectNodes("//li");
                     if (liNodes != null)
                     {
                         foreach (var liNode in liNodes)
@@ -1217,7 +1261,7 @@ namespace hasheous_server.Classes.Tasks.Clients
                     }
 
                     // replace i tags with "*" prefix and suffix
-                    var iNodes = htmlDoc.DocumentNode.SelectNodes("//i"); ;
+                    var iNodes = htmlDoc.DocumentNode.SelectNodes("//i");
                     if (iNodes != null)
                     {
                         foreach (var iNode in iNodes)
@@ -1250,7 +1294,7 @@ namespace hasheous_server.Classes.Tasks.Clients
                     }
 
                     // replace all code tags with "`" prefix and suffix
-                    var codeNodes = htmlDoc.DocumentNode.SelectNodes("//code"); ;
+                    var codeNodes = htmlDoc.DocumentNode.SelectNodes("//code");
                     if (codeNodes != null)
                     {
                         foreach (var codeNode in codeNodes)
@@ -1261,7 +1305,7 @@ namespace hasheous_server.Classes.Tasks.Clients
                     }
 
                     // replace all pre tags with "```" prefix and suffix
-                    var preNodes = htmlDoc.DocumentNode.SelectNodes("//pre"); ;
+                    var preNodes = htmlDoc.DocumentNode.SelectNodes("//pre");
                     if (preNodes != null)
                     {
                         foreach (var preNode in preNodes)
@@ -1272,7 +1316,7 @@ namespace hasheous_server.Classes.Tasks.Clients
                     }
 
                     // replace all remaining tags with their inner text
-                    var allNodes = htmlDoc.DocumentNode.SelectNodes("//*"); ;
+                    var allNodes = htmlDoc.DocumentNode.SelectNodes("//*");
                     if (allNodes != null)
                     {
                         foreach (var node in allNodes)
