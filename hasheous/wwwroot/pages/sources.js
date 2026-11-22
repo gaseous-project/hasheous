@@ -27,7 +27,21 @@ function loadSourceCounts() {
             if (lang.getLang(key + 'homepage')) {
                 let homepage = document.createElement('div');
                 homepage.classList.add('source-homepage');
-                homepage.innerHTML = lang.getLang('homepage') + '<br /><a href="' + lang.getLang(key + 'homepage', [], true) + '" target="_blank" rel="noopener noreferrer">' + lang.getLang(key + 'homepage') + '<img src="/images/link.svg" class="linkicon"></a>';
+                homepage.innerHTML = lang.getLang('homepage') + '<br />';
+                const homepageUrl = lang.getLang(key + 'homepage', [], true);
+                const homepageLink = document.createElement('a');
+                if (isSafeUrl(homepageUrl)) {
+                    homepageLink.href = homepageUrl;
+                }
+                homepageLink.target = '_blank';
+                homepageLink.rel = 'noopener noreferrer';
+                homepageLink.textContent = homepageUrl;
+                const linkIcon = document.createElement('img');
+                linkIcon.src = '/images/link.svg';
+                linkIcon.className = 'linkicon';
+                linkIcon.alt = '';
+                homepageLink.appendChild(linkIcon);
+                homepage.appendChild(homepageLink);
                 sourceBox.appendChild(homepage);
             }
 
