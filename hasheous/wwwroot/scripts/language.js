@@ -54,7 +54,11 @@ class language {
         console.log("Browser locale: " + this.locale);
 
         // load language list from the server (languages.json)
-        this.languages = await $.getJSON('/localisation/languages.json');
+        try {
+            this.languages = await $.getJSON('/localisation/languages.json');
+        } catch (e) {
+            console.error("Failed to load languages list:", e);
+        }
 
         // loading default language file - this is always en as it's always the most complete
         try {
@@ -98,7 +102,7 @@ class language {
             console.warn("No language files loaded for locale: " + this.locale + ". Falling back to default language (en).");
         }
 
-        if (!this.languageBase || !this.languageRegion) {
+        if ((!this.languageBase || (!this.languageRegion && localisation)) && this.locale != "en") {
             // place request for language matching the locale
             try {
                 await $.getJSON('/localisation/request/' + this.locale + '.json');
@@ -112,6 +116,8 @@ class language {
         console.log(this.languageDefault);
 
         console.log("Selected language: " + this.selectedLocale);
+
+        document.documentElement.lang = this.selectedLocale;
 
         this.applyLanguage();
     }

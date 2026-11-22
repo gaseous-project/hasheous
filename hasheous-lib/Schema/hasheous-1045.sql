@@ -11,7 +11,7 @@ CREATE TABLE `localisation_languages` (
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    KEY `idx_localisation_languages_code` (`FullCode`)
+    UNIQUE KEY `idx_localisation_languages_code` (`FullCode`)
 );
 
 CREATE TABLE `localisation_strings` (

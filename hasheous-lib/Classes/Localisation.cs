@@ -399,11 +399,27 @@ namespace hasheous_server.Classes
             else
             {
                 // Reset localisation tasks for the specified locale and child locales
-                TaskManagement.GetAllTasks().Where(task => (task.TaskName == Models.Tasks.TaskType.AILocalisationGeneration || task.TaskName == Models.Tasks.TaskType.AILocalisationGenerationRegional) && task.Parameters != null && task.Parameters.ContainsKey("language") && task.Parameters["language"] == locale.Split("-")[0]).ToList().ForEach(async task => await task.Reset());
+                // get all tasks that start with the specified locale
+                var tasks = TaskManagement.GetAllTasks().Where(task => (task.TaskName == Models.Tasks.TaskType.AILocalisationGeneration || task.TaskName == Models.Tasks.TaskType.AILocalisationGenerationRegional) && task.Parameters != null && task.Parameters.ContainsKey("language") && task.Parameters["language"] == locale.Split("-")[0]).ToList();
+
+                // get the culture for the requested locale
+                var culture = new System.Globalization.CultureInfo(locale);
+
+                // if locale is the parent language, reset all child tasks for this language
+                if (locale.ToLowerInvariant() == culture.TwoLetterISOLanguageName)
+                {
+                    foreach (var task in tasks)
+                    {
+                        if (task.Parameters != null && task.Parameters["language"] != null && task.Parameters["language"] != culture.TwoLetterISOLanguageName)
+                        {
+                            await task.Reset();
+                        }
+                    }
+                }
             }
         }
 
-        private static LocalisationItem ConvertStringsToTranslationItem(LocalisationItem localisationItem)
+        public static LocalisationItem ConvertStringsToTranslationItem(LocalisationItem localisationItem)
         {
             localisationItem.Translations = new Dictionary<string, LocalisationItem.TranslationItem>();
             foreach (var kvp in localisationItem.Strings)

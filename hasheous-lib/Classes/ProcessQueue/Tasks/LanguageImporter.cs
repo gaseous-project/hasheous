@@ -35,6 +35,9 @@ namespace Classes.ProcessQueue
                             continue;
                         }
 
+                        // convert any plain strings to translation items
+                        item = Localisation.ConvertStringsToTranslationItem(item);
+
                         // import the localisation item into the database
                         await Localisation.ImportLocalisationFileAsync(item);
 

@@ -52,7 +52,7 @@ namespace hasheous_server.Models.Tasks
                 { "@status", (int)this.Status },
                 { "@required_capabilities", System.Text.Json.JsonSerializer.Serialize(this.RequiredCapabilities) },
                 { "@parameters", System.Text.Json.JsonSerializer.Serialize(this.Parameters) ?? "{}"},
-                { "@parent_task_id", this.ParentTaskId }
+                { "@parent_task_id", this.ParentTaskId ?? (object)DBNull.Value }
             });
             foreach (Capabilities capability in requiredCapabilities)
             {
@@ -149,6 +149,12 @@ namespace hasheous_server.Models.Tasks
 
             this.Parameters = await TaskManagement.BuildTaskParams(this.DataObjectId, this.TaskName);
 
+            // reset all child tasks for this queue item
+            if (!this.ParentTaskId.HasValue)
+            {
+                TaskManagement.GetAllTasks().Where(task => task.ParentTaskId == this.Id).ToList().ForEach(async task => await task.Reset());
+            }
+
             switch (this.TaskName)
             {
                 case TaskType.AIDescriptionAndTagging:
@@ -196,6 +202,7 @@ namespace hasheous_server.Models.Tasks
             this.ErrorMessage = row.IsNull("error_message") ? null : row.Field<string>("error_message");
             this.StartedAt = row.IsNull("start_time") ? null : (DateTime?)row.Field<DateTime>("start_time");
             this.CompletedAt = row.IsNull("completion_time") ? null : (DateTime?)row.Field<DateTime>("completion_time");
+            this.ParentTaskId = row.IsNull("parent_task_id") ? null : (long?)row.Field<long>("parent_task_id");
 
             // Load required capabilities from the database
             DataTable capabilitiesDt = Config.database.ExecuteCMD("SELECT `capability_id` FROM `Task_Queue_Capabilities` WHERE `task_queue_id` = @task_queue_id", new Dictionary<string, object>
@@ -229,7 +236,7 @@ namespace hasheous_server.Models.Tasks
         /// </summary>
         public async Task Commit()
         {
-            await Config.database.ExecuteCMDAsync("UPDATE `Task_Queue` SET `status` = @status, `client_id` = @client_id, `parameters` = @parameters, `result` = @result, `error_message` = @error_message, `start_time` = @started_at, `completion_time` = @completed_at WHERE `id` = @id", new Dictionary<string, object>
+            await Config.database.ExecuteCMDAsync("UPDATE `Task_Queue` SET `status` = @status, `client_id` = @client_id, `parameters` = @parameters, `result` = @result, `error_message` = @error_message, `parent_task_id` = @parent_task_id, `start_time` = @started_at, `completion_time` = @completed_at WHERE `id` = @id", new Dictionary<string, object>
             {
                 { "@id", this.Id },
                 { "@status", this.Status },
@@ -238,7 +245,8 @@ namespace hasheous_server.Models.Tasks
                 { "@result", this.Result ?? (object)DBNull.Value },
                 { "@error_message", this.ErrorMessage ?? (object)DBNull.Value },
                 { "@started_at", this.StartedAt ?? (object)DBNull.Value },
-                { "@completed_at", this.CompletedAt?? (object)DBNull.Value }
+                { "@completed_at", this.CompletedAt?? (object)DBNull.Value },
+                { "@parent_task_id", this.ParentTaskId ?? (object)DBNull.Value }
             });
         }
     }

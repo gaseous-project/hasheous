@@ -209,7 +209,7 @@ namespace Classes.ProcessQueue
                                 {
                                     hasheous_server.Models.LocalisationItem? localisationItem = Newtonsoft.Json.JsonConvert.DeserializeObject<hasheous_server.Models.LocalisationItem>(aiTranslationResults["translated"] ?? "");
 
-                                    if (localisationItem != null)
+                                    if (localisationItem != null && !string.IsNullOrEmpty(localisationItem.FullCode) && localisationItem.FullCode.ToLowerInvariant() == taskItem.Parameters["language"].ToString().ToLowerInvariant() && localisationItem.Translations != null && localisationItem.Translations.Count > 0)
                                     {
                                         // start the import process
                                         await hasheous_server.Classes.Localisation.ImportLocalisationFileAsync(localisationItem);
